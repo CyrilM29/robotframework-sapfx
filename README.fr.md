@@ -24,6 +24,22 @@ Ce dépôt n'héberge **que les artefacts de release** — le **pack de
 déploiement Windows** autonome. Le code source vit dans un dépôt privé ;
 accès sur demande : <cyril@montiel.me>.
 
+## Démo
+
+![Démo live : un localisateur périmé réparé sur un vrai système SAP, jusqu'au patch resources/](demo/healing-live.gif)
+
+Tout ce qui précède est **réel** : écrans capturés sur un système live (ABAP
+Platform Trial A4H) pendant que la bibliothèque le pilote — localisateur
+périmé réparé en plein run (score 97 %), vrai comptage SE16, vrai rapport de
+dérive, patch `resources/` d'une ligne. Le healing n'est jamais silencieux :
+un WARNING au runtime devient une télémétrie cumulée, que le script de rapport
+de dérive transforme en proposition de patch — les tests métier ne sont
+jamais touchés.
+
+▶️ **[Voir la vidéo de démo complète](demo/healing-live.mp4)** — un screencast
+de 30 secondes du SAP GUI piloté en direct (transaction tapée, healing, popup
+de comptage réel, grille ALV), avec le rapport de dérive et le patch appliqué.
+
 ## Téléchargement
 
 Récupérez `sapfx-pack-<version>-win.zip` depuis la page

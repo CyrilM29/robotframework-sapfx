@@ -22,6 +22,21 @@ This repository hosts **only the release artifacts** — the self-contained
 **Windows deployment pack**. The source code lives in a private repository;
 access on request: <cyril@montiel.me>.
 
+## Demo
+
+![Live demo: a stale locator healed against a real SAP system, down to the resources patch](demo/healing-live.gif)
+
+Everything above is **real**: screens captured on a live system (ABAP Platform
+Trial A4H) while the library drives it — a stale locator healed mid-run
+(score 97 %), the real SE16 count, the real drift report, the one-line
+`resources/` patch. Healing is never silent: a runtime WARNING becomes
+cumulative telemetry, which the drift-report script turns into a patch
+proposal — business tests are never touched.
+
+▶️ **[Watch the full demo video](demo/healing-live.mp4)** — a 30-second
+screencast of SAP GUI driven live (transaction typed, healing, real count
+popup, ALV grid), with the drift report and the applied patch.
+
 ## Download
 
 Get `sapfx-pack-<version>-win.zip` from the [Releases](../../releases) page.
