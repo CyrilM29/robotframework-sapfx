@@ -45,6 +45,15 @@ de comptage réel, grille ALV), avec le rapport de dérive et le patch appliqué
 Récupérez `sapfx-pack-<version>-win.zip` depuis la page
 [Releases](../../releases).
 
+## Politique de support
+
+Seule la **dernière release** est supportée et reçoit les correctifs. Les
+releases antérieures restent disponibles pour la reproductibilité — les notes
+de chaque release publient le SHA-256 du pack, un poste de test provisionné
+peut donc toujours re-télécharger exactement le ZIP qui l'a installé — mais
+les corrections vont toujours de l'avant, jamais en rétroportage. Quand une
+release dépassée a un défaut connu, il est annoté en tête de ses notes.
+
 ## Installation (résumé)
 
 1. Dézippez sur le PC Windows cible (Python 3.10+ sur le `PATH`).
