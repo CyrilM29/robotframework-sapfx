@@ -41,6 +41,15 @@ popup, ALV grid), with the drift report and the applied patch.
 
 Get `sapfx-pack-<version>-win.zip` from the [Releases](../../releases) page.
 
+## Support policy
+
+Only the **latest release** is supported and receives fixes. Older releases
+stay available for reproducibility — each release's notes print the pack's
+SHA-256, so a provisioned test PC can always re-download the exact ZIP it was
+installed from — but issues are fixed forward, never back-ported. When a
+superseded release has a known issue, it is annotated at the top of its
+release notes.
+
 ## Install (summary)
 
 1. Unzip on the target Windows PC (Python 3.10+ on the `PATH`).
