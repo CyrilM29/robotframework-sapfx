@@ -1,5 +1,9 @@
 > **🇬🇧 English** · [🇫🇷 Français](README.fr.md)
 
+<p align="center">
+  <img src="assets/logo.png" alt="SAPFX — ECC UI5 API Library &amp; Recorder" width="200">
+</p>
+
 # SAPFX — releases
 
 Public distribution point for **SAPFX**, a SAP test-automation ecosystem for
