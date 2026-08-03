@@ -1,0 +1,64 @@
+# Publication PyPI par Trusted Publishing (OIDC) — aucun token stocké.
+# Prérequis (une fois, côté pypi.org → projet robotframework-sapfx →
+# Publishing) : ajouter un « GitHub publisher » owner=CyrilM29,
+# repository=robotframework-sapfx, workflow=pypi-publish.yml, environment=pypi.
+# Déclenchement : publication d'une GitHub Release (ou lancement manuel).
+# Le README poussé sur PyPI est la variante SANS le banner EN/FR (lien
+# relatif, cassé là-bas) — même règle que l'outillage d'export.
+name: pypi-publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write # OIDC : c'est l'identité du workflow qui authentifie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Release tag must match pyproject version
+        if: github.event_name == 'release'
+        run: |
+          python - <<'EOF'
+          import os, re, sys
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          text = open("pyproject.toml", encoding="utf-8").read()
+          version = re.search(r'^version = "([^"]+)"', text, re.M).group(1)
+          if tag != version:
+              sys.exit(f"tag {tag} != pyproject version {version}")
+          print(f"version {version} OK")
+          EOF
+
+      - name: Strip the EN/FR banner from README (relative link, broken on PyPI)
+        run: |
+          python - <<'EOF'
+          import pathlib, sys
+          p = pathlib.Path("README.md")
+          text = p.read_text(encoding="utf-8")
+          banner = "> **\U0001F1EC\U0001F1E7 English** · [\U0001F1EB\U0001F1F7 Français](README.fr.md)\n\n"
+          if banner not in text:
+              sys.exit("banner EN/FR introuvable dans README.md")
+          p.write_text(text.replace(banner, "", 1), encoding="utf-8")
+          print("README PyPI OK")
+          EOF
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --quiet build
+          python -m build
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

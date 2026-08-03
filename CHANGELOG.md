@@ -24,6 +24,11 @@ name that was current at the time).
   (binaries included, per-file justified tolerances) + a PyPI README variant
   (no relative EN/FR banner). The script is itself excluded from the export;
   its unit tests ship and skip cleanly on the public tree.
+- **PyPI Trusted Publishing workflow** — `.github/workflows/pypi-publish.yml`
+  (OIDC, `pypi` environment, no stored token): triggered by a GitHub Release
+  on the public repo (or manually), guards tag == pyproject version, strips
+  the EN/FR banner from the README (relative link, broken on PyPI), builds
+  and publishes sdist + wheel.
 - **Project presentation video published** — `docs/media/
   sapfx-project-presentation.mp4` (3 min 20) ships in the public repo and is
   the video linked from the READMEs (GitHub and PyPI), replacing the 30-second
