@@ -50,7 +50,9 @@ healing n'est jamais silencieux. Un WARNING devient une télémétrie cumulée,
 puis `scripts/healing_drift_report.py` localise le patch à faire dans
 `resources/` sans modifier les tests métier.
 
-▶️ **[Voir la vidéo de présentation du projet](https://github.com/CyrilM29/robotframework-sapfx/blob/main/docs/media/sapfx-project-presentation.mp4)** —
+https://github.com/user-attachments/assets/0a471849-30a9-47f5-a48c-7071b16be8fb
+
+
 3 min 20 : VS Code et les keywords métier, puis SAP GUI, Fiori et le canal API
 pilotés en direct, et un agent MCP qui génère une suite depuis une vraie session.
 
