@@ -14,8 +14,9 @@ Non-negotiable conventions: tests contain no raw SAP ids or CSS/XPath
 condition-based waits; assertions are locale-independent (message *types*,
 never localized texts); every keyword has an off-SAP unit test (fake COM /
 fake Browser); ambiguity is always surfaced with candidates, never resolved
-by silent first match. Distribution is a self-contained Windows deployment
-pack (no PyPI).
+by silent first match. Distribution: `pip install robotframework-sapfx`
+(PyPI), a self-contained Windows deployment pack (GitHub Releases), and the
+public source repo <https://github.com/CyrilM29/robotframework-sapfx>.
 
 ## Docs
 
