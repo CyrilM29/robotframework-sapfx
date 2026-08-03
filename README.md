@@ -48,7 +48,11 @@ runtime WARNING becomes cumulative telemetry, then
 `scripts/healing_drift_report.py` locates the patch to make in `resources/`
 without changing business tests.
 
-▶️ **[Watch the project presentation video](https://github.com/CyrilM29/robotframework-sapfx/blob/main/docs/media/sapfx-project-presentation.mp4)** —
+
+
+https://github.com/user-attachments/assets/0a471849-30a9-47f5-a48c-7071b16be8fb
+
+
 3 min 20: VS Code and the business keywords, then SAP GUI, Fiori and the API
 channel driven live, and an MCP agent generating a suite from a real session.
 
