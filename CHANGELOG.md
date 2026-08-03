@@ -5,6 +5,35 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3 — entries below keep the
 name that was current at the time).
 
+## [Unreleased]
+
+### Added
+- **Source opening (2026-08-03)** — the full source tree is now public on
+  [CyrilM29/robotframework-sapfx](https://github.com/CyrilM29/robotframework-sapfx),
+  published as a fresh history (founding commit « SAPFX 0.6.4 - source
+  opening »); historic release tags and ZIP assets survive. The private repo
+  stays the studio (communication base, settings, full history).
+- **PyPI publication** — `pip install robotframework-sapfx`
+  ([pypi.org/project/robotframework-sapfx](https://pypi.org/project/robotframework-sapfx/)),
+  sdist + wheel with LICENSE and NOTICE embedded, `twine check` clean;
+  install-from-PyPI smoke-validated in a throwaway venv (all four packages
+  import).
+- **`scripts/export_public_tree.py`** — the export-per-release tool behind the
+  posture: `git archive HEAD` + explicit exclusions + fail-closed transforms
+  (every pattern must match an exact count) + a blocking byte-level leak scan
+  (binaries included, per-file justified tolerances) + a PyPI README variant
+  (no relative EN/FR banner). The script is itself excluded from the export;
+  its unit tests ship and skip cleanly on the public tree.
+- **Project presentation video published** — `docs/media/
+  sapfx-project-presentation.mp4` (3 min 20) ships in the public repo and is
+  the video linked from the READMEs (GitHub and PyPI), replacing the 30-second
+  healing screencast link (the healing GIF stays inline).
+
+### Changed
+- READMEs: PyPI/Python/license badges, `pip install robotframework-sapfx`
+  quick start, logo and demo media served from absolute URLs so the PyPI page
+  renders them; `pyproject` project URLs now point to the public repository.
+
 ## [0.6.4] — 2026-08-02
 
 ### Changed

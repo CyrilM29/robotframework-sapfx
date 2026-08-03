@@ -133,7 +133,10 @@ per file, update the index in the same operation, never secrets anywhere.
   a spec sap-healer marked `> **Statut : PÉRIMÉE (…)**`; stamp after every
   regeneration) and the conventions guard (`check_conventions.py` — raw
   locators in a **generated** suite, `Sleep` anywhere; library-validation
-  suites are informative only, `--strict` blocks them too) in `scripts/`.
+  suites are informative only, `--strict` blocks them too) and the public
+  export tool (`export_public_tree.py` — filtered tree for the public
+  `robotframework-sapfx` repo: fail-closed transforms, blocking leak scan,
+  PyPI README variant; itself excluded from the export) in `scripts/`.
   A `PostToolUse` hook (`scripts/hook_guards.py`) runs both after each edit.
   The built pack (`dist/sapfx-pack-*.zip`) is generated — never edit it in place.
 - SAP test agents (plan → generate → heal): canonical definitions in

@@ -201,7 +201,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   locators (SAP GUI ids, UI5 addresses, CSS/XPath) in a **generated** suite
   and `Sleep` anywhere; hand-written library-validation suites are reported
   but not blocking, since driving SAP by raw ids is their very purpose
-  (`--strict` blocks those too) — in `scripts/`. A `PostToolUse` hook
+  (`--strict` blocks those too) — and `export_public_tree.py` — the
+  export-per-release tool for the public `robotframework-sapfx` repo:
+  filtered `git archive HEAD` tree, fail-closed transforms, blocking
+  byte-level leak scan, PyPI README variant; the script is itself excluded
+  from the export — in `scripts/`. A `PostToolUse` hook
   (`scripts/hook_guards.py`) runs both after every edit of
   specs/tests/resources/variables.
   **SAP test agents** (plan → generate → heal, Playwright-Test-Agents style):

@@ -1,10 +1,18 @@
 > [🇬🇧 English](README.md) · **🇫🇷 Français**
 
 <p align="center">
-  <img src="assets/logo.png" alt="SAPFX — ECC UI5 API Library &amp; Recorder" width="240">
+  <img src="https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/assets/logo.png" alt="SAPFX — ECC UI5 API Library &amp; Recorder" width="240">
 </p>
 
 # SAPFX
+
+[![PyPI](https://img.shields.io/pypi/v/robotframework-sapfx)](https://pypi.org/project/robotframework-sapfx/)
+[![Python](https://img.shields.io/pypi/pyversions/robotframework-sapfx)](https://pypi.org/project/robotframework-sapfx/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/CyrilM29/robotframework-sapfx/blob/main/LICENSE)
+
+```bash
+pip install robotframework-sapfx
+```
 
 Automatisation de tests SAP pour Robot Framework (distribution
 `robotframework-sapfx`) avec **un vocabulaire métier unique pour
@@ -42,10 +50,9 @@ healing n'est jamais silencieux. Un WARNING devient une télémétrie cumulée,
 puis `scripts/healing_drift_report.py` localise le patch à faire dans
 `resources/` sans modifier les tests métier.
 
-▶️ **[Voir la vidéo de démo complète](https://github.com/CyrilM29/robotframework-sapfx/blob/main/docs/media/healing-live.mp4)** — un
-screencast de 30 secondes du SAP GUI piloté en direct (transaction tapée,
-healing, popup de comptage réel, grille ALV), avec le rapport de dérive et le
-patch appliqué.
+▶️ **[Voir la vidéo de présentation du projet](https://github.com/CyrilM29/robotframework-sapfx/blob/main/docs/media/sapfx-project-presentation.mp4)** —
+3 min 20 : VS Code et les keywords métier, puis SAP GUI, Fiori et le canal API
+pilotés en direct, et un agent MCP qui génère une suite depuis une vraie session.
 
 ## Où ça se situe — wdi5 compris
 

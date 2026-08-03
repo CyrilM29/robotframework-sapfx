@@ -1,0 +1,101 @@
+# -*- coding: utf-8 -*-
+"""Tests hors-SAP des briques pures de l'export public
+(``scripts/export_public_tree.py`` — convention #5 du CLAUDE.md).
+
+Le script est volontairement EXCLU de l'arbre public exporté (il énumère les
+motifs interdits) : ce test, lui, est livré et se saute proprement quand le
+script est absent. Aucun littéral sensible ici — tout est synthétique.
+"""
+import importlib.util
+import os
+
+import pytest
+
+_SCRIPT_PATH = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "scripts", "export_public_tree.py"))
+
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(_SCRIPT_PATH),
+    reason="script d'export absent (arbre public exporté)")
+
+
+@pytest.fixture(scope="module")
+def mod():
+    spec = importlib.util.spec_from_file_location("export_public_tree", _SCRIPT_PATH)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+# ------------------------------------------------------------ apply_transform
+def test_transform_litteral_applique(mod):
+    out = mod.apply_transform("a lien b lien c", "lien", "URL", 2, False)
+    assert out == "a URL b URL c"
+
+
+def test_transform_compte_errone_echoue(mod):
+    with pytest.raises(mod.ExportError, match="attendu 2x, trouvé 1x"):
+        mod.apply_transform("a lien c", "lien", "URL", 2, False)
+
+
+def test_transform_regex_multiligne(mod):
+    text = "## Section privee\ncontenu\nsur deux lignes\n## Suite\n"
+    out = mod.apply_transform(
+        text, r"## Section privee\n.*?\n## Suite\n", "## Suite\n", 1, True)
+    assert out == "## Suite\n"
+
+
+def test_transform_regex_absente_echoue(mod):
+    with pytest.raises(mod.ExportError):
+        mod.apply_transform("rien ici", r"## Introuvable\n.*?fin", "", 1, True)
+
+
+# ----------------------------------------------------------------- scan_bytes
+def test_scan_detecte_motif_interdit(mod):
+    forbidden = {b"secret-interne": set()}
+    hits = mod.scan_bytes("docs/x.md", b"voir le Secret-INTERNE ici", forbidden)
+    assert hits == [("docs/x.md", "secret-interne")]
+
+
+def test_scan_respecte_la_tolerance_par_fichier(mod):
+    forbidden = {b"secret-interne": {"docs/tolere.md"}}
+    assert mod.scan_bytes("docs/tolere.md", b"secret-interne", forbidden) == []
+    assert mod.scan_bytes("docs/autre.md", b"secret-interne", forbidden)
+
+
+def test_scan_octets_binaires(mod):
+    forbidden = {b"marqueur": set()}
+    data = b"\x89PNG\x00\x01MARQUEUR\xff"
+    assert mod.scan_bytes("assets/i.png", data, forbidden)
+
+
+# ------------------------------------------------------------------ check_top
+def test_check_top_refuse_l_inconnu(mod):
+    with pytest.raises(mod.ExportError, match="nouveau-dossier"):
+        mod.check_top({"src", "nouveau-dossier"}, expected={"src", "docs"})
+
+
+def test_check_top_accepte_le_classe(mod):
+    mod.check_top({"src", "docs"}, expected={"src", "docs"})  # ne lève pas
+
+
+# ---------------------------------------------------------------- pypi_readme
+def test_pypi_readme_retire_le_banner(mod):
+    text = mod._PYPI_BANNER + "# Titre\n\ncorps\n"
+    assert mod.pypi_readme(text) == "# Titre\n\ncorps\n"
+
+
+def test_pypi_readme_banner_absent_echoue(mod):
+    with pytest.raises(mod.ExportError, match="banner"):
+        mod.pypi_readme("# Titre sans banner\n")
+
+
+# ------------------------------------------------- cohérence du périmètre
+def test_le_script_est_auto_exclu(mod):
+    assert "scripts/export_public_tree.py" in mod.EXCLUDE_PREFIXES
+
+
+def test_les_transformations_visent_des_fichiers_publies(mod):
+    exclus = tuple(p.rstrip("/") for p in mod.EXCLUDE_PREFIXES)
+    for rel, *_ in mod.TRANSFORMS:
+        assert not rel.startswith(exclus), rel
