@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>WC fixture — page « pur Web Components » (aucun runtime UI5)</title>
+</head>
+<body>
+  <!--
+    Fixture du moteur Web Components (Resolve/Click/Fill Wc …) : reproduit la
+    structure d'intégration d'une page UI5 Web Components (home SuccessFactors,
+    apps ui5-webcomponents) SANS charger le vrai paquet npm — hors ligne, donc
+    stable en CI. Points structurels reproduits fidèlement :
+      * hôtes custom elements `ui5-*` dans le light DOM (contenu via <slot>) ;
+      * internals dans un shadow root OUVERT (le CSS Playwright le perce) ;
+      * un tag SCOPÉ `ui5-button-x1b2` (scoping UI5 WC : suffixe par app) ;
+      * AUCUN runtime UI5 : pas de window.sap, registre vide — les moteurs
+        role/xpath doivent être aveugles ici, seul le moteur wc voit la page.
+  -->
+  <main id="app">
+    <ui5-button id="saveBtn" design="Emphasized">Save</ui5-button>
+    <ui5-button id="cancelBtn">Cancel</ui5-button>
+    <ui5-button-x1b2>Scoped save</ui5-button-x1b2>
+    <div>
+      <!-- accessible-name : la convention UI5 Web Components pour nommer un
+           champ sans label visible — la clé name= du moteur wc la lit. -->
+      <ui5-input placeholder="Name" accessible-name="Customer name"></ui5-input>
+    </div>
+    <p>Clicks: <span id="clicks">0</span></p>
+  </main>
+  <script>
+    class FixtureButton extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = '<button style="padding:6px 10px"><slot></slot></button>';
+        root.querySelector('button').addEventListener('click', () => {
+          const counter = document.getElementById('clicks');
+          counter.textContent = String(Number(counter.textContent) + 1);
+        });
+      }
+    }
+    class FixtureInput extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = '<input style="padding:4px">';
+      }
+    }
+    customElements.define('ui5-button', FixtureButton);
+    customElements.define('ui5-button-x1b2', class extends FixtureButton {});
+    customElements.define('ui5-input', FixtureInput);
+    // accessibleName en PROPRIÉTÉ JS non reflétée en attribut (l'autre moitié
+    // de la convention UI5 WC) : le moteur wc doit la lire aussi.
+    document.getElementById('cancelBtn').accessibleName = 'Cancel order';
+    window.__fixtureReady = true;
+  </script>
+</body>
+</html>

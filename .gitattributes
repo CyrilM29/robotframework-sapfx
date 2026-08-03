@@ -1,0 +1,14 @@
+# Normalize line endings: store LF in the repo, let Git handle the working copy.
+# Stops the "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
+
+# Windows batch launchers MUST be CRLF: cmd.exe's parser trips on LF-only
+# files (seen live: `REM` lines echoing «'M' n'est pas reconnu…» when the
+# deployment pack's install.cmd was double-clicked).
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets — never normalize.
+*.png binary
+*.jpg binary
+*.ico binary

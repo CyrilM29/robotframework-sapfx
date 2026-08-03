@@ -1,0 +1,45 @@
+[project]
+name = "sap-robotmcp"
+version = "0.6.4"
+description = "SAP plugins for the rf-mcp (RobotMCP) server: real screen perception (never optimistic), keyword routing and selector guidance for SAP GUI (ECC/S4) and Fiori/UI5 — MCP access to SAP for any agent."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
+keywords = ["mcp", "model-context-protocol", "sap", "sapgui", "fiori", "ui5",
+            "robotframework", "test-automation", "ai-agent"]
+classifiers = [
+    "Framework :: Robot Framework",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Software Development :: Testing",
+]
+requires-python = ">=3.10"
+# rf-mcp est la dépendance hôte ; SapEcc/SapFioriLibrary doivent être importables
+# dans le même environnement (pip install -e . à la racine du dépôt).
+dependencies = ["rf-mcp>=0.31"]
+
+[project.urls]
+Homepage = "https://github.com/CyrilM29/robotframework-sapfx"
+Documentation = "https://github.com/CyrilM29/robotframework-sapfx/blob/main/docs/mcp-integration.md"
+
+# Découverte par entry-point : rf-mcp scanne le groupe robotmcp.library_plugins.
+[project.entry-points."robotmcp.library_plugins"]
+sap_ecc = "sap_robotmcp.ecc_plugin:SapEccPlugin"
+sap_fiori = "sap_robotmcp.fiori_plugin:SapFioriPlugin"
+sap_api = "sap_robotmcp.api_plugin:SapApiPlugin"
+
+# Surcouche sapfx-mcp : monte le serveur rf-mcp inchangé + outils sapfx_*
+# (état par providers, canal image, hot-reload). Mêmes arguments que robotmcp.
+[project.scripts]
+sapfx-mcp = "sap_robotmcp.server:main"
+
+[tool.setuptools.packages.find]
+# Sans ceci, la découverte automatique "flat-layout" de setuptools trouve DEUX
+# dossiers top-level plausibles (`e2e/`, `sap_robotmcp/`) et refuse de deviner
+# lequel packager ("Multiple top-level packages discovered in a flat-layout").
+# `e2e/` est des scripts de démo/validation, jamais destinés à être installés.
+include = ["sap_robotmcp*"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

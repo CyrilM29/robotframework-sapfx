@@ -1,0 +1,14 @@
+# Dépendances runtime du pack de déploiement (le wheel apporte robotframework ;
+# on ré-épingle ici ce que l'environnement cible doit fixer exactement).
+# pywin32 épinglé exact — convention 6 du dépôt : #1 source de casse COM.
+pywin32==311; platform_system == "Windows"
+# Côté Fiori / web. Après installation : `rfbrowser init chromium` (option
+# -WithBrowsers de install.ps1) ou utiliser le Chrome système (channel=chrome).
+robotframework-browser>=20.0
+# Assertions visuelles et empreinte de la sentinelle de dérive
+# (`Screen Should Match Baseline`, `Check Screen Against Watch`) : Pillow ne
+# sert qu'à décoder le PNG à la frontière (extra `visual` du wheel).
+Pillow>=10.0
+# Canal RFC de SapApiLibrary (`Open Rfc Connection`/`Call Rfc`) : nécessite
+# `pyrfc` + le SAP NW RFC SDK (téléchargement SAP sous licence, pas sur PyPI)
+# — installation manuelle, voir la doc SAP ; les keywords OData n'en ont pas besoin.

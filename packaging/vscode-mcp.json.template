@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "rf-mcp-sap": {
+      "type": "stdio",
+      "command": "{{ROBOTMCP_EXE}}",
+      "args": ["--transport", "stdio", "--without-frontend"]
+    }
+  }
+}

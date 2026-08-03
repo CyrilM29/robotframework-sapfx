@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>UI5 legacy fixture (1.60 — avant Element.registry)</title>
+  <!-- Runtime OpenUI5 1.60.14 (2018) servi par le miroir npm jsDelivr : ce runtime
+       PRÉ-DATE Element.registry (introduit en 1.67) et le module ElementRegistry
+       (UI5 2.x). Il force donc le chemin de repli DOM de registryForEach dans
+       _ui5_js.py — c'est tout l'objet de cette fixture. Thème « base » : inclus
+       dans les paquets npm (les thèmes nommés n'y sont pas). -->
+  <script id="sap-ui-bootstrap"
+    src="https://cdn.jsdelivr.net/npm/@openui5/sap.ui.core@1.60.14/src/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="base"
+    data-sap-ui-resourceroots='{"sap.m": "https://cdn.jsdelivr.net/npm/@openui5/sap.m@1.60.14/src/sap/m"}'
+    data-sap-ui-compatVersion="edge"
+    data-sap-ui-async="true"></script>
+  <script>
+    sap.ui.getCore().attachInit(function () {
+      sap.ui.require([
+        "sap/m/Button", "sap/m/Input", "sap/m/Table", "sap/m/Column",
+        "sap/m/ColumnListItem", "sap/m/Label", "sap/m/Text",
+        "sap/ui/model/json/JSONModel"
+      ], function (Button, Input, Table, Column, ColumnListItem, Label, Text, JSONModel) {
+        new Button("legacyBtn", { text: "Legacy Go", press: function () {
+          window.__pressed = true;
+        } }).placeAt("content");
+
+        new Input("legacyInput", { placeholder: "legacy input" }).placeAt("content");
+
+        var oTable = new Table("legacyTable", {
+          columns: [
+            new Column({ header: new Label({ text: "Name" }) }),
+            new Column({ header: new Label({ text: "City" }) })
+          ]
+        });
+        oTable.bindItems("/rows", new ColumnListItem({
+          cells: [ new Text({ text: "{name}" }), new Text({ text: "{city}" }) ]
+        }));
+        oTable.setModel(new JSONModel({ rows: [
+          { name: "Acme", city: "New York" },
+          { name: "Globex", city: "Los Angeles" }
+        ] }));
+        oTable.placeAt("content");
+
+        window.__fixtureReady = true;
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>

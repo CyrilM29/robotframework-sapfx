@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robotframework-sapfx"
+version = "0.6.4"
+description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
+keywords = ["robotframework", "sap", "sapgui", "ecc", "s4hana", "test-automation"]
+classifiers = [
+    "Framework :: Robot Framework :: Library",
+    "Programming Language :: Python :: 3",
+    "Operating System :: Microsoft :: Windows",
+    "License :: OSI Approved :: Apache Software License",
+]
+# Core needs Robot Framework; pywin32 (ECC/SAP GUI) only installs on Windows.
+dependencies = [
+    "robotframework>=7.4",
+    "pywin32>=305; platform_system=='Windows'",
+]
+
+[project.optional-dependencies]
+# Fiori / web side. Run `rfbrowser init` after install to fetch Playwright browsers.
+web = ["robotframework-browser>=20.0"]
+# Visual assertions (Screen Should Match Baseline): Pillow decodes the PNG at
+# the boundary; the perceptual-hash core itself is stdlib-pure.
+visual = ["Pillow>=10.0"]
+dev = ["pytest>=7.0", "pytest-cov>=5.0", "ruff>=0.4", "pre-commit>=3.0", "mypy>=1.10"]
+
+[project.urls]
+Homepage = "https://github.com/CyrilM29/robotframework-sapfx"
+Upstream = "https://github.com/frankvanderkuur/robotframework-sapguilibrary"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+SapEccLibrary = ["py.typed"]
+SapFioriLibrary = ["py.typed"]
+SapApiLibrary = ["py.typed"]
+sapfx_common = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "integrations/robotmcp/tests"]
+pythonpath = ["src", "integrations/robotmcp", "tests/unit"]
+
+[tool.coverage.run]
+# _vendor/ est de l'upstream vendorisé tel quel (convention 4 du CLAUDE.md) : on
+# ne l'écrit ni ne le teste nous-mêmes, donc son taux de couverture n'est pas
+# significatif — même exclusion que ruff (extend-exclude ci-dessous).
+omit = ["*/_vendor/*"]
+
+[tool.coverage.report]
+# Lignes de garde qui n'ont pas vocation à être exercées par des tests off-SAP.
+exclude_also = [
+    "if __name__ == .__main__.:",
+    "pragma: no cover",
+]
+
+[tool.ruff]
+line-length = 100
+# Le code vendorisé reste tel quel (convention 4) ; les clones locaux sont hors périmètre.
+extend-exclude = ["src/SapEccLibrary/_vendor", "_upstream", "_pwsap", "_cap-sflight"]
+
+[tool.mypy]
+python_version = "3.10"
+# Base de code historique encore majoritairement non annotée (fork upstream) :
+# on n'exige pas des annotations partout d'un coup, on type progressivement
+# module par module (sapfx_common, _ui5_runtime en premier — voir CLAUDE.md
+# "Status / next steps") et mypy suit ce même périmètre.
+files = ["src/sapfx_common", "src/SapApiLibrary",
+        "src/SapEccLibrary/SapEccLibrary.py",
+        "src/SapFioriLibrary/SapFioriLibrary.py",
+        "src/SapFioriLibrary/_ui5_runtime.py",
+        "integrations/robotmcp/sap_robotmcp/_last_seen.py",
+        "integrations/robotmcp/sap_robotmcp/_rf_context.py",
+        "integrations/robotmcp/sap_robotmcp/_filtering.py",
+        "integrations/robotmcp/sap_robotmcp/_staleness.py",
+        "integrations/robotmcp/sap_robotmcp/_compat.py",
+        "integrations/robotmcp/sap_robotmcp/_overlay.py"]
+ignore_missing_imports = true
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, B bugbear. Pas de pyupgrade : le formatage `%`
+# est l'idiome du dépôt (messages Robot), on ne le convertit pas.
+select = ["E", "F", "W", "B"]
+ignore = [
+    "E501",   # longueur de ligne : docstrings bilingues, gérée par relecture
+    "B904",   # raise ... from err : les keywords relèvent volontairement des messages métier nus
+]

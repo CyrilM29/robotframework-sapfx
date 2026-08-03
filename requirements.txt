@@ -1,0 +1,12 @@
+# Runtime — ECC / SAP GUI (Windows only)
+robotframework>=7.4
+# Pinned exactly (CLAUDE.md convention 6): pywin32 is the #1 source of COM breakage.
+pywin32==311; platform_system == "Windows"
+
+# Runtime — Fiori / web (phase 2). After install, run `rfbrowser init` once to
+# download the Playwright browser binaries.
+robotframework-browser>=20.0
+
+# Dev / test
+pytest>=7.0
+ruff>=0.4

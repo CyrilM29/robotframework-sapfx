@@ -1,0 +1,92 @@
+SAPFX (robotframework-sapfx)
+Copyright 2026 Cyril Montiel
+
+This product includes software developed as part of:
+
+  robotframework-sapguilibrary
+  Copyright (c) Frank van der Kuur
+  https://github.com/frankvanderkuur/robotframework-sapguilibrary
+  Licensed under the Apache License, Version 2.0.
+
+The file `src/SapEccLibrary/_vendor/sapgui_base.py` is a vendored copy of that
+project's `SapGuiLibrary.py`, with the single modification of renaming the class
+`SapGuiLibrary` to `SapGuiBase`. See that file's header for details.
+
+----------------------------------------------------------------------
+
+  playwright-sap
+  Copyright (c) Arpit Sureka
+  https://github.com/ArpitSureka/playwright-sap
+  Licensed under the Apache License, Version 2.0.
+
+The UI5 locator techniques in `src/SapFioriLibrary/_ui5_js.py` and
+`tools/spy_web/ui5_selector_snippet.js` — the control-hierarchy XML tree, the XPath
+engine over it, own+inherited property extraction, the case-insensitive property
+matcher, drilling to the interactable element, and the priority-ordered property
+allowlist — are derived from that project's `packages/injected/src/sap/` and
+`packages/sap/` sources. The code was re-implemented as a single injected JS bundle
+(no Playwright fork) and adapted for Robot Framework. See that file's header.
+
+----------------------------------------------------------------------
+
+  robotframework-robosapiens (RoboSAPiens)
+  Copyright (c) imbus AG / Marduk Bolaños
+  https://github.com/imbus/robotframework-robosapiens
+  Licensed under the Apache License, Version 2.0.
+
+The human-locator techniques in `src/sapfx_common/semantic.py` — targeting SAP
+GUI controls by visible label with geometric proximity (closest label left of /
+above a field, alignment and gap tolerances), label-intersection addressing,
+prefix matching for tooltips ending in keyboard shortcuts, grid/position
+addressing (Nth field in a vertical or horizontal grid below/right of a label),
+and scoped anchoring (narrowing resolution to the neighborhood of a unique
+label to disambiguate a repeated label or a field with no label of its own) —
+are derived from that project's locator strategies (`robosapiens/Locators.cs`,
+`SAPLabel.cs`, `TextFields.cs`, `Position.cs`, `RoboSAPiens.Recorder/
+GuiRecorder.cs`). The code was re-implemented in Python over this project's
+perception model (with explicit ambiguity detection instead of first-match,
+and neighborhood-based scoping instead of their unspecified algorithm) rather
+than ported verbatim. The use of `GuiSession.GetObjectTree` as a
+single-roundtrip perception fast path (`src/sapfx_common/object_tree.py`) was
+also learned from that project's recorder.
+
+The embedded-browser-control bridge in
+`src/SapEccLibrary/keywords/_embedded_browser.py` — enabling WebView2's CDP
+remote debugging via the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment
+variable, then locating and switching to the hosted page through the Browser
+library (`robotframework-browser`) over CDP — documents and adapts a workflow
+described in that project's README (embedded browser control automation via
+Browser Library); no code was copied, only the workflow.
+
+Two further ideas were learned from that project's recorder (studied 2026-08,
+`RoboSAPiens.Recorder/GuiRecorder.cs`): generating a standalone HTML
+documentation report from a recording (their `saveHtmlReport`; re-implemented
+from scratch in `tools/recorder/sapgui_recorder.py` — `steps_to_report` — and
+in the web recorder of `src/SapFioriLibrary/_ui5_js.py`, per-step with our own
+business phrasing and inline data-URI screenshots, no template engine and no
+code ported), and resolving virtual-key names through the scripting API's
+`GuiSession.GetVKeyDescription` instead of a hand-maintained table (used as an
+optional extension of this project's static vkey table).
+
+----------------------------------------------------------------------
+
+  playwright-praman
+  Copyright (c) mrkanitkar (playwright-praman contributors)
+  https://github.com/mrkanitkar/playwright-praman
+  Licensed under the Apache License, Version 2.0.
+
+Three concepts in this project are derived from that project's design (studied
+2026-07): the business-vocabulary system in `src/sapfx_common/vocabulary.py`
+(business terms — canonical name + synonyms + ABAP field — grouped by SAP
+module domain, resolved with tiered/fuzzy scoring and an ambiguity-refusal
+threshold), the Fiori launchpad navigation keywords in
+`src/SapFioriLibrary/SapFioriLibrary.py` (`Open Fiori App` by semantic
+object/action intent hash, tile addressing by title), and the
+identity-provider login-flow presets in `src/sapfx_common/auth_flows.py`
+(recognizing common IDP login forms — SAP IAS, Azure AD — by their field
+selectors and driving single-page and two-step flows generically). All were
+re-implemented from scratch in Python on this project's engines (no code was
+ported); synonyms additionally cover French terms, and ambiguity is always
+surfaced with the candidate list, never resolved by first match.
+
+A copy of the Apache License 2.0 is provided in the LICENSE file.

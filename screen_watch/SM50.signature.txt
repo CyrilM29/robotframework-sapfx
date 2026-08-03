@@ -1,0 +1,225 @@
+# screen SAPLSLVC_FULLSCREEN/SM50/500
+  wnd[0]	GuiMainWindow	Work Processes of AS Instance vhcala4hci_A4H_00
+  wnd[0]/mbar	GuiMenubar	
+  wnd[0]/mbar/menu[0]	GuiMenu	Administration
+  wnd[0]/mbar/menu[0]/menu[0]	GuiMenu	Work Process
+  wnd[0]/mbar/menu[0]/menu[0]/menu[0]	GuiMenu	Cancel
+  wnd[0]/mbar/menu[0]/menu[0]/menu[0]/menu[0]	GuiMenu	With Core
+  wnd[0]/mbar/menu[0]/menu[0]/menu[0]/menu[1]	GuiMenu	Without Core
+  wnd[0]/mbar/menu[0]/menu[0]/menu[1]	GuiMenu	Restart After Error
+  wnd[0]/mbar/menu[0]/menu[0]/menu[1]/menu[0]	GuiMenu	Yes
+  wnd[0]/mbar/menu[0]/menu[0]/menu[1]/menu[1]	GuiMenu	No
+  wnd[0]/mbar/menu[0]/menu[0]/menu[2]	GuiMenu	Write Stack
+  wnd[0]/mbar/menu[0]/menu[1]	GuiMenu	Trace
+  wnd[0]/mbar/menu[0]/menu[1]/menu[0]	GuiMenu	Active Components
+  wnd[0]/mbar/menu[0]/menu[1]/menu[1]	GuiMenu	Display Settings
+  wnd[0]/mbar/menu[0]/menu[1]/menu[1]/menu[0]	GuiMenu	Load Components
+  wnd[0]/mbar/menu[0]/menu[1]/menu[1]/menu[1]	GuiMenu	Display Components
+  wnd[0]/mbar/menu[0]/menu[1]/menu[2]	GuiMenu	
+  wnd[0]/mbar/menu[0]/menu[1]/menu[3]	GuiMenu	Display File
+  wnd[0]/mbar/menu[0]/menu[1]/menu[3]/menu[0]	GuiMenu	Current
+  wnd[0]/mbar/menu[0]/menu[1]/menu[3]/menu[1]	GuiMenu	Previous
+  wnd[0]/mbar/menu[0]/menu[1]/menu[4]	GuiMenu	Save as Local File
+  wnd[0]/mbar/menu[0]/menu[1]/menu[5]	GuiMenu	
+  wnd[0]/mbar/menu[0]/menu[1]/menu[6]	GuiMenu	Reset
+  wnd[0]/mbar/menu[0]/menu[1]/menu[6]/menu[0]	GuiMenu	All Files
+  wnd[0]/mbar/menu[0]/menu[1]/menu[6]/menu[1]	GuiMenu	Work Process Files
+  wnd[0]/mbar/menu[0]/menu[1]/menu[7]	GuiMenu	
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]	GuiMenu	Dispatcher
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]/menu[0]	GuiMenu	Change Trace Level
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]/menu[1]	GuiMenu	
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]/menu[2]	GuiMenu	Display File
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]/menu[3]	GuiMenu	Save as Local File
+  wnd[0]/mbar/menu[0]/menu[1]/menu[8]/menu[4]	GuiMenu	Reset File
+  wnd[0]/mbar/menu[0]/menu[2]	GuiMenu	Program
+  wnd[0]/mbar/menu[0]/menu[2]/menu[0]	GuiMenu	Debugging
+  wnd[0]/mbar/menu[0]/menu[2]/menu[1]	GuiMenu	Cancel
+  wnd[0]/mbar/menu[0]/menu[3]	GuiMenu	Delete Session
+  wnd[0]/mbar/menu[0]/menu[4]	GuiMenu	Snapshot
+  wnd[0]/mbar/menu[0]/menu[4]/menu[0]	GuiMenu	Create
+  wnd[0]/mbar/menu[0]/menu[4]/menu[1]	GuiMenu	Administration
+  wnd[0]/mbar/menu[0]/menu[5]	GuiMenu	
+  wnd[0]/mbar/menu[0]/menu[6]	GuiMenu	Exit
+  wnd[0]/mbar/menu[1]	GuiMenu	Edit
+  wnd[0]/mbar/menu[1]/menu[0]	GuiMenu	Select All
+  wnd[0]/mbar/menu[1]/menu[1]	GuiMenu	Deselect All
+  wnd[0]/mbar/menu[1]/menu[2]	GuiMenu	
+  wnd[0]/mbar/menu[1]/menu[3]	GuiMenu	Set Filter
+  wnd[0]/mbar/menu[1]/menu[4]	GuiMenu	Delete Filter
+  wnd[0]/mbar/menu[1]/menu[5]	GuiMenu	
+  wnd[0]/mbar/menu[1]/menu[6]	GuiMenu	Sort in Ascending Order
+  wnd[0]/mbar/menu[1]/menu[7]	GuiMenu	Sort in Descending Order
+  wnd[0]/mbar/menu[1]/menu[8]	GuiMenu	
+  wnd[0]/mbar/menu[1]/menu[9]	GuiMenu	Display Sum
+  wnd[0]/mbar/menu[1]/menu[10]	GuiMenu	Subtotal
+  wnd[0]/mbar/menu[1]/menu[11]	GuiMenu	
+  wnd[0]/mbar/menu[1]/menu[12]	GuiMenu	Search
+  wnd[0]/mbar/menu[1]/menu[13]	GuiMenu	
+  wnd[0]/mbar/menu[1]/menu[14]	GuiMenu	Cancel
+  wnd[0]/mbar/menu[2]	GuiMenu	Goto
+  wnd[0]/mbar/menu[2]/menu[0]	GuiMenu	System-Wide List
+  wnd[0]/mbar/menu[2]/menu[1]	GuiMenu	WP Info
+  wnd[0]/mbar/menu[2]/menu[2]	GuiMenu	User Info
+  wnd[0]/mbar/menu[2]/menu[3]	GuiMenu	
+  wnd[0]/mbar/menu[2]/menu[4]	GuiMenu	Back
+  wnd[0]/mbar/menu[3]	GuiMenu	List
+  wnd[0]/mbar/menu[3]/menu[0]	GuiMenu	Print
+  wnd[0]/mbar/menu[3]/menu[1]	GuiMenu	Export
+  wnd[0]/mbar/menu[3]/menu[1]/menu[0]	GuiMenu	Word Processing...
+  wnd[0]/mbar/menu[3]/menu[1]/menu[1]	GuiMenu	Spreadsheet...
+  wnd[0]/mbar/menu[3]/menu[1]/menu[2]	GuiMenu	Local File...
+  wnd[0]/mbar/menu[3]/menu[2]	GuiMenu	Sending...
+  wnd[0]/mbar/menu[3]/menu[3]	GuiMenu	Refresh
+  wnd[0]/mbar/menu[3]/menu[4]	GuiMenu	Configuration
+  wnd[0]/mbar/menu[3]/menu[5]	GuiMenu	Reset
+  wnd[0]/mbar/menu[3]/menu[5]/menu[0]	GuiMenu	Failures
+  wnd[0]/mbar/menu[3]/menu[5]/menu[1]	GuiMenu	Info Area
+  wnd[0]/mbar/menu[4]	GuiMenu	Settings
+  wnd[0]/mbar/menu[4]/menu[0]	GuiMenu	Basic List
+  wnd[0]/mbar/menu[4]/menu[1]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[2]	GuiMenu	Layout
+  wnd[0]/mbar/menu[4]/menu[2]/menu[0]	GuiMenu	Current
+  wnd[0]/mbar/menu[4]/menu[2]/menu[1]	GuiMenu	Choose...
+  wnd[0]/mbar/menu[4]/menu[2]/menu[2]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[2]/menu[3]	GuiMenu	Saving...
+  wnd[0]/mbar/menu[4]/menu[2]/menu[4]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[2]/menu[5]	GuiMenu	Administration
+  wnd[0]/mbar/menu[4]/menu[3]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[4]	GuiMenu	Summation Levels
+  wnd[0]/mbar/menu[4]/menu[4]/menu[0]	GuiMenu	Choose...
+  wnd[0]/mbar/menu[4]/menu[4]/menu[1]	GuiMenu	Define Drilldown
+  wnd[0]/mbar/menu[4]/menu[5]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[6]	GuiMenu	Columns
+  wnd[0]/mbar/menu[4]/menu[6]/menu[0]	GuiMenu	Optimize Width
+  wnd[0]/mbar/menu[4]/menu[6]/menu[1]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[6]/menu[2]	GuiMenu	Freeze to Column
+  wnd[0]/mbar/menu[4]/menu[6]/menu[3]	GuiMenu	Unfreeze
+  wnd[0]/mbar/menu[4]/menu[7]	GuiMenu	
+  wnd[0]/mbar/menu[4]/menu[8]	GuiMenu	Selections...
+  wnd[0]/mbar/menu[4]/menu[9]	GuiMenu	List Status
+  wnd[0]/mbar/menu[5]	GuiMenu	System
+  wnd[0]/mbar/menu[5]/menu[0]	GuiMenu	New GUI Window
+  wnd[0]/mbar/menu[5]/menu[1]	GuiMenu	Close GUI Window
+  wnd[0]/mbar/menu[5]/menu[2]	GuiMenu	User Profile
+  wnd[0]/mbar/menu[5]/menu[2]/menu[0]	GuiMenu	Hold Data
+  wnd[0]/mbar/menu[5]/menu[2]/menu[1]	GuiMenu	Set Data
+  wnd[0]/mbar/menu[5]/menu[2]/menu[2]	GuiMenu	Delete Data
+  wnd[0]/mbar/menu[5]/menu[2]/menu[3]	GuiMenu	User Data
+  wnd[0]/mbar/menu[5]/menu[2]/menu[4]	GuiMenu	Expand Favorites
+  wnd[0]/mbar/menu[5]/menu[3]	GuiMenu	Services
+  wnd[0]/mbar/menu[5]/menu[3]/menu[0]	GuiMenu	Reporting
+  wnd[0]/mbar/menu[5]/menu[3]/menu[1]	GuiMenu	QuickViewer
+  wnd[0]/mbar/menu[5]/menu[3]/menu[2]	GuiMenu	Output Control
+  wnd[0]/mbar/menu[5]/menu[3]/menu[3]	GuiMenu	Table Maintenance
+  wnd[0]/mbar/menu[5]/menu[3]/menu[3]/menu[0]	GuiMenu	Extended Table Maintenance
+  wnd[0]/mbar/menu[5]/menu[3]/menu[3]/menu[1]	GuiMenu	View Cluster Maintenance
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]	GuiMenu	Batch Input
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[0]	GuiMenu	Sessions
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[1]	GuiMenu	Logs
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[2]	GuiMenu	Recorder
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[3]	GuiMenu	
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[4]	GuiMenu	Restart Transaction
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[5]	GuiMenu	Delete Transaction
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[6]	GuiMenu	Next Transaction
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[7]	GuiMenu	
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[8]	GuiMenu	Process in Foreground
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[9]	GuiMenu	Display Errors Only
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[10]	GuiMenu	Expert Mode On
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[11]	GuiMenu	Expert Mode Off
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[12]	GuiMenu	
+  wnd[0]/mbar/menu[5]/menu[3]/menu[4]/menu[13]	GuiMenu	Cancel
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]	GuiMenu	Fast Entry
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[0]	GuiMenu	Recorder
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[1]	GuiMenu	
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[2]	GuiMenu	Process in Foreground
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[3]	GuiMenu	Display Errors Only
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[4]	GuiMenu	
+  wnd[0]/mbar/menu[5]/menu[3]/menu[5]/menu[5]	GuiMenu	Cancel
+  wnd[0]/mbar/menu[5]/menu[3]/menu[6]	GuiMenu	Direct Input
+  wnd[0]/mbar/menu[5]/menu[3]/menu[7]	GuiMenu	Jobs
+  wnd[0]/mbar/menu[5]/menu[3]/menu[7]/menu[0]	GuiMenu	Define Job
+  wnd[0]/mbar/menu[5]/menu[3]/menu[7]/menu[1]	GuiMenu	Job Overview
+  wnd[0]/mbar/menu[5]/menu[3]/menu[8]	GuiMenu	Queue
+  wnd[0]/mbar/menu[5]/menu[3]/menu[9]	GuiMenu	SAP Service
+  wnd[0]/mbar/menu[5]/menu[4]	GuiMenu	Utilities
+  wnd[0]/mbar/menu[5]/menu[4]/menu[0]	GuiMenu	Debug Dynpro
+  wnd[0]/mbar/menu[5]/menu[4]/menu[1]	GuiMenu	Debug ABAP
+  wnd[0]/mbar/menu[5]/menu[4]/menu[2]	GuiMenu	Debug System
+  wnd[0]/mbar/menu[5]/menu[4]/menu[3]	GuiMenu	Resource Usage
+  wnd[0]/mbar/menu[5]/menu[4]/menu[4]	GuiMenu	Autom. Queue: Synchronous Processing
+  wnd[0]/mbar/menu[5]/menu[4]/menu[5]	GuiMenu	Performance Trace
+  wnd[0]/mbar/menu[5]/menu[4]/menu[6]	GuiMenu	Context Trace
+  wnd[0]/mbar/menu[5]/menu[4]/menu[7]	GuiMenu	Runtime Analysis
+  wnd[0]/mbar/menu[5]/menu[4]/menu[7]/menu[0]	GuiMenu	Execute
+  wnd[0]/mbar/menu[5]/menu[4]/menu[7]/menu[1]	GuiMenu	Switch On
+  wnd[0]/mbar/menu[5]/menu[4]/menu[7]/menu[2]	GuiMenu	Switch Off
+  wnd[0]/mbar/menu[5]/menu[4]/menu[8]	GuiMenu	Display Authorization Check
+  wnd[0]/mbar/menu[5]/menu[4]/menu[9]	GuiMenu	Memory Analysis
+  wnd[0]/mbar/menu[5]/menu[4]/menu[9]/menu[0]	GuiMenu	Create Memory Snapshot
+  wnd[0]/mbar/menu[5]/menu[4]/menu[9]/menu[1]	GuiMenu	Compare Memory Snapshots
+  wnd[0]/mbar/menu[5]/menu[5]	GuiMenu	List
+  wnd[0]/mbar/menu[5]/menu[5]/menu[0]	GuiMenu	Print
+  wnd[0]/mbar/menu[5]/menu[5]/menu[1]	GuiMenu	Find...
+  wnd[0]/mbar/menu[5]/menu[5]/menu[2]	GuiMenu	Save
+  wnd[0]/mbar/menu[5]/menu[5]/menu[2]/menu[0]	GuiMenu	SAPoffice Folders
+  wnd[0]/mbar/menu[5]/menu[5]/menu[2]/menu[1]	GuiMenu	List
+  wnd[0]/mbar/menu[5]/menu[5]/menu[2]/menu[2]	GuiMenu	Save
+  wnd[0]/mbar/menu[5]/menu[5]/menu[3]	GuiMenu	Send
+  wnd[0]/mbar/menu[5]/menu[5]/menu[4]	GuiMenu	List Header
+  wnd[0]/mbar/menu[5]/menu[6]	GuiMenu	Services for Object
+  wnd[0]/mbar/menu[5]/menu[7]	GuiMenu	My Objects
+  wnd[0]/mbar/menu[5]/menu[7]/menu[0]	GuiMenu	Object History
+  wnd[0]/mbar/menu[5]/menu[7]/menu[1]	GuiMenu	Edit Objects
+  wnd[0]/mbar/menu[5]/menu[8]	GuiMenu	Own Spool Requests
+  wnd[0]/mbar/menu[5]/menu[9]	GuiMenu	Own Jobs
+  wnd[0]/mbar/menu[5]/menu[10]	GuiMenu	Short Message
+  wnd[0]/mbar/menu[5]/menu[11]	GuiMenu	Status...
+  wnd[0]/mbar/menu[5]/menu[12]	GuiMenu	Log Off
+  wnd[0]/mbar/menu[6]	GuiMenu	Help
+  wnd[0]/mbar/menu[6]/menu[0]	GuiMenu	Product Assistance
+  wnd[0]/mbar/menu[6]/menu[1]	GuiMenu	SAP Help Portal
+  wnd[0]/mbar/menu[6]/menu[2]	GuiMenu	Release Notes
+  wnd[0]/mbar/menu[6]/menu[3]	GuiMenu	
+  wnd[0]/mbar/menu[6]/menu[4]	GuiMenu	SAP Support Portal
+  wnd[0]/mbar/menu[6]/menu[5]	GuiMenu	Create Support Message
+  wnd[0]/mbar/menu[6]/menu[6]	GuiMenu	
+  wnd[0]/mbar/menu[6]/menu[7]	GuiMenu	Settings...
+  wnd[0]/tbar[0]	GuiToolbar	
+  wnd[0]/tbar[0]/btn[0]	GuiButton	
+  wnd[0]/tbar[0]/btn[3]	GuiButton	Back
+  wnd[0]/tbar[0]/btn[15]	GuiButton	Exit
+  wnd[0]/tbar[0]/btn[12]	GuiButton	Cancel
+  wnd[0]/tbar[0]/btn[86]	GuiButton	
+  wnd[0]/tbar[0]/btn[71]	GuiButton	
+  wnd[0]/tbar[0]/btn[419]	GuiButton	
+  wnd[0]/tbar[0]/btn[418]	GuiButton	
+  wnd[0]/tbar[0]/btn[446]	GuiButton	
+  wnd[0]/tbar[0]/okcd	GuiOkCodeField	
+  wnd[0]/titl	GuiTitlebar	Work Processes of AS Instance vhcala4hci_A4H_00
+  wnd[0]/tbar[1]	GuiToolbar	
+  wnd[0]/tbar[1]/btn[8]	GuiButton	
+  wnd[0]/tbar[1]/btn[47]	GuiButton	
+  wnd[0]/tbar[1]/btn[34]	GuiButton	
+  wnd[0]/tbar[1]/btn[42]	GuiButton	Active Work Processes Only
+  wnd[0]/tbar[1]/btn[44]	GuiButton	
+  wnd[0]/tbar[1]/btn[38]	GuiButton	
+  wnd[0]/tbar[1]/btn[41]	GuiButton	
+  wnd[0]/tbar[1]/btn[40]	GuiButton	
+  wnd[0]/tbar[1]/btn[32]	GuiButton	
+  wnd[0]/tbar[1]/btn[33]	GuiButton	
+  wnd[0]/tbar[1]/btn[36]	GuiButton	
+  wnd[0]/tbar[1]/btn[20]	GuiButton	
+  wnd[0]/tbar[1]/btn[9]	GuiButton	
+  wnd[0]/tbar[1]/btn[17]	GuiButton	
+  wnd[0]/tbar[1]/btn[16]	GuiButton	
+  wnd[0]/tbar[1]/btn[48]	GuiButton	
+  wnd[0]/usr	GuiUserArea	
+  wnd[0]/usr/cntlGRID1	GuiCustomControl	
+  wnd[0]/usr/cntlGRID1/shellcont	GuiContainerShell	SAPGUI.CONTAINERCTRL.1
+  wnd[0]/usr/cntlGRID1/shellcont/shell	GuiSplitterShell	SAPGUI.SplitterCtrl.1
+  wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[0]	GuiContainerShell	SAPGUI.CONTAINERCTRL.1
+  wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[0]/shell	GuiShell	SAP.HTMLControl.1
+  wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]	GuiContainerShell	SAPGUI.CONTAINERCTRL.1
+  wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell	GuiShell	SAPGUI.GridViewCtrl.1
+  wnd[0]/sbar	GuiStatusbar	
+  wnd[0]/sbar/pane[0]	GuiStatusPane	

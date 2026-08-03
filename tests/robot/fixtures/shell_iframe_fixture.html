@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Shell + app en iframe (pattern Work Zone / cFLP)</title>
+  <!-- Reproduit la structure des launchpads BTP (SAP Build Work Zone, cFLP) :
+       une page « shell » SANS runtime UI5 qui embarque l'application dans une
+       IFRAME. Le bundle __SAPFX injecté dans la page top ne voit alors AUCUN
+       contrôle : c'est tout l'objet de `Set Ui5 Frame`, validé par
+       fiori_frame_smoke.robot. L'app embarquée est la fixture UI5 existante
+       (même origine file:// — le cas cross-origine exige les mêmes appels,
+       la restriction éventuelle venant du navigateur, pas de la bibliothèque). -->
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { background: #354a5f; color: #fff; padding: 10px 16px; }
+    iframe { border: 1px solid #ccc; width: 95%; height: 80vh; margin: 12px; }
+  </style>
+</head>
+<body>
+  <header>Shell factice (aucun runtime UI5 ici)</header>
+  <iframe id="application-frame" src="ui5_fixture.html"></iframe>
+</body>
+</html>

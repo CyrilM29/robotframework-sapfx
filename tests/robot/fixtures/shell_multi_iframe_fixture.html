@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Shell + DEUX apps en iframes (pattern Work Zone multi-apps)</title>
+  <!-- Variante multi-apps de shell_iframe_fixture.html : un shell sans runtime
+       UI5 embarquant DEUX applications dans deux iframes (structure d'un
+       launchpad Work Zone avec plusieurs apps ouvertes). Exerce la portée de
+       `Set Ui5 Frame` : chaque frame doit être un monde clos — la résolution
+       ciblée sur l'une ne doit jamais voir les contrôles de l'autre. -->
+  <style>
+    body { font-family: sans-serif; margin: 0; }
+    header { background: #354a5f; color: #fff; padding: 10px 16px; }
+    iframe { border: 1px solid #ccc; width: 45%; height: 70vh; margin: 12px; }
+  </style>
+</head>
+<body>
+  <header>Shell factice multi-apps (aucun runtime UI5 ici)</header>
+  <iframe id="app-frame-1" src="ui5_fixture.html"></iframe>
+  <iframe id="app-frame-2" src="ui5_second_app_fixture.html"></iframe>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>UI5 2.x fixture (nightly — après suppression des APIs legacy)</title>
+  <!-- Runtime OpenUI5 2.0 NIGHTLY servi par le CDN officiel : 2.x supprime les
+       APIs dépréciées de la baseline 1.136 (sap.ui.getCore() façade, globals de
+       bibliothèques, Element.registry). Cette fixture prouve que le bundle
+       __SAPFX résout via le module ElementRegistry (branche 1 de
+       registryForEach) et que rien chez nous ne dépend d'une API supprimée.
+       NB : le loader AMD (sap.ui.require/define) reste global en 2.x — c'est
+       l'API du loader, pas un « global de bibliothèque ». Réseau requis. -->
+  <script id="sap-ui-bootstrap"
+    src="https://sdk.openui5.org/nightly/2/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-async="true"></script>
+  <script>
+    window.addEventListener("load", function () {
+      sap.ui.require(["sap/ui/core/Core"], function (Core) {
+        Core.ready().then(function () {
+          sap.ui.require([
+            "sap/m/Button", "sap/m/Input", "sap/m/Table", "sap/m/Column",
+            "sap/m/ColumnListItem", "sap/m/Label", "sap/m/Text",
+            "sap/ui/model/json/JSONModel"
+          ], function (Button, Input, Table, Column, ColumnListItem, Label, Text, JSONModel) {
+            new Button("v2Btn", { text: "V2 Go", press: function () {
+              window.__pressed = true;
+            } }).placeAt("content");
+
+            new Input("v2Input", { placeholder: "v2 input" }).placeAt("content");
+
+            var oTable = new Table("v2Table", {
+              columns: [
+                new Column({ header: new Label({ text: "Name" }) }),
+                new Column({ header: new Label({ text: "City" }) })
+              ]
+            });
+            oTable.bindItems({ path: "/rows", template: new ColumnListItem({
+              cells: [ new Text({ text: "{name}" }), new Text({ text: "{city}" }) ]
+            }) });
+            oTable.setModel(new JSONModel({ rows: [
+              { name: "Acme", city: "New York" },
+              { name: "Globex", city: "Los Angeles" }
+            ] }));
+            oTable.placeAt("content");
+
+            window.__fixtureReady = true;
+          });
+        });
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Seconde app UI5 (cible de navigation d'iframe)</title>
+  <!-- App UI5 minimale et DISTINCTE de ui5_fixture.html : un bouton unique,
+       AUCUNE table. Sert de « deuxième application » aux scénarios multi-iframes
+       et navigation-de-frame de fiori_frame_smoke.robot : si la portée de
+       Set Ui5 Frame fuyait d'une frame à l'autre, la table de la première app
+       apparaîtrait ici (ou inversement) et les compteurs le trahiraient. -->
+  <script id="sap-ui-bootstrap"
+    src="https://sdk.openui5.org/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-async="true"></script>
+  <script>
+    sap.ui.getCore().attachInit(function () {
+      sap.ui.require(["sap/m/Button", "sap/m/Input"], function (Button, Input) {
+        new Button("secondBtn", { text: "Second App Go", press: function () {
+          window.__secondPressed = true;
+        } }).placeAt("content");
+        new Input("secondInput", { placeholder: "second input" }).placeAt("content");
+        window.__fixtureReady = true;
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>

@@ -1,0 +1,17 @@
+# Hooks locaux (pas de dépôt distant requis) : ruff est installé via pip.
+# Installation :  pip install pre-commit && pre-commit install
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: python -m ruff check --fix
+        language: system
+        types: [python]
+        exclude: ^(src/SapEccLibrary/_vendor/|_upstream/|_pwsap/|_cap-sflight/)
+      - id: pytest-unit
+        name: pytest (tests unitaires hors SAP)
+        entry: python -m pytest tests/unit -q
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

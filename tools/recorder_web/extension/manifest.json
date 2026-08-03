@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "SAP UI5 / WebGUI Locator Recorder",
+  "version": "0.8.0",
+  "description": "Capture SapFioriLibrary locators and record Robot Framework steps on SAP Fiori, SAPUI5, WebGUI and hybrid pages.",
+  "minimum_chrome_version": "111",
+  "permissions": ["scripting", "activeTab"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-record": {
+      "suggested_key": { "default": "Alt+Shift+R" },
+      "description": "Start/stop UI5 recording on the active tab"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "UI5 / WebGUI Recorder",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
+}

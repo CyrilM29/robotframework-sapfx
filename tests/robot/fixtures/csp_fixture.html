@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- CSP STRICTE côté scripts : seuls le CDN UI5 et les scripts porteurs du
+       nonce du fixture peuvent s'exécuter — pas de 'unsafe-inline', pas de
+       'unsafe-eval'. C'est la posture vers laquelle SAP pousse (la ligne
+       legacy-free vise la conformité CSP). La suite fiori_csp_smoke.robot
+       vérifie d'abord que cette politique bloque bien un <script> injecté sans
+       nonce, PUIS que le bundle __SAPFX (injecté par l'evaluate Playwright,
+       canal CDP hors de portée de la CSP de page) fonctionne quand même :
+       aucun assouplissement CSP n'est à demander sur un système testé. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="script-src https://sdk.openui5.org 'nonce-sapfx-fixture'; object-src 'none'; base-uri 'none'">
+  <title>UI5 strict-CSP fixture</title>
+  <script id="sap-ui-bootstrap"
+    src="https://sdk.openui5.org/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-async="true"></script>
+  <script nonce="sapfx-fixture">
+    window.__cspViolations = 0;
+    document.addEventListener("securitypolicyviolation", function () {
+      window.__cspViolations += 1;
+    });
+    window.addEventListener("load", function () {
+      sap.ui.require(["sap/ui/core/Core"], function (Core) {
+        Core.ready().then(function () {
+          sap.ui.require([
+            "sap/m/Button", "sap/m/Input"
+          ], function (Button, Input) {
+            new Button("cspBtn", { text: "CSP Go", press: function () {
+              window.__pressed = true;
+            } }).placeAt("content");
+            new Input("cspInput", { placeholder: "csp input" }).placeAt("content");
+            window.__fixtureReady = true;
+          });
+        });
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>

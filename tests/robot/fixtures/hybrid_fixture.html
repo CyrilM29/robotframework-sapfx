@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Hybrid fixture — WC + WebGUI + widget DOM + frames imbriquées</title>
+<!--
+  Fixture HORS LIGNE du support « pages hybrides » de SapFioriLibrary
+  (tests/robot/fiori_hybrid_smoke.robot) : quatre régions technologiques
+  cohabitent dans le même document, comme sur un vrai launchpad composite —
+  aucune n'a de runtime UI5 classique (le registre est vide, les moteurs
+  role/xpath sont aveugles ; c'est le cas que `Get Page Composition` doit
+  rendre visible et que les moteurs sid/wc/dom doivent couvrir).
+
+  1. Hôtes UI5 Web Components (custom elements ui5-*)         -> moteur wc
+  2. Élément WebGUI classique (attribut lsdata avec SID)      -> moteur sid
+  3. Widget web générique marqué React (data-reactroot)       -> moteur dom
+  4. Frames imbriquées level1 -> level2 (srcdoc, même origine) -> pile Push/Pop Ui5 Frame
+-->
+<style>
+  body { font-family: sans-serif; margin: 16px; }
+  iframe { width: 420px; height: 170px; border: 1px solid #888; display: block; margin-top: 12px; }
+  #widget button { padding: 4px 10px; }
+</style>
+</head>
+<body>
+  <h1>Page hybride (sans runtime UI5)</h1>
+
+  <!-- Région 1 : hôtes UI5 Web Components (moteur wc) -->
+  <ui5-button id="wcSave" design="Emphasized">Save</ui5-button>
+  <ui5-input id="wcName" placeholder="name"></ui5-input>
+
+  <!-- Région 2 : élément WebGUI classique (moteur sid) -->
+  <div lsdata='{"SID":"wnd[0]/usr/ctxtDATABROWSE-TABLENAME"}'>Table Name</div>
+
+  <!-- Région 3 : widget web générique (moteur dom), marqué comme du React.
+       Les cibles « accessibilité » n'ont volontairement PAS d'attribut role :
+       le moteur dom doit calculer le rôle IMPLICITE (sémantique HTML) et le
+       nom accessible (aria-label du bouton d'icône, label[for] du champ). -->
+  <div id="widget" data-reactroot="">
+    <button type="button" role="button" data-testid="submit"
+            onclick="const c = document.getElementById('clicks');
+                     c.textContent = String(parseInt(c.textContent, 10) + 1)">Valider</button>
+    <label for="name-input">Nom du client</label>
+    <input id="name-input" placeholder="Nom">
+    <span>clics : <span id="clicks">0</span></span>
+    <div id="note">Import terminé
+      <button type="button" aria-label="Fermer la notification"
+              onclick="document.getElementById('note').hidden = true">&#10005;</button>
+    </div>
+  </div>
+
+  <!-- Région 4 : frames imbriquées (level1 -> level2), même origine via srcdoc.
+       level2 est créé en JS dans le document de level1 : pas de srcdoc doublement
+       échappé, et __fixtureReady n'est levé qu'une fois les DEUX niveaux montés. -->
+  <iframe id="level1"></iframe>
+
+  <script>
+    const level1 = document.getElementById('level1');
+    level1.srcdoc = '<p>App embarquée (niveau 1)</p>' +
+      '<div lsdata=\'{"SID":"wnd[0]/tbar[1]/btn[8]"}\'>Execute</div>' +
+      '<div id="slot"></div>';
+    level1.addEventListener('load', () => {
+      const doc = level1.contentDocument;
+      const level2 = doc.createElement('iframe');
+      level2.id = 'level2';
+      level2.srcdoc = '<button id="deep-btn" role="button" ' +
+        'onclick="document.body.dataset.clicked = \'1\'">Deep action</button>';
+      level2.addEventListener('load', () => { window.__fixtureReady = true; });
+      doc.getElementById('slot').appendChild(level2);
+    });
+  </script>
+</body>
+</html>

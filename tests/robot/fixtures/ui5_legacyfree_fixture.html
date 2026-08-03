@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>UI5 1.136 legacy-free fixture (baseline sans APIs dépréciées)</title>
+  <!-- Runtime SAPUI5/OpenUI5 1.136-legacy-free : la variante officielle de la
+       LTS 1.136 avec TOUT le code déprécié supprimé (sap.ui.getCore() façade,
+       globals de bibliothèques, Element.registry) — le véhicule que SAP
+       recommande pour tester la compatibilité 2.x tant que 2.0 n'est pas GA
+       (licence développeur, CDN uniquement, interdit en production — parfait
+       pour un smoke). Cette fixture prouve que le bundle __SAPFX résout via le
+       module ElementRegistry et ne touche aucune API supprimée, sur la vraie
+       baseline intermédiaire que rencontreront les clients. Réseau requis. -->
+  <script id="sap-ui-bootstrap"
+    src="https://sdk.openui5.org/1.136-legacy-free/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-async="true"></script>
+  <script>
+    window.addEventListener("load", function () {
+      sap.ui.require(["sap/ui/core/Core"], function (Core) {
+        Core.ready().then(function () {
+          sap.ui.require([
+            "sap/m/Button", "sap/m/Input", "sap/m/Table", "sap/m/Column",
+            "sap/m/ColumnListItem", "sap/m/Label", "sap/m/Text",
+            "sap/ui/model/json/JSONModel"
+          ], function (Button, Input, Table, Column, ColumnListItem, Label, Text, JSONModel) {
+            new Button("lfBtn", { text: "LegacyFree Go", press: function () {
+              window.__pressed = true;
+            } }).placeAt("content");
+
+            new Input("lfInput", { placeholder: "lf input" }).placeAt("content");
+
+            var oTable = new Table("lfTable", {
+              columns: [
+                new Column({ header: new Label({ text: "Name" }) }),
+                new Column({ header: new Label({ text: "City" }) })
+              ]
+            });
+            oTable.bindItems({ path: "/rows", template: new ColumnListItem({
+              cells: [ new Text({ text: "{name}" }), new Text({ text: "{city}" }) ]
+            }) });
+            oTable.setModel(new JSONModel({ rows: [
+              { name: "Acme", city: "New York" },
+              { name: "Globex", city: "Los Angeles" }
+            ] }));
+            oTable.placeAt("content");
+
+            window.__fixtureReady = true;
+          });
+        });
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>
