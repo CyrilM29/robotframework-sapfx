@@ -1,0 +1,32 @@
+{
+  // Résolution des imports pour Pylance (mêmes chemins que robot.toml,
+  // qui couvre lui le résolveur RobotCode).
+  "python.analysis.extraPaths": [
+    "./src",
+    "./integrations/robotmcp"
+  ],
+  // Tests unitaires découvrables depuis l'IDE (pytest lit pyproject.toml).
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": [
+    "tests/unit",
+    "integrations/robotmcp/tests"
+  ],
+  // Le fichier vendorisé reste tel quel (convention 4 du CLAUDE.md) :
+  // pas de reformatage à l'enregistrement dans ce dossier.
+  "files.associations": {
+    "*.resource": "robotframework",
+    "*.robot": "robotframework"
+  },
+  "[python]": {
+    "editor.rulers": [100]
+  },
+  // Les clones de référence locaux (gitignorés, jamais poussés) ne doivent
+  // pas apparaître dans le panneau Source Control ni piloter la barre d'état
+  // (_pwsap est sur sa branche par défaut `sap/dev` — s'affiche comme « dev »).
+  "git.ignoredRepositories": [
+    "_upstream",
+    "_pwsap",
+    "_cap-sflight"
+  ]
+}

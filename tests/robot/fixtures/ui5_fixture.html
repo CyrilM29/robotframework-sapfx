@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>UI5 live fixture</title>
+  <script id="sap-ui-bootstrap"
+    src="https://sdk.openui5.org/resources/sap-ui-core.js"
+    data-sap-ui-libs="sap.m"
+    data-sap-ui-theme="sap_horizon"
+    data-sap-ui-compat-version="edge"
+    data-sap-ui-async="true"></script>
+  <script>
+    sap.ui.getCore().attachInit(function () {
+      sap.ui.require([
+        "sap/m/Table", "sap/m/Column", "sap/m/ColumnListItem", "sap/m/Label",
+        "sap/m/Text", "sap/m/Input", "sap/m/Button", "sap/m/Dialog",
+        "sap/ui/model/json/JSONModel"
+      ], function (Table, Column, ColumnListItem, Label, Text, Input, Button, Dialog, JSONModel) {
+        var data = { rows: [
+          { name: "Acme", city: "New York" },
+          { name: "Globex", city: "Los Angeles" }
+        ] };
+        var oTable = new Table("myTable", {
+          columns: [
+            new Column({ header: new Label({ text: "Name" }) }),
+            new Column({ header: new Label({ text: "City" }) })
+          ]
+        });
+        oTable.bindItems("/rows", new ColumnListItem({
+          cells: [ new Text({ text: "{name}" }), new Text({ text: "{city}" }) ]
+        }));
+        oTable.setModel(new JSONModel(data));
+        oTable.placeAt("content");
+
+        // input dont la valeur commence par '/' -> doit rester une SOUS-CHAINE (pas une regex)
+        new Input("pathInput", { value: "/sap/bc/ui5" }).placeAt("content");
+        // input pour la correspondance regex /motif/
+        new Input("nameInput", { value: "hello world", placeholder: "search here" }).placeAt("content");
+
+        new Button("openBtn", { text: "Open Dialog", press: function () {
+          var d = new Dialog("myDialog", {
+            title: "Confirm",
+            content: [ new Text({ text: "Proceed?" }) ],
+            beginButton: new Button({ text: "OK", press: function () { d.close(); } }),
+            endButton: new Button({ text: "Cancel", press: function () { d.close(); } })
+          });
+          d.open();
+        } }).placeAt("content");
+
+        window.__fixtureReady = true;
+      });
+    });
+  </script>
+</head>
+<body class="sapUiBody"><div id="content"></div></body>
+</html>

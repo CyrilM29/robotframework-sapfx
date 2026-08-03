@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "rf-mcp-sap": {
+      "command": "sapfx-mcp",
+      "args": ["--transport", "stdio", "--without-frontend"],
+      "env": {
+        "PYTHONPATH": "src;integrations/robotmcp"
+      }
+    }
+  }
+}

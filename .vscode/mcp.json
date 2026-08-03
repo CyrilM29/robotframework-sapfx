@@ -1,0 +1,20 @@
+{
+  // Serveur MCP rf-mcp (RobotMCP) + plugins SAP du projet, pour le mode agent
+  // de VS Code / GitHub Copilot. Prérequis (une fois) :
+  //   pip install -r requirements.txt rf-mcp
+  //   pip install -e integrations/robotmcp        -> enregistre SapEccPlugin/SapFioriPlugin
+  //                                                  + le lanceur sapfx-mcp (surcouche :
+  //                                                  outils sapfx_state/screenshot/reload)
+  // Le PYTHONPATH rend SapEccLibrary / SapFioriLibrary importables dans les
+  // sessions RF que le serveur ouvre (mêmes chemins que robot.toml).
+  "servers": {
+    "rf-mcp-sap": {
+      "type": "stdio",
+      "command": "sapfx-mcp",
+      "args": ["--transport", "stdio", "--without-frontend"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/integrations/robotmcp"
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>IDP factice (formulaire deux étapes, ids SAP IAS)</title>
+  <!-- Fournisseur d'identité FACTICE pour fiori_auth_smoke.robot : reproduit
+       le déroulé en DEUX étapes (utilisateur → Suivant → mot de passe →
+       connexion, le cas Azure AD) avec les ids du preset sap-ias
+       (#j_username / #j_password / #logOnFormSubmit) — le smoke exerce ainsi
+       la branche difficile du keyword ET la fiche de sélecteurs IAS.
+       Identifiants acceptés : TESTER / s3cret → redirection vers l'app UI5
+       (ui5_fixture.html). Mauvais mot de passe → erreur, on reste sur le
+       formulaire (le keyword doit échouer en le disant). -->
+  <style>
+    body { font-family: sans-serif; margin: 40px auto; max-width: 320px; }
+    input, button { display: block; width: 100%; margin: 8px 0; padding: 8px; }
+    #error { color: #b00; display: none; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Fake Corporate IDP</h1>
+  <p id="error">Invalid credentials</p>
+  <input id="j_username" type="text" placeholder="User ID" autocomplete="username">
+  <input id="j_password" type="password" placeholder="Password" class="hidden"
+         autocomplete="current-password">
+  <button id="logOnFormSubmit" type="button">Continue</button>
+  <script>
+    var step = 1;
+    document.getElementById("logOnFormSubmit").addEventListener("click", function () {
+      var user = document.getElementById("j_username").value;
+      var pass = document.getElementById("j_password");
+      if (step === 1) {
+        if (!user) { return; }
+        pass.classList.remove("hidden");     // étape 2 : le mot de passe apparaît
+        this.textContent = "Sign in";
+        step = 2;
+        return;
+      }
+      if (user === "TESTER" && pass.value === "s3cret") {
+        window.location.href = "ui5_fixture.html";
+      } else {
+        document.getElementById("error").style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>

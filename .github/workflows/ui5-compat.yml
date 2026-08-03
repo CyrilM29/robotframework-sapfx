@@ -1,0 +1,78 @@
+name: UI5 compatibility matrix
+
+# Les cibles CDN sont volontairement séparées de la CI de chaque PR : elles
+# qualifient la compatibilité externe sans rendre une contribution dépendante
+# du réseau SAP. Les deux versions maintenues sont bloquantes ; 2.x nightly
+# reste une sentinelle informative par nature instable.
+on:
+  schedule:
+    - cron: "0 5 * * 2"   # mardi 05:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  stable:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: current
+            suite: fiori_smoke.robot
+          - name: ui5-1.136-lts
+            suite: fiori_legacyfree_smoke.robot
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Browser channel
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[web]"
+          rfbrowser init chromium
+
+      - name: Run ${{ matrix.target.name }} compatibility smoke
+        run: |
+          robot --pythonpath src \
+            --outputdir "results/ui5-${{ matrix.target.name }}" \
+            "tests/robot/${{ matrix.target.suite }}"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ui5-${{ matrix.target.name }}-results
+          path: results/ui5-${{ matrix.target.name }}
+
+  nightly:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Browser channel
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[web]"
+          rfbrowser init chromium
+
+      - name: Run UI5 2.x nightly sentinel
+        run: |
+          robot --pythonpath src --outputdir results/ui5-2-nightly \
+            tests/robot/fiori_ui5v2_smoke.robot
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: ui5-2-nightly-results
+          path: results/ui5-2-nightly

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font: 13px/1.5 -apple-system, Segoe UI, sans-serif; width: 260px; margin: 0; padding: 12px; }
+    h1 { font-size: 13px; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+    h1 img { width: 20px; height: 20px; }
+    button { width: 100%; padding: 8px; margin: 4px 0; font-size: 13px; cursor: pointer;
+             border: 1px solid #0a6ed1; border-radius: 4px; background: #0a6ed1; color: #fff; }
+    button.secondary { background: #fff; color: #0a6ed1; }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; gap: 6px; }
+    .row button { margin: 4px 0; }
+    p { color: #555; margin: 8px 0 0; font-size: 12px; }
+    #status { color: #0a6ed1; font-size: 12px; margin-top: 8px; min-height: 16px; }
+    code { background: #f3f3f3; padding: 0 3px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <h1><img src="icon48.png" alt="" /> SAP UI5 / WebGUI Recorder</h1>
+  <button id="start">Start — hover &amp; click to capture</button>
+  <div class="row">
+    <button id="rec" class="secondary">Rec / Pause</button>
+    <button id="export" class="secondary">Export</button>
+  </div>
+  <button id="stop" class="secondary">Stop</button>
+  <p>Hover highlights; click copies a <code>Resolve&nbsp;Ui5&nbsp;…</code> line.
+     <b>Rec</b> records a flow → <b>Export</b> downloads a <code>.robot</code>.
+     Shortcut <code>Alt+Shift+R</code> toggles recording. <code>Esc</code> stops.</p>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

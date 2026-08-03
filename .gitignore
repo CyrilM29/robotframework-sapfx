@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.coverage
+coverage.xml
+.mypy_cache/
+
+# Robot Framework output
+output.xml
+log.html
+report.html
+playwright-log.txt
+*.png
+/results/
+# ...but the project logo + the extension's toolbar icons + store screenshot are committed assets.
+!assets/logo.png
+!assets/logo_rf-sapfx.png
+!tools/recorder/assets/icon.png
+!tools/recorder_web/extension/icon16.png
+!tools/recorder_web/extension/icon48.png
+!tools/recorder_web/extension/icon128.png
+!tools/recorder_web/extension/store/screenshot-1280x800.png
+# Baselines d'assertion visuelle (empreinte perceptuelle) — committées comme référence ;
+# les diffs de dérive `*.actual.png` restent ignorés (artefacts transitoires).
+!tests/robot/visual_baselines/*.png
+tests/robot/visual_baselines/*.actual.png
+# Images clés des démos vidéo (livrables comm, extraites des prises validées) —
+# régénérables par script, non committés ; les .webm sont les intermédiaires
+# Playwright des prises (le livrable est le MP4 composé).
+
+# Captures interactives des recorders (artefacts utilisateur)
+/tools/recorder/captures/
+/tools/recorder_web/captures/
+
+# Captures live du GIF de démo (spécifiques au poste, régénérables —
+# seuls les GIF/MP4 composés sont versionnés)
+
+# Secrets / clés — ne jamais committer
+/_keys/
+
+# Supports de présentation (documents de travail, hors périmètre du dépôt)
+*.pptx
+
+# Upstream / reference clones (kept local, not committed)
+/_upstream/
+/_pwsap/
+# Cible Fiori Elements locale (clone de SAP-samples/cap-sflight, `npx cds watch`)
+/_cap-sflight/
+
+# rf-mcp runtime output (artifacts, session state) — not committed
+/.robotmcp_artifacts/
+/.robotmcp/
+
+# IDE / OS
+.idea/
+# .vscode : la config d'équipe (settings, extensions, mcp) est versionnée ;
+# tout le reste (état local de l'utilisateur) est ignoré.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+*.swp
+Thumbs.db

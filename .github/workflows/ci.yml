@@ -1,0 +1,209 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Chaque étape ici est en lecture seule (lint/typecheck/test/dryrun) : pas besoin
+# du token par défaut du dépôt (potentiellement write). Défense en profondeur.
+permissions:
+  contents: read
+
+jobs:
+  # Suite pytest hors-SAP/hors-navigateur : s'appuie sur les substituts légers de
+  # tests/unit/conftest.py (pythoncom/win32com/robot factices) pour tourner sur un
+  # interpréteur nu sans pywin32 ni Windows — exactement l'usage que ce conftest
+  # documente. Tourne sur ubuntu pour rester rapide et bon marché.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0   # historique complet : nécessaire à la comparaison --since de check_bilingual_docs.py
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install -e integrations/robotmcp
+
+      - name: Lint (ruff)
+        if: matrix.python-version == '3.12'
+        run: ruff check src tools tests integrations scripts
+
+      - name: Type check (mypy — progressive, scoped in pyproject.toml)
+        if: matrix.python-version == '3.12'
+        run: mypy
+
+      - name: Bilingual doc pairing + drift check
+        if: matrix.python-version == '3.12'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          python scripts/check_bilingual_docs.py --since "origin/$DEFAULT_BRANCH"
+
+      - name: rf-mcp guidance <-> CLAUDE.md consistency check
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_guidance_sync.py
+
+      # Le plan est la source de vérité : une suite générée dont le plan a
+      # changé sans régénération, ou un plan marqué PÉRIMÉE par sap-healer,
+      # doit bloquer ici plutôt que dériver en silence.
+      - name: specs <-> suites provenance check
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_spec_sync.py
+
+      # Conventions #1/#2 tenues par les artefacts (et pas seulement énoncées
+      # dans CLAUDE.md) : locators bruts dans une suite GÉNÉRÉE, Sleep partout.
+      - name: Conventions guard (raw locators in generated suites, no Sleep)
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_conventions.py
+
+      # 3.10 = plancher supporté, 3.14 = dernier Python vérifié : les deux
+      # extrémités tournent en pytest nu ; la voie complète (lint, gardes,
+      # couverture) reste sur 3.12.
+      - name: Unit tests (min / latest supported Python)
+        if: matrix.python-version != '3.12'
+        run: pytest -q
+
+      - name: Unit tests with coverage
+        if: matrix.python-version == '3.12'
+        run: |
+          pytest -q \
+            --cov=src --cov=integrations/robotmcp/sap_robotmcp \
+            --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always() && matrix.python-version == '3.12'
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  # Côté Windows, deux vérifications que le job ubuntu ne peut pas offrir :
+  # 1. la suite unitaire avec le VRAI pywin32 (pas les stubs de conftest.py —
+  #    _ensure() les ignore quand les modules authentiques s'importent), ce qui
+  #    détecterait une dérive entre les substituts COM et la réalité ;
+  # 2. la résolution des mots-clés Robot (--dryrun, aucune exécution réelle)
+  #    sur toutes les suites tests/robot/, y compris les suites ECC qui
+  #    importent SapEccLibrary (pywin32). Ne requiert ni SAP ni navigateur en
+  #    direct : le dryrun ne fait que résoudre les noms de mots-clés.
+  # (id de job conservé « dryrun » — historique : une protection de branche
+  # pourrait l'exiger sous ce nom.)
+  dryrun:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[web,dev]"
+          rfbrowser init
+
+      - name: Unit tests against real pywin32 (no coverage gate — enforced on ubuntu)
+        run: pytest -q tests/unit
+
+      - name: Robot Framework keyword-resolution dry run
+        run: robot --pythonpath src --dryrun --outputdir results/dry tests/robot/
+
+      - name: Offline Browser smoke (real Chromium)
+        run: robot --pythonpath src --outputdir results/fiori-wc tests/robot/fiori_wc_smoke.robot
+
+  # Qualifie ce que l'utilisateur télécharge : build du ZIP, extraction hors du
+  # checkout, installation par le vrai script, documentation des trois libs,
+  # découverte du plugin, dry-run des exemples puis smoke Browser hors ligne.
+  release-pack:
+    runs-on: windows-latest
+    needs: test
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Build deployment ZIP
+        shell: pwsh
+        run: |
+          python scripts/build_release_pack.py --outdir "$env:RUNNER_TEMP\pack-build"
+
+      - name: Extract and install the downloadable product
+        shell: pwsh
+        run: |
+          $Zip = Get-ChildItem "$env:RUNNER_TEMP\pack-build\sapfx-pack-*-win.zip" -ErrorAction Stop
+          if ($Zip.Count -ne 1) { throw "Expected exactly one deployment ZIP, found $($Zip.Count)." }
+          $ExtractRoot = "$env:RUNNER_TEMP\pack-install"
+          Expand-Archive -Path $Zip.FullName -DestinationPath $ExtractRoot
+          $PackDir = Get-ChildItem $ExtractRoot -Directory -Filter "sapfx-pack-*-win" -ErrorAction Stop
+          if ($PackDir.Count -ne 1) { throw "Expected exactly one extracted pack, found $($PackDir.Count)." }
+          "PACK_DIR=$($PackDir.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          & "$($PackDir.FullName)\install.ps1" -WithMcp -WithBrowsers
+
+      - name: Validate installed libraries and rf-mcp plugin
+        shell: pwsh
+        run: |
+          $Python = "$env:PACK_DIR\.venv\Scripts\python.exe"
+          & $Python -m robot.libdoc SapEccLibrary "$env:RUNNER_TEMP\SapEccLibrary.libspec"
+          & $Python -m robot.libdoc SapFioriLibrary "$env:RUNNER_TEMP\SapFioriLibrary.libspec"
+          & $Python -m robot.libdoc SapApiLibrary "$env:RUNNER_TEMP\SapApiLibrary.libspec"
+          & $Python -c "import importlib.metadata as m; eps=m.entry_points().select(group='robotmcp.library_plugins'); assert {'sap_ecc','sap_fiori'} <= {e.name for e in eps}; print('rf-mcp SAP plugins discovered')"
+
+      - name: Dry-run packaged examples
+        shell: pwsh
+        run: |
+          & "$env:PACK_DIR\.venv\Scripts\robot.exe" --dryrun --outputdir "$env:RUNNER_TEMP\pack-dry" "$env:PACK_DIR\tests\robot"
+
+      - name: Run packaged offline Browser smoke
+        shell: pwsh
+        run: |
+          Push-Location $env:PACK_DIR
+          try {
+            & ".\.venv\Scripts\robot.exe" --outputdir "$env:RUNNER_TEMP\pack-wc" "tests\robot\fiori_wc_smoke.robot"
+          } finally {
+            Pop-Location
+          }
+
+      - name: Generate installed-environment SBOM
+        shell: pwsh
+        run: |
+          python -m pip install cyclonedx-bom==7.3.0
+          $PackPython = "$env:PACK_DIR\.venv\Scripts\python.exe"
+          python -m cyclonedx_py environment $PackPython --of JSON `
+            --output-reproducible -o "$env:RUNNER_TEMP\pack-build\sapfx-pack.cdx.json"
+
+      - name: Attest deployment ZIP provenance
+        if: github.event_name == 'push'
+        continue-on-error: ${{ github.event.repository.visibility != 'public' }}
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: ${{ runner.temp }}/pack-build/sapfx-pack-*-win.zip
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: sapfx-windows-pack
+          path: |
+            ${{ runner.temp }}/pack-build/sapfx-pack-*-win.zip
+            ${{ runner.temp }}/pack-build/sapfx-pack-*-win.zip.sha256
+            ${{ runner.temp }}/pack-build/sapfx-pack.cdx.json

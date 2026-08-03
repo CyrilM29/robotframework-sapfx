@@ -1,0 +1,38 @@
+name: Vendor drift check
+
+# Périodique (pas sur chaque push/PR) : clone l'upstream réel depuis GitHub et
+# vérifie que src/SapEccLibrary/_vendor/sapgui_base.py n'en diverge que par les
+# changements tolérés (convention #4 du CLAUDE.md — voir scripts/check_vendor_drift.py
+# et docs/audit-upstream.md). Un échec ici signale soit une édition directe du
+# fichier vendorisé, soit une nouvelle release amont à auditer avant re-sync.
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # tous les lundis 06:00 UTC
+  workflow_dispatch: {}    # déclenchement manuel depuis l'onglet Actions
+
+# Étape en lecture seule (clone + diff texte) : pas besoin du token par défaut du
+# dépôt (potentiellement write). Défense en profondeur.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Clone upstream robotframework-sapguilibrary
+        run: |
+          git clone --depth 1 \
+            https://github.com/frankvanderkuur/robotframework-sapguilibrary.git \
+            _upstream_fresh
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Check vendor drift against the freshly-cloned upstream
+        run: |
+          python scripts/check_vendor_drift.py \
+            --upstream-file _upstream_fresh/SapGuiLibrary/SapGuiLibrary.py

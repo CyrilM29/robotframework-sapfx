@@ -1,0 +1,28 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.{js,json,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.{robot,resource}]
+indent_style = space
+indent_size = 4
+
+[*.md]
+# Les fins de ligne significatives de Markdown ne doivent pas être rognées.
+trim_trailing_whitespace = false
+
+[src/SapEccLibrary/_vendor/**]
+# Fichier vendorisé : ne pas reformater (convention 4 du CLAUDE.md).
+trim_trailing_whitespace = false
+insert_final_newline = false
