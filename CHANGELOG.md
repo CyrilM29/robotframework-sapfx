@@ -5,7 +5,7 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
-## [Unreleased]
+## [0.6.5] - 2026-08-05
 
 ### Added
 - **Source opening (2026-08-03)**: the full source tree is now public on

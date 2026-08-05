@@ -4,4 +4,4 @@ Aucune dépendance COM ni navigateur : uniquement de la logique de synchronisati
 (sondage borné, relance sur exception) utilisée à l'identique par les deux canaux.
 Voir `polling.py`.
 """
-__version__ = "0.6.4"
+__version__ = "0.6.5"
