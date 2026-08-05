@@ -124,7 +124,7 @@ class SapApiLibrary:
     (SAP NW RFC SDK requis) ; sinon l'erreur donne la marche à suivre.
     """
 
-    __version__ = "0.6.4"
+    __version__ = "0.6.5"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
