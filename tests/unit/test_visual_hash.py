@@ -1,5 +1,5 @@
 """Tests du hash perceptuel pur (sapfx_common.visual_hash) et des keywords
-d'assertion visuelle — sans Pillow : la frontière image est stubbée, seul le
+d'assertion visuelle, sans Pillow : la frontière image est stubbée, seul le
 cœur algorithmique (matrices de gris) est exercé, comme il tournera en CI."""
 import base64
 

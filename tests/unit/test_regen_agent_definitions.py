@@ -1,8 +1,8 @@
 """Tests hors-ligne du déclinateur de définitions d'agents
-(``scripts/regen_agent_definitions.py`` — convention #5 du CLAUDE.md, appliquée
+(``scripts/regen_agent_definitions.py``, convention #5 du CLAUDE.md, appliquée
 à un script d'outillage, comme ``test_build_release_pack.py``). Vérifie le
 parse du frontmatter plat, la table de correspondance des outils Claude Code →
-VS Code, le rendu chat mode, la détection de dérive ``--check`` — et, sur le
+VS Code, le rendu chat mode, la détection de dérive ``--check``, et, sur le
 VRAI dépôt, que les chat modes committés sont à jour (pendant pytest du check CI)."""
 import importlib.util
 import os
@@ -40,7 +40,7 @@ _SAMPLE = (
 def test_parse_front_matter_splits_meta_and_body():
     meta, body = mod.parse_front_matter(_SAMPLE)
     assert meta["name"] == "sap-demo"
-    # partition sur le PREMIER ':' seulement — la description peut en contenir.
+    # partition sur le PREMIER ':' seulement : la description peut en contenir.
     assert meta["description"] == 'Demo agent, with: a colon and "quotes".'
     assert body == "\nBody line 1.\n"
 

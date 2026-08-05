@@ -3,7 +3,7 @@
 # Publier l'extension UI5 / WebGUI Recorder
 
 L'extension est prête pour le store. La soumission reste manuelle (elle nécessite votre
-compte développeur et la revue des stores) — voici les étapes exactes.
+compte développeur et la revue des stores), voici donc les étapes exactes.
 
 ## 1. Construire le paquet
 
@@ -19,7 +19,7 @@ Le zip ne contient que les fichiers d'exécution : `manifest.json`, `popup.html`
 `popup.js`, `recorder.js`, `background.js`, `bridge.js`, `icon16/48/128.png`. Les
 helpers de développement (`gen_icons.py`, `package.py`, les READMEs) sont exclus.
 Incrémentez `"version"` dans `manifest.json` avant chaque mise en ligne (actuellement
-`0.3.0`).
+`0.9.2`).
 
 ## 2. Chrome Web Store
 
@@ -27,16 +27,16 @@ Incrémentez `"version"` dans `manifest.json` avant chaque mise en ligne (actuel
    (frais uniques de 5 US$).
 2. **Add new item** → téléversez le `.zip`.
 3. Remplissez la fiche : nom, résumé, description, catégorie *Developer Tools*, langue,
-   au moins une capture **1280×800** — une prête est fournie dans
+   au moins une capture **1280×800** (une prête est fournie dans
    `store/screenshot-1280x800.png` (régénérez avec
-   `robot --pythonpath src tools/recorder_web/extension/store/make_screenshot.robot`) —
+   `robot --pythonpath src tools/recorder_web/extension/store/make_screenshot.robot`),
    et l'icône 128 px (déjà dans le paquet).
 4. **Confidentialité** : déclarez un objectif unique (« capturer des localisateurs de
    test stables et enregistrer des déroulés sur les pages SAP UI5/WebGUI ») ; justifiez
-   les permissions — `scripting` + `activeTab` ne servent qu'à injecter le recorder dans
+   les permissions : `scripting` + `activeTab` ne servent qu'à injecter le recorder dans
    l'onglet que vous activez explicitement (clic icône ou `Alt+Shift+R`). **Aucune donnée
    collectée ni transmise** (tout est local ; les sélecteurs vont au presse-papiers / un
-   `.robot` téléchargé). Fournissez l'**URL de la politique de confidentialité** —
+   `.robot` téléchargé). Fournissez l'**URL de la politique de confidentialité** :
    hébergez [`PRIVACY.fr.md`](PRIVACY.fr.md) (ex. via GitHub Pages / page brute) et collez
    son URL.
 5. Soumettez à la revue.
@@ -63,6 +63,6 @@ encore entièrement validé.
 > registre de contrôles SAP UI5 / le `lsdata` WebGUI et calculer des localisateurs de
 > test stables, plus un petit `bridge.js` pour piloter le badge de l'icône. Aucune
 > permission d'hôte n'est demandée ; rien ne s'exécute tant que l'utilisateur n'agit pas.
-> L'extension n'effectue **aucune requête réseau** et **ne collecte aucune donnée** — les
+> L'extension n'effectue **aucune requête réseau** et **ne collecte aucune donnée** ; les
 > localisateurs capturés restent dans le presse-papiers local / un `.robot` téléchargé.
 > Voir [PRIVACY.fr.md](PRIVACY.fr.md).

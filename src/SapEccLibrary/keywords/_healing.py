@@ -4,14 +4,14 @@ Un id SAP GUI hiérarchique casse typiquement par renumérotation de sous-écran
 (``subSUB0:SAPLMEGUI:0013`` -> ``:0015`` selon customizing/variante/release)
 alors que le champ visé, lui, est toujours là. Ces keywords scorent les
 contrôles réellement présents (parcours de la fenêtre active) contre l'id
-attendu — segment terminal (nom du champ dynpro) lourdement pondéré, chemin en
-LCS, type — et :
+attendu (segment terminal du nom de champ dynpro lourdement pondéré, chemin en
+LCS, type) et :
 
 * `Resolve Element With Healing` **répare** au-dessus d'un seuil, avec un
   warning journalisé (jamais silencieux : le test passe, la dérive est visible
   et le localisateur à corriger est dans le log) ;
 * `Get Closest Element Ids` alimente des messages d'erreur **auto-corrigibles**
-  (un agent rf-mcp — ou un humain — lit les candidats scorés directement dans
+  (un agent rf-mcp, ou un humain, lit les candidats scorés directement dans
   l'erreur au lieu de repartir d'une perception complète).
 
 Le scoring pur vit dans ``sapfx_common.healing`` (partagé, typé, testé).
@@ -48,14 +48,14 @@ class HealingKeywords:
            ``SAPFX_HEALING_LOG`` est défini (``sapfx_common.healing_telemetry``).
         3. Si ``label`` est fourni et que le score ne suffit pas : tentative par
            **ancre de libellé** (``sapfx_common.semantic``, grammaire de `Find
-           Element By Label`) — un libellé visible survit aux renumérotations
+           Element By Label`) : un libellé visible survit aux renumérotations
            d'écran qui pulvérisent les ids. La réparation n'est adoptée que si
            le libellé désigne UN SEUL élément (jamais de premier-match
            silencieux) ; journalisée en WARNING + télémétrie ``engine=label``.
         4. Sinon -> échec avec les ``limit`` candidats les plus proches DANS le
            message (erreur auto-corrigible : un agent peut choisir et réessayer).
 
-        Retourne toujours une **chaîne** (jamais l'objet COM — sûr à travers la
+        Retourne toujours une **chaîne** (jamais l'objet COM : sûr à travers la
         frontière rf-mcp). Usage type::
 
             ${id}=    Resolve Element With Healing    wnd[0]/usr/ctxtMEPO_TOPLINE-BSART    label=Doc. type
@@ -99,7 +99,7 @@ class HealingKeywords:
 
     def _present_ids(self):
         """Paires ``(id relatif, type)`` de tous les contrôles de la fenêtre
-        active — la population de candidats du scoring. Passe par
+        active, la population de candidats du scoring. Passe par
         ``_screen_elements`` (mixin de perception) : chemin rapide
         ``GetObjectTree`` quand disponible, marche COM sinon. Défensif : une
         fenêtre indisponible donne une liste vide (échec propre en aval)."""

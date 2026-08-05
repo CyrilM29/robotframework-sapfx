@@ -3,7 +3,7 @@
 # SAP GUI Recorder (phase 2)
 
 Outillage de localisateurs + déroulés pour le client lourd SAP. `sapgui_recorder.py`
-opère sur la même connexion COM que la bibliothèque — chaque id qu'il expose est
+opère sur la même connexion COM que la bibliothèque : chaque id qu'il expose est
 exactement ce que l'on colle dans un keyword `SapEccLibrary`. Cinq modes : **dump**,
 **surlignage**, **clic-à-capturer** interactif, **survol** (inspecteur), et un
 **enregistreur** à la demande qui transcrit vos manipulations en une séquence de
@@ -15,26 +15,26 @@ Prérequis : SAP Logon Pad ouvert avec une session en cours, scripting activé c
 serveur et client (voir `../../docs/testing-without-sap.fr.md`), et `pywin32`.
 
 ```bash
-# Dump — tout l'arbre d'objets en direct
+# Dump : tout l'arbre d'objets en direct
 python sapgui_recorder.py                  # arbre indenté -> stdout
 python sapgui_recorder.py --filter txt     # ids/types contenant "txt"
 python sapgui_recorder.py --json           # JSON -> captures/dump_<horodatage>.json
 python sapgui_recorder.py --json tree.json # JSON -> captures/tree.json
 
-# Surlignage — encadre un contrôle en rouge à l'écran (Visualize)
+# Surlignage : encadre un contrôle en rouge à l'écran (Visualize)
 python sapgui_recorder.py --highlight "wnd[0]/usr/ctxtDATABROWSE-TABLENAME"
 
-# Clic-à-capturer — enregistre chaque contrôle FOCALISÉ + une ligne de keyword
+# Clic-à-capturer : enregistre chaque contrôle FOCALISÉ + une ligne de keyword
 python sapgui_recorder.py --capture                 # Ctrl+C pour arrêter
 python sapgui_recorder.py --capture --out mes.txt   # destination personnalisée
 python sapgui_recorder.py --capture --no-highlight  # sans surligner au passage
 python sapgui_recorder.py --capture --filter btn    # seulement ids/types correspondants
 
-# Survol — encadre le contrôle SOUS LE CURSEUR en direct (inspecteur)
+# Survol : encadre le contrôle SOUS LE CURSEUR en direct (inspecteur)
 python sapgui_recorder.py --hover                    # Ctrl+C pour arrêter
 python sapgui_recorder.py --hover --out mes.txt      # enregistre aussi le survol
 
-# Record — transcrit tout un déroulé en un corps *** Test Cases *** rejouable
+# Record : transcrit tout un déroulé en un corps *** Test Cases *** rejouable
 python sapgui_recorder.py --record                   # Ctrl+C pour arrêter
 python sapgui_recorder.py --record --out scenario.robot
 python sapgui_recorder.py --record --engine native   # force le moteur natif (événements)
@@ -45,10 +45,10 @@ python sapgui_recorder.py --record --export-resources  # + paire resource-first 
 python sapgui_recorder.py --record --export-spec       # + plan Markdown format specs/ (brouillon)
 python sapgui_recorder.py --record --export-report     # + rapport HTML de documentation auto-contenu
 
-# Replay — rejoue un enregistrement contre la session SAP GUI OUVERTE (arrêt au 1er échec)
+# Replay : rejoue un enregistrement contre la session SAP GUI OUVERTE (arrêt au 1er échec)
 python sapgui_recorder.py --replay captures/record_x.robot
 
-# Transpile — convertit un enregistrement VBS ALT+F12 de SAP GUI en keywords (sans SAP)
+# Transpile : convertit un enregistrement VBS ALT+F12 de SAP GUI en keywords (sans SAP)
 python sapgui_recorder.py --transpile-vbs mon_enregistrement.vbs --suite --export-resources
 ```
 
@@ -61,41 +61,41 @@ Un enregistrement sans assertion n'est qu'un script de navigation. Pendant
 `--record` (les deux moteurs), deux **raccourcis globaux** insèrent des
 vérifications sans quitter SAP GUI :
 
-- **Ctrl+Alt+A** — assertion de valeur sur l'élément focalisé
-  (`Element Value Should Be` ; présence si l'élément n'a pas de texte lisible —
+- **Ctrl+Alt+A** : assertion de valeur sur l'élément focalisé
+  (`Element Value Should Be` ; présence si l'élément n'a pas de texte lisible,
   jamais la valeur d'un champ mot de passe) ;
-- **Ctrl+Alt+V** — assertion visuelle de l'écran courant
-  (`Screen Should Match Baseline    <out>_etape_NN` — la baseline est créée au
+- **Ctrl+Alt+V** : assertion visuelle de l'écran courant
+  (`Screen Should Match Baseline    <out>_etape_NN` ; la baseline est créée au
   premier replay, voir les keywords de perception).
 
 ### Exports post-enregistrement
 
 Le déroulé brut (ids techniques) est un **brouillon**. Quatre exports en
-dérivent — l'enregistrement brut n'est jamais modifié :
+dérivent ; l'enregistrement brut n'est jamais modifié :
 
-- `--suite` — le fichier de sortie est directement un `.robot` complet et
-  rejouable (Settings + `Suite Setup    Attach To Open Session` — le nouveau
+- `--suite` : le fichier de sortie est directement un `.robot` complet et
+  rejouable (Settings + `Suite Setup    Attach To Open Session`, le nouveau
   keyword qui rattache la bibliothèque à la session SAP GUI déjà ouverte, par
   index ; `Connect To Session` seul n'obtient que le moteur de scripting,
-  jamais la session — attrapé en rejouant un export en live).
-- `--export-resources` — écrit `<out>_keywords.resource` (chaque id devient une
+  jamais la session ; attrapé en rejouant un export en live).
+- `--export-resources` : écrit `<out>_keywords.resource` (chaque id devient une
   variable `${LOC_…}` enveloppée dans un keyword métier : `Saisir
   DATABROWSE_TABLENAME`, `Cliquer Bouton 31`…) plus
-  `<out>_resource_first.robot`, une suite qui n'appelle **que ces keywords** —
+  `<out>_resource_first.robot`, une suite qui n'appelle **que ces keywords** :
   plus aucun id brut dans le test (convention n°1 du projet, et la couche que
   `sap-healer` sait réparer).
-- `--export-spec` — écrit `<out>.spec.md`, un plan Markdown au format `specs/`
+- `--export-spec` : écrit `<out>.spec.md`, un plan Markdown au format `specs/`
   (étapes en langage métier, ids relevés relégués en notes factuelles) :
   l'enregistrement devient l'*entrée* du cycle plan → generate → heal des
   agents, au lieu d'un test figé.
-- `--export-report` — écrit `<out>_report.html`, un **rapport HTML de
+- `--export-report` : écrit `<out>_report.html`, un **rapport HTML de
   documentation auto-contenu** (CSS minimal inline, aucun script, aucune
-  ressource externe) : une phrase métier française par step — les keywords
+  ressource externe) : une phrase métier française par step (les keywords
   ECC, Fiori/UI5 **et** API sont phrasés, un déroulé mixte cross-canal se
-  documente donc aussi — avec la ligne RF exacte en regard, et les captures
+  documente donc aussi) avec la ligne RF exacte en regard, et les captures
   de `--screenshots` incrustées en data-URI par step (capture manquante
   nommée, jamais silencieuse ; les arguments nommés `password=` sont
-  toujours masqués). De la documentation pour humains — jamais un test.
+  toujours masqués). De la documentation pour humains, jamais un test.
   Concept observé chez le recorder de RoboSAPiens (`saveHtmlReport`, voir
   `NOTICE`), réimplémenté par step.
 
@@ -103,14 +103,14 @@ Les lignes sémantiques de `--semantic` (un step `Fill Field By Label` /
 `Click Button By Label` portant son id technique en commentaire de fin de
 ligne) reçoivent un export resource-first **auto-réparable** : le keyword
 généré résout via `Resolve Element With Healing` avec l'id enregistré *et*
-l'ancre de libellé — chemin nominal par id d'abord, réparation scorée +
+l'ancre de libellé : chemin nominal par id d'abord, réparation scorée +
 re-résolution par libellé sinon, jamais en silence.
 
 ### Replay (`--replay FICHIER`)
 
 Le « play » de l'esprit Selenium IDE, côté client lourd : rejoue un
 enregistrement (corps nu ou suite complète) contre la session SAP GUI **déjà
-ouverte** (`Attach To Open Session`), step par step — arrêt au premier échec
+ouverte** (`Attach To Open Session`), step par step, arrêt au premier échec
 avec le step fautif nommé ; commentaires ignorés, keywords hors bibliothèque
 signalés mais non bloquants. La GUI l'expose par le bouton **Rejouer** du
 panneau de steps (sauvegarde d'abord les éditions en attente).
@@ -118,7 +118,7 @@ panneau de steps (sauvegarde d'abord les éditions en attente).
 ### Transpile VBS (`--transpile-vbs FICHIER`)
 
 Convertit un enregistrement du « Script Recording and Playback » **intégré à
-SAP GUI (ALT+F12)** (VBScript) en keywords SapEccLibrary — via la même machine
+SAP GUI (ALT+F12)** (VBScript) en keywords SapEccLibrary, via la même machine
 à états que le moteur natif (OK-code + Entrée fusionnés en `Run Transaction`,
 menus contextuels appariés, cellules de grille suivies ; appels sans keyword
 conservés en commentaires `# non mappé`). Ne requiert **aucune session SAP** ;
@@ -128,7 +128,7 @@ normalement. Validé de bout en bout : VBS format ALT+F12 → transpile →
 
 ### Lanceur visuel (sans ligne de commande)
 
-Une fenêtre Tkinter légère (bibliothèque standard — aucune dépendance en plus) pour
+Une fenêtre Tkinter légère (bibliothèque standard, aucune dépendance en plus) pour
 choisir le mode et les options et lancer en un clic. **Double-cliquez `recorder.cmd`**
 à la racine du dépôt (Windows), ou lancez :
 
@@ -142,8 +142,8 @@ tournent dans une console séparée (sortie live + Ctrl+C) ; **Arrêter** les st
 **Dossier captures** ouvre le dossier de sortie. Les options du record (suite
 complète, export resource-first, export spec, export rapport HTML) sont des
 cases à cocher. En mode
-record, le **panneau « Étapes »** suit le fichier de sortie en direct — chaque
-step émis apparaît au fil de l'enregistrement — et permet de réordonner (↑/↓),
+record, le **panneau « Étapes »** suit le fichier de sortie en direct (chaque
+step émis apparaît au fil de l'enregistrement) et permet de réordonner (↑/↓),
 supprimer (✕), **éditer en place** (double-clic sur un step), **Enregistrer**
 le fichier corrigé et **Rejouer** (lance `--replay` contre la session ouverte,
 console séparée), comme le panneau du recorder web.
@@ -167,11 +167,11 @@ Scénario enregistré
     Send Vkey    0
 ```
 
-### Fonctionnement du mode record — deux moteurs
+### Fonctionnement du mode record : deux moteurs
 
 `--engine auto|native|poll` (défaut `auto` : natif d'abord, repli automatique).
 
-**Moteur natif** — s'abonne aux événements de l'API de scripting elle-même :
+Le **moteur natif** s'abonne aux événements de l'API de scripting elle-même :
 `Session.Record = True` fait émettre à la session un événement `Change` par action
 utilisateur avec la **commande exacte** (le mécanisme derrière l'enregistreur
 ALT+F12 intégré à SAP GUI). Chaque commande se mappe 1:1 sur un keyword :
@@ -183,20 +183,20 @@ Context Menu Item` ; les nœuds d'arbre se mappent en `Select Node` (dépliage
 compris) ; une ligne de grille sélectionnée devient `Select Table Row` ; les
 clics de cellule gardent leur ligne/colonne (suivies via les événements
 `currentCell*`) dans un commentaire enrichi. Les commandes sans équivalent
-keyword sont conservées en commentaires `# non mappé :` — rien n'est perdu en
+keyword sont conservées en commentaires `# non mappé :` ; rien n'est perdu en
 silence. Les
 mots de passe sont caviardés. Les commentaires de vkeys (`# F8`) viennent d'une
 table statique pour les touches courantes, étendue en live via
 `GuiSession.GetVKeyDescription` pour le reste (`# Shift+F5`…). La liaison aux événements n'utilise **pas** le
 `DispatchWithEvents` de pywin32 (sa génération makepy plante sur la typelib
-sapfewse — issue pywin32 #2433) mais un abonnement manuel au point de connexion
+sapfewse, issue pywin32 #2433) mais un abonnement manuel au point de connexion
 (`advise_session_events()`) ; validé en live sur A4H.
 
-**Moteur polling** (repli, et le moteur de `--screenshots`) — SAP est un système
+**Moteur polling** (repli, et le moteur de `--screenshots`). SAP est un système
 d'écrans à états : on remplit des champs (pas d'aller-retour), puis on **soumet**
 (aller-retour serveur). La frontière d'aller-retour est un changement de
 **signature d'écran** = `(programme/transaction/n° écran, ensemble complet des ids
-de contrôles)` — ainsi une action qui réaffiche le *même* dynpro (ex. *Exécuter*
+de contrôles)` : ainsi une action qui réaffiche le *même* dynpro (ex. *Exécuter*
 de SE16, qui ne fait qu'ajouter la grille de résultat) est détectée. À chaque
 frontière il émet le diff des champs éditables (`Input Text`/`Select Checkbox`/…)
 puis l'action de soumission (`Run Transaction` si un OK-code a été saisi, sinon
@@ -209,7 +209,7 @@ d'aller-retour) implique le moteur polling.
 
 Limites assumées (moteur polling) : un réaffichage strictement identique du même
 écran n'est pas détecté ; le bouton exact pressé n'est pas déductible (les
-soumissions simples deviennent `Send Vkey 0` — à ajuster si c'était un bouton
+soumissions simples deviennent `Send Vkey 0` ; à ajuster si c'était un bouton
 précis). Les deux moteurs : les mots de passe sont illisibles par scripting (émis
 en `Input Password    <id>    <password>`).
 
@@ -224,7 +224,7 @@ Une politique unifiée pour tout (`--json`, `--capture` **et** `--record`) :
 | un chemin **absolu** (`C:/tmp/t.json`) | exactement là |
 
 Un simple `python sapgui_recorder.py` sans `--json` ne fait qu'afficher dans le
-terminal — rien n'est écrit. Le dossier `captures/` est gitignoré : ce sont vos
+terminal : rien n'est écrit. Le dossier `captures/` est gitignoré : ce sont vos
 artefacts de travail, non commités.
 
 ## Pourquoi cet outil plutôt qu'un tiers
@@ -236,27 +236,27 @@ n'installe rien d'autre que pywin32.
 
 ## Feuille de route
 
-- [x] **Surlignage** — encadre un contrôle en rouge (`Visualize` natif), via `--highlight ID`.
-- [x] **Clic-à-capturer** — `--capture` enregistre chaque contrôle focalisé (polling
+- [x] **Surlignage** : encadre un contrôle en rouge (`Visualize` natif), via `--highlight ID`.
+- [x] **Clic-à-capturer** : `--capture` enregistre chaque contrôle focalisé (polling
       `ActiveWindow.GuiFocus`) avec une ligne de keyword. `--filter` s'y applique aussi.
-- [x] **Survol** — `--hover` encadre le contrôle sous le *curseur* (pas seulement le
+- [x] **Survol** : `--hover` encadre le contrôle sous le *curseur* (pas seulement le
       focalisé), en mappant `win32api.GetCursorPos` au plus petit rect `ScreenLeft/Top/Width/Height`.
-- [x] **Mode record** — `--record` suit vos manipulations et émet un corps
+- [x] **Mode record** : `--record` suit vos manipulations et émet un corps
       `*** Test Cases ***` rejouable (diff par aller-retour via la signature d'écran).
       Validé en live sur ABAP Platform A4H.
-- [x] **Moteur natif à événements** — `--engine native` transcrit les événements
+- [x] **Moteur natif à événements** : `--engine native` transcrit les événements
       `Change` de l'API de scripting (boutons exacts, grilles, arbres ;
       `Run Transaction` fusionné), avec capture par hit-test (`Hit`/`FocusChanged`)
       et repli polling automatique. Validé en live de bout en bout sur A4H (actions
       manuelles *et* scriptées).
-- [x] **Assertions à chaud + exports (2026-07)** — raccourcis Ctrl+Alt+A/V pendant
+- [x] **Assertions à chaud + exports (2026-07)** : raccourcis Ctrl+Alt+A/V pendant
       le record ; `--suite` (.robot complet rejouable) ; `--export-resources`
       (paire resource-first, aucun id brut dans les tests) ; `--export-spec`
       (plan au format specs/). Capture/survol suggèrent aussi `Click Element At
       Offset` (position relative du curseur) quand la cible est un
-      `GuiShell`/`GuiChart` opaque — le repli pointeur que l'API ne scripte pas.
-- [ ] **Presse-papiers** — copier la ligne de keyword directement dans le presse-papiers.
-- [ ] **Transpile VBS** — consommer la sortie `.vbs` du « Script Recording and
+      `GuiShell`/`GuiChart` opaque : le repli pointeur que l'API ne scripte pas.
+- [ ] **Presse-papiers** : copier la ligne de keyword directement dans le presse-papiers.
+- [ ] **Transpile VBS** : consommer la sortie `.vbs` du « Script Recording and
       Playback » intégré à SAP GUI et émettre des keywords `SapEccLibrary`.
 
 ## Pendant web (Fiori)
@@ -264,5 +264,5 @@ n'installe rien d'autre que pywin32.
 Le recorder web est dans [`../recorder_web/`](../recorder_web/) : un extrait DevTools
 et une extension navigateur qui surlignent au survol, capturent des localisateurs
 UI5/WebGUI, et (mode record) transcrivent clics/saisies en séquences
-`Click Ui5 Control` / `Fill Ui5 Input` — générés depuis le même bundle de résolution
+`Click Ui5 Control` / `Fill Ui5 Input`, générés depuis le même bundle de résolution
 `SapFioriLibrary`.

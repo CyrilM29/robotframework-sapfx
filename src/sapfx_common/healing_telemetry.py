@@ -2,16 +2,16 @@
 
 Le healing (``Resolve Element With Healing`` côté ECC, ``Resolve Ui5 With
 Fallback`` côté Fiori) journalise déjà chaque réparation en WARNING dans le log
-Robot — visible, mais volatile : chaque run écrase le précédent. Ce module y
+Robot, visible mais volatile : chaque run écrase le précédent. Ce module y
 ajoute un journal **JSONL cumulatif** (une ligne JSON par réparation, en append)
 qui survit aux runs : en le relisant sur une semaine de CI, on voit *quels*
-localisateurs dérivent de façon récurrente — le healing devient un outil de
+localisateurs dérivent de façon récurrente : le healing devient un outil de
 maintenance préventive des ``resources/``, pas seulement une rustine de runtime.
 
 Opt-in par variable d'environnement : ``SAPFX_HEALING_LOG=<chemin du fichier>``
-(désactivé si absente/vide — zéro coût). Best-effort par contrat : la télémétrie
+(désactivé si absente/vide, zéro coût). Best-effort par contrat : la télémétrie
 ne fait JAMAIS échouer un test (toute erreur d'E/S est avalée), et n'écrit
-jamais de valeur saisie — uniquement des localisateurs.
+jamais de valeur saisie, uniquement des localisateurs.
 
 Module pur (aucune dépendance COM/navigateur/Robot), typé, testé hors SAP.
 """
@@ -45,8 +45,8 @@ def record_healing(channel: str, original: str, healed: str,
     ``channel`` identifie le canal (``ecc`` / ``fiori``), ``original`` le
     localisateur primaire qui a dérivé, ``healed`` ce qui a été retenu à la
     place ; ``score`` (ECC : similarité [0,1]) et ``engine`` (Fiori : moteur de
-    repli — xpath/sid/wc) sont facultatifs. Retourne ``True`` si une ligne a été
-    écrite, ``False`` sinon (désactivé ou erreur d'E/S — jamais d'exception)."""
+    repli, xpath/sid/wc) sont facultatifs. Retourne ``True`` si une ligne a été
+    écrite, ``False`` sinon (désactivé ou erreur d'E/S, jamais d'exception)."""
     path = telemetry_path()
     if not path:
         return False

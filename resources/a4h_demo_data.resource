@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Préparation des jeux de données de démo de l'ABAP Platform Trial
-...                 (A4H) — voir docs/sap-test-data.fr.md. Rend les smokes ECC
+...                 (A4H) : voir docs/sap-test-data.fr.md. Rend les smokes ECC
 ...                 data-driven déterministes : on garantit que SFLIGHT (modèle vol
 ...                 classique) et EPM (SNWD_*) contiennent des données avant de lire.
 ...                 Les générateurs standard SAP utilisés :
@@ -27,7 +27,7 @@ Table Is Populated
 Generate Flight Demo Data
     [Documentation]    Lance ``SAPBC_DATA_GENERATOR`` (SE38) avec ses paramètres par
     ...                défaut (jeu minimal) : supprime puis régénère les tables du
-    ...                modèle vol (SPFLI, SFLIGHT, SBOOK…). Long — jusqu'à quelques
+    ...                modèle vol (SPFLI, SFLIGHT, SBOOK…). Long : jusqu'à quelques
     ...                minutes sur le trial.
     Run Report    SAPBC_DATA_GENERATOR
     # Écran de sélection du générateur -> exécuter tel quel (F8).
@@ -49,7 +49,7 @@ Ensure Flight Demo Data Exists
 Generate EPM Demo Data
     [Documentation]    Lance la génération EPM standard (transaction ``SEPM_DG``,
     ...                rapport SEPM_DG_EPM_STD_CHANNEL) avec ses paramètres par
-    ...                défaut. Long — plusieurs minutes possibles.
+    ...                défaut. Long : plusieurs minutes possibles.
     Go To Transaction    SEPM_DG
     Send Vkey    8
     Wait Until Busy Done    timeout=900s

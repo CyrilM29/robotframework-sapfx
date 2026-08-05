@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Smoke ECC **data-driven** contre l'ABAP Platform Trial (A4H) :
 ...                 garantit d'abord des données de démo (SFLIGHT via
-...                 SAPBC_DATA_GENERATOR — génération uniquement si la table est
+...                 SAPBC_DATA_GENERATOR : génération uniquement si la table est
 ...                 vide), puis lit des grilles garanties non vides. Assertions
 ...                 indépendantes de la locale : identifiants techniques de colonnes
 ...                 (``CARRID``), jamais les titres affichés. Voir
@@ -36,7 +36,7 @@ SFLIGHT Grid Has Flight Data
     Should Not Be Empty    ${rows}
 
 SPFLI Connections Are Readable
-    [Documentation]    Le même générateur alimente SPFLI (liaisons) — lecture de la
+    [Documentation]    Le même générateur alimente SPFLI (liaisons) : lecture de la
     ...                première cellule de la colonne technique CONNID par titre résolu.
     Display Table Contents    SPFLI
     ${ids}=    Get Grid Column Ids    ${SE16_GRID}
@@ -46,7 +46,7 @@ SPFLI Connections Are Readable
 
 EPM Purchase Orders Are Readable
     [Documentation]    Les commandes d'achat EPM (SNWD_PO, générées par SEPM_DG)
-    ...                sont lisibles — colonne technique PO_ID présente et lignes non vides.
+    ...                sont lisibles : colonne technique PO_ID présente et lignes non vides.
     Display Table Contents    SNWD_PO
     ${ids}=    Get Grid Column Ids    ${SE16_GRID}
     Should Contain    ${ids}    PO_ID
@@ -54,7 +54,7 @@ EPM Purchase Orders Are Readable
     Should Not Be Empty    ${rows}
 
 Flight Data Survives A Reread
-    [Documentation]    Relire SFLIGHT donne un résultat stable (mêmes colonnes) —
+    [Documentation]    Relire SFLIGHT donne un résultat stable (mêmes colonnes) :
     ...                garde-fou contre un état de session résiduel entre lectures.
     Display Table Contents    SFLIGHT
     ${first}=    Get Grid Column Ids    ${SE16_GRID}

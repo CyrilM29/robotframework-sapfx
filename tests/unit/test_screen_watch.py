@@ -36,7 +36,7 @@ def test_compare_watch_derive_structurelle_nommee():
 
 
 def test_compare_watch_disparition_reste_un_bloc_moins_plus():
-    # un élément réellement DISPARU (aucun id proche) garde la ligne « - » —
+    # un élément réellement DISPARU (aucun id proche) garde la ligne « - » :
     # l'appariement ne fabrique jamais un faux renommage.
     sig_sans_bouton = "\n".join(
         line for line in SIG_V1.splitlines() if "btn[31]" not in line)
@@ -167,7 +167,7 @@ def test_render_watch_report_inclut_la_derive_localisee():
     from sapfx_common.screen_watch import apply_tile_verdict
     outcome = apply_tile_verdict(
         compare_watch("SE16", SIG_V1, SIG_V1),
-        "tuile (2,1) [0,262 484x262] : 7 bits — éléments : usr/cntlGRID1")
+        "tuile (2,1) [0,262 484x262] : 7 bits ; éléments : usr/cntlGRID1")
     report = render_watch_report([outcome])
     assert "dérive visuelle localisée" in report
     assert "usr/cntlGRID1" in report

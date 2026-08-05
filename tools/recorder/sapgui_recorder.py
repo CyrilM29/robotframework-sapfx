@@ -1,28 +1,28 @@
-"""SAP GUI Recorder — capture de localisateurs pour le client bureau (phase 2).
+"""SAP GUI Recorder : capture de localisateurs pour le client bureau (phase 2).
 
 Cinq usages, du plus simple au plus interactif :
 
-1. **Dump** (par défaut) — parcourt l'arbre d'objets SAP GUI en direct via l'API de
+1. **Dump** (par défaut) : parcourt l'arbre d'objets SAP GUI en direct via l'API de
    scripting et liste chaque élément avec son id complet, son type et son texte.
    Cet id est exactement ce que l'on colle dans un mot-clé SapEccLibrary
    (``wnd[0]/usr/txtRSYST-BNAME``).
-2. **Surlignage** (``--highlight ID``) — encadre un contrôle **en rouge à l'écran**
+2. **Surlignage** (``--highlight ID``) : encadre un contrôle **en rouge à l'écran**
    via la méthode native ``Visualize`` de SAP GUI Scripting, pour vérifier
    visuellement à quoi correspond un id.
-3. **Clic-à-capturer** (``--capture``) — surveille l'élément qui a le **focus** dans
+3. **Clic-à-capturer** (``--capture``) : surveille l'élément qui a le **focus** dans
    SAP GUI (``ActiveWindow.GuiFocus``) ; à chaque fois que tu cliques/tabules sur un
    champ, il enregistre son id, le surligne, et propose une **ligne de mot-clé prête
    à coller** (``Input Text``, ``Click Element``…). C'est le vrai enregistreur.
-4. **Survol** (``--hover``) — encadre en continu le contrôle **sous le curseur** (et
+4. **Survol** (``--hover``) : encadre en continu le contrôle **sous le curseur** (et
    non celui qui a le focus) : associe la position souris (``win32api.GetCursorPos``)
    au plus petit rectangle écran (``ScreenLeft/Top/Width/Height``) qui la contient.
    Inspecteur live ; avec ``--out``, enregistre aussi chaque contrôle survolé.
-5. **Enregistreur** (``--record``) — suit tes manipulations et transcrit le déroulé
+5. **Enregistreur** (``--record``) : suit tes manipulations et transcrit le déroulé
    en une **séquence de keywords rejouable** (un corps ``*** Test Cases ***``). Modèle
    par aller-retour : entre deux écrans, diff des champs éditables -> ``Input Text``…
    puis l'action de soumission (``Run Transaction`` si OK-code saisi, sinon ``Send Vkey 0``).
    Avec ``--screenshots``, capture aussi (best-effort, bitmap) l'écran d'arrivée de
-   chaque aller-retour — utile pour diagnostiquer visuellement un replay qui diverge.
+   chaque aller-retour, utile pour diagnostiquer visuellement un replay qui diverge.
 
 Utilisation (avec SAP Logon Pad ouvert et une session en cours) :
     python sapgui_recorder.py                      # arbre complet -> terminal
@@ -38,7 +38,7 @@ Utilisation (avec SAP Logon Pad ouvert et une session en cours) :
                                                    # id technique en commentaire (moteur natif)
 
 Politique de sauvegarde unifiée : tout artefact (dump JSON et captures) atterrit dans
-``tools/recorder/captures/`` — horodaté si aucun nom n'est donné, sous ``captures/`` pour un
+``tools/recorder/captures/`` : horodaté si aucun nom n'est donné, sous ``captures/`` pour un
 chemin relatif, et tel quel pour un chemin absolu. Le dump sans ``--json`` reste un
 simple affichage terminal.
 
@@ -93,7 +93,7 @@ def relative_id(full_id):
     ``walk`` part du nœud session et SAP GUI expose le ``.Id`` **absolu** de chaque
     descendant (``/app/con[0]/ses[0]/wnd[0]/usr/txt...``). Or ``SapEccLibrary`` résout
     via ``session.findById(id)``, donc **relativement à la session**
-    (``wnd[0]/usr/txt...``) — la forme qu'utilisent tests et ``resources/``. On
+    (``wnd[0]/usr/txt...``) : la forme qu'utilisent tests et ``resources/``. On
     normalise pour que chaque id surfacé soit réellement collable. Un id déjà
     relatif (sans préfixe) est renvoyé tel quel."""
     return _SESSION_PREFIX.sub("", full_id or "")
@@ -190,7 +190,7 @@ def find_element(engine, element_id):
     """Cherche un élément par id dans toutes les sessions ouvertes ; ``None`` si absent.
 
     ``findById(id, False)`` renvoie ``None`` au lieu de lever quand l'id est
-    introuvable — on parcourt les sessions car l'id pourrait viser n'importe laquelle."""
+    introuvable : on parcourt les sessions car l'id pourrait viser n'importe laquelle."""
     for ci in range(engine.Children.Count):
         connection = engine.Children.ElementAt(ci)
         for si in range(connection.Children.Count):
@@ -223,7 +223,7 @@ def highlight(engine, element_id, seconds=3.0):
 def active_focus(session):
     """Retourne l'élément focalisé de la fenêtre active d'une session, ou ``None``.
 
-    ``GuiMainWindow.GuiFocus`` pointe le contrôle qui a le focus — c'est le socle
+    ``GuiMainWindow.GuiFocus`` pointe le contrôle qui a le focus : c'est le socle
     fiable du clic-à-capturer (validé en live sur ABAP Platform A4H)."""
     try:
         window = session.ActiveWindow
@@ -281,7 +281,7 @@ def default_dump_path(now=None):
 
 
 def resolve_save_path(path, default_factory):
-    """Politique de sauvegarde unifiée — tout va dans ``captures/`` sauf chemin absolu.
+    """Politique de sauvegarde unifiée : tout va dans ``captures/`` sauf chemin absolu.
 
     - ``None`` (option sans valeur)  -> ``default_factory()`` (horodaté dans captures/)
     - chemin **relatif**             -> sous ``captures/`` (artefact de travail)
@@ -313,7 +313,7 @@ def capture_loop(engine, out_path, do_highlight=True, poll_seconds=0.3,
     tests : en production la boucle tourne indéfiniment et écrit sur stdout + fichier."""
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     fh = open(out_path, "w", encoding="utf-8")
-    fh.write("# Captures SAP GUI Spy — %s\n\n" % out_path)
+    fh.write("# Captures SAP GUI Spy : %s\n\n" % out_path)
     fh.flush()
     _writer("Mode capture : clique/tabule sur les champs dans SAP GUI.")
     _writer("Chaque élément focalisé est enregistré -> %s" % out_path)
@@ -345,7 +345,7 @@ def capture_loop(engine, out_path, do_highlight=True, poll_seconds=0.3,
                                 pass
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        _writer("\nArrêt — %s élément(s) capturé(s) dans %s" % (count, out_path))
+        _writer("\nArrêt : %s élément(s) capturé(s) dans %s" % (count, out_path))
     finally:
         fh.close()
     return count
@@ -380,7 +380,7 @@ def iter_active_window_elements(engine):
     non visible pouvait l'emporter dans `element_at` sur le contrôle réellement
     sous le curseur. On n'a pas de notion de z-order/premier-plan **entre
     sessions** via l'API Scripting (pas de hWnd fiable exposé), donc ceci
-    reste une approximation par session — mais élimine le cas le plus fréquent
+    reste une approximation par session, mais élimine le cas le plus fréquent
     (fenêtres résiduelles au sein d'une même session)."""
     for ci in range(engine.Children.Count):
         connection = engine.Children.ElementAt(ci)
@@ -417,7 +417,7 @@ def capture_rect_to_bmp(rect, out_path):
     ces coordonnées écran, obtenues via `element_rect` (``ScreenLeft/ScreenTop/
     Width/Height``, déjà utilisées et fiables pour ``--hover``). Recette GDI
     standard (``BitBlt`` depuis le DC du bureau) via pywin32, déjà une dépendance
-    du projet — pas de nouvelle dépendance (Pillow, etc.)."""
+    du projet : pas de nouvelle dépendance (Pillow, etc.)."""
     if win32gui is None or win32ui is None or win32con is None:
         return False
     left, top, width, height = rect
@@ -481,7 +481,7 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
     """Mode survol : encadre en rouge le contrôle sous le curseur, en continu.
 
     ``filter_text`` (option ``--filter``) restreint aux contrôles dont l'id ou le type
-    le contient — les autres sont ignorés (ni cadre ni capture). ``cursor_fn`` (défaut
+    le contient : les autres sont ignorés (ni cadre ni capture). ``cursor_fn`` (défaut
     ``win32api.GetCursorPos``) et ``_max_iterations`` sont des points d'injection pour
     les tests. Si ``out_path`` est fourni, chaque nouveau contrôle survolé est aussi
     enregistré (sinon : inspecteur live, sans fichier)."""
@@ -493,7 +493,7 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
     if out_path:
         os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
         fh = open(out_path, "w", encoding="utf-8")
-        fh.write("# Survol SAP GUI Spy — %s\n\n" % out_path)
+        fh.write("# Survol SAP GUI Spy : %s\n\n" % out_path)
         fh.flush()
     _writer("Mode survol : déplace la souris sur SAP GUI ; le contrôle sous le curseur est encadré.")
     _writer("Ctrl+C pour arrêter." + (" Enregistrement -> %s" % out_path if out_path else ""))
@@ -554,7 +554,7 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
 # entre deux écrans, on diffe l'état des champs éditables et on émet les Input...
 # correspondants, puis l'action de soumission (Run Transaction si un okcode a été
 # saisi, sinon Send Vkey 0). La frontière d'aller-retour = changement d'écran
-# (programme/transaction/numéro d'écran via session.Info) — robuste sans devoir
+# (programme/transaction/numéro d'écran via session.Info) : robuste sans devoir
 # intercepter session.Busy. La logique de décision est isolée dans process_poll
 # (pure, testable hors SAP).
 
@@ -574,7 +574,7 @@ def first_session(engine):
 
 def screen_key(session):
     """Identité de l'écran courant ``(programme, transaction, n° écran)`` via
-    ``session.Info`` — son changement marque un aller-retour serveur."""
+    ``session.Info`` : son changement marque un aller-retour serveur."""
     try:
         info = session.Info
     except (AttributeError, com_error):
@@ -632,8 +632,8 @@ def _field_step(eid, etype, value):
 
     `diff_to_steps` a déjà écarté les champs inchangés et les nouveaux champs
     vides : une valeur falsy ICI est donc une action délibérée (case décochée,
-    champ vidé) et s'enregistre — ``Unselect Checkbox``, ``Input Text …
-    ${EMPTY}`` — au même contrat que le moteur natif. Seul le radio reste
+    champ vidé) et s'enregistre : ``Unselect Checkbox``, ``Input Text …
+    ${EMPTY}``, au même contrat que le moteur natif. Seul le radio reste
     émis-si-True : son False est induit par le frère nouvellement coché."""
     if etype in ("GuiTextField", "GuiCTextField"):
         return "Input Text    %s    %s" % (eid, rf_escape_value(value))
@@ -667,7 +667,7 @@ def diff_to_steps(prev, cur):
 
 def submit_step(okcd):
     """Action de soumission : ``Run Transaction`` si un OK-code a été saisi, sinon
-    ``Send Vkey 0`` (Entrée — le bouton exact n'est pas déductible en polling)."""
+    ``Send Vkey 0`` (Entrée, le bouton exact n'est pas déductible en polling)."""
     return ("Run Transaction    %s" % okcd) if okcd else "Send Vkey    0"
 
 
@@ -747,13 +747,13 @@ def default_record_path(now=None):
 # Trois exports le rapprochent d'un test maintenable, sans rien perdre :
 #   * ``--suite``            : fichier .robot COMPLET (Settings + Suite Setup),
 #     rejouable tel quel contre la session SAP GUI déjà ouverte ;
-#   * ``--export-resources`` : la paire resource-first — un ``.resource`` où
+#   * ``--export-resources`` : la paire resource-first, un ``.resource`` où
 #     chaque id devient une variable ``${LOC_…}`` enveloppée dans un keyword
 #     métier, et la suite n'appelle plus QUE ces keywords (convention n°1 du
-#     projet : aucun id brut dans les tests — et c'est la couche resources que
+#     projet : aucun id brut dans les tests, et c'est la couche resources que
 #     sap-healer sait réparer) ;
 #   * ``--export-spec``      : un plan Markdown au format ``specs/`` (étapes en
-#     langage métier, ids relégués en notes factuelles) — l'enregistrement
+#     langage métier, ids relégués en notes factuelles) : l'enregistrement
 #     devient l'ENTRÉE du cycle plan → generate → heal au lieu d'un test figé.
 # Tout est pur (texte -> texte) et testé hors SAP.
 
@@ -761,12 +761,12 @@ DEFAULT_TEST_NAME = "Scénario enregistré"
 
 _SUITE_SETTINGS = (
     "*** Settings ***\n"
-    "Documentation       Enregistré par SAP GUI Recorder — replay : SAP Logon ouvert,\n"
+    "Documentation       Enregistré par SAP GUI Recorder. Replay : SAP Logon ouvert,\n"
     "...                 session connectée (le Suite Setup s'y rattache).\n"
     "Library             SapEccLibrary\n"
     "\n"
     # Attach To Open Session (et non Connect To Session : celui-ci n'obtient que
-    # le moteur, jamais la session — replay impossible ; découvert par le replay
+    # le moteur, jamais la session : replay impossible ; découvert par le replay
     # live d'un export, 2026-07-19).
     "Suite Setup         Attach To Open Session\n"
     "\n")
@@ -777,7 +777,7 @@ def build_record_header(out_path, suite=False, test_name=DEFAULT_TEST_NAME,
     """En-tête du fichier d'enregistrement : corps nu (historique) ou suite
     complète (``--suite``) ; ``resource_file`` ajoute l'import Resource
     (export resource-first)."""
-    header = "# Enregistré par SAP GUI Recorder — %s\n\n" % out_path
+    header = "# Enregistré par SAP GUI Recorder : %s\n\n" % out_path
     if suite or resource_file:
         settings = _SUITE_SETTINGS
         if resource_file:
@@ -792,7 +792,7 @@ def build_record_header(out_path, suite=False, test_name=DEFAULT_TEST_NAME,
 
 def parse_recorded_body(text):
     """Relit un fichier d'enregistrement (corps nu OU suite complète) et
-    retourne ``(nom du test, [étapes])`` — les étapes sont les lignes indentées
+    retourne ``(nom du test, [étapes])`` : les étapes sont les lignes indentées
     du premier test, commentaires inclus (``# screenshot: …``)."""
     name = None
     steps = []
@@ -941,7 +941,7 @@ def steps_to_resource_first(steps, test_name=DEFAULT_TEST_NAME,
     DATABROWSE_TABLENAME``) adossé à une variable ``${LOC_…}`` dans le
     resource ; la suite n'appelle plus que ces keywords. Les lignes déjà
     métier (``Run Transaction``, ``Send Vkey``, keywords sémantiques,
-    baselines visuelles, commentaires) passent inchangées — jamais de perte
+    baselines visuelles, commentaires) passent inchangées : jamais de perte
     d'information."""
     variables = {}          # eid -> nom de variable
     var_order = []
@@ -983,7 +983,7 @@ def steps_to_resource_first(steps, test_name=DEFAULT_TEST_NAME,
         wrapper = _RESOURCE_WRAPPERS.get(cells[0]) if cells else None
         if cells and id_hint and cells[0] == "Fill Field By Label" and len(cells) >= 3:
             # Ligne sémantique du record natif --semantic : libellé ET id connus.
-            # Le keyword généré naît AUTO-RÉPARABLE — résolution nominale par id,
+            # Le keyword généré naît AUTO-RÉPARABLE : résolution nominale par id,
             # réparation scorée + ancre de libellé sinon (jamais silencieuse).
             loc = var_for(id_hint.group(1))
             slug = loc[len("${LOC_"):-1]
@@ -1031,7 +1031,7 @@ def steps_to_resource_first(steps, test_name=DEFAULT_TEST_NAME,
             test_lines.append(step)      # déjà métier / commentaire / inconnu
 
     resource = ["*** Settings ***",
-                "Documentation       Keywords générés par le SAP GUI Recorder — brouillon",
+                "Documentation       Keywords générés par le SAP GUI Recorder : brouillon",
                 "...                 à renommer/factoriser dans resources/ (site_keywords).",
                 "Library             SapEccLibrary",
                 ""]
@@ -1062,7 +1062,7 @@ def md_code(text):
     CommonMark) : la clôture est une série de backticks plus longue que toute
     série interne, et un espace de bourrage isole un contenu qui commence ou
     finit par un backtick. Protège les plans générés des métacaractères
-    Markdown dans les données enregistrées — ``*LH*`` (joker SAP typique en
+    Markdown dans les données enregistrées : ``*LH*`` (joker SAP typique en
     écran de sélection) rendrait « LH » en italique entre simples guillemets."""
     text = str(text)
     longest = max((len(run) for run in re.findall("`+", text)), default=0)
@@ -1072,11 +1072,11 @@ def md_code(text):
 
 
 def _humanize_step(cells, comment):
-    """Phrase métier française pour une étape connue — ou ``None`` (étape à
+    """Phrase métier française pour une étape connue, ou ``None`` (étape à
     laisser en brut). Aucun id SAP dedans (contrat ``specs/``) ; les valeurs
     sont DÉSÉCHAPPÉES pour l'affichage (le plan est en langage humain), et
     toute donnée interpolée passe en code span `md_code` (style de l'exemple
-    de référence ``specs/`` — et un ``*``/``_`` saisi ne met pas le plan en
+    de référence ``specs/``, et un ``*``/``_`` saisi ne met pas le plan en
     italique)."""
     kw = cells[0] if cells else ""
     if kw == "Input Text" and len(cells) >= 3:
@@ -1128,7 +1128,7 @@ def _humanize_step(cells, comment):
 def steps_to_spec(steps, test_name=DEFAULT_TEST_NAME,
                   system="session SAP GUI locale (à préciser)"):
     """Transforme un déroulé brut en **plan Markdown** au format ``specs/`` :
-    étapes en langage métier (aucun id SAP — convention du répertoire), ids
+    étapes en langage métier (aucun id SAP, convention du répertoire), ids
     relevés relégués en « Points de vigilance » comme notes factuelles pour le
     sap-generator. Le plan est marqué BROUILLON : à retravailler (résultats
     attendus, données) avant génération."""
@@ -1145,7 +1145,7 @@ def steps_to_spec(steps, test_name=DEFAULT_TEST_NAME,
                 ids_seen[cell] = len(etapes) + 1
         if human is None:
             # Étape inconnue : la ligne exacte ne va dans les étapes QUE si elle
-            # ne porte aucun id (contrat specs/ — pas d'id dans les étapes) ;
+            # ne porte aucun id (contrat specs/ : pas d'id dans les étapes) ;
             # sinon elle vit en « Points de vigilance », intégralement.
             if any(c.startswith("wnd[") for c in cells[1:]):
                 raw_steps.append((step, len(etapes) + 1))
@@ -1156,7 +1156,7 @@ def steps_to_spec(steps, test_name=DEFAULT_TEST_NAME,
         etapes.append(human)
     lines = ["# %s" % test_name,
              "",
-             "> **Brouillon généré par le SAP GUI Recorder** — à retravailler",
+             "> **Brouillon généré par le SAP GUI Recorder** : à retravailler",
              "> (résultats attendus, données) avant passage au sap-generator.",
              "",
              "- **Canal** : ECC (SAP GUI)",
@@ -1199,13 +1199,13 @@ def steps_to_spec(steps, test_name=DEFAULT_TEST_NAME,
 # --- Export rapport HTML : la documentation humaine d'un enregistrement -------
 #
 # 4e export (`--export-report`) : une page HTML AUTO-CONTENUE (CSS minimal
-# inline, captures en data-URI — aucune dépendance, aucun réseau) qui documente
+# inline, captures en data-URI : aucune dépendance, aucun réseau) qui documente
 # le déroulé en langage métier, la ligne RF exacte en regard, et l'écran
 # d'arrivée de chaque aller-retour quand ``--screenshots`` était actif.
-# Concept observé chez RoboSAPiens (saveHtmlReport — NOTICE) ; réimplémenté sur
+# Concept observé chez RoboSAPiens (saveHtmlReport, NOTICE) ; réimplémenté sur
 # notre modèle : par STEP (pas une capture par fenêtre), texte -> texte pur,
 # lecture des captures injectable (testable hors SAP). Ce rapport est une
-# documentation, jamais un artefact rejouable — l'enregistrement brut fait foi.
+# documentation, jamais un artefact rejouable : l'enregistrement brut fait foi.
 
 _REPORT_CSS = """\
 body { font-family: system-ui, 'Segoe UI', sans-serif; margin: 2em auto;
@@ -1246,7 +1246,7 @@ def report_screenshot_loader(record_dir):
     quel, chemin relatif essayé depuis le répertoire courant PUIS depuis le
     dossier de l'enregistrement (les commentaires ``# screenshot:`` stockent le
     chemin tel que le record l'a construit). Retourne ``(mime, octets)`` ou
-    ``None`` — jamais d'exception : une capture illisible devient une mention
+    ``None`` ; jamais d'exception : une capture illisible devient une mention
     honnête dans le rapport, pas un échec d'export."""
     def load(path):
         candidates = [path] if os.path.isabs(path) else \
@@ -1270,7 +1270,7 @@ def report_screenshot_loader(record_dir):
 # spec, lui, reste borné au contrat ECC du recorder desktop. Le sélecteur/
 # chemin est rendu tel quel (la ligne exacte est de toute façon en regard).
 def _humanize_channel_step(cells):
-    """Phrase métier française pour un keyword Fiori/UI5 ou API — ou ``None``."""
+    """Phrase métier française pour un keyword Fiori/UI5 ou API, ou ``None``."""
     kw = cells[0] if cells else ""
 
     def rest(start, stop=None):
@@ -1333,7 +1333,7 @@ def steps_to_report(steps, test_name=DEFAULT_TEST_NAME, source="",
     """Transforme un déroulé brut en **rapport HTML de documentation**
     auto-contenu (chaîne). Chaque étape porte sa phrase métier (celle de
     l'export spec, étendue aux keywords Fiori/UI5 et API pour les déroulés
-    mixtes) ET la ligne RF exacte — le rapport n'invente rien ; les
+    mixtes) ET la ligne RF exacte : le rapport n'invente rien ; les
     commentaires ``# screenshot: <chemin>`` deviennent l'« écran d'arrivée »
     de l'étape précédente, image inline en data-URI via ``screenshot_loader``
     (``chemin -> (mime, octets) | None`` ; ``None`` = pas d'images)."""
@@ -1366,7 +1366,7 @@ def steps_to_report(steps, test_name=DEFAULT_TEST_NAME, source="",
            "</head>",
            "<body>",
            "<h1>%s</h1>" % _esc(test_name),
-           '<p class="meta">Rapport généré par le SAP GUI Recorder%s — '
+           '<p class="meta">Rapport généré par le SAP GUI Recorder%s, '
            "%d étape(s). Documentation du déroulé enregistré : "
            "l'enregistrement brut fait foi, ce rapport n'est pas un test.</p>"
            % ((" depuis %s" % _esc(source)) if source else "", step_count),
@@ -1390,14 +1390,14 @@ def steps_to_report(steps, test_name=DEFAULT_TEST_NAME, source="",
 
 def _report_shots(shots):
     """Fragments HTML des captures d'une étape : image inline (data-URI) quand
-    le chargeur l'a lue, mention honnête sinon — jamais de silence."""
+    le chargeur l'a lue, mention honnête sinon : jamais de silence."""
     frags = []
     for path, loaded in shots:
         if loaded:
             mime, data = loaded
             frags.append('<figure><img src="data:%s;base64,%s" '
                          'alt="Écran d\'arrivée"><figcaption>Écran d\'arrivée '
-                         "— %s</figcaption></figure>"
+                         ": %s</figcaption></figure>"
                          % (mime, base64.b64encode(data).decode("ascii"),
                             _esc(path)))
         else:
@@ -1409,7 +1409,7 @@ def _report_shots(shots):
 def _strip_md_code(text):
     """Retire les code spans Markdown d'une phrase de `_humanize_step` (écrite
     pour l'export spec) : en HTML les backticks seraient du bruit, la valeur
-    reste — ``Saisir `T000` dans…`` -> ``Saisir T000 dans…``."""
+    reste : ``Saisir `T000` dans…`` -> ``Saisir T000 dans…``."""
     return re.sub(r"(`+)( ?)(.*?)\2\1", r"\3", text)
 
 
@@ -1420,12 +1420,12 @@ def _strip_md_code(text):
 # les key users SAP pratiquent depuis toujours. `--transpile-vbs FILE` convertit
 # ces enregistrements en steps SapEccLibrary via la MÊME machine à états que le
 # record natif (`process_change` : fusion OK-code+Entrée, menus contextuels
-# appariés, cellules de grille suivies) — les exports --suite /
+# appariés, cellules de grille suivies) : les exports --suite /
 # --export-resources / --export-spec s'appliquent ensuite normalement.
 
 _VBS_CALL = re.compile(r'^\s*session\.findById\("([^"]+)"\)\.(\w+)(.*)$')
 
-# Le VBS ne porte pas le type de contrôle : on l'infère du préfixe de l'id —
+# Le VBS ne porte pas le type de contrôle : on l'infère du préfixe de l'id,
 # suffisant pour les aiguillages de map_change_command (radio/checkbox/okcd…).
 _VBS_TYPE_PREFIXES = (
     ("okcd", "GuiOkCodeField"), ("rad", "GuiRadioButton"), ("chk", "GuiCheckBox"),
@@ -1472,9 +1472,9 @@ def decode_vbs_source(data, ansi_encoding=None):
 
     Les ``.vbs`` rencontrés en pratique : UTF-8 (avec ou sans BOM), UTF-16
     LE/BE avec BOM (Bloc-notes « Unicode », ``Out-File`` PowerShell 5.1), ou
-    la page de code ANSI du poste (SAP GUI ALT+F12, éditeurs anciens — cp1252
+    la page de code ANSI du poste (SAP GUI ALT+F12, éditeurs anciens : cp1252
     en Europe de l'Ouest). Forcer l'UTF-8 corrompait silencieusement les deux
-    derniers cas — les octets NUL de l'UTF-16 étant du UTF-8 *valide*, la
+    derniers cas : les octets NUL de l'UTF-16 étant du UTF-8 *valide*, la
     transpilation rendait 0 step sans la moindre exception.
 
     Ordre de décision : BOM explicite > présence d'octets NUL (UTF-16 sans
@@ -1482,7 +1482,7 @@ def decode_vbs_source(data, ansi_encoding=None):
     ANSI (``mbcs`` sous Windows, encodage préféré du système ailleurs).
     ``ansi_encoding`` force ce repli (tests, poste à page de code atypique).
     Les replis décodent en ``errors="replace"`` : la fonction n'échoue jamais,
-    fidèle au contrat du transpileur — rien d'actionnable perdu en silence."""
+    fidèle au contrat du transpileur : rien d'actionnable perdu en silence."""
     if data.startswith(codecs.BOM_UTF8):
         return data.decode("utf-8-sig", errors="replace")
     if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
@@ -1490,7 +1490,7 @@ def decode_vbs_source(data, ansi_encoding=None):
     if b"\x00" in data:
         # Du VBScript ANSI/UTF-8 ne contient jamais d'octet NUL : c'est de
         # l'UTF-16 sans BOM. Sur du texte majoritairement ASCII, les NUL
-        # occupent l'octet de poids fort — les positions impaires en LE.
+        # occupent l'octet de poids fort : les positions impaires en LE.
         little = data[1::2].count(0) >= data[0::2].count(0)
         return data.decode("utf-16-le" if little else "utf-16-be",
                            errors="replace")
@@ -1507,7 +1507,7 @@ def transpile_vbs(text):
     """Transcrit un enregistrement VBS ALT+F12 en steps SapEccLibrary (liste de
     lignes RF). Le boilerplate (`If Not IsObject…`, `Set session = …`,
     commentaires) est ignoré ; les commandes sans keyword restent des
-    commentaires ``# non mappé`` — rien d'actionnable n'est perdu."""
+    commentaires ``# non mappé`` : rien d'actionnable n'est perdu."""
     state = initial_native_state()
     steps = []
     for raw in text.splitlines():
@@ -1536,7 +1536,7 @@ def transpile_vbs(text):
 # Le « play » de l'esprit Selenium IDE, côté client lourd : `--replay FILE`
 # relit un enregistrement (corps nu ou suite complète), rattache SapEccLibrary
 # à la session SAP GUI déjà ouverte (`Attach To Open Session`) et exécute les
-# steps un à un — arrêt au premier échec, step fautif nommé. La GUI l'expose
+# steps un à un : arrêt au premier échec, step fautif nommé. La GUI l'expose
 # par le bouton « Rejouer » du panneau de steps.
 
 def replay_recorded_steps(steps, lib, writer=print):
@@ -1558,7 +1558,7 @@ def replay_recorded_steps(steps, lib, writer=print):
             continue
         writer("  > %s" % step)
         try:
-            # les valeurs sont échappées façon RF dans le fichier — l'inverse
+            # les valeurs sont échappées façon RF dans le fichier : l'inverse
             # exact avant l'appel (les ids SAP ne portent jamais de backslash)
             method(*[rf_unescape_value(c) for c in cells[1:]])
         except Exception as exc:
@@ -1568,13 +1568,13 @@ def replay_recorded_steps(steps, lib, writer=print):
 
 
 def _default_replay_lib():
-    """SapEccLibrary rattachée à la session ouverte — import depuis ``src/`` du
+    """SapEccLibrary rattachée à la session ouverte : import depuis ``src/`` du
     dépôt si présent (sinon l'environnement installé, cas du pack déployé).
 
     ``screenshots_on_error=False`` : la CLI n'a pas de log Robot où incruster
     une capture, et hors contexte RF le handler ``take_screenshot`` remplace
     l'erreur réelle du step par « Cannot access execution context » (constaté
-    live 2026-07-21 — l'échec du replay devenait indiagnosticable)."""
+    live 2026-07-21 : l'échec du replay devenait indiagnosticable)."""
     src = os.path.normpath(os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "src"))
     if os.path.isdir(src) and src not in sys.path:
@@ -1610,7 +1610,7 @@ def run_replay(path, _lib_factory=None, _writer=print):
         _writer("ÉCHEC au step %d : %s" % (failed + 1, message))
         _writer("  %s" % steps[failed])
         return 1
-    _writer("Replay OK — %d step(s) exécuté(s), %d ignoré(s)." % (executed, skipped))
+    _writer("Replay OK : %d step(s) exécuté(s), %d ignoré(s)." % (executed, skipped))
     return 0
 
 
@@ -1620,10 +1620,10 @@ def run_replay(path, _lib_factory=None, _writer=print):
 # record (les deux moteurs), deux raccourcis GLOBAUX insèrent des vérifications
 # dans le déroulé, sans quitter SAP GUI :
 #   * Ctrl+Alt+A -> assertion de VALEUR sur l'élément focalisé
-#     (``Element Value Should Be`` — ou présence si l'élément n'a pas de texte ;
+#     (``Element Value Should Be``, ou présence si l'élément n'a pas de texte ;
 #     jamais la valeur d'un champ mot de passe) ;
 #   * Ctrl+Alt+V -> assertion VISUELLE de l'écran (``Screen Should Match
-#     Baseline`` — baseline créée au premier replay, cf. _perception.py).
+#     Baseline`` : baseline créée au premier replay, cf. _perception.py).
 # Détection par GetAsyncKeyState (pywin32, déjà requis) avec front montant :
 # un appui = une assertion. Logique pure injectable pour les tests.
 
@@ -1674,7 +1674,7 @@ def visual_assertion_step(base_name, index):
 
 def hotkey_assertion_lines(action, session, base_name, visual_counter):
     """Traduit un déclenchement de raccourci en lignes d'étape. Retourne
-    ``(lignes, nouveau compteur visuel)`` — jamais d'exception (COM défensif)."""
+    ``(lignes, nouveau compteur visuel)`` ; jamais d'exception (COM défensif)."""
     if action == "visual":
         counter = visual_counter + 1
         return [visual_assertion_step(base_name, counter)], counter
@@ -1697,7 +1697,7 @@ _OPAQUE_TYPES = ("GuiShell", "GuiChart")
 def offset_suggestion(etype, eid, rect, x, y):
     """Pour un élément OPAQUE au scripting (intérieur d'un GuiShell, GuiChart),
     propose la ligne du repli coordonnées ``Click Element At Offset`` avec la
-    position RELATIVE du curseur (pourcentages 0..1, 2 décimales) — le geste
+    position RELATIVE du curseur (pourcentages 0..1, 2 décimales) : le geste
     matériel documenté de ``_pointer.py``. ``None`` pour les types scriptables
     ou sans géométrie exploitable."""
     if etype not in _OPAQUE_TYPES or not eid or rect is None:
@@ -1716,17 +1716,17 @@ def offset_suggestion(etype, eid, rect, x, y):
 # L'API SAP GUI Scripting expose un mode Record natif (le mécanisme derrière
 # ALT+F12) : ``GuiSession.Record = True`` fait émettre par SAP GUI lui-même,
 # via l'événement ``Change(session, component, commandArray)``, la commande
-# exacte exécutée — ``["SP", propriété, valeur]`` (set-property) ou
-# ``["M", méthode, args...]`` (appel de méthode) — juste avant chaque
+# exacte exécutée : ``["SP", propriété, valeur]`` (set-property) ou
+# ``["M", méthode, args...]`` (appel de méthode), juste avant chaque
 # aller-retour serveur (doc officielle « SAP GUI Scripting API », GuiSession).
 # Contrairement au diff de polling ci-dessus, il capte nativement les clics de
-# boutons/toolbar, la grille ALV, les arbres, les onglets et menus — avec le
+# boutons/toolbar, la grille ALV, les arbres, les onglets et menus, avec le
 # bouton EXACT pressé (fini le ``Send Vkey 0`` par défaut).
 #
 # Limites officielles à connaître : le F4 devient modal et le drag & drop est
 # désactivé pendant l'enregistrement ; et AUCUN événement n'est émis si le
 # profil serveur ``sapgui/user_scripting_disable_recording`` est actif
-# (``session.Info.ScriptingModeRecordingDisabled``) — d'où le repli
+# (``session.Info.ScriptingModeRecordingDisabled``), d'où le repli
 # automatique sur le mode polling (``--engine auto``, défaut).
 #
 # La traduction événement -> keyword est isolée dans des fonctions pures
@@ -1750,7 +1750,7 @@ _VKEY_NAMES = {
 }
 
 # Résolveur DYNAMIQUE optionnel des noms de vkeys : l'API scripting les connaît
-# déjà tous (``GuiSession.GetVKeyDescription`` — usage observé chez RoboSAPiens,
+# déjà tous (``GuiSession.GetVKeyDescription``, usage observé chez RoboSAPiens,
 # qui a remplacé sa table manuelle par cet appel). Branché par le moteur record
 # natif quand une session live est là ; la table statique reste prioritaire
 # (sorties stables, testables hors SAP), le résolveur couvre le reste
@@ -1760,7 +1760,7 @@ _VKEY_RESOLVER = {"fn": None}
 
 def set_vkey_resolver(fn):
     """Branche (``fn = code -> description``) ou débranche (``None``) la
-    résolution dynamique des noms de vkeys. Retourne le résolveur précédent —
+    résolution dynamique des noms de vkeys. Retourne le résolveur précédent,
     à restaurer en teardown, comme les réglages de timeout des bibliothèques."""
     previous = _VKEY_RESOLVER["fn"]
     _VKEY_RESOLVER["fn"] = fn
@@ -1804,7 +1804,7 @@ def _is_true(value):
 
 def map_change_command(eid, etype, parts, context=None):
     """Traduit un événement Change (id relatif, type, commande normalisée) en ligne
-    de keyword SapEccLibrary — ou ``None`` (bruit à ignorer), ou une ligne de
+    de keyword SapEccLibrary, ou ``None`` (bruit à ignorer), ou une ligne de
     commentaire ``# non mappé : ...`` si aucun keyword ne correspond (l'information
     n'est jamais perdue : le commentaire contient l'appel exact à rejouer).
 
@@ -1823,7 +1823,7 @@ def map_change_command(eid, etype, parts, context=None):
             rows = args[0] if args else ""
             if rows.isdigit():
                 return "Select Table Row    %s    %s" % (eid, rows)
-            return ("# grille %s : sélection de lignes '%s' — une ligne simple = "
+            return ("# grille %s : sélection de lignes '%s', une ligne simple = "
                     "Select Table Row    %s    <n>" % (eid, rows, eid))
         if lname in _NOISE_PROPERTIES:
             return None
@@ -1833,7 +1833,7 @@ def map_change_command(eid, etype, parts, context=None):
                 # ne l'enregistre pas : placeholder, à remplacer au replay).
                 return "Input Password    %s    <password>" % eid
             # Valeur échappée façon RF (${...}, runs d'espaces, # de tête…) ;
-            # vider un champ devient ${EMPTY} — un step rejouable, pas une
+            # vider un champ devient ${EMPTY} : un step rejouable, pas une
             # cellule manquante.
             return "Input Text    %s    %s" % (eid, rf_escape_value(args[0] if args else ""))
         if lname == "selected":
@@ -1845,7 +1845,7 @@ def map_change_command(eid, etype, parts, context=None):
         if lname == "key" and etype == "GuiComboBox":
             # La base ne sélectionne que par libellé ; on garde la clé exacte en
             # commentaire pour que l'utilisateur (ou l'agent) la convertisse.
-            return ("# Combo par clé — remplacer par : Select From List By Label    %s"
+            return ("# Combo par clé, remplacer par : Select From List By Label    %s"
                     "    <libellé de la clé '%s'>" % (eid, args[0] if args else ""))
     elif kind == "M":
         if lname in ("setfocus",):
@@ -1869,19 +1869,19 @@ def map_change_command(eid, etype, parts, context=None):
             button = context.get("ctx_button")
             if button:
                 return "Select Context Menu Item    %s    %s    %s" % (eid, button, args[0])
-            return ("# menu contextuel %s : fcode '%s' sans bouton apparié — "
+            return ("# menu contextuel %s : fcode '%s' sans bouton apparié ; "
                     "Select Context Menu Item    %s    <bouton>    %s"
                     % (eid, args[0], eid, args[0]))
         if lname == "selectnode" and args:
             return "Select Node    %s    %s" % (eid, args[0])
         if lname == "expandnode" and args:
-            # select_node(expand=True) sélectionne ET déplie — le replay fidèle.
+            # select_node(expand=True) sélectionne ET déplie : le replay fidèle.
             return "Select Node    %s    %s    True" % (eid, args[0])
         if lname in ("doubleclickcurrentcell", "clickcurrentcell"):
             cell = context.get("cell") or {}
             row, col = cell.get("row", "?"), cell.get("col", "?")
             action = "double-clic" if lname.startswith("double") else "clic"
-            return ("# grille %s : %s cellule ligne %s, colonne %s — lecture : "
+            return ("# grille %s : %s cellule ligne %s, colonne %s, lecture : "
                     "Get Cell Value    %s    %s    %s" % (eid, action, row, col,
                                                           eid, row, col))
     # Méthode/propriété sans keyword direct (arbres : doubleClickNode... ;
@@ -1910,10 +1910,10 @@ def process_change(state, eid, etype, command):
 
     * OK-code : la saisie d'un tcode (SP text sur ``.../okcd``) suivie d'Entrée
       (M sendVKey 0) doit devenir UNE ligne ``Run Transaction`` (le keyword
-      envoie lui-même le vkey 0 — émettre les deux rejouerait Entrée deux
+      envoie lui-même le vkey 0 : émettre les deux rejouerait Entrée deux
       fois). Un OK-code suivi d'autre chose est émis comme ``Input Text``.
     * Grilles : les SP ``currentCellRow``/``currentCellColumn`` (bruit seuls)
-      sont MÉMORISÉS par élément — un ``doubleClickCurrentCell`` ultérieur
+      sont MÉMORISÉS par élément : un ``doubleClickCurrentCell`` ultérieur
       connaît ainsi sa cellule ; ``pressToolbarContextButton`` est retenu
       jusqu'au ``selectContextMenuItem`` qui suit -> UNE ligne
       ``Select Context Menu Item`` (le keyword de la base fait les deux)."""
@@ -1967,13 +1967,13 @@ def recording_disabled(session):
 
 # --- Mode sémantique (--semantic) : keywords « humains » au lieu d'ids -------
 #
-# Idée portée de RoboSAPiens (imbus, Apache-2.0 — NOTICE) : au moment de
-# l'événement, l'écran est encore là — on peut calculer le LIBELLÉ qui désigne
+# Idée portée de RoboSAPiens (imbus, Apache-2.0, NOTICE) : au moment de
+# l'événement, l'écran est encore là : on peut calculer le LIBELLÉ qui désigne
 # l'élément (géométrie label -> champ) et émettre `Fill Field By Label   Table
 # Name   T000` au lieu de l'id technique, directement au niveau d'abstraction
 # de resources/ (convention n°1). Différence assumée : le libellé n'est retenu
 # que s'il RE-RÉSOUT de façon unique vers le même élément
-# (sapfx_common.semantic.describe_element) — sinon la ligne technique est
+# (sapfx_common.semantic.describe_element) ; sinon la ligne technique est
 # gardée telle quelle, jamais de perte d'information. Requiert le paquet
 # sapfx_common (installé avec les wheels du pack / present dans src/ au repo) ;
 # sans lui, --semantic se désactive avec un avertissement.
@@ -1987,7 +1987,7 @@ def _elem_int(node, attr):
 
 def screen_elements(session):
     """Contrôles de la fenêtre active en ``ScreenElement`` (géométrie incluse),
-    ids relatifs — le socle du mode ``--semantic``. Chemin rapide
+    ids relatifs : le socle du mode ``--semantic``. Chemin rapide
     ``GetObjectTree`` (un appel COM), repli marche COM. ``[]`` si sapfx_common
     n'est pas importable ou la fenêtre indisponible."""
     try:
@@ -2029,7 +2029,7 @@ def semanticize_step(line, elements):
     """Réécrit une ligne technique en keyword « humain » quand un libellé
     re-résout de façon unique vers le même élément (``describe_element``) ;
     l'id technique reste en commentaire de fin de ligne (traçabilité +
-    diagnostic). Ligne rendue inchangée sinon — jamais de perte d'information.
+    diagnostic). Ligne rendue inchangée sinon : jamais de perte d'information.
 
     Pur (aucun COM) : ``elements`` est l'instantané ``screen_elements`` pris au
     moment de l'événement, quand l'écran d'origine est encore affiché."""
@@ -2060,7 +2060,7 @@ def semanticize_step(line, elements):
 
 def hardcopy_screenshot(session, out_base):
     """Capture la fenêtre active via ``HardCopyToMemory`` (API scripting :
-    image fidèle de la fenêtre, même partiellement recouverte — supérieure au
+    image fidèle de la fenêtre, même partiellement recouverte, supérieure au
     BitBlt du bureau) et l'écrit sous ``out_base`` + extension du format RÉEL
     (magic bytes). Retourne le chemin écrit, ou ``None`` si l'API est absente /
     la fenêtre indisponible (l'appelant replie sur la capture GDI)."""
@@ -2096,7 +2096,7 @@ def hardcopy_screenshot(session, out_base):
     return path
 
 
-# IID du dispinterface ``ISapSessionEvents`` et dispids de ses événements —
+# IID du dispinterface ``ISapSessionEvents`` et dispids de ses événements,
 # contrat COM de sapfewse (stable par définition : un IID ne change jamais),
 # vérifiés contre la typelib live de SAP GUI 8.00.
 SESSION_EVENTS_IID = "{67A71FA4-9381-4061-B3BB-74A545C75874}"
@@ -2105,7 +2105,7 @@ _SESSION_EVENT_DISPIDS = {1280: "OnChange", 1281: "OnHit", 1286: "OnFocusChanged
 
 class SessionEventConnection:
     """Poignée d'abonnement aux événements de session : ``close()`` désabonne
-    (idempotent, jamais d'exception — utilisé dans les teardowns)."""
+    (idempotent, jamais d'exception, utilisé dans les teardowns)."""
 
     def __init__(self, connection_point, cookie):
         self._cp = connection_point
@@ -2127,16 +2127,16 @@ def advise_session_events(session, on_change=None, on_hit=None,
     liaison échoue (l'appelant replie alors sur le polling).
 
     ``DispatchWithEvents`` est inutilisable sur la typelib sapfewse : sa
-    génération makepy plante (AssertionError dans genpy — pywin32 issue #2433,
+    génération makepy plante (AssertionError dans genpy, pywin32 issue #2433,
     reproduit sur pywin32 311 / SAP GUI 8.00). On se connecte donc au point de
     connexion manuellement, avec le hack canonique de la démo officielle
     ``win32com/demos/connect.py`` : le sink répond au QueryInterface pour l'IID
-    du dispinterface en retournant sa propre passerelle IDispatch (légal — un
+    du dispinterface en retournant sa propre passerelle IDispatch (légal : un
     dispinterface EST un IDispatch au niveau vtable). Validé live contre un
     A4H : les actions scriptées comme manuelles émettent bien les Change.
 
     Handlers (tous optionnels) : ``on_change(component, command_array)``,
-    ``on_hit(component)``, ``on_focus_changed(component)`` — les composants sont
+    ``on_hit(component)``, ``on_focus_changed(component)`` : les composants sont
     livrés déjà enveloppés (attributs ``.Id``/``.Type`` accessibles). Un handler
     ne doit jamais déclencher d'aller-retour serveur (boucle infinie, doc
     officielle) ; toute exception y est étouffée (le pont COM ne doit pas casser)."""
@@ -2200,13 +2200,13 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     ``semantic=True`` (``--semantic``) : chaque ligne est réécrite en keyword
     « humain » (`Fill Field By Label`, `Click Button By Label`) quand le
     libellé calculé au moment de l'événement re-résout de façon unique vers le
-    même élément — l'id technique reste en commentaire (voir
+    même élément : l'id technique reste en commentaire (voir
     `semanticize_step`). Le déroulé émis parle alors le langage de
     ``resources/`` (convention n°1) au lieu d'ids à retravailler.
 
     Retourne le nombre d'étapes écrites, ou ``None`` si le mode natif est
     indisponible (événements interdits par le profil serveur, liaison COM aux
-    événements impossible) — l'appelant replie alors sur `record_loop` (polling).
+    événements impossible) : l'appelant replie alors sur `record_loop` (polling).
     ``_advise``/``_pump``/``_max_iterations``/``_sleep``/``_elements_fn`` sont
     des points d'injection pour les tests hors SAP."""
     session = first_session(engine)
@@ -2215,7 +2215,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
         return 0
     if recording_disabled(session):
         _writer("Événements d'enregistrement désactivés par le serveur "
-                "(sapgui/user_scripting_disable_recording) — repli sur le polling.")
+                "(sapgui/user_scripting_disable_recording) : repli sur le polling.")
         return None
     if _advise is None:
         if win32com is None:
@@ -2253,7 +2253,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
         connection = _advise(session, on_change=on_change)
     except Exception as exc:
         fh.close()
-        _writer("Liaison aux événements COM impossible (%s) — repli sur le polling." % exc)
+        _writer("Liaison aux événements COM impossible (%s) : repli sur le polling." % exc)
         return None
 
     try:
@@ -2261,7 +2261,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     except (AttributeError, com_error) as exc:
         connection.close()
         fh.close()
-        _writer("Impossible d'activer Session.Record (%s) — repli sur le polling." % exc)
+        _writer("Impossible d'activer Session.Record (%s) : repli sur le polling." % exc)
         return None
 
     _writer("Mode record NATIF : effectue tes actions dans SAP GUI ; chaque commande "
@@ -2270,7 +2270,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
             "Ctrl+Alt+V = empreinte visuelle de l'écran.")
     _writer("Séquence -> %s   (Ctrl+C pour arrêter)\n" % out_path)
     # Noms de vkeys au-delà de la table statique : l'API de la session les
-    # connaît tous (GetVKeyDescription) — branché le temps de l'enregistrement.
+    # connaît tous (GetVKeyDescription) : branché le temps de l'enregistrement.
     previous_resolver = set_vkey_resolver(
         lambda code: session.GetVKeyDescription(code))
     hotkeys = make_hotkey_poller(_key_state_fn)
@@ -2299,7 +2299,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
             pass
         connection.close()
         fh.close()
-        _writer("\nArrêt — %s étape(s) enregistrée(s) dans %s"
+        _writer("\nArrêt : %s étape(s) enregistrée(s) dans %s"
                 % (counters["steps"], out_path))
     return counters["steps"]
 
@@ -2320,7 +2320,7 @@ def open_record_file(out_path, suite=False):
 # L'API expose aussi un « hit test mode » : ``session.elementVisualizationMode =
 # True`` fait surligner par SAP GUI le contrôle sous le curseur et émet un
 # événement ``Hit(session, component, innerObject)`` quand l'utilisateur CLIQUE
-# un élément — le vrai clic-à-capturer officiel, supérieur au polling du focus
+# un élément : le vrai clic-à-capturer officiel, supérieur au polling du focus
 # (il voit aussi les éléments non focusables : labels, cellules, toolbars).
 # On écoute aussi ``FocusChanged`` en complément (navigation clavier).
 
@@ -2338,7 +2338,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
         _writer("Aucune session SAP ouverte.")
         return 0
     if recording_disabled(session):
-        _writer("Événements désactivés par le serveur — repli sur le polling du focus.")
+        _writer("Événements désactivés par le serveur : repli sur le polling du focus.")
         return None
     if _advise is None:
         if win32com is None:
@@ -2350,7 +2350,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
     seen = {"last": None, "count": 0}
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     fh = open(out_path, "w", encoding="utf-8")
-    fh.write("# Captures SAP GUI Spy (hit-test natif) — %s\n\n" % out_path)
+    fh.write("# Captures SAP GUI Spy (hit-test natif) : %s\n\n" % out_path)
     fh.flush()
 
     cursor_fn = _cursor_fn
@@ -2368,7 +2368,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
         record = {"id": eid, "type": etype, "text": _safe(component, "Text")}
         block = format_capture_block(record)
         if cursor_fn is not None:
-            # Zone opaque cliquée (Hit) : propose aussi le repli coordonnées —
+            # Zone opaque cliquée (Hit) : propose aussi le repli coordonnées ;
             # la position du curseur AU CLIC donne l'offset relatif exact.
             try:
                 x, y = cursor_fn()
@@ -2387,7 +2387,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
                              on_focus_changed=on_component)
     except Exception as exc:
         fh.close()
-        _writer("Liaison aux événements COM impossible (%s) — repli sur le polling." % exc)
+        _writer("Liaison aux événements COM impossible (%s) : repli sur le polling." % exc)
         return None
 
     hit_mode = True
@@ -2416,7 +2416,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
                 pass
         connection.close()
         fh.close()
-        _writer("\nArrêt — %s élément(s) capturé(s) dans %s" % (seen["count"], out_path))
+        _writer("\nArrêt : %s élément(s) capturé(s) dans %s" % (seen["count"], out_path))
     return seen["count"]
 
 
@@ -2432,7 +2432,7 @@ def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
 
     ``screenshot_dir``, si fourni, active une capture d'écran best-effort de
     l'écran d'arrivée à chaque aller-retour détecté (référencée par un
-    commentaire ``# screenshot: <fichier>`` dans le fichier de sortie) — utile
+    commentaire ``# screenshot: <fichier>`` dans le fichier de sortie), utile
     pour diagnostiquer visuellement un replay qui diverge plus tard. Une
     capture échouée (API/version SAP GUI, bureau verrouillé...) est
     silencieusement ignorée : n'interrompt jamais l'enregistrement.
@@ -2493,7 +2493,7 @@ def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
                 count += 1
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        _writer("\nArrêt — %s étape(s) enregistrée(s) dans %s" % (count, out_path))
+        _writer("\nArrêt : %s étape(s) enregistrée(s) dans %s" % (count, out_path))
     finally:
         fh.close()
     return count
@@ -2503,7 +2503,7 @@ def run_record_exports(out_path, export_resources=False, export_spec=False,
                        export_report=False, _writer=print):
     """Post-traitement d'un enregistrement (``--export-resources`` /
     ``--export-spec`` / ``--export-report``) : relit le fichier de sortie et
-    écrit les artefacts dérivés À CÔTÉ — l'enregistrement brut n'est jamais
+    écrit les artefacts dérivés À CÔTÉ : l'enregistrement brut n'est jamais
     modifié."""
     if not (export_resources or export_spec or export_report):
         return
@@ -2548,7 +2548,7 @@ def main(argv=None):
                              "chemin relatif -> sous captures/ ; chemin absolu -> tel quel)")
     parser.add_argument("--filter", metavar="TEXT",
                         help="ne retient que les éléments dont l'id ou le type contient TEXT "
-                             "(insensible à la casse) — s'applique au dump, à --capture et à --hover")
+                             "(insensible à la casse), s'applique au dump, à --capture et à --hover")
     # Modes mutuellement exclusifs : combiner --capture/--hover/--record/--highlight
     # n'a pas de sens (chacun boucle ou quitte immédiatement) ; sans ce groupe, un
     # tel mélange était honoré silencieusement par ordre de priorité fixe dans
@@ -2566,7 +2566,7 @@ def main(argv=None):
                                  "keywords rejouable (diff par aller-retour ; Ctrl+C pour arrêter)")
     mode_group.add_argument("--replay", metavar="FILE",
                             help="rejoue un enregistrement (corps ou suite) contre la session SAP GUI "
-                                 "déjà ouverte (Attach To Open Session) — arrêt au premier échec, "
+                                 "déjà ouverte (Attach To Open Session), arrêt au premier échec, "
                                  "step fautif nommé")
     mode_group.add_argument("--transpile-vbs", metavar="FILE",
                             help="convertit un enregistrement VBS du recorder ALT+F12 intégré à "
@@ -2578,7 +2578,7 @@ def main(argv=None):
                              "chemin relatif -> sous captures/ ; chemin absolu -> tel quel)")
     parser.add_argument("--engine", choices=("auto", "native", "poll"), default="auto",
                         help="moteur de --record/--capture : 'native' = événements de l'API "
-                             "(Session.Record + Change ; hit-test pour --capture) — capte boutons, "
+                             "(Session.Record + Change ; hit-test pour --capture), capte boutons, "
                              "grilles, arbres ; 'poll' = sondage (diff d'écran / focus) ; "
                              "'auto' (défaut) essaie native puis replie sur poll")
     parser.add_argument("--no-highlight", action="store_true",
@@ -2589,7 +2589,7 @@ def main(argv=None):
                              "<out>_shots/ ; sans effet hors --record")
     parser.add_argument("--semantic", action="store_true",
                         help="en mode record NATIF, émet des keywords « humains » (Fill Field "
-                             "By Label, Click Button By Label — libellé vérifié re-résolvant "
+                             "By Label, Click Button By Label ; libellé vérifié re-résolvant "
                              "vers le même élément, id technique en commentaire) au lieu des "
                              "ids ; requiert le paquet sapfx_common ; sans effet en polling")
     parser.add_argument("--suite", action="store_true",
@@ -2599,17 +2599,17 @@ def main(argv=None):
     parser.add_argument("--export-resources", action="store_true",
                         help="après l'enregistrement, génère la paire resource-first : "
                              "<out>_keywords.resource (variables ${LOC_…} + keywords métier) "
-                             "et <out>_resource_first.robot (suite sans aucun id brut — "
+                             "et <out>_resource_first.robot (suite sans aucun id brut, "
                              "convention n°1) ; l'enregistrement brut reste intact")
     parser.add_argument("--export-spec", action="store_true",
                         help="après l'enregistrement, génère aussi <out>.spec.md : un plan "
                              "Markdown au format specs/ (étapes en langage métier, ids en "
-                             "notes) — l'entrée du cycle sap-planner/sap-generator")
+                             "notes) : l'entrée du cycle sap-planner/sap-generator")
     parser.add_argument("--export-report", action="store_true",
                         help="après l'enregistrement, génère aussi <out>_report.html : un "
                              "rapport HTML auto-contenu documentant le déroulé (phrases "
                              "métier + lignes exactes + captures inline si --screenshots) "
-                             "— documentation, pas un test")
+                             ": documentation, pas un test")
     args = parser.parse_args(argv)
 
     def _resolved(path, factory):
@@ -2672,7 +2672,7 @@ def main(argv=None):
             except KeyboardInterrupt:
                 raise
             except Exception as exc:      # défaillance COM imprévue -> repli, jamais un crash
-                print("Mode natif en échec (%s) — repli sur le polling." % exc,
+                print("Mode natif en échec (%s) : repli sur le polling." % exc,
                       file=sys.stderr)
                 captured = None
             if captured is None and args.engine == "native":
@@ -2712,7 +2712,7 @@ def main(argv=None):
             except KeyboardInterrupt:
                 raise
             except Exception as exc:      # défaillance COM imprévue -> repli, jamais un crash
-                print("Mode natif en échec (%s) — repli sur le polling." % exc,
+                print("Mode natif en échec (%s) : repli sur le polling." % exc,
                       file=sys.stderr)
                 recorded = None
             if recorded is None and args.engine == "native":
@@ -2721,7 +2721,7 @@ def main(argv=None):
                 return 1
         if recorded is None:
             if args.semantic:
-                print("--semantic requiert le moteur natif — déroulé en ids techniques.",
+                print("--semantic requiert le moteur natif : déroulé en ids techniques.",
                       file=sys.stderr)
             record_loop(engine, out_path, screenshot_dir=screenshot_dir, suite=args.suite)
         run_record_exports(out_path, export_resources=args.export_resources,

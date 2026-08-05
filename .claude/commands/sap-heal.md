@@ -1,5 +1,7 @@
 ---
-description: Réparer un test SAP en échec — diagnostic, vérification live via rf-mcp, patch de la couche resources (agent sap-healer)
+description: >-
+  Réparer un test SAP en échec : diagnostic, vérification live via rf-mcp,
+  patch de la couche resources (agent sap-healer)
 ---
 
 Use the **sap-healer** agent to repair the failing SAP test(s): $ARGUMENTS

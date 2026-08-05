@@ -1,6 +1,6 @@
 """Tests hors SAP des mixins diagnostic (préflight scripting, TestToolMode,
 télémétrie) et healing (réparation de localisateurs, closest matches), plus les
-primitives pures de ``sapfx_common.healing``. Fake COM — convention #5."""
+primitives pures de ``sapfx_common.healing``. Fake COM, convention #5."""
 import pytest
 
 from sapfx_common.healing import (

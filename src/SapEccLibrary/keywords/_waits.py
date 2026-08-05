@@ -7,7 +7,7 @@ synchronisation basée sur deux propriétés de la SAP GUI Scripting API :
 
 * `session.Busy` vaut ``True`` pendant qu'un aller-retour serveur est en cours.
 * `session.findById(id, False)` retourne ``None`` (au lieu de lever une exception)
-  quand le second argument est ``False`` — idéal pour sonder l'existence d'un élément.
+  quand le second argument est ``False`` : idéal pour sonder l'existence d'un élément.
 
 Ces keywords sont la méthode recommandée pour attendre ; réservez `Set Explicit Wait`
 aux démos et au débogage. Les boucles de sondage/relance elles-mêmes vivent dans
@@ -120,7 +120,7 @@ class WaitKeywords:
 
         ``default_timeout`` est le repli utilisé par chaque keyword ``Wait
         Until ...`` (et par les attentes de connexion) quand aucun ``timeout``
-        explicite n'est passé — fixé à l'import de la bibliothèque, ajustable
+        explicite n'est passé, fixé à l'import de la bibliothèque, ajustable
         ici en cours de suite. Accepte les chaînes de temps Robot (``30s``,
         ``2 min``). L'ancienne valeur est retournée dans le même format,
         prête à être restaurée en teardown :
@@ -129,7 +129,7 @@ class WaitKeywords:
         | ... étapes lentes (génération de données de démo) ... | |
         | Set Default Timeout | ${old} | |
 
-        Portée : l'instance de bibliothèque (scope ``SUITE``) — le réglage ne
+        Portée : l'instance de bibliothèque (scope ``SUITE``), le réglage ne
         déborde jamais sur la suite suivante.
         """
         previous = secs_to_timestr(self.default_timeout)
@@ -171,7 +171,7 @@ class WaitKeywords:
 
     def _closest_matches_hint(self, element_id):
         """Suffixe de message d'erreur listant les ids présents les plus proches
-        (erreur auto-corrigible : un agent — ou un humain — corrige le
+        (erreur auto-corrigible : un agent, ou un humain, corrige le
         localisateur sans repasser par une perception complète). Best-effort :
         ne masque jamais l'erreur d'origine si le calcul échoue, et vide si le
         mixin healing n'est pas composé (usage isolé du mixin en tests)."""

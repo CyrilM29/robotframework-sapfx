@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  Lanceur du SAP GUI Recorder (variante pack de déploiement) — double-clic.
+REM  Lanceur du SAP GUI Recorder (variante pack de déploiement) : double-clic.
 REM  Préfère le Python du venv du pack (.venv\, créé par install.cmd, où pywin32
 REM  est installé) ; repli sur le Python du PATH sinon.
 REM  Prérequis : install.cmd exécuté, SAP Logon ouvert avec une session active.
@@ -25,7 +25,7 @@ if exist "%~dp0.venv\Scripts\python.exe" (
     goto :eof
 )
 
-echo venv introuvable (.venv\) — lancez d'abord install.cmd. Repli sur le PATH...
+echo venv introuvable (.venv\) : lancez d'abord install.cmd. Repli sur le PATH...
 where pythonw >nul 2>nul
 if %errorlevel%==0 (
     start "" pythonw "%GUI%"

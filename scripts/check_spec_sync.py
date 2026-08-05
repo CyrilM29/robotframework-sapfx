@@ -7,7 +7,7 @@ Pour que cette promesse tienne, il faut détecter la dérive dans les deux sens 
 
 * une suite générée porte un **marqueur de provenance** dans sa
   ``Documentation`` : ``Spec: specs/<plan>.md (sha256:<12 hex du contenu>,
-  <date de génération>)`` — la date est informative, seul le hash fait foi ;
+  <date de génération>)``, la date est informative, seul le hash fait foi ;
 * si le plan a changé depuis la génération (hash différent), la suite est
   **périmée** → exit 1 : il faut repasser par ``/sap-generate`` (ou assumer le
   changement en re-stampant), jamais éditer la suite à la main en silence ;
@@ -18,10 +18,10 @@ Pour que cette promesse tienne, il faut détecter la dérive dans les deux sens 
   C'est ce qui ferme la boucle healer → planner : sans lui, le signalement
   restait de la prose dans un rapport de conversation, donc perdu ;
 * les plans sans suite sont listés à titre informatif (le generator n'est
-  peut-être pas encore passé) — jamais bloquant.
+  peut-être pas encore passé), jamais bloquant.
 
 Garde de cohérence, pas générateur (comme ``check_bilingual_docs`` /
-``check_guidance_sync``) — la génération reste le travail de sap-generator,
+``check_guidance_sync``) : la génération reste le travail de sap-generator,
 qui exécute chaque étape live avant d'écrire. Seul ``--stamp`` écrit : il
 appose/rafraîchit le marqueur d'une suite APRÈS une (re)génération assumée.
 
@@ -55,7 +55,7 @@ _UNLINKED_OK = ("README.md", "couverture-proposee.md")
 
 
 def spec_digest(spec_path: Path) -> str:
-    """Empreinte (12 hex) du plan, fins de ligne normalisées — stable à
+    """Empreinte (12 hex) du plan, fins de ligne normalisées, stable à
     travers les checkouts CRLF/LF de git sous Windows."""
     text = spec_path.read_text(encoding="utf-8").replace("\r\n", "\n")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
@@ -86,14 +86,14 @@ def check(repo_root: Path) -> int:
     for suite, spec_rel, digest in markers:
         spec_path = repo_root / spec_rel
         if not spec_path.exists():
-            problems.append("%s : marqueur cassé — %s n'existe plus"
+            problems.append("%s : marqueur cassé, %s n'existe plus"
                             % (suite.name, spec_rel))
             continue
         linked_specs.add(spec_path.name)
         actual = spec_digest(spec_path)
         if actual != digest:
             problems.append(
-                "%s : PÉRIMÉE — %s a changé depuis la génération "
+                "%s : PÉRIMÉE, %s a changé depuis la génération "
                 "(sha256 %s ≠ %s) : repasser par /sap-generate, ou re-stamper "
                 "si le changement n'impacte pas la suite"
                 % (suite.name, spec_rel, actual, digest))
@@ -104,7 +104,7 @@ def check(repo_root: Path) -> int:
             if STALE.search(spec_path.read_text(encoding="utf-8")):
                 problems.append(
                     "specs/%s : marquée PÉRIMÉE par sap-healer (changement "
-                    "fonctionnel du flux) — re-explorer via /sap-plan ; le "
+                    "fonctionnel du flux) : re-explorer via /sap-plan ; le "
                     "planner retire le marqueur" % spec_path.name)
     if problems:
         print("[check_spec_sync] ÉCHEC :")
@@ -114,7 +114,7 @@ def check(repo_root: Path) -> int:
     unlinked = [p.name for p in sorted(specs_dir.glob("*.md"))
                 if p.name not in linked_specs and p.name not in _UNLINKED_OK] \
         if specs_dir.exists() else []
-    print("[check_spec_sync] OK — %d suite(s) en phase avec leur spec."
+    print("[check_spec_sync] OK : %d suite(s) en phase avec leur spec."
           % len(markers))
     if unlinked:
         print("  (info : specs sans suite générée : %s)" % ", ".join(unlinked))
@@ -122,7 +122,7 @@ def check(repo_root: Path) -> int:
 
 
 def stamp(repo_root: Path, suite_rel: str, spec_rel: str) -> int:
-    """Appose (ou rafraîchit) le marqueur de provenance d'une suite — à appeler
+    """Appose (ou rafraîchit) le marqueur de provenance d'une suite, à appeler
     APRÈS une (re)génération assumée, jamais pour masquer une dérive."""
     suite_path = repo_root / suite_rel
     spec_path = repo_root / spec_rel
@@ -136,7 +136,7 @@ def stamp(repo_root: Path, suite_rel: str, spec_rel: str) -> int:
     if MARKER.search(text):
         text = MARKER.sub(marker, text, count=1)
     else:
-        # Ancrage : première ligne de la Documentation de la suite — le
+        # Ancrage : première ligne de la Documentation de la suite ; le
         # marqueur devient une ligne de continuation juste en dessous.
         lines = text.splitlines(keepends=True)
         for index, line in enumerate(lines):
@@ -146,7 +146,7 @@ def stamp(repo_root: Path, suite_rel: str, spec_rel: str) -> int:
                              % (marker, newline))
                 break
         else:
-            print("[check_spec_sync] pas de ligne Documentation dans %s — "
+            print("[check_spec_sync] pas de ligne Documentation dans %s : "
                   "ajouter le marqueur à la main" % suite_rel)
             return 1
         text = "".join(lines)
@@ -157,7 +157,7 @@ def stamp(repo_root: Path, suite_rel: str, spec_rel: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors page
-    # de code — UTF-8 best-effort plutôt qu'un plantage à l'affichage (même
+    # de code : UTF-8 best-effort plutôt qu'un plantage à l'affichage (même
     # leçon que healing_drift_report, apprise au premier essai CLI).
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

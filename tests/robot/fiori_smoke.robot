@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Smoke test for the Fiori/web side against the public OpenUI5
-...                 Demo Kit — no SAP access or login required. Exercises the ported
+...                 Demo Kit: no SAP access or login required. Exercises the ported
 ...                 playwright-sap locator engine: role/property resolution, the
 ...                 hierarchical UI5 *XPath* engine over the control tree, drilling
 ...                 to the interactable inner element, and clear failure on no match.
@@ -11,7 +11,7 @@ Documentation       Smoke test for the Fiori/web side against the public OpenUI5
 ...                 Run (after `pip install -r requirements.txt` and `rfbrowser init`):
 ...                   robot -v HEADLESS:True tests/robot/fiori_smoke.robot
 ...
-...                 FR — Test smoke du côté Fiori/web sur l'OpenUI5 Demo Kit public —
+...                 FR : Test smoke du côté Fiori/web sur l'OpenUI5 Demo Kit public,
 ...                 aucun accès SAP ni login requis. Exerce le moteur de locators porté
 ...                 de playwright-sap : résolution par rôle/propriété, moteur XPath UI5
 ...                 hiérarchique sur l'arbre des contrôles, descente vers l'élément

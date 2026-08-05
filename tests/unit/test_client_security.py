@@ -1,7 +1,7 @@
 """Tests hors SAP du préflight de posture de sécurité du poste client :
 ``sapfx_common.client_security`` (logique pure) et les keywords
 `Get Client Security Status` / `Client Security Should Be Hardened` du mixin
-diagnostics. Fake COM — convention #5."""
+diagnostics. Fake COM, convention #5."""
 import pytest
 
 from sapfx_common.client_security import (
@@ -136,7 +136,7 @@ def test_hardened_fails_on_present_history_unless_allowed(tmp_path):
     lib = _lib(sapapp=FakeInfo(MajorVersion=8, MinorVersion=0, Patchlevel=9))
     with pytest.raises(AssertionError, match="historique de saisie"):
         lib.client_security_should_be_hardened(history_dirs=[str(history)])
-    # tolérance explicite — y compris sous la forme chaîne envoyée par Robot
+    # tolérance explicite, y compris sous la forme chaîne envoyée par Robot
     lib.client_security_should_be_hardened(
         allow_input_history="True", history_dirs=[str(history)])
 

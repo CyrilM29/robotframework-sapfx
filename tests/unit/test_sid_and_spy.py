@@ -31,7 +31,7 @@ def test_sid_xpath_builds_contains_predicate():
 def test_sid_xpath_matches_both_lsdata_encodings():
     # Découvert live sur le WebGUI A4H (exploration agent 2026-07-18) : le vrai
     # SAP GUI for HTML émet `lsdata` en littéral JS (`SID:'…'`, clé non citée,
-    # guillemets simples) et non le JSON `"SID":"…"` des fixtures — l'ancien
+    # guillemets simples) et non le JSON `"SID":"…"` des fixtures : l'ancien
     # sélecteur JSON-seul ne matchait RIEN sur un vrai système (0 match live).
     sel = sid_xpath("wnd[0]/tbar[0]/okcd")
     assert "contains(@lsdata, '\"SID\":\"wnd[0]/tbar[0]/okcd\"')" in sel      # fixtures / anciens ITS
@@ -108,7 +108,7 @@ def test_recorder_snippet_high_impact_features():
     assert "Library    SapFioriLibrary" in snippet and "New Browser" in snippet
     # 2) liste de steps éditable (déplacer / supprimer)
     assert "function moveStep" in snippet and "function removeStep" in snippet
-    # 3) déduplication des steps consécutifs identiques — TEMPORISÉE depuis
+    # 3) déduplication des steps consécutifs identiques, TEMPORISÉE depuis
     # 2026-07 : un double dispatch (<500 ms) est dédupliqué, une répétition
     # volontaire (second clic sur le même bouton au-delà de la fenêtre) est gardée
     assert "CLICK_DEDUP_WINDOW_MS" in snippet and "if (last === line &&" in snippet
@@ -144,6 +144,6 @@ def test_generated_spy_files_are_in_sync_with_bundle():
         with open(path, "r", encoding="utf-8") as fh:
             on_disk = fh.read().replace("\r\n", "\n")
         assert on_disk == expected, (
-            "%s is out of sync with _ui5_js.py — run "
+            "%s is out of sync with _ui5_js.py: run "
             "`python -m SapFioriLibrary.regen_recorder`." % path
         )

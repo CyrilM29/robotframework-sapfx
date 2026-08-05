@@ -1,11 +1,11 @@
 /*
  * Service worker (MV3). Two jobs:
- *   1. Toolbar badge — reflects the recording state relayed by bridge.js (REC = recording).
- *   2. Keyboard shortcut (Alt+Shift+R, command "toggle-record") — injects the recorder if
+ *   1. Toolbar badge: reflects the recording state relayed by bridge.js (REC = recording).
+ *   2. Keyboard shortcut (Alt+Shift+R, command "toggle-record"): injects the recorder if
  *      absent (bridge + recorder) and toggles recording, without opening the popup.
  * A keyboard command grants `activeTab` on the current tab, so no host permissions are
  * needed. Chromium (MV3 service worker + scripting world MAIN, Chrome 111+) is the
- * supported target; the `browser` fallback below is defensive only — Firefox would
+ * supported target; the `browser` fallback below is defensive only: Firefox would
  * additionally need background.scripts and browser_specific_settings to run this.
  */
 const api = (typeof browser !== "undefined") ? browser : chrome;
@@ -36,7 +36,7 @@ api.commands.onCommand.addListener(async (command) => {
       func: () => !!(window.__ui5RecorderApi && window.__ui5RecorderApi.isRecording()),
     });
     const anyRecording = (probes || []).some((p) => p && p.result);
-    // Toujours injecter, allFrames : les deux fichiers sont idempotents — les
+    // Toujours injecter, allFrames : les deux fichiers sont idempotents, les
     // frames déjà instrumentées no-opent, et les iframes apparues depuis la
     // dernière injection (navigation intra-launchpad) sont couvertes aussi.
     await api.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["bridge.js"] });
@@ -49,8 +49,8 @@ api.commands.onCommand.addListener(async (command) => {
       },
     });
   } catch (e) {
-    // chrome://, le Web Store, le visualiseur PDF… : l'injection y est interdite
-    // — l'afficher sur le badge plutôt que mourir en rejection non gérée.
+    // chrome://, le Web Store, le visualiseur PDF… : l'injection y est interdite,
+    // autant l'afficher sur le badge plutôt que mourir en rejection non gérée.
     api.action.setBadgeText({ tabId: tab.id, text: "n/a" });
     setTimeout(() => api.action.setBadgeText({ tabId: tab.id, text: "" }), 1500);
   }

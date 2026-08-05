@@ -2,7 +2,7 @@
 rf-mcp (``sap_robotmcp._staleness``), convention #5 du CLAUDE.md.
 
 Le piège couvert : rf-mcp fige classes et instances de bibliothèques pour tout
-le process — un fichier de ``src/`` modifié après le démarrage n'est PAS pris
+le process : un fichier de ``src/`` modifié après le démarrage n'est PAS pris
 en compte par ``manage_session init``, et l'agent debugge un comportement qui
 n'existe plus dans les sources.
 """

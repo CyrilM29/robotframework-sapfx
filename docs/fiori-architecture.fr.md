@@ -30,9 +30,9 @@ ne plus adresser le **DOM** mais à adresser directement le **contrôle UI5**.
     `properties` (sous-chaîne insensible à la casse, ou `/regex/`), `id`,
     `bindingPath`, `viewId`. → `Resolve Ui5 Control`. Retourne
     `css=[id="<controlId>"]` (l'id du *contrôle*, par ex.
-    `sdk---app--searchControl-searchField` — stable, et non l'id DOM généré qui change).
+    `sdk---app--searchControl-searchField`, stable, et non l'id DOM généré qui change).
   - **xpath** : construit un arbre XML reproduisant la **hiérarchie des contrôles** (balise = type court du contrôle,
-    attributs = ses propriétés) et évalue un XPath sur cet arbre — ce qui permet
+    attributs = ses propriétés) et évalue un XPath sur cet arbre, ce qui permet
     d'exprimer des relations d'ascendance et des prédicats. → `Resolve Ui5 By Xpath`.
     Même forme de retour.
   - **wc** : scan du light DOM des custom elements `ui5-*`, pour les pages
@@ -43,7 +43,7 @@ ne plus adresser le **DOM** mais à adresser directement le **contrôle UI5**.
     les **régions non-SAP** d'une page hybride (voir plus bas).
     → `Resolve Dom Element`.
 - Les applications rendent les vues de manière asynchrone ; la résolution **interroge en boucle** jusqu'à ce qu'un contrôle apparaisse
-  ou que `ui5_timeout` soit dépassé — jamais une attente fixe (l'équivalent web du
+  ou que `ui5_timeout` soit dépassé, jamais une attente fixe (l'équivalent web du
   `Wait Until Element Present` côté ECC).
 
 ```robotframework
@@ -60,22 +60,22 @@ Porté depuis playwright-sap `getShortestXPath` : étant donné un contrôle ré
 contrôle. Utile pour la génération de code et pour transformer un contrôle trouvé en un localisateur
 hiérarchique stable et lisible.
 
-### SAP WebGUI / SAP GUI for HTML — le moteur `sid`
+### SAP WebGUI / SAP GUI for HTML : le moteur `sid`
 
 Les pages WebGUI ABAP classiques (SAP GUI for HTML) ne sont **pas** en UI5. Leurs éléments portent un
-attribut ``lsdata`` dont le JSON contient un ``"SID"`` stable — le même espace d'id que le
+attribut ``lsdata`` dont le JSON contient un ``"SID"`` stable : le même espace d'id que le
 scripting SAP GUI (``wnd[0]/usr/ctxtVBAK-VBELN``). `Resolve Sid` le fait correspondre via
 un XPath ``contains()`` sur ``@lsdata`` et retourne un sélecteur ``xpath=`` ; `Click Sid` /
 `Fill Sid Input` / `Sid Should Be Visible` s'appuient dessus. Le Spy capture également les SIDs
-(en analysant ``lsdata``). Ceci complète les moteurs UI5 pour les environnements hybrides — il n'est
+(en analysant ``lsdata``). Ceci complète les moteurs UI5 pour les environnements hybrides. Il n'est
 pas exercé par le smoke de l'OpenUI5 Demo Kit (pas de WebGUI là) ; le constructeur SID-XPath
 et la logique de capture sont testés par des tests unitaires à la place.
 
-### UI5 Web Components — le moteur `wc`
+### UI5 Web Components : le moteur `wc`
 
 Les pages bâties sur les **UI5 Web Components** (page d'accueil SuccessFactors,
 apps ui5-webcomponents) n'ont **aucun runtime UI5 classique** : pas de
-`window.sap`, registre d'éléments vide — les moteurs role et xpath y sont
+`window.sap`, registre d'éléments vide : les moteurs role et xpath y sont
 structurellement aveugles. Le moteur `wc` scanne le **light DOM** du document à
 la recherche des custom elements `ui5-*` (le contenu applicatif reste dans le
 light DOM via les slots ; seuls les internals des composants vivent dans les
@@ -86,9 +86,9 @@ shadow roots) :
   fonctionne aussi ;
 - `properties=` matche les attributs/propriétés de l'hôte avec le *même*
   comparateur que le moteur role (sous-chaîne insensible à la casse, `/regex/`
-  borné — implémentation `valueMatches` partagée) ; `text=` matche le
+  borné ; implémentation `valueMatches` partagée) ; `text=` matche le
   `textContent` épuré ;
-- `name=` matche le **nom accessible** de l'hôte — ce qu'un lecteur d'écran
+- `name=` matche le **nom accessible** de l'hôte, c'est-à-dire ce qu'un lecteur d'écran
   annoncerait : `aria-labelledby`/`aria-label`, puis la convention UI5 Web
   Components `accessible-name` (attribut) / `accessibleName` (propriété JS
   non reflétée), puis label/texte visible. Le localisateur « intention
@@ -103,10 +103,10 @@ Le recorder web capture/enregistre aussi les hôtes WC sur les pages sans
 registre (`Click Wc Control`, assertions Alt+clic). Prouvé hors ligne contre
 une fixture locale avec un vrai tag scopé (`tests/robot/fiori_wc_smoke.robot`).
 
-### Iframes de launchpad — `Set Ui5 Frame` (Work Zone / cFLP)
+### Iframes de launchpad : `Set Ui5 Frame` (Work Zone / cFLP)
 
 SAP Build Work Zone et le cFLP classique embarquent chaque application dans une
-**iframe**, souvent cross-origin — le runtime UI5 dont le bundle a besoin vit
+**iframe**, souvent cross-origin : le runtime UI5 dont le bundle a besoin vit
 *dans* la frame, pas dans le shell. `Set Ui5 Frame    iframe#application-...`
 bascule la bibliothèque : le bundle est injecté et évalué **dans le contexte de la
 frame**, et chaque sélecteur retourné est préfixé par la frame + le combinateur de
@@ -114,36 +114,36 @@ perçage `>>>` de Playwright (qui traverse les origines). `Set Ui5 Frame` sans
 argument revient à la page principale. Prouvé contre une fixture réellement
 cross-origin (`tests/robot/fiori_frame_smoke.robot`).
 
-### Pages hybrides — sonde de composition, pile de frames, moteur `dom`
+### Pages hybrides : sonde de composition, pile de frames, moteur `dom`
 
 Un vrai écran composite (shell Work Zone + une app UI5 dans une iframe + une
 transaction WebGUI dans une autre + un widget React/vanilla dans un portlet)
 mélange les technologies **par région d'une même page**. Trois keywords en font
 des citoyens de première classe :
 
-- **`Get Page Composition`** — la sonde de perception hybride : rapporte, par
+- **`Get Page Composition`**, la sonde de perception hybride : rapporte, par
   région, quelles technologies sont présentes (runtime UI5 classique / hôtes WC
   `ui5-*` / éléments `lsdata` WebGUI / indices React-Angular-Vue), les
   **moteurs recommandés** dans l'ordre de repli, et chaque iframe avec un
   sélecteur Browser réutilisable plus SA composition sondée (un niveau de
-  profondeur, best-effort — une frame injoignable porte un champ `error`,
+  profondeur, best-effort : une frame injoignable porte un champ `error`,
   jamais une perception en échec). À appeler en premier sur un écran inconnu
   pour savoir *quel moteur viser où*.
-- **`Push Ui5 Frame` / `Pop Ui5 Frame` / `Get Ui5 Frame Stack`** — la portée de
+- **`Push Ui5 Frame` / `Pop Ui5 Frame` / `Get Ui5 Frame Stack`**, la portée de
   frames imbriquées au-dessus de `Set Ui5 Frame` (qui remplace toute la pile) :
   chaque niveau s'empile, la portée effective est le chaînage
-  `niveau1 >>> niveau2` de Browser. Un `Pop` de trop échoue bruyamment —
+  `niveau1 >>> niveau2` de Browser. Un `Pop` de trop échoue bruyamment :
   jamais une portée silencieusement fausse.
 - **le moteur `dom`** (`Resolve/Click/Fill Dom …`, `Get Dom Text`,
-  `Get Dom Match Count`, `Dom Element Should Be Visible`) — correspondance
+  `Get Dom Match Count`, `Dom Element Should Be Visible`) : correspondance
   générique sur CSS, texte, rôle ARIA et attributs (mêmes règles
   `valueMatches` que role/wc, chemins CSS light-DOM comme wc) : les régions
-  non-SAP entrent dans la *même grammaire* — polling, chaîne de repli et
-  télémétrie de healing compris — au lieu de retomber sur des sélecteurs
-  Browser bruts hors bibliothèque. `role=` est le rôle ARIA **calculé** —
-  l'attribut `role` explicite *ou* la sémantique HTML implicite (un
+  non-SAP entrent dans la *même grammaire* (polling, chaîne de repli et
+  télémétrie de healing compris) au lieu de retomber sur des sélecteurs
+  Browser bruts hors bibliothèque. `role=` est le rôle ARIA **calculé**,
+  c'est-à-dire l'attribut `role` explicite *ou* la sémantique HTML implicite (un
   `<button>` nu, `a[href]` → `link`, `input[type=checkbox]` → `checkbox`,
-  `h1`-`h6` → `heading`…, sous-ensemble pragmatique de HTML-AAM) — et
+  `h1`-`h6` → `heading`…, sous-ensemble pragmatique de HTML-AAM), et
   `name=` est le **nom accessible** (accname simplifié, dans l'ordre de
   précédence W3C : `aria-labelledby`, `aria-label`, `label[for]`/label
   englobant, `alt`, `value` de bouton, texte visible, `title`,
@@ -154,31 +154,31 @@ des citoyens de première classe :
   gagne toujours ; `dom` est le dernier recours par conception.
 
 Prouvé hors ligne contre `fixtures/hybrid_fixture.html` (quatre technologies,
-deux niveaux de frames réellement imbriqués —
+deux niveaux de frames réellement imbriqués, voir
 `tests/robot/fiori_hybrid_smoke.robot`).
 
-### Chaîne de repli de sélecteurs — `Resolve Ui5 With Fallback`
+### Chaîne de repli de sélecteurs : `Resolve Ui5 With Fallback`
 
 Un keyword, cinq moteurs : essaie **role**, puis **xpath**, puis **sid**, puis
-**wc** (`wc={'tag': 'Button', 'text': '…'}` — par ex. une app re-plateformée en
+**wc** (`wc={'tag': 'Button', 'text': '…'}`, par ex. une app re-plateformée en
 UI5 Web Components dont le registre a disparu), puis **dom**
-(`dom={'role': 'button', 'text': '…'}` — le dernier recours, une région
+(`dom={'role': 'button', 'text': '…'}` : le dernier recours, une région
 re-plateformée hors de tout cadre SAP), chacun
 avec son propre timeout court, et journalise un WARNING dès qu'il réussit sur un
-autre moteur que le premier — un localisateur réparé n'est jamais silencieux (le
+autre moteur que le premier : un localisateur réparé n'est jamais silencieux (le
 log dit quel sélecteur corriger, et la réparation est ajoutée au journal
-cumulatif `SAPFX_HEALING_LOG` s'il est configuré — voir
+cumulatif `SAPFX_HEALING_LOG` s'il est configuré ; voir
 `sapfx_common.healing_telemetry`). Les échecs listent ce que *chaque* moteur a
 tenté ; les échecs role ajoutent un indice au niveau du type (« N contrôle(s) de
 ce type SONT rendus » vs « aucun ») pour distinguer une mauvaise propriété d'un
 mauvais type de contrôle.
 
-### Fiori Elements — `idSuffix` stable
+### Fiori Elements : `idSuffix` stable
 
 Fiori Elements v4 génère des ids de contrôles stables et sémantiques se terminant
 par des motifs comme `fe::table::Travel::LineItem-innerTable`. La clé de sélecteur
 `idSuffix` matche sur ce suffixe (moteur role + capture) ; le recorder l'émet
-automatiquement quand un id de contrôle porte un marqueur `fe::` — le localisateur
+automatiquement quand un id de contrôle porte un marqueur `fe::` : le localisateur
 le plus robuste pour les applications FE.
 
 ### Porté depuis playwright-sap
@@ -190,7 +190,7 @@ ré-implémentés sous la forme d'un bundle injecté unique (sans fork de Playwr
 
 > **Pourquoi pas `RecordReplay.findDOMElementByControlSelector` ?** Une conception antérieure utilisait
 > `sap.ui.test.RecordReplay` de SAP. Lors de la validation contre OpenUI5 1.149, cette API
-> levait une erreur en interne (`reading 'ancestor'`) en dehors du pipeline OPA5 complet — même avec
+> levait une erreur en interne (`reading 'ancestor'`) en dehors du pipeline OPA5 complet, même avec
 > un sélecteur valide codé en dur. L'approche par registre/arbre est plus robuste et
 > moins dépendante.
 >
@@ -206,21 +206,21 @@ remplir son champ de saisie interne, et confirmer qu'un contrôle manquant écho
 
 Couverture de versions au-delà du runtime courant (toutes validées en live) :
 
-- **UI5 1.60** (avant `Element.registry`) — `fiori_legacy_smoke.robot` prouve le
+- **UI5 1.60** (avant `Element.registry`) : `fiori_legacy_smoke.robot` prouve le
   repli DOM `registryForEach` contre un vrai runtime 1.60.14.
-- **UI5 2.0 nightly** — `fiori_ui5v2_smoke.robot` prouve la branche module
+- **UI5 2.0 nightly** : `fiori_ui5v2_smoke.robot` prouve la branche module
   `ElementRegistry` et l'absence de dépendance aux APIs supprimées en 2.x
   (`sap.ui.getCore()`, `Element.registry`, `sap.ui.version`). NB : à UI5con
-  (juillet 2026), SAP a annoncé qu'aucune release UI5 2.0 n'est prévue — la
+  (juillet 2026), SAP a annoncé qu'aucune release UI5 2.0 n'est prévue : la
   voie officielle de modernisation est la ligne 1.x legacy-free. Ce smoke
   reste donc une sentinelle non bloquante tant que le CDN nightly/2 est servi
   (il peut disparaître) ; le smoke 1.136-legacy-free est la cible d'avenir.
-- **Iframes cross-origin** — `fiori_frame_smoke.robot` (voir `Set Ui5 Frame` ci-dessus).
-- **Fiori Elements v4** — `fiori_sflight_smoke.robot` vs un cap-sflight local.
+- **Iframes cross-origin** : `fiori_frame_smoke.robot` (voir `Set Ui5 Frame` ci-dessus).
+- **Fiori Elements v4** : `fiori_sflight_smoke.robot` vs un cap-sflight local.
 
 ## Pourquoi pas Selenium / CSS brut / wdi5
 
-- **CSS/XPath brut** : cassé par le changement d'ids — c'est exactement le problème que l'on évite.
+- **CSS/XPath brut** : cassé par le changement d'ids. C'est exactement le problème que l'on évite.
 - **wdi5** : excellent et natif UI5, mais basé sur WebdriverIO et extérieur à
   Robot Framework. Notre stack est Robot, donc Browser + `RecordReplay` garde tout
   dans un seul runner et un seul rapport aux côtés des suites ECC.
@@ -239,8 +239,8 @@ Le Recorder web capture des localisateurs depuis une page en direct : le **survo
 le curseur (encadré bleu + étiquette) ; le **clic** le capture dans un **panneau flottant**
 avec des boutons **copier** par ligne `role` / `xpath` / `sid` / `all` (et copie le dernier
 dans le presse-papiers). Il sélectionne la meilleure propriété depuis la liste de priorité et émet
-des lignes `Resolve Ui5 Control` + `Resolve Ui5 By Xpath` (XPath unique le plus court) — avec
-`idSuffix` pour les contrôles Fiori Elements — plus `Resolve Sid` sur les pages WebGUI classiques.
+des lignes `Resolve Ui5 Control` + `Resolve Ui5 By Xpath` (XPath unique le plus court), avec
+`idSuffix` pour les contrôles Fiori Elements, plus `Resolve Sid` sur les pages WebGUI classiques.
 Le **mode record** (`rec`) transcrit un flux complet : clics → `Click Ui5 Control`, champs
 saisis → `Fill Ui5 Input`, Alt+clic → assertion de visibilité, **Shift+Alt+clic →
 assertion de valeur `Ui5 Text Should Be`** ; `export` télécharge un fichier `.robot`
@@ -248,8 +248,8 @@ exécutable. Fonctionne aussi dans les iframes de launchpad (les titres du panne
 affichent `[iframe]` ; l'extension s'injecte dans toutes les frames).
 Deux interfaces, un seul programme :
 
-- `tools/recorder_web/recorder_snippet.js` — à coller dans la console DevTools.
-- `tools/recorder_web/extension/` — extension navigateur MV3 ; cliquer sur l'icône → Start. Elle
+- `tools/recorder_web/recorder_snippet.js` : à coller dans la console DevTools.
+- `tools/recorder_web/extension/` : extension navigateur MV3 ; cliquer sur l'icône → Start. Elle
   injecte `recorder.js` dans le monde MAIN de la page (pour accéder à `window.sap`) via
   `chrome.scripting` + `activeTab` (sans permissions d'hôte étendues). Icônes générées
   (`gen_icons.py`) et un constructeur de zip prêt pour le store (`package.py` + `PUBLISHING.md`).
@@ -279,11 +279,11 @@ option complémentaire plus lourde.
       `Ui5 Text Should Be` (+ capture d'assertion au recorder).
 - [x] **0.2.5** : **moteur `wc`** pour les pages UI5 Web Components sans runtime
       classique (scan light-DOM `ui5-*`, tags scopés, clic/saisie à travers les
-      shadow roots, capture recorder — smoke hors ligne 6/6), chaîne de repli
+      shadow roots, capture recorder ; smoke hors ligne 6/6), chaîne de repli
       étendue à role→xpath→sid→wc, journal de télémétrie de healing
       (`SAPFX_HEALING_LOG`).
 - [x] **Parité du canal visuel avec l'ECC** : `Get Ui5 Perceptual Hash` +
-      `Ui5 Screen Should Match Baseline` — le même cycle snapshot-baseline que
+      `Ui5 Screen Should Match Baseline` : le même cycle snapshot-baseline que
       `Screen Should Match Baseline` (`sapfx_common.visual_baseline` partagé),
       sur une capture de page de la bibliothèque Browser. Couvre ce que
       l'arbre UI5 ne dit pas (canvas, images, thème/rendu globalement altéré).

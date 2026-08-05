@@ -1,10 +1,10 @@
 *** Settings ***
-Documentation       Campagne exploratoire SAP GUI (ECC/S4, backend A4H — S/4HANA 1909, GUI 8.00).
+Documentation       Campagne exploratoire SAP GUI (ECC/S4, backend A4H : S/4HANA 1909, GUI 8.00).
 ...
 ...                 Objectif : dresser l'inventaire exhaustif des **classes métier** (classes de
 ...                 livraison du dictionnaire ABAP, domaine ``CONTFLAG``) et des **classes
 ...                 techniques de table** (domaine ``TABCLASS``) disponibles sur cette instance,
-...                 puis vérifier en profondeur — table par table, via SE16 — l'accessibilité et
+...                 puis vérifier en profondeur (table par table, via SE16) l'accessibilité et
 ...                 le nombre d'entrées de toutes les tables de données des paquets de
 ...                 démonstration réellement peuplés sur A4H (vol ``SAPBC_DATAMODEL`` et EPM
 ...                 ``SNWD_*``).
@@ -14,14 +14,14 @@ Documentation       Campagne exploratoire SAP GUI (ECC/S4, backend A4H — S/4HA
 ...                 ``resources/ecc_keywords.resource`` ni aux autres suites du dépôt), pour rester
 ...                 indépendant du reste du projet.
 ...
-...                 NB — cette autonomie DÉROGE volontairement à la convention n°1 du dépôt
+...                 NB : cette autonomie DÉROGE volontairement à la convention n°1 du dépôt
 ...                 (« les ids SAP vivent dans resources/ ») : la suite est embarquée telle
 ...                 quelle dans le **pack de déploiement Windows** comme exemple « données
 ...                 réelles » rejouable sans le dépôt (voir ``packaging/``). Le pendant
 ...                 conforme aux conventions, pour le développement dans le dépôt, est
 ...                 ``ecc_exploration.robot`` (mêmes vérifications, via la resource métier).
 ...
-...                 Découverte dynamique : les listes de tables ne sont **jamais codées en dur** —
+...                 Découverte dynamique : les listes de tables ne sont **jamais codées en dur**,
 ...                 chaque exécution relit le référentiel (TADIR) en direct, ce qui rend la suite
 ...                 rejouable telle quelle après une montée de version ou l'ajout de données.
 Library             SapEccLibrary    screenshots_on_error=${True}    default_timeout=30s
@@ -34,7 +34,7 @@ Test Tags           sap    ecc    exploration
 
 
 *** Variables ***
-# Identifiants de connexion — fournis en ligne de commande (-v) ou en variables d'environnement.
+# Identifiants de connexion, fournis en ligne de commande (-v) ou en variables d'environnement.
 ${SAP_CONNECTION}               ${EMPTY}    # ex. "/H/vhcala4hci/S/3200" (chaîne de connexion Docker/local)
 ${SAP_USER}                     ${EMPTY}
 ${SAP_PASSWORD}                 ${EMPTY}
@@ -50,13 +50,13 @@ ${SE16_ALV_GRID_RADIO}          wnd[1]/usr/tabsG_TABSTRIP/tabp0400/ssubTOOLAREA:
 ${SE16_MAX_HITS_FIELD}          wnd[0]/usr/txtMAX_SEL             # « Maximum No. of Hits »
 ${SE16_COUNT_BUTTON}            wnd[0]/tbar[1]/btn[31]            # « Number of Entries »
 ${SE16_COUNT_RESULT}            wnd[1]/usr/txtG_DBCOUNT           # popup « Number of Entries »
-# Champs de sélection positionnels (I<n> suit l'ordre des champs de la table — stable par version).
+# Champs de sélection positionnels (I<n> suit l'ordre des champs de la table, stable par version).
 ${DD07L_DOMNAME_FIELD}          wnd[0]/usr/ctxtI1-LOW             # DD07L : DOMNAME (1er champ)
 ${TADIR_OBJECT_FIELD}           wnd[0]/usr/ctxtI2-LOW             # TADIR : OBJECT (TABL, VIEW…)
 ${TADIR_OBJ_NAME_FIELD}         wnd[0]/usr/txtI3-LOW              # TADIR : OBJ_NAME (champ txt)
 ${TADIR_DEVCLASS_FIELD}         wnd[0]/usr/ctxtI8-LOW             # TADIR : DEVCLASS (paquet)
 
-# --- Catalogues métier verrouillés — vérifiés live le 2026-07-12 sur cette instance A4H
+# --- Catalogues métier verrouillés, vérifiés live le 2026-07-12 sur cette instance A4H
 # --- (S/4HANA 1909, GUI 8.00). Un écart signale une évolution du système à documenter.
 @{EXPECTED_DELIVERY_CLASSES}    A    C    E    G    L    S    W
 @{EXPECTED_TABLE_CLASSES}       APPEND    INTTAB    TRANSP    VIEW
@@ -72,7 +72,7 @@ ${EPM_NAME_PATTERN}              SNWD_*
 SAP GUI Scripting Should Be Fully Enabled
     [Documentation]    Préflight : le scripting SAP GUI doit être pleinement actif (côté
     ...                serveur RZ11 ``sapgui/user_scripting`` et côté client) avant toute
-    ...                exploration — échoue tôt et clairement plutôt que par des timeouts
+    ...                exploration : échoue tôt et clairement plutôt que par des timeouts
     ...                en cascade plus loin dans la suite.
     [Tags]    smoke
     Scripting Should Be Fully Enabled
@@ -89,12 +89,12 @@ Business Delivery Classes Catalog Should Match Known Set
     Should Not Be Empty    ${delivery_classes}
     Lists Should Be Equal    ${delivery_classes}    ${EXPECTED_DELIVERY_CLASSES}
     ...    ignore_order=True
-    ...    msg=Le catalogue des classes de livraison a changé sur ce système — mettre à jour EXPECTED_DELIVERY_CLASSES après investigation.
+    ...    msg=Le catalogue des classes de livraison a changé sur ce système : mettre à jour EXPECTED_DELIVERY_CLASSES après investigation.
 
 Table Technical Classes Catalog Should Match Known Set
     [Documentation]    Même principe que le test précédent, pour les **classes techniques de
     ...                table** (domaine ``TABCLASS``) : transparente, vue, table interne,
-    ...                append — utile pour distinguer une vraie table d'une vue ou d'un append
+    ...                append. Utile pour distinguer une vraie table d'une vue ou d'un append
     ...                avant de tenter une vérification SE16.
     [Tags]    catalog
     ${table_classes}=    Read Domain Fixed Values    TABCLASS
@@ -102,12 +102,12 @@ Table Technical Classes Catalog Should Match Known Set
     Should Not Be Empty    ${table_classes}
     Lists Should Be Equal    ${table_classes}    ${EXPECTED_TABLE_CLASSES}
     ...    ignore_order=True
-    ...    msg=Le catalogue des classes techniques de table a changé sur ce système — mettre à jour EXPECTED_TABLE_CLASSES après investigation.
+    ...    msg=Le catalogue des classes techniques de table a changé sur ce système : mettre à jour EXPECTED_TABLE_CLASSES après investigation.
 
 Flight Demo Package Tables Should All Be Accessible And Counted
     [Documentation]    Vérification en profondeur : redécouvre dynamiquement (TADIR, objets
     ...                ``R3TR TABL``) toutes les tables du paquet de démonstration vol
-    ...                (``SAPBC_DATAMODEL``), puis vérifie chacune individuellement via SE16 —
+    ...                (``SAPBC_DATAMODEL``), puis vérifie chacune individuellement via SE16 :
     ...                consultable + nombre d'entrées lu, ou reconnue comme structure/include
     ...                (statut ``E`` à l'ouverture, ex. ``SFL_AUX``) sans faire échouer le test.
     [Tags]    deep
@@ -120,7 +120,7 @@ Flight Demo Package Tables Should All Be Accessible And Counted
 
 EPM Demo Package Tables Should All Be Accessible And Counted
     [Documentation]    Même vérification en profondeur pour les tables EPM (motif de nom
-    ...                ``SNWD_*`` — paquet EPM non homogène, d'où le filtrage par nom plutôt
+    ...                ``SNWD_*`` : paquet EPM non homogène, d'où le filtrage par nom plutôt
     ...                que par DEVCLASS unique).
     [Tags]    deep
     ${tables}=    List Repository Tables    name_pattern=${EPM_NAME_PATTERN}    max_hits=200
@@ -179,7 +179,7 @@ Popup Is Present
     RETURN    ${present}
 
 Cancel Residual Popup
-    [Documentation]    Referme une fenêtre modale résiduelle si présente (F12) — sécurise
+    [Documentation]    Referme une fenêtre modale résiduelle si présente (F12) : sécurise
     ...                l'enchaînement des sondes SE16 en balayage de masse. Ne fait rien si
     ...                aucun popup n'est ouvert.
     ${present}=    Popup Is Present
@@ -192,7 +192,7 @@ Use ALV Grid In Data Browser
     [Documentation]    Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
     ...                **grille ALV** (Settings > User Parameters > ALV Grid Display).
     ...                Réglage persistant par utilisateur et idempotent (peut être rappelé
-    ...                sans risque) — indispensable : la « Standard SE16 list » (défaut) est
+    ...                sans risque). Indispensable : la « Standard SE16 list » (défaut) est
     ...                une liste ABAP classique sans objet grille scriptable.
     Run Transaction    SE16
     Click Element    ${SE16_SETTINGS_USER_PARAMS_MENU}
@@ -204,7 +204,7 @@ Use ALV Grid In Data Browser
 
 Try Open Table Selection Screen
     [Documentation]    Ouvre SE16 sur ``${table}`` et tente d'atteindre l'écran de sélection.
-    ...                Retourne ``True`` si l'écran s'ouvre, ``False`` si SE16 rejette le nom —
+    ...                Retourne ``True`` si l'écran s'ouvre, ``False`` si SE16 rejette le nom :
     ...                message de statut de type ``E`` (structure, include ou table inconnue) ;
     ...                l'assertion porte sur le *type* du message, jamais sur son texte
     ...                localisé. Gère le dialogue « choix des champs de sélection » des tables
@@ -232,7 +232,7 @@ Try Open Table Selection Screen
 Count Entries On Current Selection Screen
     [Documentation]    Suppose un écran de sélection SE16 déjà ouvert : clique « Number of
     ...                Entries », lit le compteur du popup puis le referme (F12). Compte
-    ...                **toutes** les entrées répondant aux critères saisis — fiable même sur
+    ...                **toutes** les entrées répondant aux critères saisis, fiable même sur
     ...                table vide (retourne 0), contrairement à l'exécution F8.
     Click Element    ${SE16_COUNT_BUTTON}
     Wait Until Busy Done
@@ -249,7 +249,7 @@ Count Entries On Current Selection Screen
 Verify Table Is Accessible And Counted
     [Documentation]    Vérification en profondeur d'une table unique : tente d'ouvrir SE16
     ...                sur ``${table}``. Si consultable, compte ses entrées et journalise le
-    ...                résultat (assertion : le compte est un entier >= 0, toujours vrai —
+    ...                résultat (assertion : le compte est un entier >= 0, toujours vrai,
     ...                l'objectif est de prouver que la lecture n'a pas échoué silencieusement).
     ...                Si SE16 la rejette (structure ou include, statut ``E``), le journalise
     ...                comme tel sans faire échouer le test : ce n'est pas une anomalie mais
@@ -264,12 +264,12 @@ Verify Table Is Accessible And Counted
         ${type}    ${text}=    Get Status Message
         Should Be Equal As Strings    ${type}    E
         ...    msg=Table ${table} rejetée par SE16 pour une raison inattendue (type '${type}': ${text}).
-        Log    Table ${table} : non consultable via SE16 (structure/include) — statut '${type}': ${text}.    level=INFO
+        Log    Table ${table} : non consultable via SE16 (structure/include), statut '${type}': ${text}.    level=INFO
     END
 
 Read Domain Fixed Values
     [Documentation]    Lit les valeurs fixes autorisées d'un domaine du dictionnaire ABAP
-    ...                (table ``DD07L``) et les retourne triées — p.ex. ``CONTFLAG`` (classes
+    ...                (table ``DD07L``) et les retourne triées, p.ex. ``CONTFLAG`` (classes
     ...                de livraison / business classes) ou ``TABCLASS`` (classes techniques).
     [Arguments]    ${domain}    ${max_hits}=200
     ${opened}=    Try Open Table Selection Screen    DD07L
@@ -288,7 +288,7 @@ List Repository Tables
     ...                ``R3TR TABL`` filtrés par paquet (``DEVCLASS``) et/ou motif de nom
     ...                (joker ``*``). Retourne une liste triée, vide si aucun objet ne répond.
     ...                Lève si le nombre de lignes lues atteint exactement ``max_hits``
-    ...                (troncature probable — un vrai inventaire complet ne doit jamais
+    ...                (troncature probable : un vrai inventaire complet ne doit jamais
     ...                tomber pile sur la limite par hasard), pour ne jamais faire passer
     ...                silencieusement un inventaire tronqué pour un inventaire exhaustif.
     [Arguments]    ${package}=${EMPTY}    ${name_pattern}=${EMPTY}    ${max_hits}=500
@@ -308,7 +308,7 @@ List Repository Tables
     ${rows}=    Read Full Grid    ${SE16_GRID}    max_rows=${max_hits}
     IF    len($rows) == int($max_hits)
         Fail    List Repository Tables a lu exactement max_hits=${max_hits} lignes pour
-        ...    package='${package}' name_pattern='${name_pattern}' — inventaire probablement
+        ...    package='${package}' name_pattern='${name_pattern}' : inventaire probablement
         ...    tronqué. Augmenter max_hits.
     END
     ${names}=    Evaluate    sorted({r["OBJ_NAME"] for r in $rows})

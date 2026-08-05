@@ -3,20 +3,20 @@
 Le SAP GUI Scripting est désactivé par défaut côté serveur
 (``sapgui/user_scripting = FALSE``) et peut être **dégradé silencieusement** par
 les paramètres de profil : ``user_scripting_set_readonly`` (l'API ne peut plus
-rien modifier), ``user_scripting_disable_recording`` (plus aucun événement —
+rien modifier), ``user_scripting_disable_recording`` (plus aucun événement :
 mode record natif du recorder inopérant), ``user_scripting_per_user``
 (autorisation S_SCR requise). Aucun de ces modes ne produit d'erreur franche à
 la connexion : les symptômes apparaissent plus tard, au premier keyword qui
 échoue bizarrement. Ces keywords lisent l'état réel exposé par l'API
 (``GuiConnection.DisabledByServer``, ``GuiSessionInfo.ScriptingModeReadOnly`` /
-``ScriptingModeRecordingDisabled`` — doc officielle « SAP GUI Scripting API »)
+``ScriptingModeRecordingDisabled``, doc officielle « SAP GUI Scripting API »)
 pour échouer TÔT, avec la cause exacte et le paramètre RZ11 à corriger.
 
 Également ici : ``TestToolMode`` (supprime les popups de messages I/A au replay,
-update immédiat — pensé par SAP pour les outils de test), la télémétrie de
+update immédiat, pensé par SAP pour les outils de test), la télémétrie de
 ``session.Info`` (temps de réponse, aller-retours) pour instrumenter les runs,
-le préflight du **mode accessibilité** — l'autre réglage silencieux (côté
-client, celui-là) dont dépend la lecture des listes ABAP classiques — et le
+le préflight du **mode accessibilité**, l'autre réglage silencieux (côté
+client, celui-là) dont dépend la lecture des listes ABAP classiques, et le
 préflight de **posture de sécurité du poste** (`Get Client Security Status` /
 `Client Security Should Be Hardened` : client patché contre la CVE-2025-0055
 de l'historique de saisie, historique désactivé sur un poste où les tests
@@ -35,7 +35,7 @@ from sapfx_common.client_security import (
 
 def _truthy(value):
     """Interprétation Robot-friendly d'un booléen : les arguments non annotés
-    arrivent en chaîne (« False » est truthy en Python — piège classique)."""
+    arrivent en chaîne (« False » est truthy en Python, piège classique)."""
     if isinstance(value, str):
         return value.strip().lower() not in ("false", "0", "no", "non", "")
     return bool(value)
@@ -64,7 +64,7 @@ class DiagnosticsKeywords:
         - ``disabled_by_server`` : ``sapgui/user_scripting`` absent/FALSE côté serveur ;
         - ``read_only`` : mode lecture seule (``sapgui/user_scripting_set_readonly``) ;
         - ``recording_disabled`` : événements coupés
-          (``sapgui/user_scripting_disable_recording``) — le mode record natif du
+          (``sapgui/user_scripting_disable_recording``) : le mode record natif du
           recorder et tout spy événementiel sont inopérants ;
         - ``ui_guideline`` : thème/guideline actif (détection Belize/Quartz/Horizon) ;
         - ``system``/``client``/``user`` : contexte de la session.
@@ -109,21 +109,21 @@ class DiagnosticsKeywords:
         problems = []
         if status["disabled_by_server"]:
             problems.append(
-                "le scripting est désactivé côté serveur — RZ11 : "
+                "le scripting est désactivé côté serveur, RZ11 : "
                 "sapgui/user_scripting = TRUE (en MAJUSCULES) ; si le paramètre "
                 "est déjà TRUE, le système est probablement en "
                 "sapgui/user_scripting_per_user = TRUE et ce compte n'a pas "
-                "l'autorisation S_SCR Execute(16) — c'est d'ailleurs la "
+                "l'autorisation S_SCR Execute(16). C'est d'ailleurs la "
                 "configuration recommandée : scripting réservé aux comptes de "
                 "test (cf. docs/hardening-test-environment.md)")
         if status["read_only"]:
             problems.append(
-                "le scripting est en LECTURE SEULE (aucune action possible) — "
+                "le scripting est en LECTURE SEULE (aucune action possible), "
                 "RZ11 : sapgui/user_scripting_set_readonly = FALSE")
         if status["recording_disabled"] and not allow_recording_disabled:
             problems.append(
                 "les événements de scripting sont coupés (record natif/spys "
-                "événementiels inopérants) — RZ11 : "
+                "événementiels inopérants), RZ11 : "
                 "sapgui/user_scripting_disable_recording = FALSE, ou appeler ce "
                 "keyword avec allow_recording_disabled=True si assumé")
         if problems:
@@ -138,7 +138,7 @@ class DiagnosticsKeywords:
         Prévu par SAP pour les outils de test : les messages d'information et
         d'abandon (types ``I``/``A``) ne s'affichent plus en popup (ils passent
         dans la barre d'état), les messages système sont ignorés et le mode
-        update du serveur devient immédiat pour cette connexion — trois sources
+        update du serveur devient immédiat pour cette connexion, trois sources
         classiques de replays instables. À activer en Suite Setup, désactiver
         avec ``enabled=False``. Nécessite un kernel récent (sinon sans effet)."""
         value = str(enabled).strip().lower() not in ("false", "0", "no", "non", "")
@@ -150,7 +150,7 @@ class DiagnosticsKeywords:
                 % exc)
 
     def get_list_rendering_status(self):
-        """Décrit comment l'écran ACTIF expose son contenu — le préflight du
+        """Décrit comment l'écran ACTIF expose son contenu : le préflight du
         **mode accessibilité** SAP GUI (pendant côté client de
         `Get Scripting Status`, qui couvre le côté serveur).
 
@@ -161,18 +161,18 @@ class DiagnosticsKeywords:
           (``GuiShell``/``GuiContainerShell``/``GuiCustomControl``) ;
         - ``list_readable`` : vrai si le contenu est lisible en labels ;
         - ``accessibility_mode_needed`` : vrai quand le contenu est **enfermé
-          dans un shell sans aucun label** — la signature exacte d'une liste
+          dans un shell sans aucun label**, la signature exacte d'une liste
           ABAP rendue sans le mode accessibilité (constaté live sur A4H / SAP
           GUI 8.00 : la sortie RSPARAM n'expose alors AUCUN label) ;
         - ``hint`` : la marche à suivre, ou ``None`` si rien à corriger.
 
         Le mode accessibilité est un réglage **du poste** (Options SAP GUI →
         Interaction Design → Accessibility) qui exige un redémarrage du client :
-        il se provisionne, il ne s'active pas depuis un test — d'où ce keyword
+        il se provisionne, il ne s'active pas depuis un test : d'où ce keyword
         de constat, exactement comme on ne bascule pas RZ11 depuis une suite.
         Lecture seule, indépendant de la locale (aucun texte n'est interprété).
 
-        NB : une grille ALV est *légitimement* rendue dans un shell — sur un
+        NB : une grille ALV est *légitimement* rendue dans un shell ; sur un
         écran ALV, ``shell_rendered`` est vrai sans que rien ne soit à
         corriger (les labels y sont inutiles : lire via `Read Grid`)."""
         elements = self._screen_elements()
@@ -204,8 +204,8 @@ class DiagnosticsKeywords:
         avec la cause exacte et la marche à suivre (cf. `Get List Rendering
         Status`).
 
-        À appeler juste avant `Read Abap List` — ou en Suite Setup d'une suite
-        qui lit des sorties de reports — pour transformer un « aucune liste
+        À appeler juste avant `Read Abap List` (ou en Suite Setup d'une suite
+        qui lit des sorties de reports) pour transformer un « aucune liste
         détectée » découvert au milieu du run en un échec explicite qui nomme le
         réglage du poste à provisionner."""
         status = self.get_list_rendering_status()
@@ -224,7 +224,7 @@ class DiagnosticsKeywords:
         ``roundtrips``, ``flushes``, ``low_speed_connection``.
 
         Utile pour instrumenter un run (journaliser le coût serveur de chaque
-        étape métier) ou détecter une connexion dégradée — ``flushes`` élevés =
+        étape métier) ou détecter une connexion dégradée : ``flushes`` élevés =
         beaucoup d'appels COM synchrones, candidat à l'optimisation. Clés à
         ``None`` si la propriété n'est pas exposée par cette version."""
         info = _read(self.session, "Info")
@@ -237,14 +237,14 @@ class DiagnosticsKeywords:
         }
 
     def get_client_security_status(self, history_dirs=None):
-        """Posture de sécurité du POSTE de test (client SAP GUI) — lecture
+        """Posture de sécurité du POSTE de test (client SAP GUI) : lecture
         seule, aucun effet de bord.
 
         Complète `Get Scripting Status` (versant serveur) par le versant
         client. Clés :
 
         - ``gui_version`` : version du client (``8.0 PL6``…) ;
-        - ``input_history_cve`` : ``patched`` / ``vulnerable`` / ``unknown`` —
+        - ``input_history_cve`` : ``patched`` / ``vulnerable`` / ``unknown``,
           position du client vis-à-vis de la CVE-2025-0055 (l'historique de
           saisie de SAP GUI for Windows était chiffré par un XOR à clé
           statique ; corrigé à partir de la 8.00 PL9, notes de sécurité SAP
@@ -252,7 +252,7 @@ class DiagnosticsKeywords:
         - ``input_history_files`` / ``input_history_present`` : bases
           d'historique (``*.db``) trouvées aux emplacements connus du poste.
           Sur un poste de TEST c'est le point important : tout ce que les
-          suites saisissent dans de vrais champs peut y être persisté —
+          suites saisissent dans de vrais champs peut y être persisté :
           l'historique doit être désactivé (Options SAP GUI → Local Data →
           History) et les bases existantes purgées ;
         - ``scripting`` : rappel du préflight serveur
@@ -260,7 +260,7 @@ class DiagnosticsKeywords:
         - ``hints`` : les corrections à apporter (vide si rien à signaler).
 
         ``history_dirs`` (répertoire ou liste) remplace les emplacements
-        scannés — utile si l'historique a été déplacé via les options SAP GUI.
+        scannés, utile si l'historique a été déplacé via les options SAP GUI.
         Dict JSON-safe (utilisable à travers rf-mcp). Forme assertion :
         `Client Security Should Be Hardened`. Guide complet :
         docs/hardening-test-environment.md."""
@@ -286,7 +286,7 @@ class DiagnosticsKeywords:
             hints.append(
                 "%d base(s) d'historique de saisie présente(s) sur ce poste : "
                 "désactiver l'historique (Options SAP GUI → Local Data → "
-                "History) et purger ces fichiers — les saisies des tests y "
+                "History) et purger ces fichiers : les saisies des tests y "
                 "sont persistées" % len(files))
         return {
             "gui_version": status["gui_version"],
@@ -312,7 +312,7 @@ class DiagnosticsKeywords:
         - bases d'historique de saisie présentes sur le poste : échec, sauf
           ``allow_input_history=True`` (assumé : poste hors production, données
           de test synthétiques) ;
-        - niveau de patch indéterminé : toléré par défaut —
+        - niveau de patch indéterminé : toléré par défaut ;
           ``allow_unknown_patch_level=False`` pour l'exiger (poste durci où la
           version DOIT être identifiable).
 
@@ -326,17 +326,17 @@ class DiagnosticsKeywords:
         if posture["input_history_cve"] == INPUT_HISTORY_VULNERABLE:
             problems.append(
                 "client SAP GUI %s vulnérable sur l'historique de saisie "
-                "(CVE-2025-0055) — monter en 8.00 PL9+ ou en 8.10+"
+                "(CVE-2025-0055) : monter en 8.00 PL9+ ou en 8.10+"
                 % (posture["gui_version"] or "?"))
         elif (posture["input_history_cve"] == INPUT_HISTORY_UNKNOWN
               and not allow_unknown):
             problems.append(
                 "niveau de patch du client indéterminé (exigé par "
-                "allow_unknown_patch_level=False) — vérifier les notes de "
+                "allow_unknown_patch_level=False) : vérifier les notes de "
                 "sécurité SAP de janvier 2025")
         if posture["input_history_present"] and not allow_history:
             problems.append(
-                "%d base(s) d'historique de saisie sur le poste (%s) — "
+                "%d base(s) d'historique de saisie sur le poste (%s) : "
                 "désactiver l'historique (Options SAP GUI → Local Data → "
                 "History) et purger, ou appeler ce keyword avec "
                 "allow_input_history=True si assumé"

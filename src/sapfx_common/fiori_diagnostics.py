@@ -4,8 +4,8 @@ Browser 20 expose séparément le log console (`Get Console Log`), les erreurs
 JS non interceptées (`Get Page Errors`) et le snapshot ARIA (`Get Aria
 Snapshot`) ; le projet a de son côté l'arbre UI5 (`Get Ui5 Page Tree`) et la
 sonde de composition hybride (`Get Page Composition`). Sur un écran qui ne se
-comporte pas comme attendu, l'information utile est la CONJONCTION de ces vues
-— une erreur console explique souvent un arbre UI5 vide, la composition dit
+comporte pas comme attendu, l'information utile est la CONJONCTION de ces vues :
+une erreur console explique souvent un arbre UI5 vide, la composition dit
 quel moteur adresser à la place, l'ARIA couvre les zones non-SAP.
 
 Ce module tient la partie pure de l'agrégation : normalisation des entrées
@@ -30,7 +30,7 @@ _CONSOLE_WARNING_TYPES = frozenset({"warning", "warn"})
 
 def parse_sections(sections: object) -> list[str]:
     """Valide et normalise le paramètre ``sections`` (chaîne ``a,b,c`` ou
-    liste). Section inconnue = erreur listant les valides — jamais ignorée en
+    liste). Section inconnue = erreur listant les valides, jamais ignorée en
     silence (le contrat des presets IDP / du vocabulaire métier)."""
     if isinstance(sections, str):
         wanted = [part.strip().lower() for part in sections.split(",") if part.strip()]
@@ -52,7 +52,7 @@ def parse_sections(sections: object) -> list[str]:
 
 def _location_to_str(location: object) -> str:
     """Compacte la localisation Playwright (``{url, lineNumber, columnNumber}``)
-    en ``url:ligne:colonne`` — une chaîne stable plutôt qu'un dict imbriqué."""
+    en ``url:ligne:colonne``, une chaîne stable plutôt qu'un dict imbriqué."""
     if isinstance(location, Mapping):
         url = str(location.get("url", "") or "")
         line = location.get("lineNumber", "")
@@ -66,7 +66,7 @@ def _location_to_str(location: object) -> str:
 def normalize_console_entries(entries: object) -> list[dict[str, str]]:
     """Normalise les entrées de `Get Console Log` (Browser) en dicts JSON-safe
     à forme stable ``{type, text, location, time}`` (chaînes partout). Une
-    entrée inattendue (non-dict) devient ``type=log, text=str(entrée)`` —
+    entrée inattendue (non-dict) devient ``type=log, text=str(entrée)`` :
     best-effort, un diagnostic ne doit jamais échouer sur sa propre matière."""
     normalized: list[dict[str, str]] = []
     if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
@@ -108,7 +108,7 @@ def normalize_page_errors(errors: object) -> list[dict[str, str]]:
 
 def tail_entries(entries: list[dict[str, str]],
                  limit: int) -> tuple[list[dict[str, str]], int]:
-    """Garde les ``limit`` DERNIÈRES entrées (les plus récentes — celles qui
+    """Garde les ``limit`` DERNIÈRES entrées (les plus récentes, celles qui
     expliquent l'état courant) et retourne ``(gardées, nb_écartées)``. La
     troncature est toujours annoncée par l'appelant (pas de cap silencieux) ;
     ``limit <= 0`` = tout garder."""
@@ -126,14 +126,14 @@ def summarize_issues(diagnostics: Mapping[str, Any]) -> list[str]:
     if page_errors:
         first = page_errors[0]
         issues.append(
-            "%d erreur(s) JS non interceptée(s) — première : %s: %s"
+            "%d erreur(s) JS non interceptée(s), première : %s: %s"
             % (len(page_errors), first.get("name", "Error"),
                first.get("message", "")))
     console = diagnostics.get("console") or []
     errors = [e for e in console if e.get("type") in _CONSOLE_ERROR_TYPES]
     warnings = [e for e in console if e.get("type") in _CONSOLE_WARNING_TYPES]
     if errors:
-        issues.append("%d erreur(s) console — première : %s"
+        issues.append("%d erreur(s) console, première : %s"
                       % (len(errors), errors[0].get("text", "")))
     if warnings:
         issues.append("%d avertissement(s) console" % len(warnings))
@@ -146,9 +146,9 @@ def summarize_issues(diagnostics: Mapping[str, Any]) -> list[str]:
                        if e not in ("role", "xpath")]
             frames = composition.get("frames") or []
             if engines:
-                hint = " — moteurs recommandés sur cette portée : %s" % ", ".join(engines)
+                hint = " ; moteurs recommandés sur cette portée : %s" % ", ".join(engines)
             if frames:
-                hint += (" ; la page a %d iframe(s) — l'app est peut-être dans "
+                hint += (" ; la page a %d iframe(s), l'app est peut-être dans "
                          "une frame (Set Ui5 Frame / Push Ui5 Frame)" % len(frames))
         issues.append("pas d'arbre UI5 sur la portée courante (registre vide "
                       "ou pas une app UI5)%s" % hint)
@@ -158,7 +158,7 @@ def summarize_issues(diagnostics: Mapping[str, Any]) -> list[str]:
 
 
 def render_diagnostics_report(diagnostics: Mapping[str, Any]) -> str:
-    """Rapport Markdown du diagnostic — anomalies d'abord, puis chaque section
+    """Rapport Markdown du diagnostic : anomalies d'abord, puis chaque section
     collectée en résumé compact (le dict complet reste la donnée de travail ;
     le rapport est la vue humaine à coller dans le log Robot ou une issue)."""
     lines = ["# Diagnostic Fiori"]
@@ -166,7 +166,7 @@ def render_diagnostics_report(diagnostics: Mapping[str, Any]) -> str:
     context = [str(part) for part in (diagnostics.get("url"),
                                       diagnostics.get("title")) if part]
     if context:
-        lines.append("- page : %s" % " — ".join(context))
+        lines.append("- page : %s" % " · ".join(context))
     lines.append("- portée : %s" % (scope or "page principale"))
     issues = diagnostics.get("issues") or []
     lines.append("")

@@ -2,7 +2,7 @@
 Documentation       Démo scénarisée du **recorder ECC (SAP GUI)** contre un vrai système
 ...                 A4H, ENREGISTRÉE EN VIDÉO. Contrairement au canal web, il n'y a pas
 ...                 de panneau dans la page : on capture LA FENÊTRE SAP GUI (et elle
-...                 seule — aucune fuite de bureau) avec ffmpeg `gdigrab`, et les
+...                 seule, aucune fuite de bureau) avec ffmpeg `gdigrab`, et les
 ...                 sous-titres incrustés portent les steps RÉELLEMENT émis par le
 ...                 moteur record, horodatés à l'exécution.
 ...
@@ -14,7 +14,7 @@ Documentation       Démo scénarisée du **recorder ECC (SAP GUI)** contre un v
 ...                     tools/recorder/demo/ecc_demo_video.robot
 ...                 Sortie : dist/video/sapfx-ecc-recorder-demo.mp4
 ...
-...                 NB : la prise filme une application de BUREAU — contrairement au
+...                 NB : la prise filme une application de BUREAU et, contrairement au
 ...                 canal web, elle ne peut pas être headless. Ne pas toucher
 ...                 souris/clavier pendant l'enregistrement, et ne rien poser
 ...                 par-dessus la fenêtre SAP.
@@ -35,7 +35,7 @@ ${OUT}          ${EXECDIR}/dist/video
 ${RAW}          ${OUT}/ecc_capture.mkv
 ${SRT}          ${OUT}/ecc_capture.srt
 ${FINAL}        sapfx-ecc-recorder-demo.mp4
-# posées à l'exécution — déclarées ici pour l'analyse statique
+# posées à l'exécution, déclarées ici pour l'analyse statique
 ${T0}           ${0}
 ${OFFSET}       ${0}
 ${FFMPEG}       ${EMPTY}
@@ -56,9 +56,9 @@ Record The ECC Demo Video
     ${state}=    Create Dictionary
     ${state}    ${ignored}=    Poll Recorder    ${state}    # référence : écran d'accueil
 
-    Beat    SAP GUI (ECC) — enregistreur de tests    Robot Framework · système SAP réel    3.5
+    Beat    SAP GUI (ECC) : enregistreur de tests    Robot Framework · système SAP réel    3.5
 
-    Beat    1. Le recorder observe la session    Par l'API de scripting SAP GUI — aucun clic intercepté    3
+    Beat    1. Le recorder observe la session    Par l'API de scripting SAP GUI, aucun clic intercepté    3
 
     # --- geste 1 : lancer une transaction, comme un utilisateur ---
     Beat    2. On pilote SAP normalement    L'OK-code est saisi, puis validé    1
@@ -104,13 +104,13 @@ Record The ECC Demo Video
     # --- replay : SAP rebouge tout seul ---
     Run Transaction    /n
     Wait Until Busy Done
-    Beat    7. Replay contre la session ouverte    Le déroulé est rejoué — SAP repart de zéro    2.5
+    Beat    7. Replay contre la session ouverte    Le déroulé est rejoué : SAP repart de zéro    2.5
     ${lib}=    Get Library Instance    SapEccLibrary
     ${executed}    ${skipped}    ${failed}    ${msg}=
     ...    Recorder.Replay Recorded Steps    ${ALL_STEPS}    ${lib}
     Should Be Equal    ${failed}    ${None}    le replay doit passer : ${msg}
     ${title}=    Get Value    wnd[0]/titl
-    Beat    7. Replay OK    ${executed} steps rejoués — écran d'arrivée : ${title}    4
+    Beat    7. Replay OK    ${executed} steps rejoués, écran d'arrivée : ${title}    4
 
     Beat    ECC · Fiori · WebGUI · API    Un enregistrement, un test qui parle métier    4
 
@@ -122,7 +122,7 @@ Record The ECC Demo Video
 *** Keywords ***
 Prepare Sap Window
     [Documentation]    Fenêtre SAP GUI au premier plan et à taille maîtrisée : gdigrab
-    ...                lie le HWND une fois, mais capture le contenu — une fenêtre
+    ...                lie le HWND une fois, mais capture le contenu : une fenêtre
     ...                recouverte donnerait une image polluée.
     ${title}=    Evaluate    __import__("win32gui").GetWindowText(__import__("win32gui").GetForegroundWindow())
     Set Suite Variable    ${WIN_TITLE}    ${title}
@@ -173,8 +173,8 @@ Stop Capture
     ${offset}=    Evaluate    max(0.0, ${duration} - ${elapsed})
     Set Suite Variable    ${OFFSET}    ${offset}
     # une seule cellule : la 2e serait lue comme l'argument `stream` de Log To Console
-    ${line}=    Catenate    capture ${size} o — film ${duration}s / scénario ${elapsed}s
-    ...    — décalage sous-titres ${offset}s
+    ${line}=    Catenate    capture ${size} o, film ${duration}s / scénario ${elapsed}s
+    ...    (décalage sous-titres ${offset}s)
     Log To Console    \n>>> ${line}
 
 Beat
@@ -184,7 +184,7 @@ Beat
     ${t}=    Evaluate    __import__("time").time() - ${T0}
     ${cue}=    Create Dictionary    t=${t}    title=${title}    detail=${detail}    block=${block}
     Append To List    ${CUES}    ${cue}
-    Log To Console    \n>>> [${t}] ${title} — ${detail}
+    Log To Console    \n>>> [${t}] ${title} : ${detail}
     Sleep    ${seconds}
 
 Poll Recorder
@@ -248,7 +248,7 @@ Write Srt
 
 Extract Section
     [Documentation]    Les ``${max}`` premières lignes non vides qui SUIVENT un marqueur
-    ...                de section — de quoi incruster l'essentiel d'un artefact sans
+    ...                de section : de quoi incruster l'essentiel d'un artefact sans
     ...                déborder du bandeau.
     [Arguments]    ${text}    ${marker}    ${max}
     ${lines}=    Evaluate    [l.rstrip() for l in $text.splitlines()]

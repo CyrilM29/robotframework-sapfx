@@ -104,7 +104,7 @@ def test_collect_state_serves_both_sections_from_the_provider():
     assert out["library"] == "SapEccLibrary"
     assert out["sections"]["page_source"]["page_source"] == "# screen"
     # la sémantique full_source est transmise TELLE QUELLE (défaut False :
-    # le mode diff du provider peut s'exercer — le point de la surcouche)
+    # le mode diff du provider peut s'exercer, le point de la surcouche)
     assert out["sections"]["page_source"]["kwargs"]["full_source"] is False
     assert out["sections"]["application_state"]["modal_open"] is False
     assert "stale_code_warning" not in out

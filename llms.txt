@@ -1,8 +1,8 @@
-# SAPFX — SAP test automation for Robot Framework
+# SAPFX: SAP test automation for Robot Framework
 
 > Open-source SAP test-automation ecosystem for Robot Framework, covering both
-> SAP paradigms end to end: SapEccLibrary (SAP GUI desktop client — ECC and
-> S/4HANA backend — via the SAP GUI Scripting COM API), SapFioriLibrary
+> SAP paradigms end to end: SapEccLibrary (SAP GUI desktop client, ECC and
+> S/4HANA backend, via the SAP GUI Scripting COM API), SapFioriLibrary
 > (Fiori / SAPUI5 / UI5 Web Components on the web, alongside the Browser
 > library / Playwright), SapApiLibrary (OData v2/v4 + optional RFC), shared
 > pure engines (locator healing, screen perception, visual hashing, semantic
@@ -10,41 +10,44 @@
 > (plan → generate → heal) composed over the rf-mcp MCP server.
 
 Non-negotiable conventions: tests contain no raw SAP ids or CSS/XPath
-(business keywords live in `resources/`); never `time.sleep` — always
+(business keywords live in `resources/`); never `time.sleep`, always
 condition-based waits; assertions are locale-independent (message *types*,
 never localized texts); every keyword has an off-SAP unit test (fake COM /
 fake Browser); ambiguity is always surfaced with candidates, never resolved
 by silent first match. Distribution: `pip install robotframework-sapfx`
-(PyPI), a self-contained Windows deployment pack (GitHub Releases), and the
-public source repo <https://github.com/CyrilM29/robotframework-sapfx>.
+(PyPI: the four libraries only), the self-contained Windows deployment pack
+(GitHub Releases, the ONLY full-install channel: libraries + recorders +
+rf-mcp plugins + business resources + test agents; the installer still pulls
+pinned dependencies from PyPI or an internal mirror), and the public source repo
+<https://github.com/CyrilM29/robotframework-sapfx>.
 
 ## Docs
 
 - [Architecture](docs/architecture.md): the two paradigms unified above the
   technical layer, in Robot Framework business keywords
 - [Fiori architecture](docs/fiori-architecture.md): the injected `__SAPFX`
-  bundle and its five engines — role (UI5 registry), xpath (control
+  bundle and its five engines: role (UI5 registry), xpath (control
   hierarchy), sid (SAP GUI for HTML / WebGUI), wc (UI5 Web Components pages
   without a UI5 runtime), dom (generic CSS/text + computed ARIA role +
-  accessible name `name=` — user-intent locators for the non-SAP regions of
+  accessible name `name=`: user-intent locators for the non-SAP regions of
   hybrid pages; `name=` also on the wc engine via the UI5 Web Components
-  `accessible-name` convention) — plus the hybrid-page probe
+  `accessible-name` convention), plus the hybrid-page probe
   `Get Page Composition`, the
   nested-iframe frame stack (`Push/Pop Ui5 Frame`) and the aggregated
   diagnostics keyword `Get Fiori Diagnostics` (composition + UI5 tree +
   console/page errors + ARIA snapshot, actionable `issues` summary)
 - [Test agents](docs/test-agents.md): sap-planner / sap-generator /
-  sap-healer — live exploration through rf-mcp, plans in `specs/` as the
+  sap-healer: live exploration through rf-mcp, plans in `specs/` as the
   source of truth, every generated step verified live before being written;
   `/sap-maintain` chains sentinel → healing telemetry → healer into one
   report, `/sap-eval-healer` evaluates the healer blind on a simulated drift
   (`scripts/agent_eval_harness.py`)
 - [MCP integration](docs/mcp-integration.md): plugins composed over rf-mcp
-  (keyword routing, screen perception state providers — smart diffs on
+  (keyword routing, screen perception state providers (smart diffs on
   changed screens, live application state with modal detection, stale-code
-  warning — selector guidance), plus the `sapfx-mcp` overlay launcher (rf-mcp
+  warning), selector guidance), plus the `sapfx-mcp` overlay launcher (rf-mcp
   unchanged + `sapfx_state`/`sapfx_screenshot`/`sapfx_reload` tools and a
-  startup compatibility guard — not a fork)
+  startup compatibility guard, not a fork)
 - [Hardening the test environment](docs/hardening-test-environment.md):
   security checklist (RZ11 server posture, client patch level and input
   history, credentials, MV3/CDP surface, MCP containment) mapped to the
@@ -67,13 +70,13 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
   across ECC and Fiori)
 - `src/SapEccLibrary/`: vendored upstream base + mixins (connection, waits,
   grids, perception, diagnostics/preflights, healing, semantic labels,
-  embedded browser, pointer fallback, multi-session registry — named session
+  embedded browser, pointer fallback, multi-session registry: named session
   aliases with an STA thread-safety rail and isolated teardown)
 - `src/SapFioriLibrary/`: UI5 resolution engines, launchpad intent
   navigation, identity-provider login flows, visual assertions
 - `src/sapfx_common/`: shared pure logic (polling, healing scores,
   perception diff, visual hash, semantic geometry, business vocabulary,
-  IDP presets) — typed and unit-tested without SAP or a browser
+  IDP presets), typed and unit-tested without SAP or a browser
 - `tests/robot/`: smoke suites runnable against public targets (OpenUI5 Demo
   Kit, local fixtures, UI5 legacy/legacy-free/2.x CDN builds) or a live A4H
 - `CLAUDE.md`: the canonical, detailed contributor guide (layout table,

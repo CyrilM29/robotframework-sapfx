@@ -9,7 +9,7 @@ Documentation       Smoke test for the **web Recorder's record mode** against a
 ...
 ...                 Run:  robot -v HEADLESS:True tests/robot/recorder_web_smoke.robot
 ...
-...                 FR — Test smoke du **mode record du Recorder web** contre un fixture
+...                 FR : Test smoke du **mode record du Recorder web** contre un fixture
 ...                 UI5 autonome (OpenUI5 depuis le CDN, sans SAP). Injecte le
 ...                 `recorder.js` généré, démarre l'enregistrement, simule un clic et une
 ...                 saisie, et vérifie que le déroulé transcrit contient les keywords
@@ -57,7 +57,7 @@ Web Recorder Transcribes A Click And A Fill
     Should Contain    ${panel}    Fill Ui5 Input
     Should Contain    ${panel}    abc
     # export ouvre depuis 2026-07 un MENU à 3 formats : cliquer le bouton puis
-    # l'entrée « .robot complet » — capture dans le dossier captures du projet
+    # l'entrée « .robot complet » : capture dans le dossier captures du projet
     ${dl_path}=    Normalize Path    ${CURDIR}/../../tools/recorder_web/captures/recorded.robot
     ${promise}=    Promise To Wait For Download    saveAs=${dl_path}
     Evaluate JavaScript    ${None}
@@ -129,6 +129,33 @@ Recorder Persists Across Reload Edits Steps And Exports Full Script
     Should Contain    ${full}    New Browser
     Should Contain    ${full}    Click Ui5 Control
     Should Contain    ${full}    Fill Ui5 Input
+
+Recorder Masks Sensitive Fields At Capture Time
+    [Documentation]    Portage rf-web-recorder 0.4.1 : les valeurs des champs
+    ...                sensibles (password, carte via token autocomplete cc-number,
+    ...                OTP via motif de nom) n'atteignent JAMAIS le déroulé enregistré
+    ...                (ni sessionStorage, ni export) ; un champ ordinaire est, lui,
+    ...                capturé en clair. Fixture hors ligne, sans UI5 : la capture
+    ...                passe par le moteur dom.
+    ${fixture}=    Normalize Path    ${CURDIR}/fixtures/sensitive_fixture.html
+    ${url}=        Evaluate    pathlib.Path(r"${fixture}").as_uri()    pathlib
+    ${recjs}=      Normalize Path    ${CURDIR}/../../tools/recorder_web/extension/recorder.js
+    ${src}=        Get File    ${recjs}
+    New Browser    chromium    headless=${HEADLESS}
+    New Page       ${url}
+    Evaluate JavaScript    ${None}    (s) => { (0,eval)(s); }    arg=${src}
+    Wait For Function    () => !!document.getElementById('__ui5SpyPanel')    timeout=10s
+    Evaluate JavaScript    ${None}
+    ...    () => { const p=document.getElementById('__ui5SpyPanel'); [...p.querySelectorAll('button')].find(x=>x.textContent==='rec').click(); }
+    Evaluate JavaScript    ${None}
+    ...    () => { const f=(id,v)=>{ const i=document.getElementById(id); i.value=v; i.dispatchEvent(new Event('change',{bubbles:true})); }; f('pwd','S3cret!'); f('card','4111111111111111'); f('otp','123456'); f('q','abc'); }
+    ${steps}=    Evaluate JavaScript    ${None}    () => sessionStorage.getItem('__ui5RecorderSteps')
+    Should Contain    ${steps}    <REDACTED>
+    Should Contain    ${steps}    <SECRET>
+    Should Contain    ${steps}    abc
+    Should Not Contain    ${steps}    S3cret!
+    Should Not Contain    ${steps}    4111111111111111
+    Should Not Contain    ${steps}    123456
 
 Recorder Panel Controls And Extension Api
     [Documentation]    Pièces in-page des items moyen impact : API (__ui5RecorderApi),

@@ -1,23 +1,23 @@
 *** Settings ***
 Documentation       Campagne de vérification exploratoire de la base SAP cible
-...                 (ABAP Platform Trial A4H, S/4HANA 1909, SAP GUI 8.00) — les
+...                 (ABAP Platform Trial A4H, S/4HANA 1909, SAP GUI 8.00) : les
 ...                 découvertes de la campagne robotmcp du 2026-07-09 encodées en
 ...                 tests rejouables. Trois volets :
 ...
-...                 1. *Catalogues* — la liste exhaustive des classes de données de
+...                 1. *Catalogues* : la liste exhaustive des classes de données de
 ...                 cette version, lue dans le dictionnaire (domaines ``CONTFLAG``
 ...                 et ``TABCLASS`` de ``DD07L``) et verrouillée par assertion :
 ...                 - classes de livraison : A, C, E, G, L, S, W ;
 ...                 - classes techniques : APPEND, INTTAB, TRANSP, VIEW
 ...                 (POOL/CLUSTER n'existent plus sur S/4HANA).
 ...
-...                 2. *Inventaires* — les tables métier recensées par le
+...                 2. *Inventaires* : les tables métier recensées par le
 ...                 référentiel (``TADIR``) : 27 objets TABL du modèle de vol
 ...                 (package ``SAPBC_DATAMODEL``, dont la structure ``SFL_AUX``)
 ...                 et 114 objets EPM (``SNWD_*``, dont 14 structures/includes
 ...                 non consultables).
 ...
-...                 3. *Vérification en profondeur* — chaque table inventoriée est
+...                 3. *Vérification en profondeur* : chaque table inventoriée est
 ...                 sondée via SE16 : ouverture de l'écran de sélection puis
 ...                 comptage « Number of Entries » (fiable même sur table vide) ;
 ...                 les structures doivent être rejetées avec un message de type
@@ -48,7 +48,7 @@ Test Tags           exploration
 
 
 *** Variables ***
-# Catalogues attendus — relevés live sur cette version (voir Documentation) ; un
+# Catalogues attendus, relevés live sur cette version (voir Documentation) ; un
 # écart signale une dérive du dictionnaire (patch, autre release) et doit se voir.
 @{EXPECTED_DELIVERY_CLASSES}    A    C    E    G    L    S    W
 @{EXPECTED_TABLE_CLASSES}       APPEND    INTTAB    TRANSP    VIEW
@@ -88,7 +88,7 @@ Flight Model Inventory Contains The Core Tables
 Every Flight Model Table Is Countable Through SE16
     [Documentation]    Vérification en profondeur : chaque objet TABL du modèle
     ...    de vol est soit une table consultable répondant au comptage
-    ...    « Number of Entries » (0 admis — une table vide reste consultable),
+    ...    « Number of Entries » (0 admis : une table vide reste consultable),
     ...    soit une structure proprement rejetée (message type ``E``, p.ex.
     ...    ``SFL_AUX``). Les tables cœur du jeu de démo doivent toutes être
     ...    dans le camp des consultables.
@@ -129,7 +129,7 @@ SFLIGHT Demo Data Is Present And Readable
 Every EPM Object Is Accessible Or A Declared Structure
     [Documentation]    Balayage des objets TABL ``SNWD_*`` du référentiel : chacun
     ...    est soit une table consultable (écran de sélection + comptage >= 0),
-    ...    soit rejeté proprement comme structure — message de statut de type
+    ...    soit rejeté proprement comme structure : message de statut de type
     ...    ``E``, seule assertion indépendante de la locale. Toute autre issue
     ...    (blocage, popup inattendu) fait échouer le test.
     [Tags]    deep

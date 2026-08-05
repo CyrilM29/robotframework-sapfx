@@ -10,7 +10,7 @@ Documentation       Démo scénarisée du **recorder web SAP** contre une VRAIE 
 ...
 ...                 Headless par DÉFAUT : une fenêtre visible reste interactive, donc un
 ...                 simple mouvement de souris pollue la prise. `-v HEADLESS:False` pour
-...                 regarder la démo se dérouler — mais alors, ne toucher à rien.
+...                 regarder la démo se dérouler, mais alors, ne toucher à rien.
 
 Library             Browser    auto_closing_level=SUITE
 Library             OperatingSystem
@@ -24,7 +24,7 @@ Suite Teardown      Close Browser
 ${APP}              http://localhost:4004/sap.fe.cap.travel/index.html
 ${RECJS}            ${CURDIR}${/}..${/}extension${/}recorder.js
 # auth `mocked` de cds v9 : les requêtes OData anonymes prennent un 401 et la
-# List Report reste vide (constaté live 2026-07-20) — utilisateur mocké de
+# List Report reste vide (constaté live 2026-07-20). Utilisateur mocké de
 # cap-sflight, surchargez par -v CDS_USER:... -v CDS_PWD:... si besoin.
 ${CDS_USER}         alice
 ${CDS_PWD}          ${EMPTY}
@@ -33,7 +33,7 @@ ${HEADLESS}         ${True}
 ${BEAT}             1.8s
 ${SEARCH}           input[id$="BasicSearchField-inner-I"]
 ${GO}               button:has-text("Go") >> visible=true
-# posée à l'exécution (chemin résolu en slashes) — déclarée ici pour l'analyse statique
+# posée à l'exécution (chemin résolu en slashes), déclarée ici pour l'analyse statique
 ${VIDEO_DIR}        ${EMPTY}
 
 
@@ -46,7 +46,7 @@ Record The Fiori Demo Video
     Set Suite Variable    ${VIDEO_DIR}    ${video_dir}
     Create Directory    ${video_dir}
     # Purge des captures Playwright d'anciennes prises : sans elle, la prise livrée
-    # pouvait être une VIEILLE vidéo (vu en vrai — 28 s livrées pour un scénario
+    # pouvait être une VIEILLE vidéo (vu en vrai : 28 s livrées pour un scénario
     # de 49 s). `Rename Video To` prend en plus la plus récente, ceinture et bretelles.
     Remove File    ${video_dir}${/}page@*.webm
     New Browser    chromium    headless=${HEADLESS}    slowMo=0:00:00.20
@@ -61,10 +61,10 @@ Record The Fiori Demo Video
     Wait For UI5 Idle
     Install Caption Bar
 
-    Caption    SAP Fiori — enregistreur de tests    Robot Framework · application Fiori Elements réelle
+    Caption    SAP Fiori : enregistreur de tests    Robot Framework · application Fiori Elements réelle
     Sleep    3s
 
-    Caption    1. Injection    Extension Chrome ou snippet console — le panneau apparaît
+    Caption    1. Injection    Extension Chrome ou snippet console : le panneau apparaît
     Intercept Blobs
     Evaluate JavaScript    ${None}    (s) => { (0,eval)(s); }    arg=${src}
     Wait For Function    () => !!document.getElementById('__ui5SpyPanel')    timeout=15s
@@ -87,7 +87,7 @@ Record The Fiori Demo Video
 
     # Sous-titre EXACT : l'id DOM montré est celui du champ de recherche, préfixé par
     # le composant applicatif. Le recorder n'en garde que le suffixe stable Fiori
-    # Elements — c'est ce qui survit à un changement de composant ou de thème.
+    # Elements : c'est ce qui survit à un changement de composant ou de thème.
     Caption    4. Des CONTRÔLES UI5, pas des ids DOM    L'id DOM porte le préfixe de l'app ; le recorder ne garde que le suffixe stable Fiori Elements
     Show Locator Card
     Sleep    5s
@@ -104,7 +104,7 @@ Record The Fiori Demo Video
     Evaluate JavaScript    ${None}    (s) => { (0,eval)(s); }    arg=${src}
     Wait For Function    () => !!document.getElementById('__ui5SpyPanel')    timeout=15s
     ${reset}=    Read Table Title
-    Caption    5. Application remise à zéro    ${reset} — mais les steps sont toujours là
+    Caption    5. Application remise à zéro    ${reset}, mais les steps sont toujours là
     Sleep    3s
 
     Caption    6. Replay dans la page    « play » rejoue le déroulé, avec les mêmes moteurs de résolution
@@ -113,10 +113,10 @@ Record The Fiori Demo Video
     Wait For UI5 Idle
     ${after}=    Read Table Title
     Should Be Equal    ${after}    ${FILTERED}    le replay doit ramener l'app à l'état filtré
-    Caption    6. L'application a réellement réagi    ${reset} → ${after} — validé avant même d'exporter
+    Caption    6. L'application a réellement réagi    ${reset} → ${after}, validé avant même d'exporter
     Sleep    3s
 
-    Caption    7. Export resource-first    Keywords métier + suite SANS localisateur — la convention du projet
+    Caption    7. Export resource-first    Keywords métier + suite SANS localisateur : la convention du projet
     Export Resource First
     Park Mouse
     Show Exported Pair
@@ -139,7 +139,7 @@ Install Caption Bar
     ...                none` pour ne jamais intercepter un clic du scénario.
     ...
     ...                Ajouté à `documentElement`, PAS à `body` : le `<body>` d'une app UI5
-    ...                impose son contexte de mise en page — greffé dedans, le bandeau
+    ...                impose son contexte de mise en page : greffé dedans, le bandeau
     ...                s'étirait sur toute la hauteur et poussait l'application de côté
     ...                (constaté à l'image). Le recorder ancre son propre menu là pour la
     ...                même raison. `height:auto` verrouille le calcul de hauteur.
@@ -152,7 +152,7 @@ Caption
     # une apostrophe française (« l'application ») casserait le littéral.
     Evaluate JavaScript    ${None}
     ...    (s) => { const i = s.indexOf('||'); window.__caption(s.slice(0, i), s.slice(i + 2)); }    arg=${title}||${subtitle}
-    Log To Console    \n>>> ${title} — ${subtitle}
+    Log To Console    \n>>> ${title} : ${subtitle}
 
 Read Table Title
     [Documentation]    Le titre de la table FE porte le compte (« Travels (4,133) ») :
@@ -243,7 +243,7 @@ Convert To Mp4
     # le ferait lire comme des échappements Python (\U…).
     ${found}=    Get Length    ${ffmpeg}
     IF    ${found} == 0
-        Log To Console    \n>>> ffmpeg absent — .webm conservé (convertir pour LinkedIn)
+        Log To Console    \n>>> ffmpeg absent : .webm conservé (convertir pour LinkedIn)
         RETURN
     END
     ${result}=    Run Process    ${ffmpeg}    -y    -hide_banner    -loglevel    error

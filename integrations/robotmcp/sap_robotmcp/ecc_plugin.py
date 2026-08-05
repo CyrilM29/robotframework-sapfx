@@ -1,4 +1,4 @@
-"""Plugin rf-mcp pour SapEccLibrary — perception écran SAP GUI desktop + guidance.
+"""Plugin rf-mcp pour SapEccLibrary : perception écran SAP GUI desktop + guidance.
 
 Côté ECC, SapEccLibrary EST la bibliothèque active de la session : son state
 provider est donc bien sollicité par rf-mcp (contrairement au cas Fiori, où
@@ -81,7 +81,7 @@ class EccStateProvider(LibraryStateProvider):
             page_source = _UNCHANGED_MARKER
         elif previous is not None and not full_source:
             # Écran déjà vu qui a changé : servir « ce qui a changé » (diff
-            # intelligent, renommages appariés) plutôt que tout re-décrire —
+            # intelligent, renommages appariés) plutôt que tout re-décrire,
             # sauf si le diff ne fait pas gagner de place (écran entièrement
             # remplacé), auquel cas la vue complète reste la plus honnête.
             candidate = _DIFF_HEADER + diff_perception(previous, sig,
@@ -126,13 +126,13 @@ class EccStateProvider(LibraryStateProvider):
         Sections best-effort au-delà de la transaction (chaque échec est
         consigné dans ``collection_errors`` sans faire tomber l'état) :
 
-        - ``windows``/``modal_open``/``modal_titles`` — la pile de fenêtres
+        - ``windows``/``modal_open``/``modal_titles`` : la pile de fenêtres
           réelle. C'est le garde-fou du piège vu live sur SESSION_MANAGER :
           ``Run Transaction`` peut rapporter un succès alors qu'un MODAL
           d'erreur est resté ouvert et neutralise l'OK-code ;
-        - ``status_message`` — type (E/S/W/I, l'ancre d'assertion
+        - ``status_message`` : type (E/S/W/I, l'ancre d'assertion
           locale-indépendante) + texte (contexte humain, jamais une assertion) ;
-        - ``telemetry`` — compteurs ``session.Info`` du dernier aller-retour.
+        - ``telemetry`` : compteurs ``session.Info`` du dernier aller-retour.
         """
         state: Dict[str, Any] = {"active_library": "SapEccLibrary"}
         try:
@@ -235,7 +235,7 @@ class SapEccPlugin(StaticLibraryPlugin):
         return PromptBundle(recommendation=ECC_RECOMMENDATION)
 
     def get_keyword_library_map(self) -> Dict[str, str]:
-        # Keywords ajoutés/surchargés par le fork (mixins + SapEccLibrary.py) —
+        # Keywords ajoutés/surchargés par le fork (mixins + SapEccLibrary.py) :
         # les centaines de keywords hérités de l'upstream vendored passent par la
         # découverte standard de rf-mcp ; la carte d'intention couvre la
         # valeur ajoutée du fork (vérifiée par test contre la lib réelle).

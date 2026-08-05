@@ -4,7 +4,7 @@ Le mode natif s'appuie sur les événements COM de l'API SAP GUI Scripting
 (``Session.Record`` + ``Change``, hit-test ``Hit``, ``FocusChanged``). Toute la
 traduction événement -> keyword est pure (`normalize_command`,
 `map_change_command`, `process_change`, `flush_native_state`) et la glue COM
-est injectable (`_dispatch_with_events`/`_pump`) — testable avec des doublures,
+est injectable (`_dispatch_with_events`/`_pump`) : testable avec des doublures,
 convention #5 du CLAUDE.md.
 """
 import importlib.util
@@ -106,7 +106,7 @@ def test_map_noise_properties_are_dropped():
 
 def test_map_unknown_method_becomes_comment_with_full_call():
     # NB : doubleClickCurrentCell (l'ancien exemple) est mappé depuis 2026-07
-    # en commentaire de grille enrichi (ligne/colonne suivies) — voir
+    # en commentaire de grille enrichi (ligne/colonne suivies) : voir
     # test_recorder_exports.py ; doubleClickNode reste un vrai non-mappé.
     line = spy.map_change_command("wnd[0]/shellcont/tree", "GuiShell",
                                   ["M", "doubleClickNode", "N1"])
@@ -162,7 +162,7 @@ def test_regular_events_flow_through_one_to_one():
 #
 # La liaison réelle (`advise_session_events` : connexion manuelle au point de
 # connexion ISapSessionEvents, hack _query_interface_ de la démo pywin32
-# connect.py — DispatchWithEvents étant inutilisable sur la typelib sapfewse,
+# connect.py, DispatchWithEvents étant inutilisable sur la typelib sapfewse,
 # issue pywin32 #2433) est validée LIVE contre l'A4H ; ici on injecte `_advise`
 # pour tester la boucle (émission, teardown, replis) hors SAP.
 

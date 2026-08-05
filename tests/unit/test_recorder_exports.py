@@ -32,7 +32,7 @@ gui = _load(_GUI_PATH, "recorder_gui")
 
 def test_build_record_header_body_only_keeps_historic_shape():
     header = spy.build_record_header("captures/x.robot")
-    assert header.startswith("# Enregistré par SAP GUI Recorder — captures/x.robot")
+    assert header.startswith("# Enregistré par SAP GUI Recorder : captures/x.robot")
     assert "*** Settings ***" not in header
     assert header.rstrip().endswith("*** Test Cases ***\n" + spy.DEFAULT_TEST_NAME)
 
@@ -42,7 +42,7 @@ def test_build_record_header_suite_is_replayable():
     assert "*** Settings ***" in header
     assert "Library             SapEccLibrary" in header
     # Attach To Open Session, PAS Connect To Session : ce dernier n'obtient que
-    # le moteur de scripting, jamais la session (replay impossible — attrapé par
+    # le moteur de scripting, jamais la session (replay impossible, attrapé par
     # le replay live d'un export le 2026-07-19).
     assert "Suite Setup         Attach To Open Session" in header
     assert "Connect To Session\n" not in header
@@ -174,7 +174,7 @@ def test_run_record_exports_noop_without_flags(tmp_path):
 
 
 # --- export rapport HTML (documentation d'un enregistrement) ------------------
-# Concept observé chez RoboSAPiens (saveHtmlReport — NOTICE) ; réimplémenté par
+# Concept observé chez RoboSAPiens (saveHtmlReport, NOTICE) ; réimplémenté par
 # STEP, texte -> texte pur, chargeur de captures injectable.
 
 def test_report_documents_steps_with_human_phrase_and_exact_line():
@@ -231,7 +231,7 @@ def test_report_covers_fiori_and_api_channels():
     assert "Saisir Aussie dans le contrôle" in page
     assert "Ouvrir l'app Fiori Travel-manage" in page
     assert "Compter les entités OData SEPMRA_SHOP/Products" in page
-    # un rapport ne montre JAMAIS un secret — argument nommé masqué
+    # un rapport ne montre JAMAIS un secret : argument nommé masqué
     assert "Secret123" not in page and "password=***" in page
 
 
@@ -387,7 +387,7 @@ def test_process_change_tracks_current_cell_for_grid_clicks():
     state, lines = spy.process_change(state, "grid", "GuiShell",
                                       ("M", "doubleClickCurrentCell"))
     assert lines == ["# grille grid : double-clic cellule ligne 5, colonne CARRID"
-                     " — lecture : Get Cell Value    grid    5    CARRID"]
+                     ", lecture : Get Cell Value    grid    5    CARRID"]
 
 
 def test_process_change_okcode_flow_still_merges_into_run_transaction():
@@ -459,7 +459,7 @@ def test_transpile_vbs_flushes_trailing_okcode():
 def test_default_replay_lib_disables_screenshot_handler(monkeypatch):
     # Hors contexte Robot, le handler screenshot d'échec remplacerait l'erreur
     # réelle du step par « Cannot access execution context » (constaté live
-    # 2026-07-21 — l'échec du replay devenait indiagnosticable) : la fabrique
+    # 2026-07-21, l'échec du replay devenait indiagnosticable) : la fabrique
     # CLI du replay doit désarmer screenshots_on_error.
     import sys
     import types
@@ -496,7 +496,7 @@ def test_decode_vbs_source_utf8_avec_bom():
 
 
 def test_decode_vbs_source_utf16_le_avec_bom():
-    # encode("utf-16") écrit le BOM LE — la forme « Unicode » du Bloc-notes
+    # encode("utf-16") écrit le BOM LE : la forme « Unicode » du Bloc-notes
     # et d'``Out-File`` PowerShell 5.1.
     assert spy.decode_vbs_source(_VBS_ACCENTED.encode("utf-16")) == _VBS_ACCENTED
 
@@ -507,7 +507,7 @@ def test_decode_vbs_source_utf16_be_avec_bom():
 
 
 def test_decode_vbs_source_utf16_le_sans_bom():
-    # Le cas perfide : les octets NUL de l'UTF-16 sont du UTF-8 VALIDE —
+    # Le cas perfide : les octets NUL de l'UTF-16 sont du UTF-8 VALIDE,
     # l'ancien décodage UTF-8 forcé « réussissait » et la transpilation
     # sortait 0 step, sans la moindre exception.
     data = _VBS_ACCENTED.encode("utf-16-le")
@@ -669,7 +669,7 @@ def test_replay_unescapes_values_before_invoking_keywords():
 
 def test_spec_export_unknown_step_with_id_moves_to_vigilance():
     # contrat specs/ : une étape inconnue PORTANT un id ne laisse pas l'id dans
-    # les étapes — la ligne exacte part en « Points de vigilance »
+    # les étapes : la ligne exacte part en « Points de vigilance »
     md = spy.steps_to_spec(["Mon Keyword Exotique    wnd[0]/usr/txtX    12"])
     etapes = md.split("## Scénarios")[1].split("## Points de vigilance")[0]
     assert "wnd[" not in etapes

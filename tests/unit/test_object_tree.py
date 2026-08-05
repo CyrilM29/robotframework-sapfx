@@ -2,7 +2,7 @@
 
 Aplatissement du JSON de ``GuiSession.GetObjectTree`` : forme récursive
 ``properties``/``children``, nœud enveloppe, nombres en chaînes (comportement
-observé de l'API — RoboSAPiens active ``AllowReadingFromString`` pour la même
+observé de l'API ; RoboSAPiens active ``AllowReadingFromString`` pour la même
 raison), ``Changeable`` en ``"true"``/``"false"``, entrées malformées.
 """
 import pytest

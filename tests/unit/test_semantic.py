@@ -436,7 +436,7 @@ def test_read_field_by_label_via_grille_compte_les_memes_positions_que_fill():
 
 
 def test_read_field_by_label_replie_sur_la_lecture_seule_d_un_affichage():
-    # Dynpro d'AFFICHAGE : aucune cible modifiable — la cascade replie sur le
+    # Dynpro d'AFFICHAGE : aucune cible modifiable, la cascade replie sur le
     # champ en lecture seule (la façon dont un dynpro montre ses valeurs).
     affichage = [
         _el("wnd[0]/usr/lblClient", "GuiLabel", "Client", box=(10, 20, 80, 20)),
@@ -450,7 +450,7 @@ def test_read_field_by_label_replie_sur_la_lecture_seule_d_un_affichage():
 
 def test_read_field_by_label_ambiguite_de_la_passe_modifiable_remontee():
     # Deux champs modifiables ancrés au même libellé (droite + dessous) : la
-    # cascade ne replie PAS sur la lecture seule — l'ambiguïté est remontée.
+    # cascade ne replie PAS sur la lecture seule : l'ambiguïté est remontée.
     ambigu = [
         _el("wnd[0]/usr/lblDouble", "GuiLabel", "Double", box=(10, 20, 60, 20)),
         _el("wnd[0]/usr/txtDROITE", "GuiTextField", "", changeable=True,

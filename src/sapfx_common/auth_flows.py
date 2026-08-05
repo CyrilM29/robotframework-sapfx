@@ -1,8 +1,8 @@
-"""Presets de connexion aux fournisseurs d'identité (IDP) — données pures.
+"""Presets de connexion aux fournisseurs d'identité (IDP) : données pures.
 
-Concept issu de l'analyse de playwright-praman (Apache-2.0 — attribution dans
+Concept issu de l'analyse de playwright-praman (Apache-2.0, attribution dans
 ``NOTICE``), réimplémenté sur notre modèle : un launchpad Fiori d'entreprise
-n'affiche presque jamais un formulaire SAP classique — il redirige vers un
+n'affiche presque jamais un formulaire SAP classique : il redirige vers un
 IDP (SAP Identity Authentication / IAS, Azure AD/Entra, IDP maison). Chaque
 IDP a un formulaire aux sélecteurs connus et un déroulé en UNE page
 (utilisateur+mot de passe ensemble) ou en DEUX étapes (utilisateur → Suivant
@@ -30,14 +30,14 @@ class IdpPreset:
 
 
 IDP_PRESETS: dict = {
-    # SAP Identity Authentication Service (IAS) — le défaut BTP/Fiori cloud.
+    # SAP Identity Authentication Service (IAS) : le défaut BTP/Fiori cloud.
     "sap-ias": IdpPreset(
         "sap-ias",
         username_selector="#j_username",
         password_selector="#j_password",
         submit_selector="#logOnFormSubmit",
         description="SAP Identity Authentication Service (BTP default)"),
-    # Azure AD / Microsoft Entra — déroulé en deux étapes.
+    # Azure AD / Microsoft Entra : déroulé en deux étapes.
     "azure-ad": IdpPreset(
         "azure-ad",
         username_selector="input[name=loginfmt]",
@@ -50,7 +50,7 @@ IDP_PRESETS: dict = {
         username_selector="input[type=email], input[type=text]",
         password_selector="input[type=password]",
         submit_selector="button[type=submit], input[type=submit]",
-        description="Generic form — override selectors per call"),
+        description="Generic form: override selectors per call"),
 }
 
 

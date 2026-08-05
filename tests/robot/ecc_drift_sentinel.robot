@@ -1,17 +1,17 @@
 *** Settings ***
-Documentation       **Sentinelle de dérive** — la surveillance d'écrans SANS tests
+Documentation       **Sentinelle de dérive** : la surveillance d'écrans SANS tests
 ...                 scriptés : chaque transaction surveillée est perçue (signature
 ...                 structurée + empreinte visuelle) et comparée à sa référence
 ...                 mémorisée dans ``${WATCH_DIR}`` (à committer). Première
 ...                 exécution = les références sont créées ; les suivantes ne
 ...                 remontent QUE la dérive (champ disparu, bouton déplacé, rendu
-...                 altéré), nommée ligne à ligne — l'entrée idéale d'un run de
+...                 altéré), nommée ligne à ligne, l'entrée idéale d'un run de
 ...                 veille nocturne, avant qu'un seul test n'échoue.
 ...
 ...                 Par défaut la sentinelle RAPPORTE (le run reste vert et le
 ...                 rapport agrégé arrive dans le log) ; ``-v FAIL_ON_DRIFT:True``
 ...                 la transforme en assertion. Étendre la surveillance = ajouter
-...                 un tcode à ``@{WATCHED_TRANSACTIONS}`` — aucun scénario à
+...                 un tcode à ``@{WATCHED_TRANSACTIONS}``, aucun scénario à
 ...                 écrire.
 ...
 ...                   robot --pythonpath src -v SAP_CONNECTION:... -v SAP_USER:...

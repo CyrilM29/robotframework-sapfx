@@ -1,7 +1,7 @@
 /*
  * Popup controller. Injects the Recorder into the active tab's MAIN world (so it can
  * reach the page's `window.sap`) plus a small ISOLATED bridge (for the toolbar badge),
- * and drives it (rec/pause, export, stop). Uses `activeTab` — access is granted for the
+ * and drives it (rec/pause, export, stop). Uses `activeTab`: access is granted for the
  * current tab when the user clicks the toolbar icon, so no host permissions are needed.
  * `api` is `browser` on Firefox, `chrome` on Chromium (cross-browser shim).
  */
@@ -19,7 +19,7 @@ function setStatus(text) {
 // Exécute `func` dans le MAIN world de TOUTES les frames de l'onglet (Work Zone /
 // cFLP ouvrent l'app dans une iframe : le shell top-level n'a pas ses contrôles).
 // Retourne le premier résultat truthy, sinon le résultat de la frame principale.
-// NB : sans host permissions, Chrome n'injecte pas dans les iframes cross-origin —
+// NB : sans host permissions, Chrome n'injecte pas dans les iframes cross-origin :
 // l'injection y échoue silencieusement, le reste des frames fonctionne.
 async function runInPage(tabId, func) {
   try {
@@ -60,7 +60,7 @@ document.getElementById("start").addEventListener("click", async () => {
   const tab = await getActiveTab();
   if (!tab || !tab.id) return;
   try {
-    // bridge (ISOLATED) for the badge, then the recorder (MAIN world) — in ALL
+    // bridge (ISOLATED) for the badge, then the recorder (MAIN world), in ALL
     // frames, so launchpad-embedded apps (Work Zone/cFLP iframes) get a panel too.
     await api.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["bridge.js"] });
     await api.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, world: "MAIN", files: ["recorder.js"] });

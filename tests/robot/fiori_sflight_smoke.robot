@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Smoke Fiori Elements contre **cap-sflight en local** (aucun backend
-...                 SAP, aucun réseau) — voir docs/sap-test-data.fr.md §3. Démarrage de
+...                 SAP, aucun réseau) : voir docs/sap-test-data.fr.md §3. Démarrage de
 ...                 la cible :
 ...
 ...                   git clone https://github.com/SAP-samples/cap-sflight
@@ -16,7 +16,7 @@ Library             Browser
 Resource            ../../resources/fiori_keywords.resource
 
 # La resource importe SapFioriLibrary (défaut 15s) ; le budget élargi de cette
-# suite passe par le réglage dynamique — jamais par un second import avec
+# suite passe par le réglage dynamique, jamais par un second import avec
 # d'autres arguments (Robot l'ignorerait avec un warning).
 Suite Setup         Run Keywords    Set Ui5 Timeout    30s
 ...                     AND    Open Fiori Launchpad    ${SFLIGHT_URL}
@@ -26,7 +26,7 @@ Suite Teardown      Close Fiori
 *** Variables ***
 ${SFLIGHT_URL}      http://localhost:4004/sap.fe.cap.travel/index.html
 # Id de contrôle UI5 stable généré par Fiori Elements v4 (vue TravelList, table
-# LineItem) — la ``sap.m.Table`` interne qui matérialise les lignes ; le wrapper
+# LineItem) : la ``sap.m.Table`` interne qui matérialise les lignes ; le wrapper
 # ``sap.ui.mdc.Table`` ne les expose pas.
 ${TRAVEL_TABLE_ID}    sap.fe.cap.travel::TravelList--fe::table::Travel::LineItem-innerTable
 

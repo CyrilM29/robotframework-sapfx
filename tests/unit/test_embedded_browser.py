@@ -2,7 +2,7 @@
 
 Aucune fenêtre SAP GUI ni navigateur réel : seule la logique Python autour de
 la bibliothèque Browser est exercée, avec une doublure de celle-ci (convention
-#5 du CLAUDE.md — même pattern que ``test_fiori_actions.py``)."""
+#5 du CLAUDE.md, même pattern que ``test_fiori_actions.py``)."""
 import os
 
 import pytest

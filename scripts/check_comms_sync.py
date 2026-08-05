@@ -1,7 +1,7 @@
 """Garde-fou de dérive de la base de communication (`comms/` ↔ `pyproject.toml`).
 
 `comms/` affirme des choses au monde extérieur : une version, un nombre de tests,
-une couverture. Ces chiffres vieillissent en silence — c'est exactement ce qui
+une couverture. Ces chiffres vieillissent en silence ; c'est exactement ce qui
 s'est produit à la création du dossier, né en « v0.5.0 / 508 tests » alors que le
 projet était déjà en 0.5.2 avec 617 tests. Une consigne (« pensez à mettre à
 jour ») n'a rien empêché ; ce dépôt ne tourne pas aux intentions mais aux codes
@@ -59,7 +59,7 @@ _SCANNED_SUFFIXES = (".md", ".py")
 
 
 def project_version(root=_ROOT):
-    """La version déclarée dans `pyproject.toml` — la source de vérité."""
+    """La version déclarée dans `pyproject.toml` : la source de vérité."""
     text = (Path(root) / "pyproject.toml").read_text(encoding="utf-8")
     match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
     if not match:

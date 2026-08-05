@@ -1,5 +1,5 @@
 """Tests hors-SAP du garde de dérive de la base de communication
-(``scripts/check_comms_sync.py`` — convention #5 du CLAUDE.md, appliquée ici à
+(``scripts/check_comms_sync.py``, convention #5 du CLAUDE.md, appliquée ici à
 un script d'outillage plutôt qu'à un keyword).
 
 Le cas de régression qui compte est ``test_version_de_reference_perimee_echoue``

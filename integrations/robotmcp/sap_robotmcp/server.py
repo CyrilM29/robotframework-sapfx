@@ -1,16 +1,16 @@
-"""``sapfx-mcp`` — point d'entrée de la surcouche SAP au-dessus de rf-mcp.
+"""``sapfx-mcp`` : point d'entrée de la surcouche SAP au-dessus de rf-mcp.
 
 PAS un fork : ce module importe l'instance FastMCP de rf-mcp TELLE QUELLE
 (tous ses outils restent servis, comportement inchangé) et y AJOUTE trois
 outils que le contrat plugin rf-mcp 0.31 ne permet pas (constaté live le
-2026-07-23 — field notes « Test live agent+MCP » de CLAUDE.md) :
+2026-07-23, field notes « Test live agent+MCP » de CLAUDE.md) :
 
-- ``sapfx_state``       — état SAP par NOS state providers : ``page_source``
+- ``sapfx_state``       : état SAP par NOS state providers, ``page_source``
   en vraie sémantique diff par défaut, ``application_state`` enrichi
-  (``modal_open``, statut, télémétrie — jamais routé par rf-mcp) ;
-- ``sapfx_screenshot``  — le canal VISION : vraie image MCP (brute ou
+  (``modal_open``, statut, télémétrie, jamais routé par rf-mcp) ;
+- ``sapfx_screenshot``  : le canal VISION, vraie image MCP (brute ou
   annotée Set-of-Mark + légende ``numéro -> id``) ;
-- ``sapfx_reload``      — hot-reload de la couche plugin sans redémarrage.
+- ``sapfx_reload``      : hot-reload de la couche plugin sans redémarrage.
 
 Au démarrage, le garde de compatibilité (:mod:`sap_robotmcp._compat`) vérifie
 la fenêtre de versions rf-mcp validée et chaque point d'ancrage, et REFUSE de
@@ -58,10 +58,10 @@ def build_overlay(mcp: Any, execution_engine: Any) -> List[str]:
                           library: str = "") -> dict:
         """SAP session state served DIRECTLY by the SAPFX state providers.
 
-        Sections (default: both): 'page_source' — the screen perception with
+        Sections (default: both): 'page_source', the screen perception with
         the REAL differential semantics (an already-seen screen that changed
         returns a compact smart diff unless full_source=true), and
-        'application_state' — the live enriched state: transaction, window
+        'application_state', the live enriched state: transaction, window
         stack with modal_open (the leftover-error-modal trap), status-message
         type, session telemetry. 'library' picks the provider explicitly
         (SapEccLibrary/SapFioriLibrary) when the session imports both.
@@ -107,7 +107,7 @@ def build_overlay(mcp: Any, execution_engine: Any) -> List[str]:
         """Hot-reload the SAPFX plugin layer without restarting the server.
 
         Reloads the sap_robotmcp modules, resets the rf-mcp plugin manager
-        and re-registers the entry-point plugins — the live-validated
+        and re-registers the entry-point plugins, the live-validated
         protocol (the builtin 'manage_library_plugins reload' alone serves
         cached instances). Library code (SapEccLibrary/...) changed on disk
         still needs the RF-context hot-swap or a server restart; see the

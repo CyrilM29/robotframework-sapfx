@@ -1,4 +1,4 @@
-"""Modèle de sélecteur de contrôle UI5 (données pures — sans navigateur, sans Playwright).
+"""Modèle de sélecteur de contrôle UI5 (données pures : sans navigateur, sans Playwright).
 
 Tout l'enjeu du côté Fiori est de ne plus combattre les identifiants DOM dynamiques de
 SAPUI5 (``__xmlview0--__button12``). On s'adresse aux *contrôles UI5* par leurs attributs
@@ -22,11 +22,11 @@ from urllib.parse import quote
 _DICT_KEYS = ("properties", "bindingPath")
 
 # Clés de sélecteur comprises par le résolveur de registre. Limitées à ce que l'on peut
-# réellement et fiablement faire correspondre — une faute de frappe ou une clé non prise
+# réellement et fiablement faire correspondre : une faute de frappe ou une clé non prise
 # en charge échoue rapidement au lieu de correspondre silencieusement au mauvais contrôle.
 _ALLOWED_KEYS = {
     "id",            # identifiant exact du contrôle, p. ex. "sdk---app--searchField"
-    "idSuffix",      # FIN de l'identifiant — le motif des ids stables Fiori Elements
+    "idSuffix",      # FIN de l'identifiant : le motif des ids stables Fiori Elements
                      # ("fe::table::<Entity>::LineItem::Table" ; le préfixe app/route varie)
     "controlType",   # p. ex. "sap.m.Button"
     "properties",    # dict propriété -> valeur attendue, p. ex. {"text": "Create"}
@@ -54,7 +54,7 @@ def build_control_selector(**kwargs: Any) -> dict[str, Any]:
         )
     selector = {k: v for k, v in kwargs.items() if v is not None}
     if not selector:
-        raise ValueError("Empty UI5 selector — provide at least one of: %s"
+        raise ValueError("Empty UI5 selector. Provide at least one of: %s"
                          % sorted(_ALLOWED_KEYS))
     for key in _DICT_KEYS:
         if key in selector:
@@ -66,7 +66,7 @@ def _coerce_dict(value: Any, key: str) -> dict[str, Any]:
     """Accepte un dict tel quel, ou parse une chaîne littérale de dict.
 
     Robot transmet ``properties={'text': 'X'}`` comme la chaîne ``"{'text': 'X'}"`` ;
-    on la convertit via ``ast.literal_eval`` (sûr — littéraux uniquement). Un appel
+    on la convertit via ``ast.literal_eval`` (sûr, littéraux uniquement). Un appel
     Python direct (et les tests) passe déjà un dict, laissé intact."""
     if isinstance(value, dict):
         return value
@@ -94,15 +94,15 @@ def selector_to_json(selector: dict[str, Any]) -> str:
 
 # Clés du sélecteur du moteur **Web Components** (`Resolve Wc Control`) : les pages
 # « pur UI5 Web Components » (ex. home SuccessFactors) rendent des custom elements
-# <ui5-button>… SANS runtime UI5 classique — registre vide, moteurs role/xpath
+# <ui5-button>… SANS runtime UI5 classique : registre vide, moteurs role/xpath
 # aveugles. Ce moteur scanne les hôtes custom elements du light DOM.
 _WC_ALLOWED_KEYS = {
     "tag",         # 'Button' (type court) ou 'ui5-button' (tag complet) ; matche
                    # aussi les tags SCOPÉS ui5-button-<suffixe> (scoping UI5 WC)
     "text",        # sous-chaîne insensible à la casse (ou /regex/flags) sur le textContent
     "name",        # NOM ACCESSIBLE de l'hôte (accname simplifié : aria-labelledby,
-                   # aria-label, accessible-name/accessibleName — la convention
-                   # UI5 Web Components —, label, texte…) ; mêmes règles de matching
+                   # aria-label, accessible-name/accessibleName (la convention
+                   # UI5 Web Components), label, texte…) ; mêmes règles de matching
     "id",          # id exact de l'élément hôte
     "idSuffix",    # FIN de l'id de l'hôte (même sémantique que le moteur role)
     "properties",  # dict attribut/propriété -> attendu (mêmes règles de matching
@@ -124,7 +124,7 @@ def build_wc_selector(**kwargs: Any) -> dict[str, Any]:
         )
     selector = {k: v for k, v in kwargs.items() if v is not None}
     if not selector:
-        raise ValueError("Empty WC selector — provide at least one of: %s"
+        raise ValueError("Empty WC selector. Provide at least one of: %s"
                          % sorted(_WC_ALLOWED_KEYS))
     if "properties" in selector:
         selector["properties"] = _coerce_dict(selector["properties"], "properties")
@@ -140,7 +140,7 @@ _DOM_ALLOWED_KEYS = {
     "text",        # sous-chaîne insensible à la casse ou /regex/ sur le textContent
     "role",        # rôle ARIA CALCULÉ : attribut role explicite OU rôle implicite
                    # de la sémantique HTML (button, a[href] -> link, input[type] ->
-                   # textbox/checkbox/…, h1-h6 -> heading…) — insensible à la casse
+                   # textbox/checkbox/…, h1-h6 -> heading…), insensible à la casse
     "name",        # NOM ACCESSIBLE (accname simplifié : aria-labelledby, aria-label,
                    # label[for]/englobant, alt, value de bouton, texte, title,
                    # placeholder) ; mêmes règles de matching que text
@@ -164,7 +164,7 @@ def build_dom_selector(**kwargs: Any) -> dict[str, Any]:
         )
     selector = {k: v for k, v in kwargs.items() if v is not None}
     if not selector:
-        raise ValueError("Empty DOM selector — provide at least one of: %s"
+        raise ValueError("Empty DOM selector. Provide at least one of: %s"
                          % sorted(_DOM_ALLOWED_KEYS))
     if "properties" in selector:
         selector["properties"] = _coerce_dict(selector["properties"], "properties")
@@ -176,7 +176,7 @@ def recommended_engines(composition: dict[str, Any]) -> list[str]:
 
     Fonction pure (testable hors navigateur) derrière la clé ``engines`` de
     `Get Page Composition` : traduit les technologies détectées dans une
-    région en moteurs concrets, du plus stable au plus générique — le même
+    région en moteurs concrets, du plus stable au plus générique, le même
     ordre que la chaîne de `Resolve Ui5 With Fallback`. ``dom`` ferme toujours
     la liste : une page a toujours un DOM."""
     engines: list[str] = []
@@ -195,7 +195,7 @@ def recommended_engines(composition: dict[str, Any]) -> list[str]:
 # l'arbre de contrôles UI5 est réduit aux cibles ACTIONNABLES, numérotées, pour
 # que l'agent agisse par référence (`Click Ui5 Ref`) sans recopier un id.
 
-# Types courts SAISISSABLES (marqués ``*`` — la valeur courante est affichée).
+# Types courts SAISISSABLES (marqués ``*`` : la valeur courante est affichée).
 UI5_EDITABLE_TYPES = frozenset({
     "Input", "MultiInput", "MaskInput", "TextArea", "SearchField",
     "ComboBox", "MultiComboBox", "DatePicker", "DateRangeSelection",
@@ -204,7 +204,7 @@ UI5_EDITABLE_TYPES = frozenset({
 
 # Types courts actionnables PAR CLIC (boutons, liens, cases, onglets…). Les
 # lignes de liste/table (ColumnListItem…) sont volontairement exclues du
-# défaut — elles noieraient la carte ; les viser via ``include_types``.
+# défaut : elles noieraient la carte ; les viser via ``include_types``.
 UI5_CLICKABLE_TYPES = frozenset({
     "Button", "ToggleButton", "OverflowToolbarButton", "Link", "CheckBox",
     "RadioButton", "Switch", "Select", "MenuItem", "IconTabFilter", "Tab",
@@ -222,12 +222,12 @@ def ui5_page_map(tree_xml: str,
     """Réduit l'arbre XML des contrôles (``Get Ui5 Page Tree``) à la **carte
     numérotée** des cibles actionnables : ``(lignes, refs)``.
 
-    Chaque ligne : ``@N\\t<marque><libellé ou ?>\\t<id>\\t<TypeCourt>`` —
-    marque ``* `` pour un champ saisissable (suivi de ``= <valeur>``), deux
+    Chaque ligne : ``@N\\t<marque><libellé ou ?>\\t<id>\\t<TypeCourt>``, avec la
+    marque ``* `` pour un champ saisissable (suivi de ``= <valeur>``) et deux
     espaces pour une cible cliquable. ``refs`` mappe ``"N" -> id de contrôle``
     (l'id DOM stable rendu par le registre UI5), l'ordre est celui du
     document. ``include_types`` (chaîne ``"A,B"`` ou itérable de types courts)
-    remplace la sélection par défaut — p. ex. ``ColumnListItem`` pour
+    remplace la sélection par défaut, p. ex. ``ColumnListItem`` pour
     numéroter les lignes d'une table. Pure (aucun navigateur) ; lève
     ``ValueError`` si le XML est invalide."""
     import xml.etree.ElementTree as ElementTree
@@ -266,7 +266,7 @@ def ui5_page_map(tree_xml: str,
 
 
 # --- Navigation launchpad (FLP) : intent sémantique -> hash -------------------
-# Concept issu de l'analyse de playwright-praman (Apache-2.0 — NOTICE) : on
+# Concept issu de l'analyse de playwright-praman (Apache-2.0, voir NOTICE) : on
 # navigue un launchpad par son INTENT « SemanticObject-action » (le hash
 # stable, cross-thème, cross-catalogue), jamais en cliquant des tuiles par
 # position. La partie pure (validation + construction du hash) vit ici.
@@ -279,12 +279,12 @@ def build_intent_hash(intent: str, params: dict[str, Any] | None = None) -> str:
 
     ``build_intent_hash("SalesOrder-manage", {"SalesOrder": "1234"})`` →
     ``#SalesOrder-manage?SalesOrder=1234``. Valide la forme de l'intent
-    (échec immédiat avec la forme attendue — pas de hash silencieusement
+    (échec immédiat avec la forme attendue, pas de hash silencieusement
     cassé) ; les paramètres sont encodés URL et émis en ordre déterministe."""
     intent = str(intent).strip().lstrip("#")
     if not _INTENT_RE.match(intent):
         raise ValueError(
-            "Intent FLP invalide : %r — forme attendue 'SemanticObject-action' "
+            "Intent FLP invalide : %r. Forme attendue 'SemanticObject-action' "
             "(ex. 'Shell-home', 'SalesOrder-manage')." % intent)
     hash_ = "#" + intent
     if params:

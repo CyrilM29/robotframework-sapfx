@@ -1,6 +1,6 @@
 """Tests hors navigateur du support iframe (Work Zone/cFLP), des erreurs
 auto-corrigibles, de la chaîne de fallback et du support Fiori Elements
-(``idSuffix``) de SapFioriLibrary. Fake Browser — convention #5."""
+(``idSuffix``) de SapFioriLibrary. Fake Browser, convention #5."""
 import pytest
 
 from SapFioriLibrary._ui5_js import (

@@ -1,8 +1,8 @@
 """Tests hors SAP / hors navigateur des concepts portés de playwright-praman
-(Apache-2.0 — NOTICE) : vocabulaire métier (``sapfx_common.vocabulary``),
+(Apache-2.0, NOTICE) : vocabulaire métier (``sapfx_common.vocabulary``),
 presets IDP (``sapfx_common.auth_flows``), hash d'intent FLP
 (``_ui5_runtime.build_intent_hash``) et les keywords qui les exposent.
-Doublures Browser — convention #5."""
+Doublures Browser, convention #5."""
 import pytest
 from robot.api.types import Secret
 
@@ -55,7 +55,7 @@ def test_prefix_matches_below_default_threshold():
 
 def test_ambiguous_prefix_is_refused_even_with_lowered_threshold():
     # « purcha » préfixe purchase order ET purchasing organization : à seuil
-    # abaissé, l'ambiguïté est remontée — jamais de premier-match silencieux.
+    # abaissé, l'ambiguïté est remontée : jamais de premier-match silencieux.
     with pytest.raises(ValueError, match="ambigu"):
         lookup_term("purcha", threshold=0.7)
 

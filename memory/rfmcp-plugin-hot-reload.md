@@ -1,12 +1,12 @@
 ---
 name: rfmcp-plugin-hot-reload
-description: rf-mcp — hot-reload plugins sans redémarrage, routage page_source/application_state, où le mode diff s'exerce (validé live 2026-07-23)
+description: rf-mcp, hot-reload plugins sans redémarrage, routage page_source/application_state, où le mode diff s'exerce (validé live 2026-07-23)
 type: projet
 date: 2026-07-23
 ---
 
 Quatre faits rf-mcp 0.31.2 validés live (A4H, SE16) le 2026-07-23, détaillés
-dans les field notes de CLAUDE.md (toujours valables en 0.35.0 —
+dans les field notes de CLAUDE.md (toujours valables en 0.35.0 :
 re-vérification du 2026-07-24) :
 
 1. **Hot-reload de la couche plugin sans redémarrer le serveur** :
@@ -15,10 +15,10 @@ re-vérification du 2026-07-24) :
    ré-enregistrement (`iter_entry_point_plugins` → `register_plugin`). Le tool
    `manage_library_plugins reload` seul ne suffit PAS (instances en cache).
 2. `get_session_state(page_source)` ne route vers le provider SAP que si
-   `session.browser_state.active_library` est posé — jamais posé par le
+   `session.browser_state.active_library` est posé, jamais posé par le
    contexte natif pour une lib desktop (→ « No page source available »).
 3. Le chemin `application_state` de rf-mcp n'appelle jamais
-   `get_application_state` des plugins — l'état enrichi (modal_open…) passe
+   `get_application_state` des plugins : l'état enrichi (modal_open…) passe
    par les keywords (`Get Open Windows`) via `execute_step`.
 4. Le serveur passe `full_source=not page_source_filtered` : le mode DIFF du
    provider ne s'exerce qu'avec `page_source_filtered=true`.

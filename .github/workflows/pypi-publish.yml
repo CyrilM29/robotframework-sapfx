@@ -1,10 +1,10 @@
-# Publication PyPI par Trusted Publishing (OIDC) — aucun token stocké.
+# Publication PyPI par Trusted Publishing (OIDC) : aucun token stocké.
 # Prérequis (une fois, côté pypi.org → projet robotframework-sapfx →
 # Publishing) : ajouter un « GitHub publisher » owner=CyrilM29,
 # repository=robotframework-sapfx, workflow=pypi-publish.yml, environment=pypi.
 # Déclenchement : publication d'une GitHub Release (ou lancement manuel).
 # Le README poussé sur PyPI est la variante SANS le banner EN/FR (lien
-# relatif, cassé là-bas) — même règle que l'outillage d'export.
+# relatif, cassé là-bas) : même règle que l'outillage d'export.
 name: pypi-publish
 
 on:

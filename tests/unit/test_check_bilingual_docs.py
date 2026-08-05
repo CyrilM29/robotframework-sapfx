@@ -1,5 +1,5 @@
 """Tests hors-SAP du garde-fou de dérive documentaire bilingue
-(``scripts/check_bilingual_docs.py`` — convention #5 du CLAUDE.md, appliquée
+(``scripts/check_bilingual_docs.py``, convention #5 du CLAUDE.md, appliquée
 ici à un script d'outillage plutôt qu'à un keyword)."""
 import importlib.util
 import os

@@ -1,6 +1,6 @@
 ---
 name: a4h-se16-write-delete
-description: A4H — SE16 permet Create/Change/Delete en place (DEVELOPER) ; pièges de navigation relevés live
+description: A4H, SE16 permet Create/Change/Delete en place (DEVELOPER) ; pièges de navigation relevés live
 type: projet
 date: 2026-07-17
 ---
@@ -10,7 +10,7 @@ pendant une campagne d'écriture sur SCARR.
 
 **SE16 n'est PAS en lecture seule sur cet A4H.** Avec DEVELOPER (autorisations
 complètes), l'écran RÉSULTAT SE16 expose un menu « Table Entry » avec
-**Create / Change / Delete / Delete all** — cycle CRUD complet sans SE16N
+**Create / Change / Delete / Delete all** : cycle CRUD complet sans SE16N
 (absent) ni SM30.
 
 Chemins relevés live (grille ALV activée au préalable) :
@@ -20,7 +20,7 @@ Chemins relevés live (grille ALV activée au préalable) :
   « Database record successfully created ». ⚠️ Sur l'écran de **sélection**
   (après Entrée), `menu[0]/menu[1]` = « Execute and Print » → ouvre le dialogue
   d'impression `SAPLSPRI/PRI_PARAMS` (bug attrapé en run live).
-- **Supprimer** : depuis la grille de résultats filtrée sur la clé —
+- **Supprimer** : depuis la grille de résultats filtrée sur la clé,
   `Edit > Select All` (`menu[1]/menu[0]`) puis `Table Entry > Delete`
   (`menu[0]/menu[6]` ; ⚠️ `menu[5]` = « Delete all ») → écran « Table … Delete »
   (`/SE16/101`) → bouton **Delete Entry** `wnd[0]/tbar[1]/btn[14]` → statut S

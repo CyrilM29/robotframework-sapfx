@@ -1,5 +1,5 @@
 """Tests hors réseau de SapApiLibrary : la frontière `_transport` est stubbée
-par une fausse réponse HTTP — sessions, construction d'URL (options système
+par une fausse réponse HTTP : sessions, construction d'URL (options système
 OData, sap-client), enveloppes v2/v4, $count, protocole CSRF, erreurs
 auto-corrigibles, RFC optionnel (pyrfc factice injecté)."""
 import io

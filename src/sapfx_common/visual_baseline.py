@@ -5,17 +5,17 @@ GUI via ``HardCopyToMemory``, page Fiori via la bibliothèque Browser, région
 d'un élément découpée) :
 
 * premier passage (aucune baseline ``<name>.png``) : la capture devient la
-  baseline — l'appelant journalise un WARNING, le test passe (PNG à committer
+  baseline : l'appelant journalise un WARNING, le test passe (PNG à committer
   s'il fait référence) ;
 * passages suivants : distance de Hamming entre le hash perceptuel de la
   capture et celui **recalculé depuis le PNG** de la baseline ; au-delà du
-  seuil, échec auto-corrigible — distance mesurée, chemins de la baseline et
+  seuil, échec auto-corrigible : distance mesurée, chemins de la baseline et
   de la capture ``<name>.actual.png`` sauvée à côté, et le remède (supprimer
   la baseline si le changement est voulu).
 
 Ce module porte cette sémantique UNE fois (fichiers + décision + message) ;
 le décodage image reste passé en ``decode`` par l'appelant (Pillow à la
-frontière, stubbable en test — voir :func:`decode_image_to_gray`, l'impl
+frontière, stubbable en test ; voir :func:`decode_image_to_gray`, l'impl
 partagée). Aucune dépendance Robot/COM/navigateur : utilisable des deux côtés.
 """
 from __future__ import annotations
@@ -26,10 +26,10 @@ from typing import Callable, List, NamedTuple, Optional
 
 from .visual_hash import HASH_SIZE, dhash_hex, hamming_distance
 
-# Matrice de gris (lignes de valeurs 0..255) — la monnaie de visual_hash.
+# Matrice de gris (lignes de valeurs 0..255) : la monnaie de visual_hash.
 GrayImage = List[List[int]]
 
-# Seuil par défaut : 5 bits sur 64 — tolère l'anticrénelage/thème, signale un
+# Seuil par défaut : 5 bits sur 64, tolère l'anticrénelage/thème, signale un
 # vrai changement local. Le même que la sentinelle (screen_watch).
 THRESHOLD = 5
 
@@ -72,7 +72,7 @@ def match_baseline(name: str, png_bytes: bytes,
     sauve ``<name>.actual.png`` et lève ``AssertionError`` auto-corrigible.
     Le hash de la baseline est recalculé depuis son PNG à chaque assertion :
     changer ``hash_size`` (ou le masque appliqué dans ``decode``) reste
-    honnête — les deux côtés passent par le même pipeline."""
+    honnête : les deux côtés passent par le même pipeline."""
     safe = validate_snapshot_name(name)
     hash_size = int(hash_size)
     threshold = int(threshold)
@@ -106,7 +106,7 @@ def match_baseline(name: str, png_bytes: bytes,
 
 
 def decode_image_to_gray(image_bytes: bytes) -> GrayImage:
-    """PNG/JPEG/BMP → matrice de gris — la frontière image PARTAGÉE des deux
+    """PNG/JPEG/BMP → matrice de gris : la frontière image PARTAGÉE des deux
     canaux (les keywords l'exposent en ``_decode_image_to_gray`` stubbable).
     Pillow est importé ICI seulement : l'assertion visuelle est opt-in (extra
     ``visual``), le reste des bibliothèques n'en dépend jamais."""

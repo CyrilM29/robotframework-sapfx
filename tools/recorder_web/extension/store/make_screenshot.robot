@@ -3,7 +3,7 @@ Documentation       Generates the 1280x800 store screenshot of the UI5 Recorder:
 ...                 capture panel populated with a few captures and the hover overlay
 ...                 on a control, on the live OpenUI5 Demo Kit.
 ...
-...                 FR — Génère la capture d'écran 1280x800 pour la fiche du store :
+...                 FR. Génère la capture d'écran 1280x800 pour la fiche du store :
 ...                 le panneau de captures rempli et la surbrillance au survol, sur
 ...                 l'OpenUI5 Demo Kit en direct.
 ...

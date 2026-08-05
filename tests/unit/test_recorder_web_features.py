@@ -3,7 +3,7 @@ capture du moteur dom générique, compaction des steps, menu contextuel
 d'assertions, capture d'Entrée, attente UI5 intelligente, alerte frames
 cross-origin et exports resource-first / spec.
 
-La logique vit dans le JS généré (``_ui5_js.py`` — source unique de vérité,
+La logique vit dans le JS généré (``_ui5_js.py``, source unique de vérité,
 cf. ``regen_recorder``) : comme ``test_sid_and_spy.py``, on verrouille les
 contrats par assertion sur le contenu du bundle et du listener générés, plus
 la synchronisation des artefacts écrits sous ``tools/recorder_web/``.
@@ -127,8 +127,8 @@ def test_spec_export_follows_specs_contract():
 
 
 def test_report_export_is_a_self_contained_html_documentation():
-    # Concept observé chez RoboSAPiens (saveHtmlReport — NOTICE) : rapport HTML
-    # auto-contenu — phrase métier + ligne RF exacte par step, contenu échappé.
+    # Concept observé chez RoboSAPiens (saveHtmlReport, NOTICE) : rapport HTML
+    # auto-contenu, phrase métier + ligne RF exacte par step, contenu échappé.
     assert "function buildReport()" in SNIPPET
     assert "function escapeHtml(t)" in SNIPPET
     assert "recorded_report.html" in SNIPPET
@@ -176,7 +176,7 @@ def test_resource_first_converts_xpath_hint_into_fallback_resolution():
 
 def test_panel_header_fits_its_buttons_on_one_line():
     """À 380 px l'en-tête débordait ses 7 boutons et `overflow:hidden` rognait
-    « stop » — inatteignable à la souris (vu à l'image sur une app Fiori Elements).
+    « stop », inatteignable à la souris (vu à l'image sur une app Fiori Elements).
     Le titre doit s'ellipser, les boutons ne jamais être compressés.
     """
     assert "width:470px" in SNIPPET
@@ -191,7 +191,7 @@ def test_resource_first_fill_targets_the_inner_input_of_a_composite_control():
     descendre dans l'élément interne, comme le fait Fill Ui5 Input.
 
     Régression attrapée par le run LIVE de la paire exportée contre une app Fiori
-    Elements (cap-sflight) — le dryrun, lui, passait.
+    Elements (cap-sflight) ; le dryrun, lui, passait.
     """
     assert "Fill Text    ${cible} >> css=input, textarea    ${valeur}" in SNIPPET
     assert "Fill Text    ${cible}    ${valeur}" not in SNIPPET
@@ -227,7 +227,7 @@ def test_steps_are_editable_in_place():
 
 def test_download_anchor_is_parented_to_the_panel_not_the_document():
     # L'ancre de téléchargement doit vivre DANS le panneau (inOurUI) : sinon la
-    # capture dom intercepte son propre clic synthétique — une ancre href a le
+    # capture dom intercepte son propre clic synthétique : une ancre href a le
     # rôle 'link', donc cible interactive → preventDefault → téléchargement
     # annulé. Attrapé live par recorder_web_smoke lors du passage à captureDom.
     assert "panel.appendChild(a);" in SNIPPET
@@ -240,15 +240,15 @@ def test_generated_recorder_files_are_in_sync_with_source():
     for name in ("recorder_snippet.js", os.path.join("extension", "recorder.js")):
         path = os.path.join(_RECORDER_WEB, name)
         with open(path, "r", encoding="utf-8") as fh:
-            assert fh.read() == SNIPPET, "%s diverge — python -m SapFioriLibrary.regen_recorder" % name
+            assert fh.read() == SNIPPET, "%s diverge : python -m SapFioriLibrary.regen_recorder" % name
 
 
 def test_extension_manifest_bumped_for_recorder_features():
     with open(os.path.join(_RECORDER_WEB, "extension", "manifest.json"),
               encoding="utf-8") as fh:
         manifest = json.load(fh)
-    assert manifest["version"] == "0.8.0"
-    # Le Chrome Web Store refuse une description > 132 caractères — bloquant
+    assert manifest["version"] == "0.9.2"
+    # Le Chrome Web Store refuse une description > 132 caractères : bloquant
     # de soumission attrapé lors de la revue croisée avec rf-web-recorder.
     assert len(manifest["description"]) <= 132
     # scripting world MAIN nécessite Chrome 111+ : l'annoncer évite des
@@ -272,7 +272,7 @@ def test_bundle_normalizes_whitespace_for_text_and_name_matching():
 
 def test_listener_dedup_window_also_covers_keyboard_key():
     # deux Entrées volontaires (double validation) au-delà de la fenêtre de
-    # 500 ms produisent bien deux steps — même exemption que les clics
+    # 500 ms produisent bien deux steps : même exemption que les clics
     assert "/^(Click |Keyboard Key)/" in SNIPPET
 
 
@@ -290,3 +290,83 @@ def test_listener_spec_export_keeps_locator_bearing_raw_steps_out_of_steps():
     # vigilance », pas dans les étapes (contrat specs/)
     assert "technique \\u00e0 traduire" in SNIPPET
     assert "hasLocator" in SNIPPET
+
+
+# --- portages rf-web-recorder 0.4.1 (2026-08-05) ------------------------------
+
+def test_listener_masks_password_payment_and_otp_fields():
+    # password -> <REDACTED> (graphie UI5 WC 'Password' incluse) ; paiement et
+    # OTP -> <SECRET>, via tokens autocomplete OU motifs name/id/aria-label
+    # (portage rf-web-recorder : les vraies valeurs n'atteignent jamais
+    # recorded.robot / sessionStorage / le presse-papiers)
+    assert "function sensitiveMask(t)" in SNIPPET
+    assert "'<REDACTED>'" in SNIPPET
+    assert "'<SECRET>'" in SNIPPET
+    assert "cc-number|cc-csc|cc-exp(-month|-year)?|one-time-code" in SNIPPET
+    assert "current-password|new-password" in SNIPPET
+    assert "cvv|cvc|card.?number" in SNIPPET
+    # le masque s'applique AVANT l'échappement RF : la vraie valeur n'entre
+    # jamais dans un step, quel que soit le moteur (cap/sid/wc/dom)
+    assert "var mask = sensitiveMask(t);" in SNIPPET
+    assert "var value = mask || rfEscape(t.value, true);" in SNIPPET
+    # tout champ masqué (plus seulement password) garde sa ligne xpath de
+    # secours : le locator reste exploitable pour rebrancher une vraie valeur
+    assert "if (mask) {" in SNIPPET
+
+
+def test_listener_copy_has_honest_execcommand_fallback():
+    # sans navigator.clipboard (origine http non sécurisée : WebGUI intranet),
+    # le repli execCommand copie réellement ; le bouton n'affiche jamais un
+    # « copied » optimiste quand rien n'a été copié
+    assert "function legacyCopy()" in SNIPPET
+    assert "document.execCommand && document.execCommand('copy')" in SNIPPET
+    assert "flash(ok ? 'copied' : 'copy failed');" in SNIPPET
+    # writeText rejeté = repli tenté (pas un simple 'copy failed')
+    assert "p.then(function () { flash('copied'); }, legacyCopy);" in SNIPPET
+    assert "} catch (e) { legacyCopy(); }" in SNIPPET
+
+
+def test_listener_storage_and_download_failures_are_surfaced():
+    # écriture sessionStorage en échec = console.warn UNE seule fois (sinon
+    # les steps se perdent en silence au rechargement) ; download() en échec =
+    # message dans le bandeau du panneau, la copie presse-papiers en secours
+    assert "function warnStorage(e)" in SNIPPET
+    assert "if (storageWarned) return;" in SNIPPET
+    assert "catch (e) { warnStorage(e); }" in SNIPPET
+    assert "\\u00c9chec du t\\u00e9l\\u00e9chargement de " in SNIPPET
+    assert "Utiliser la copie presse-papiers." in SNIPPET
+
+
+def test_listener_exports_bootstrap_on_recording_start_url():
+    # portage rf-web-recorder : New Page amorce l'URL de DÉBUT d'enregistrement
+    # (mémorisée au premier rec, jamais écrasée par la reprise post-navigation),
+    # pas l'URL du moment de l'export. Constaté live sur OrangeHRM : un record
+    # login -> dashboard exporté depuis le dashboard rejouait au mauvais
+    # endroit. clear purge l'URL, l'import d'un .robot la restaure (round-trip).
+    assert "var URL_KEY = '__ui5RecorderStartUrl';" in SNIPPET
+    assert "function rememberUrl()" in SNIPPET
+    assert ("if (!sessionStorage.getItem(URL_KEY)) "
+            "sessionStorage.setItem(URL_KEY, location.href);") in SNIPPET
+    assert "if (on) rememberUrl();" in SNIPPET
+    # les DEUX bootstraps (.robot complet + paire resource-first) et les DEUX
+    # documents (spec, rapport) parlent de l'URL de départ
+    assert SNIPPET.count("New Page    ' + startUrl()") == 2
+    assert "New Page    ' + location.href" not in SNIPPET
+    assert "' + startUrl() + '\\n';" in SNIPPET
+    assert "escapeHtml(startUrl())" in SNIPPET
+    assert "sessionStorage.removeItem(URL_KEY);" in SNIPPET
+    assert "trimmed.match(/^New Page\\s{2,}(\\S+)/)" in SNIPPET
+
+
+def test_listener_panel_carries_the_aicabra_icon_and_drag_affordance():
+    # picto aicabra en data-URI (bundle auto-contenu : aucune requete reseau),
+    # repli silencieux si une CSP img-src stricte bloque data:, et l'indice de
+    # deplacement (title + cursor move) sur l'en-tete DEJA draggable
+    from SapFioriLibrary._ui5_js import _AICABRA_ICON, spy_snippet
+    assert _AICABRA_ICON.startswith("data:image/png;base64,")
+    rendered = spy_snippet()
+    assert "__AICABRA_ICON__" not in rendered          # token remplace au rendu
+    assert _AICABRA_ICON in rendered
+    assert "logo.onerror = function () { logo.style.display = 'none'; };" in SNIPPET
+    assert "head.appendChild(logo);" in SNIPPET
+    assert "SAPFX Recorder : glisser l\\'en-t\\u00eate" in SNIPPET

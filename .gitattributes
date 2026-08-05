@@ -8,7 +8,7 @@
 *.cmd text eol=crlf
 *.bat text eol=crlf
 
-# Binary assets — never normalize.
+# Binary assets: never normalize.
 *.png binary
 *.jpg binary
 *.ico binary

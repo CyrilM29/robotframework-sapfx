@@ -2,13 +2,13 @@
 Documentation       Smoke **compatibilité UI5 2.x** : exerce SapFioriLibrary contre le
 ...                 runtime OpenUI5 **2.0 nightly** (CDN officiel ``sdk.openui5.org/
 ...                 nightly/2``) chargé par ``fixtures/ui5_v2_fixture.html``. 2.x
-...                 supprime les APIs dépréciées de la baseline 1.136 — dont
+...                 supprime les APIs dépréciées de la baseline 1.136, dont
 ...                 ``Element.registry`` et la façade ``sap.ui.getCore()`` : ce smoke
 ...                 prouve que ``registryForEach`` passe bien par le module
 ...                 ``sap/ui/core/ElementRegistry`` (branche 2.x) et qu'aucun de nos
 ...                 chemins ne dépend d'une API supprimée. Pendant symétrique de
 ...                 ``fiori_legacy_smoke.robot`` (1.60) à l'autre bout du spectre.
-...                 Nécessite le réseau (CDN SAP nightly — INSTABLE par nature :
+...                 Nécessite le réseau (CDN SAP nightly, INSTABLE par nature :
 ...                 un échec ici signale une dérive 2.x à investiguer, pas
 ...                 forcément une régression de la bibliothèque). Aucun SAP.
 ...                 Exécution :  robot --pythonpath src tests/robot/fiori_ui5v2_smoke.robot
@@ -38,9 +38,9 @@ Open V2 Fixture
 *** Test Cases ***
 Runtime Is A 2.x Build Without The Legacy Registry
     [Documentation]    Garde-fou : version 2.x, et ``Element.registry`` (déprécié
-    ...                en 1.120, hors baseline) absent — sinon ce smoke ne
+    ...                en 1.120, hors baseline) absent : sinon ce smoke ne
     ...                prouverait pas la branche module ``ElementRegistry``.
-    # ``sap.ui.version`` (global) n'existe plus en 2.x — c'est déjà un signal ;
+    # ``sap.ui.version`` (global) n'existe plus en 2.x, c'est déjà un signal ;
     # la version officielle s'obtient par le module VersionInfo (API 2.x).
     ${version}=    Evaluate JavaScript    ${None}
     ...    () => new Promise((res) => sap.ui.require(['sap/ui/VersionInfo'], (VI) => VI.load().then((i) => res(i.version)).catch(() => res('load-failed')), () => res('module-missing')))

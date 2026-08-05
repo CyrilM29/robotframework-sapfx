@@ -2,14 +2,14 @@
 
 Le master committé (512×512, médaillon détouré sur fond transparent) est décliné :
 
-- ``icon48.png`` / ``icon128.png`` — la médaille complète, simplement redimensionnée ;
-- ``icon16.png`` — à cette taille la médaille est illisible : on recadre sur le
+- ``icon48.png`` / ``icon128.png`` : la médaille complète, simplement redimensionnée ;
+- ``icon16.png`` (à cette taille la médaille est illisible) : on recadre sur le
   cadran rond du visage du robot (~30 % central), masque circulaire, contraste et
   netteté légèrement renforcés ;
-- ``../../recorder/assets/icon.png`` (256×256) — l'icône de fenêtre du lanceur
+- ``../../recorder/assets/icon.png`` (256×256) : l'icône de fenêtre du lanceur
   Tkinter du recorder bureau, même source pour une identité visuelle unique.
 
-Nécessite Pillow (outil de développement uniquement — les PNG générés sont
+Nécessite Pillow (outil de développement uniquement : les PNG générés sont
 committés, rien n'en dépend à l'exécution).
 
 Run:  python tools/recorder_web/extension/gen_icons.py

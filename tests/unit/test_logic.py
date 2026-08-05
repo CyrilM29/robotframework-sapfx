@@ -1,6 +1,6 @@
 """Tests unitaires hors SAP pour la logique déterministe ajoutée par le fork.
 
-Ces tests exercent les mixins directement contre de faux objets COM — sans SAP,
+Ces tests exercent les mixins directement contre de faux objets COM : sans SAP,
 sans COM Windows, sans exécuteur Robot Framework. Ils valident le *nouveau*
 comportement (attentes, relance, grille par titre, vérification de transaction
 indépendante de la locale), et non le code vendeur amont.
@@ -334,7 +334,7 @@ class _FakeEngine:
 
 def test_attach_to_open_session_binds_connection_and_session_by_index():
     # Le prérequis de replay des suites générées par le recorder : Connect To
-    # Session n'obtient que le moteur — Attach To Open Session complète la
+    # Session n'obtient que le moteur ; Attach To Open Session complète la
     # chaîne connection/session par index (découvert par le replay live d'un
     # export, 2026-07-19).
     lib = make_lib(ConnectionKeywords)

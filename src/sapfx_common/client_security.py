@@ -1,18 +1,18 @@
-"""Posture de sécurité du poste client SAP GUI — logique pure, sans COM.
+"""Posture de sécurité du poste client SAP GUI : logique pure, sans COM.
 
 Contexte : jusqu'en janvier 2025, l'historique de saisie de SAP GUI for
 Windows (fichiers ``SAPHistory*.db``) était protégé par un chiffrement XOR à
-clé statique réutilisée — une seule saisie connue suffisait à reconstituer la
+clé statique réutilisée : une seule saisie connue suffisait à reconstituer la
 clé et déchiffrer tout l'historique (CVE-2025-0055, note SAP 3472837 ;
-chiffrement renforcé à partir de SAP GUI for Windows 8.00 PL9 — la variante
+chiffrement renforcé à partir de SAP GUI for Windows 8.00 PL9 ; la variante
 SAP GUI for Java est la CVE-2025-0056). Sur un poste de TEST c'est aggravé : les suites tapent des
 données dans de vrais champs, donc tout ce qu'un run saisit peut se retrouver
 persisté dans l'historique local du poste. Deux parades complémentaires :
 
-- un client **patché** (8.00 PL9+ ou 8.10+) — :func:`input_history_cve_status`
+- un client **patché** (8.00 PL9+ ou 8.10+) : :func:`input_history_cve_status`
   classe la version du client ;
 - l'historique de saisie **désactivé** (Options SAP GUI → Local Data →
-  History) — :func:`find_history_databases` constate la présence de bases
+  History) : :func:`find_history_databases` constate la présence de bases
   d'historique sur le poste (des fichiers présents = l'historique a été actif,
   et leur contenu reste à purger même après désactivation).
 
@@ -55,7 +55,7 @@ def input_history_cve_status(major: object, minor: object,
 
     Retourne ``"patched"`` (8.00 PL9+, ou branche postérieure type 8.10),
     ``"vulnerable"`` (8.00 PL < 9) ou ``"unknown"`` (version non exposée,
-    non numérique, ou branche antérieure à 8.00 — à vérifier via les notes
+    non numérique, ou branche antérieure à 8.00, à vérifier via les notes
     de sécurité SAP de janvier 2025)."""
     version_major = _as_int(major)
     version_minor = _as_int(minor)

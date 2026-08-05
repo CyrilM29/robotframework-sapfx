@@ -1,6 +1,6 @@
 """Lanceur visuel léger du SAP GUI Recorder (`sapgui_recorder.py`).
 
-Une petite fenêtre Tkinter (bibliothèque standard — aucune dépendance en plus de
+Une petite fenêtre Tkinter (bibliothèque standard, aucune dépendance en plus de
 pywin32) pour lancer le recorder bureau sans retenir la ligne de commande : on choisit
 le **mode** (dump, JSON, capture, survol, record, surlignage) et les options, puis
 « Lancer ». Les modes interactifs (capture/survol/record) tournent dans une **console
@@ -8,7 +8,7 @@ séparée** (sortie live + Ctrl+C natif) ; « Arrêter » termine le processus.
 
 En mode record, le panneau « Étapes » suit le fichier de sortie EN DIRECT (les
 steps émis apparaissent au fil de l'enregistrement) et permet de réordonner /
-supprimer des étapes puis d'« Enregistrer » le fichier corrigé — la parité avec
+supprimer des étapes puis d'« Enregistrer » le fichier corrigé : la parité avec
 le panneau du recorder web.
 
     python tools/recorder/recorder_gui.py
@@ -44,7 +44,7 @@ def _recorder_core():
 
 def default_record_name(now=None):
     """Nom de fichier record par défaut, généré CÔTÉ GUI pour connaître (et
-    suivre) le fichier de sortie — la CLI horodaterait elle-même sinon, et le
+    suivre) le fichier de sortie : la CLI horodaterait elle-même sinon, et le
     panneau de steps n'aurait rien à suivre."""
     stamp = (now or datetime.datetime.now()).strftime("%Y%m%d_%H%M%S")
     return "record_%s.robot" % stamp
@@ -62,7 +62,7 @@ def resolve_record_out(current, previous_auto, now=None):
     """Nom de sortie d'un lancement record : un nom SAISI par l'utilisateur est
     respecté tel quel (écraser est alors son choix explicite) ; un champ vide ou
     resté sur le nom auto-généré du lancement précédent reçoit un NOUVEAU nom
-    horodaté — relancer un record ne tronque jamais silencieusement
+    horodaté : relancer un record ne tronque jamais silencieusement
     l'enregistrement précédent. Retourne ``(nom, nom_auto_mémorisé)``."""
     current = (current or "").strip()
     if current and current != previous_auto:
@@ -70,17 +70,30 @@ def resolve_record_out(current, previous_auto, now=None):
     fresh = default_record_name(now)
     return fresh, fresh
 
+def banner_drag_position(press_root, press_win, motion_root):
+    """Nouvelle origine de la fenêtre pendant un glisser du bandeau.
+
+    Logique pure du déplacement : ``press_root`` est la position (x, y) de la
+    souris À L'ENFONCEMENT (coordonnées écran), ``press_win`` l'origine de la
+    fenêtre au même instant, ``motion_root`` la position courante de la souris.
+    La fenêtre suit le delta souris : même contrat que le drag de l'en-tête du
+    panneau du recorder web.
+    """
+    return (press_win[0] + motion_root[0] - press_root[0],
+            press_win[1] + motion_root[1] - press_root[1])
+
+
 # (clé, libellé affiché, description courte). L'ordre = l'ordre des boutons radio.
 MODES = [
-    ("dump", "Dump — arbre d'objets (terminal)",
+    ("dump", "Dump : arbre d'objets (terminal)",
      "Liste tout l'arbre de contrôles SAP GUI dans la console. Astuce : filtre."),
     ("json", "Dump JSON (fichier)",
      "Écrit l'arbre en JSON sous captures/ (ou le fichier de sortie indiqué)."),
-    ("capture", "Capture — clic = 1 locator",
+    ("capture", "Capture : clic = 1 locator",
      "Enregistre chaque contrôle focalisé + une ligne de keyword prête à coller."),
-    ("hover", "Survol — inspecteur live",
+    ("hover", "Survol : inspecteur live",
      "Encadre le contrôle sous le curseur en continu (avec sortie : enregistre aussi)."),
-    ("record", "Record — enregistrer un déroulé",
+    ("record", "Record : enregistrer un déroulé",
      "Transcrit vos manipulations en un corps *** Test Cases *** rejouable."),
     ("highlight", "Surligner un id à l'écran",
      "Encadre en rouge l'élément dont vous saisissez l'id, puis quitte."),
@@ -152,7 +165,7 @@ def console_python():
     """Chemin d'un interpréteur *console* (jamais ``pythonw.exe``).
 
     ``recorder.cmd`` lance cette GUI via ``pythonw`` pour éviter une console
-    parasite derrière la fenêtre Tkinter — mais ``pythonw.exe`` est un binaire à
+    parasite derrière la fenêtre Tkinter, mais ``pythonw.exe`` est un binaire à
     sous-système GUI qui n'a **aucun** flux stdio, même dans une nouvelle console
     (``CREATE_NEW_CONSOLE``) : le premier ``print()`` du recorder y échoue. Si
     ``sys.executable`` pointe vers ``pythonw.exe``, on bascule sur le
@@ -190,6 +203,47 @@ def main():
     except Exception:
         pass   # icône absente ou Tk sans support PNG : purement cosmétique
 
+    # --- bandeau identité : picto aicabra + titre, et poignée de déplacement --
+    # La fenêtre se déplace déjà par sa barre de titre native ; le bandeau
+    # devient une DEUXIÈME poignée (miroir de l'en-tête déplaçable du panneau
+    # web) : utile au-dessus d'un SAP GUI plein écran où la barre native peut
+    # sortir de l'écran. Le PNG est sous-échantillonné par ``subsample`` (Tk pur,
+    # pas de Pillow à l'exécution) ; sans support PNG le bandeau reste textuel.
+    banner = tk.Frame(root, bg="#0a6ed1", cursor="fleur")
+    banner.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+    banner_img = None
+    try:
+        _raw = tk.PhotoImage(file=os.path.join(_DIR, "assets", "icon.png"))
+        _factor = max(1, _raw.width() // 24)
+        banner_img = _raw.subsample(_factor, _factor)
+        tk.Label(banner, image=banner_img, bg="#0a6ed1").pack(side="left", padx=(8, 4), pady=3)
+    except Exception:
+        pass
+    tk.Label(banner, text="SAPFX Recorder", fg="white", bg="#0a6ed1",
+             font=("Segoe UI", 10, "bold")).pack(side="left", pady=3)
+    tk.Label(banner, text="glisser pour déplacer", fg="#cfe3f7", bg="#0a6ed1",
+             font=("Segoe UI", 8)).pack(side="right", padx=8)
+    _drag = {"press_root": None, "press_win": None}
+
+    def _banner_press(event):
+        _drag["press_root"] = (event.x_root, event.y_root)
+        _drag["press_win"] = (root.winfo_x(), root.winfo_y())
+
+    def _banner_motion(event):
+        if _drag["press_root"] is None:
+            return
+        x, y = banner_drag_position(_drag["press_root"], _drag["press_win"],
+                                    (event.x_root, event.y_root))
+        root.geometry("+%d+%d" % (x, y))
+
+    def _banner_release(_event):
+        _drag["press_root"] = None
+
+    for w in [banner] + list(banner.winfo_children()):
+        w.bind("<ButtonPress-1>", _banner_press)
+        w.bind("<B1-Motion>", _banner_motion)
+        w.bind("<ButtonRelease-1>", _banner_release)
+
     proc = {"p": None}   # processus en cours (modes interactifs)
     # état du panneau de steps : fichier suivi, dernière mtime lue, édition en cours
     watch = {"path": None, "mtime": None, "dirty": False, "text": ""}
@@ -211,7 +265,7 @@ def main():
 
     # --- modes -------------------------------------------------------------
     frm_mode = ttk.LabelFrame(root, text="Mode")
-    frm_mode.grid(row=0, column=0, sticky="ew", **pad)
+    frm_mode.grid(row=1, column=0, sticky="ew", **pad)
     for i, (key, label, _desc) in enumerate(MODES):
         ttk.Radiobutton(frm_mode, text=label, value=key, variable=mode_var,
                         command=lambda: _on_mode_change()).grid(
@@ -219,7 +273,7 @@ def main():
 
     # --- options -----------------------------------------------------------
     frm_opt = ttk.LabelFrame(root, text="Options")
-    frm_opt.grid(row=1, column=0, sticky="ew", **pad)
+    frm_opt.grid(row=2, column=0, sticky="ew", **pad)
     ttk.Label(frm_opt, text="Filtre (id/type) :").grid(row=0, column=0, sticky="w", padx=6, pady=2)
     ent_filter = ttk.Entry(frm_opt, textvariable=filter_var, width=34)
     ent_filter.grid(row=0, column=1, padx=6, pady=2)
@@ -255,7 +309,7 @@ def main():
 
     desc_var = tk.StringVar()
     ttk.Label(root, textvariable=desc_var, wraplength=360, foreground="#555").grid(
-        row=2, column=0, sticky="w", **pad)
+        row=3, column=0, sticky="w", **pad)
     status_var = tk.StringVar(value="Prêt. Ouvrez SAP Logon avec une session active.")
     ttk.Label(root, textvariable=status_var, wraplength=360, foreground="#0a6ed1").grid(
         row=5, column=0, sticky="w", **pad)
@@ -281,7 +335,7 @@ def main():
 
     # --- panneau de steps (mode record) ------------------------------------
     frm_steps = ttk.LabelFrame(root, text="Étapes enregistrées (record)")
-    frm_steps.grid(row=3, column=0, sticky="ew", **pad)
+    frm_steps.grid(row=4, column=0, sticky="ew", **pad)
     lst_steps = tk.Listbox(frm_steps, height=7, width=56, font=("Consolas", 9))
     lst_steps.grid(row=0, column=0, columnspan=5, sticky="ew", padx=6, pady=3)
     steps_state = {"steps": []}
@@ -362,7 +416,7 @@ def main():
         status_var.set("Étapes enregistrées dans %s" % path)
 
     def on_step_edit(_event=None):
-        # édition in-place (double-clic) — la parité avec le panneau du recorder web
+        # édition in-place (double-clic) : la parité avec le panneau du recorder web
         i = _selected_index()
         if i is None:
             return
@@ -461,7 +515,7 @@ def main():
             status_var.set("Captures : %s" % CAPTURES_DIR)
 
     frm_btn = ttk.Frame(root)
-    frm_btn.grid(row=4, column=0, sticky="ew", **pad)
+    frm_btn.grid(row=5, column=0, sticky="ew", **pad)
     ttk.Button(frm_btn, text="Lancer", command=on_launch).grid(row=0, column=0, padx=4)
     ttk.Button(frm_btn, text="Arrêter", command=on_stop).grid(row=0, column=1, padx=4)
     ttk.Button(frm_btn, text="Dossier captures", command=on_open_captures).grid(row=0, column=2, padx=4)

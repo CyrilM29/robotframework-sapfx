@@ -1,5 +1,5 @@
 """Tests hors-SAP du garde-fou de dérive vendor (``scripts/check_vendor_drift.py``
-— convention #5 du CLAUDE.md, appliquée à un script d'outillage)."""
+: convention #5 du CLAUDE.md, appliquée à un script d'outillage)."""
 import importlib.util
 import os
 
@@ -29,7 +29,7 @@ _UPSTREAM_BODY = (
 
 _VENDOR_HEADER = (
     "# -----------------------------------------------------------------\n"
-    "# VENDORED CODE — DO NOT EDIT EXCEPT FOR UPSTREAM SYNC\n"
+    "# VENDORED CODE: DO NOT EDIT EXCEPT FOR UPSTREAM SYNC\n"
     "# -----------------------------------------------------------------\n"
 )
 

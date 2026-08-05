@@ -1,11 +1,11 @@
 """Tests du journal JSONL cumulatif de healing (``sapfx_common.healing_telemetry``)
 et de son branchement dans les deux canaux : ECC (`Resolve Element With Healing`)
-et Fiori (`Resolve Ui5 With Fallback`). Fake COM / fake Browser — convention #5."""
+et Fiori (`Resolve Ui5 With Fallback`). Fake COM / fake Browser, convention #5."""
 import json
 
 from sapfx_common.healing_telemetry import ENV_VAR, record_healing, telemetry_path
 
-# Doublures partagées avec les tests existants (pythonpath tests/unit — pyproject).
+# Doublures partagées avec les tests existants (pythonpath tests/unit, pyproject).
 from test_diagnostics_and_healing import FakeNode, FakeSession, _lib as _ecc_lib
 from test_fiori_frames_and_fallback import FakeBrowser, _lib as _fiori_lib
 

@@ -1,6 +1,6 @@
 > **🇬🇧 English** · [🇫🇷 Français](README.fr.md)
 
-# UI5 / WebGUI Locator Recorder — browser extension
+# UI5 / WebGUI Locator Recorder: browser extension
 
 One-click version of the Recorder: no console paste. **Hover** highlights the control
 under the cursor; **click** captures it into an **in-app panel** (a floating list
@@ -14,9 +14,9 @@ ends the session.
 The panel is **draggable** (grab its header) and **collapsible** (▾), and shows a red
 **recording indicator**. You can drive it from the **toolbar popup** too (Start, Rec/Pause,
 Export, Stop, with live status), and the keyboard shortcut **`Alt+Shift+R`** toggles
-recording without opening the popup — the icon shows a **`REC` badge** while recording.
+recording without opening the popup; the icon shows a **`REC` badge** while recording.
 
-## Load it (unpacked — Chrome / Edge)
+## Load it (unpacked, Chrome / Edge)
 
 1. Generate the content script and icons (once, and after any bundle change):
 
@@ -33,17 +33,17 @@ recording without opening the popup — the icon shows a **`REC` badge** while r
 ## How it works
 
 - `popup.js` / `background.js` inject `recorder.js` into the page's **MAIN world** via
-  `chrome.scripting.executeScript` — required so the script can read the page's
+  `chrome.scripting.executeScript`, required so the script can read the page's
   `window.sap` (UI5 runtime). Injection targets **all frames** (`allFrames: true`),
   so apps embedded in a launchpad **iframe** (Work Zone / cFLP, even cross-origin)
-  are covered — the panel title shows `[iframe]` in that case. They use the
+  are covered, and the panel title shows `[iframe]` in that case. They use the
   `activeTab` permission, granted when you click the icon or press the shortcut,
   so the extension needs **no broad host permissions**.
 - The recorder (MAIN world) can't call `chrome.*`, so a tiny **`bridge.js`** (ISOLATED
   world) relays the recording state to `background.js`, which sets the **toolbar badge**.
 - `recorder.js` is **generated from `src/SapFioriLibrary/_ui5_js.py`** (identical to
   the console snippet `../recorder_snippet.js`) so capture never drifts from the
-  library's resolver. Don't edit it by hand — re-run `regen_recorder`.
+  library's resolver. Don't edit it by hand: re-run `regen_recorder`.
 
 ## Files
 

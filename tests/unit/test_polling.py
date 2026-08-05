@@ -1,4 +1,4 @@
-"""Tests unitaires de ``sapfx_common.polling`` — les primitives de synchronisation
+"""Tests unitaires de ``sapfx_common.polling``, les primitives de synchronisation
 partagées par les deux canaux (convention #5 du CLAUDE.md)."""
 import time
 

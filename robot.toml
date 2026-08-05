@@ -1,6 +1,6 @@
 # Configuration Robot Framework partagée (lue par RobotCode/IDE et rf-cli).
 # Donne au résolveur de bibliothèques le même PYTHONPATH que les invocations
-# `robot --pythonpath src` documentées — supprime les faux "KeywordNotFound"
+# `robot --pythonpath src` documentées : supprime les faux "KeywordNotFound"
 # de l'IDE sur resources/ et tests/robot/.
 python-path = ["src", "integrations/robotmcp"]
 output-dir = "results"

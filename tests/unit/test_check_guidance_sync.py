@@ -1,5 +1,5 @@
 """Tests hors-SAP du garde-fou de cohérence guidance rf-mcp <-> CLAUDE.md
-(``scripts/check_guidance_sync.py`` — convention #5 du CLAUDE.md, appliquée à
+(``scripts/check_guidance_sync.py``, convention #5 du CLAUDE.md, appliquée à
 un script d'outillage)."""
 import importlib.util
 import os

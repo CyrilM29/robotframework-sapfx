@@ -51,7 +51,7 @@ pythonpath = ["src", "integrations/robotmcp", "tests/unit"]
 [tool.coverage.run]
 # _vendor/ est de l'upstream vendorisé tel quel (convention 4 du CLAUDE.md) : on
 # ne l'écrit ni ne le teste nous-mêmes, donc son taux de couverture n'est pas
-# significatif — même exclusion que ruff (extend-exclude ci-dessous).
+# significatif : même exclusion que ruff (extend-exclude ci-dessous).
 omit = ["*/_vendor/*"]
 
 [tool.coverage.report]
@@ -70,7 +70,7 @@ extend-exclude = ["src/SapEccLibrary/_vendor", "_upstream", "_pwsap", "_cap-sfli
 python_version = "3.10"
 # Base de code historique encore majoritairement non annotée (fork upstream) :
 # on n'exige pas des annotations partout d'un coup, on type progressivement
-# module par module (sapfx_common, _ui5_runtime en premier — voir CLAUDE.md
+# module par module (sapfx_common, _ui5_runtime en premier : voir CLAUDE.md
 # "Status / next steps") et mypy suit ce même périmètre.
 files = ["src/sapfx_common", "src/SapApiLibrary",
         "src/SapEccLibrary/SapEccLibrary.py",

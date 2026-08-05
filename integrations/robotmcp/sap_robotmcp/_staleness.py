@@ -1,7 +1,7 @@
 """Détection de code SAPFX modifié APRÈS le démarrage du serveur rf-mcp.
 
 Piège connu (field notes CLAUDE.md) : rf-mcp importe les bibliothèques à la
-première session et **fige classe ET instance** pour toute la vie du process —
+première session et **fige classe ET instance** pour toute la vie du process :
 après une modification du code de ``src/``, un simple ``manage_session init``
 resservira l'ANCIENNE classe, et l'agent debuggue un comportement qui n'existe
 plus dans les sources. Ce module transforme ce piège en avertissement
@@ -10,7 +10,7 @@ SAPFX déjà chargés à l'heure de démarrage du process et, en cas d'écart,
 ajoutent ``stale_code_warning`` à leurs réponses.
 
 Best-effort par construction : jamais d'exception (une erreur de stat est
-ignorée), jamais bloquant — un scan de ``sys.modules`` filtré par préfixe.
+ignorée), jamais bloquant : un scan de ``sys.modules`` filtré par préfixe.
 """
 from __future__ import annotations
 

@@ -1,8 +1,8 @@
 """Tests unitaires hors navigateur pour la logique de sélecteur UI5.
 
-Ces tests valident la couche pure données/chaînes du côté Fiori — construction
+Ces tests valident la couche pure données/chaînes du côté Fiori (construction
 et sérialisation des sélecteurs de contrôles UI5 ainsi que la forme du bundle JS
-injecté — sans navigateur ni Playwright. La résolution en page elle-même est
+injecté) sans navigateur ni Playwright. La résolution en page elle-même est
 exercée par la suite de fumée contre l'OpenUI5 Demo Kit
 (voir docs/testing-without-sap.md).
 """

@@ -1,6 +1,6 @@
 > **🇬🇧 English** · [🇫🇷 Français](audit-upstream.fr.md)
 
-# Audit — `robotframework-sapguilibrary` (upstream)
+# Audit: `robotframework-sapguilibrary` (upstream)
 
 Reviewed commit: tip of `master` (release **v1.2.1**, March 2022). License **Apache 2.0**.
 Source audited: `SapGuiLibrary/SapGuiLibrary.py` (single ~780-line module, one class).
@@ -9,7 +9,7 @@ Source audited: `SapGuiLibrary/SapGuiLibrary.py` (single ~780-line module, one c
 
 A solid, focused base worth forking rather than rewriting. The COM plumbing and a
 coherent keyword vocabulary are already there and battle-tested. The gaps are
-narrow and well-defined — exactly the things we add in `SapEccLibrary`.
+narrow and well-defined: exactly the things we add in `SapEccLibrary`.
 
 ## What it already does well
 
@@ -40,7 +40,7 @@ narrow and well-defined — exactly the things we add in `SapEccLibrary`.
 | 2 | **Locale-fragile transaction check.** Unknown-tcode detection string-matches the status bar in **Dutch/English/German only**. | `run_transaction` compares against `"Transactie %s bestaat niet"`, `"Transaction %s does not exist"`, `"Transaktion %s existiert nicht"`. | Override reads `sbar.messageType == "E"` (locale-independent). |
 | 3 | **No connection bootstrap.** Assumes the Logon Pad is already running; docs tell you to start it with AutoIt/Process library. | `connect_to_session` raises "is Sap Logon Pad open?" if not. | `keywords/_connection.py`: `Open Sap Logon` (launch exe + wait for engine), `Close Sap Logon`, `Connect To Session With Retry`. |
 | 4 | **Grid addressed only by technical column id.** You must know `"MATNR"` etc. (found via the external Scripting Tracker). | `get_cell_value(table_id, row, col_id)` takes a raw `col_id`. | `keywords/_grid.py`: resolve columns by visible title, `Read Grid` → list of dicts. |
-| 5 | **No status-message helpers.** | — | `Get Status Message`, `Status Message Should Be Success`. |
+| 5 | **No status-message helpers.** | (none) | `Get Status Message`, `Status Message Should Be Success`. |
 
 ## Minor observations (not fixed, noted for later)
 
@@ -52,7 +52,7 @@ narrow and well-defined — exactly the things we add in `SapEccLibrary`.
   harmless but chatty over COM.
 - `select_node`'s `expand=True` swallows all `com_error`s (a `# TODO` is left in
   Dutch). Acceptable.
-- Python 2.7 classifiers in `setup.py` — dropped in our `pyproject.toml`.
+- Python 2.7 classifiers in `setup.py`, dropped in our `pyproject.toml`.
 
 ## Re-sync strategy
 

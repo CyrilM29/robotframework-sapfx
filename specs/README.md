@@ -1,4 +1,4 @@
-# specs/ — plans de test (agents SAP)
+# specs/ : plans de test (agents SAP)
 
 Plans de test **lisibles métier**, au format Markdown, produits par l'agent
 **sap-planner** (exploration live du système via rf-mcp) et consommés par
@@ -11,14 +11,14 @@ Règles du répertoire :
 - **Un fichier par domaine métier**, nom en kebab-case (`sflight-consultation-se16.md`).
 - Rédigé **en français** ; noms de keywords, codes transaction, ids techniques
   restent en anglais.
-- Un plan décrit des **scénarios en langage métier** — jamais d'id d'élément SAP
+- Un plan décrit des **scénarios en langage métier** : jamais d'id d'élément SAP
   ni de CSS/XPath dans les étapes (convention #1) ; les identifiants observés
   vont dans « Données observées » / « Points de vigilance », comme notes
   factuelles pour le générateur.
 - Un plan est **ancré dans l'observé** : données réelles relevées pendant
   l'exploration, pas de valeurs supposées.
 - La suite générée référence son plan d'origine ; quand le flux métier change,
-  on met à jour le plan (re-passage du planner) puis on régénère — on n'édite
+  on met à jour le plan (re-passage du planner) puis on régénère ; on n'édite
   pas les localisateurs à la main dans les tests.
 
 Gabarit d'un plan :

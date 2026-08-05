@@ -1,12 +1,12 @@
 *** Settings ***
 Documentation       Smoke des **sessions hybrides** contre la fixture locale
-...                 `fixtures/hybrid_fixture.html` — une page composite SANS runtime
+...                 `fixtures/hybrid_fixture.html`, une page composite SANS runtime
 ...                 UI5 où cohabitent quatre régions technologiques : hôtes UI5 Web
 ...                 Components, élément WebGUI (`lsdata`), widget web générique
 ...                 marqué React, et frames IMBRIQUÉES (level1 -> level2). Prouve :
 ...                 la sonde de composition `Get Page Composition` (technologies +
 ...                 moteurs recommandés par région, descente dans les frames), le
-...                 moteur DOM générique (`Resolve/Click/Fill Dom …` — la zone
+...                 moteur DOM générique (`Resolve/Click/Fill Dom …` : la zone
 ...                 non-SAP entre dans la même grammaire), la pile de frames
 ...                 `Push/Pop Ui5 Frame` (portée chaînée ``a >>> b`` sur deux
 ...                 niveaux), et le repli ``dom=`` de `Resolve Ui5 With Fallback`.
@@ -62,23 +62,23 @@ Dom Engine Resolves Clicks And Fills The Non-Sap Widget
 
 Accessibility Locators Address The Widget By Role And Name
     [Documentation]    Le cran accessibilité du moteur dom : rôle ARIA IMPLICITE
-    ...                (sémantique HTML — aucun attribut role sur la cible) + nom
-    ...                accessible (aria-label, label[for]) — le localisateur
+    ...                (sémantique HTML, aucun attribut role sur la cible) + nom
+    ...                accessible (aria-label, label[for]) : le localisateur
     ...                « intention utilisateur », indépendant de la structure DOM.
-    # bouton d'icône : ni attribut role, ni texte parlant — l'aria-label le nomme
+    # bouton d'icône : ni attribut role, ni texte parlant, l'aria-label le nomme
     ${count}=    Get Dom Match Count    role=button    name=Fermer la notification
     Should Be Equal As Integers    ${count}    1
     Click Dom Element    role=button    name=Fermer la notification
     ${hidden}=    Evaluate JavaScript    ${None}    () => document.getElementById('note').hidden
     Should Be Equal    ${hidden}    ${True}
-    # champ nommé par son <label for=…> — rôle textbox implicite (input nu)
+    # champ nommé par son <label for=…> : rôle textbox implicite (input nu)
     Fill Dom Input    Martin    role=textbox    name=Nom du client
     ${value}=    Evaluate JavaScript    ${None}    () => document.getElementById('name-input').value
     Should Be Equal    ${value}    Martin
 
 Frame Stack Scopes Resolution Across Two Nested Levels
     [Documentation]    Push/Pop Ui5 Frame : la portée s'empile (chaînage Browser
-    ...                ``level1 >>> level2``) — le moteur sid opère au niveau 1,
+    ...                ``level1 >>> level2``) : le moteur sid opère au niveau 1,
     ...                le moteur dom au niveau 2, puis la pile se déroule.
     Push Ui5 Frame    iframe[id="level1"]
     Sid Should Be Visible    wnd[0]/tbar[1]/btn[8]
@@ -98,7 +98,7 @@ Frame Stack Scopes Resolution Across Two Nested Levels
     [Teardown]    Set Ui5 Frame    ${EMPTY}    # isolation : jamais de portée résiduelle
 
 Pop On The Main Page Fails Clearly
-    [Documentation]    Un Pop de trop est un bug de scénario — erreur nette, jamais
+    [Documentation]    Un Pop de trop est un bug de scénario : erreur nette, jamais
     ...                un état de portée silencieusement faux.
     Run Keyword And Expect Error    *frame stack is empty*    Pop Ui5 Frame
 

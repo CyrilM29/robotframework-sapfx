@@ -1,6 +1,6 @@
 """Tests du mode diff de perception : primitives pures (``sapfx_common.
 perception_diff``) et keywords ``Get Screen Signature``/``Get Ui5 Page Tree``
-avec ``mode=diff``. Hors SAP/navigateur — convention #5."""
+avec ``mode=diff``. Hors SAP/navigateur, convention #5."""
 from sapfx_common.perception_diff import diff_lines, diff_perception, split_xml_lines
 from SapEccLibrary.SapEccLibrary import SapEccLibrary
 from SapFioriLibrary._ui5_js import DUMP_TREE_JS

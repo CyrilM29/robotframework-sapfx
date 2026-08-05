@@ -1,20 +1,20 @@
-"""Garde mécanique des conventions #1 et #2 — celles qu'un linter peut prouver.
+"""Garde mécanique des conventions #1 et #2 : celles qu'un linter peut prouver.
 
 Les agents (sap-generator, sap-healer) et CLAUDE.md promettent en prose que :
 
-* **convention #1** — les tests ne contiennent aucun localisateur brut : les
+* **convention #1** : les tests ne contiennent aucun localisateur brut ; les
   ids d'éléments SAP GUI (``wnd[0]/usr/ctxt…``, ``/app/con[0]/ses[0]/…``), les
   adresses de contrôles UI5 et les sélecteurs DOM (``css=``, ``xpath=``,
   ``//…``) vivent dans ``resources/`` ou ``variables/locators.py``, jamais dans
   un fichier de ``tests/robot/`` ;
-* **convention #2** — jamais de ``Sleep`` pour attendre SAP : les attentes
+* **convention #2** : jamais de ``Sleep`` pour attendre SAP ; les attentes
   réelles (``Wait Until Busy Done``, ``Wait Until Element Present``,
-  ``Wait For UI5 Ready``) uniquement — dans les tests COMME dans la couche
+  ``Wait For UI5 Ready``) uniquement, dans les tests COMME dans la couche
   ``resources/``.
 
 Pourquoi ce garde existe : ``check_guidance_sync.py`` vérifie que les
 conventions restent *énoncées* (dans CLAUDE.md, dans les hints rf-mcp, dans les
-définitions d'agents) — mais rien ne vérifiait qu'elles soient *tenues* par les
+définitions d'agents), mais rien ne vérifiait qu'elles soient *tenues* par les
 artefacts produits. Une règle en prose n'est pas un contrat : ce garde la rend
 mécanique. Il est appelé comme gate par sap-generator (entre le dry run et le
 run live), par le hook post-édition du workspace et par la CI. Échec = un
@@ -27,10 +27,10 @@ plan → generate → heal), avec les motifs SAP en plus : le garde y était né
 constat que les conventions #1/#2 n'étaient tenues que par la discipline du
 modèle.
 
-**Périmètre de la convention #1 — la nuance propre à ce dépôt.** Ici, deux
+**Périmètre de la convention #1 : la nuance propre à ce dépôt.** Ici, deux
 familles de suites cohabitent sous ``tests/robot/`` :
 
-* les suites **générées depuis un plan** par sap-generator — elles portent le
+* les suites **générées depuis un plan** par sap-generator, elles portent le
   marqueur de provenance ``Spec: specs/<plan>.md (sha256:…)``. Ce sont des
   tests *métier*, dérivés d'un plan relu par le métier : la convention #1 y est
   **bloquante**, sans exception ;
@@ -42,7 +42,7 @@ familles de suites cohabitent sous ``tests/robot/`` :
   **signalées à titre informatif**, jamais bloquantes (``--strict`` les rend
   bloquantes, pour un chantier de mise en conformité assumé).
 
-La convention #2 (``Sleep``), elle, est **universelle et bloquante partout** —
+La convention #2 (``Sleep``), elle, est **universelle et bloquante partout**,
 tests comme resources, générés ou pas : aucune attente fixe ne se justifie.
 
 Ce découpage est auto-maintenu : il se lit sur le marqueur de provenance, il
@@ -51,7 +51,7 @@ n'y a aucune liste d'exemptions à tenir à jour.
 Limites assumées : détection par motifs sur les cellules Robot Framework
 (séparateur 2+ espaces ou tabulation) ; les blocs ``Documentation`` et les
 commentaires sont ignorés (on peut y CITER un localisateur). Un localisateur
-exotique peut passer — le garde attrape les violations franches, la revue
+exotique peut passer : le garde attrape les violations franches, la revue
 humaine garde le reste.
 
 Usage::
@@ -153,7 +153,7 @@ def scan_file(path: Path, forbid_locators: bool) -> list[tuple[int, str, int]]:
         for cell in cells:
             if _is_sleep(cell):
                 problems.append(
-                    (lineno, "Sleep interdit (convention #2) — utiliser "
+                    (lineno, "Sleep interdit (convention #2) : utiliser "
                              "Wait Until Busy Done / Wait Until Element "
                              "Present / Wait For UI5 Ready", 2))
                 break
@@ -162,7 +162,7 @@ def scan_file(path: Path, forbid_locators: bool) -> list[tuple[int, str, int]]:
                 if _is_raw_locator(cell):
                     problems.append(
                         (lineno, "localisateur brut dans un test "
-                                 "(convention #1) : « %s » — le déplacer dans "
+                                 "(convention #1) : « %s » ; le déplacer dans "
                                  "resources/page_objects/ ou "
                                  "variables/locators.py" % cell, 1))
     return problems
@@ -214,21 +214,21 @@ def check(repo_root: Path, targets: list[str] | None = None,
         for entry in informative:
             by_file[entry.split(":")[0]] = by_file.get(
                 entry.split(":")[0], 0) + 1
-        print("  (info : convention #1 dans des suites NON générées — leur "
-              "objet est de piloter SAP par ses ids bruts ; --strict pour les "
-              "rendre bloquantes)")
+        print("  (info : convention #1 dans des suites NON générées, dont "
+              "l'objet est de piloter SAP par ses ids bruts ; --strict pour "
+              "les rendre bloquantes)")
         for name, count in sorted(by_file.items()):
             print("    · %s : %d" % (name, count))
     if blocking:
         return 1
-    print("[check_conventions] OK — %d fichier(s), aucune violation bloquante."
+    print("[check_conventions] OK : %d fichier(s), aucune violation bloquante."
           % total)
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors page
-    # de code — UTF-8 best-effort plutôt qu'un plantage à l'affichage.
+    # de code : UTF-8 best-effort plutôt qu'un plantage à l'affichage.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])

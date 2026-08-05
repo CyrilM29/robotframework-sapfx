@@ -1,4 +1,4 @@
-"""Hook PostToolUse (Write|Edit) — lance les gardes après toute édition des
+"""Hook PostToolUse (Write|Edit) : lance les gardes après toute édition des
 artefacts du cycle agentique (specs/, tests/robot/, resources/, variables/).
 
 Deux sévérités, calées sur la nature de chaque garde :
@@ -30,15 +30,25 @@ def main() -> int:
         return 0
     file_path = str((payload.get("tool_input") or {}).get("file_path") or "")
     normalized = file_path.replace("\\", "/")
-    if not any(segment in normalized for segment in WATCHED):
-        return 0
     root = Path(__file__).resolve().parents[1]
 
-    def run(script: str) -> subprocess.CompletedProcess:
+    def run(script: str, *args: str) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(root / "scripts" / script)],
+            [sys.executable, str(root / "scripts" / script), *args],
             cwd=root, capture_output=True, text=True,
             encoding="utf-8", errors="replace")
+
+    # Le tiret cadratin se vérifie sur TOUT fichier édité, pas seulement sur les
+    # artefacts du cycle agentique : c'est une règle de rédaction globale, et la
+    # rattraper à l'écriture coûte une seconde contre une relecture entière.
+    if file_path:
+        em_dash = run("check_no_em_dash.py", file_path)
+        if em_dash.returncode != 0:
+            sys.stderr.write(em_dash.stdout + em_dash.stderr)
+            return 2  # bloquant : l'assistant doit reformuler tout de suite
+
+    if not any(segment in normalized for segment in WATCHED):
+        return 0
 
     conventions = run("check_conventions.py")
     if conventions.returncode != 0:
@@ -50,7 +60,7 @@ def main() -> int:
         report = (sync.stdout + sync.stderr).strip()
         print(json.dumps({
             "systemMessage": "check_spec_sync : dérive plan ↔ suite détectée "
-                             "(voir détail) — re-stamper, régénérer, ou "
+                             "(voir détail) : re-stamper, régénérer, ou "
                              "ré-explorer si le plan est marqué PÉRIMÉE.",
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",

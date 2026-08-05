@@ -3,7 +3,7 @@
 ``LibraryStateProvider.get_page_source`` (contrat rf-mcp réel, vérifié dans
 ``robotmcp/plugins/contracts.py`` / ``page_source_service.py``) accepte
 ``filtered: bool`` et ``filtering_level: str`` (``"minimal"``/``"standard"``/
-``"aggressive"``) — le provider Browser intégré les utilise pour réduire
+``"aggressive"``) : le provider Browser intégré les utilise pour réduire
 progressivement le HTML renvoyé (scripts/style retirés en minimal, éléments non
 visuels en plus en standard, éléments cachés en plus en aggressive). Nos
 providers SAP acceptaient ces deux paramètres sans jamais les utiliser
@@ -31,7 +31,7 @@ def filter_ecc_signature(signature: str, level: str = "standard") -> str:
       (bruit structurel pur : rien à lire, rien à remplir).
     - ``standard``    : + retire les conteneurs de mise en page connus
       (barres d'outils, onglets, splitters...) même s'ils portent un peu de texte.
-    - ``aggressive``  : ne garde que les champs éditables (``* ``) — la vue la
+    - ``aggressive``  : ne garde que les champs éditables (``* ``), la vue la
       plus compacte, pour un agent qui veut juste "que puis-je remplir ?".
 
     L'en-tête ``# screen ...`` est toujours conservé."""

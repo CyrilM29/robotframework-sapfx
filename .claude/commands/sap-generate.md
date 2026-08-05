@@ -6,7 +6,7 @@ Use the **sap-generator** agent to turn a plan from `specs/` into an executable
 Robot Framework suite under `tests/robot/`, for: $ARGUMENTS
 
 If the arguments do not name a spec file, list `specs/*.md` (excluding
-README.md) and ask the user (in French) which plan to generate — or suggest
+README.md) and ask the user (in French) which plan to generate, or suggest
 running `/sap-plan` first when `specs/` is empty. Pass the user's connection
 variables (SAP_CONNECTION / SAP_USER / Fiori URL…) through to the agent; never
 invent credentials.

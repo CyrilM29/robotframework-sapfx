@@ -5,12 +5,12 @@ conventions numérotées de CLAUDE.md dont elles sont la traduction pour l'agent
 #3 « assertions indépendantes de la locale »).
 
 Vérifie de la même façon que les définitions des agents de test
-(``.claude/agents/sap-*.md`` — planner/generator/healer, déclinées en chat
+(``.claude/agents/sap-*.md`` : planner/generator/healer, déclinées en chat
 modes VS Code par ``regen_agent_definitions.py``) continuent de porter ces
 conventions vers les agents.
 
 Ce n'est PAS un générateur : CLAUDE.md est de la prose libre destinée à des
-lecteurs humains/IA, pas une donnée structurée — en extraire mécaniquement du
+lecteurs humains/IA, pas une donnée structurée ; en extraire mécaniquement du
 texte serait fragile et produirait des hints de piètre qualité. C'est un
 garde-fou de COHÉRENCE, dans le même esprit que ``check_bilingual_docs.py`` et
 ``check_vendor_drift.py``. Pour chaque convention suivie, il vérifie :
@@ -30,7 +30,7 @@ correspondant (``get_keyword_library_map``). C'est le garde qui aurait attrapé
 la dérive 0.5.6 → 0.6.1 : trois releases de keywords (multi-session, screenshot
 annoté, effecteur pointer…) absents de la carte, donc invisibles au routage
 d'intention des agents. Contrôle TEXTUEL (les plugins importent ``robotmcp``,
-qu'on ne veut pas exiger ici) — un keyword renommé côté bibliothèque fera
+qu'on ne veut pas exiger ici) : un keyword renommé côté bibliothèque fera
 échouer ce garde : mettre à jour la carte ET cette liste.
 
 Usage : python scripts/check_guidance_sync.py
@@ -57,7 +57,7 @@ _TRACKED = [
 ]
 
 # Définitions d'agents de test : chaque fichier ``sap-*.md`` doit encore
-# mentionner ces marqueurs (en minuscules) — la traduction des conventions #1
+# mentionner ces marqueurs (en minuscules) : la traduction des conventions #1
 # (localisateurs dans la couche resources), #2 (pas d'attente fixe) et #3
 # (assertions par type de message) pour les agents planner/generator/healer.
 _AGENTS_DIR = os.path.join(_ROOT, ".claude", "agents")
@@ -65,6 +65,12 @@ _AGENT_MARKERS = [
     (1, "resources/"),
     (2, "time.sleep"),
     (3, "message type"),
+    # Règle de rédaction (CLAUDE.md § Language) : les trois agents écrivent de
+    # la prose publiée (plans specs/, section « Écarts », heal-journal), ils
+    # doivent donc porter l'interdiction. Pendant du garde mécanique
+    # check_no_em_dash.py : ici on vérifie qu'elle est ÉNONCÉE, là-bas qu'elle
+    # est TENUE.
+    (0, "em dash"),
 ]
 
 # Fraîcheur des cartes de keywords des plugins rf-mcp : pour chaque mixin
@@ -159,9 +165,12 @@ def check():
             agent_text = f.read().lower()
         for num, marker in _AGENT_MARKERS:
             if marker not in agent_text:
+                # num == 0 : règle de rédaction, pas une convention numérotée.
+                label = ("règle de rédaction" if num == 0
+                         else "convention #%d" % num)
                 problems.append(
-                    "convention #%d : la définition d'agent %s ne mentionne "
-                    "plus %r -- a-t-elle dérivé ?" % (num, filename, marker))
+                    "%s : la définition d'agent %s ne mentionne "
+                    "plus %r -- a-t-elle dérivé ?" % (label, filename, marker))
 
     for plugin_file, keywords in _MAP_MARKERS.items():
         path = os.path.join(_PLUGINS_DIR, plugin_file)

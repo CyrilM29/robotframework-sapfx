@@ -3,15 +3,15 @@ a un original anglais `*.md` et une version française `*.fr.md`).
 
 Deux vérifications, toutes deux sans dépendance externe (juste `git` en PATH) :
 
-1. **Appariement structurel** — chaque `*.md` suivi par git (hors exceptions
+1. **Appariement structurel** : chaque `*.md` suivi par git (hors exceptions
    volontairement anglais-seul : CLAUDE.md, AGENTS.md, CHANGELOG.md,
    .github/copilot-instructions.md ; et hors arborescences volontairement
-   monolingues : définitions d'agents/commands et chat modes générés — des
-   prompts techniques, pas des docs — ainsi que `specs/`, rédigé en français,
+   monolingues : définitions d'agents/commands et chat modes générés (des
+   prompts techniques, pas des docs) ainsi que `specs/`, rédigé en français,
    la langue de travail de l'équipe) a son pendant `*.fr.md`, et réciproquement.
    Détecte une doc oubliée à sa création ou une traduction orpheline renommée.
 
-2. **Dérive de mise à jour** (avec ``--since <ref>``) — dans l'ensemble de
+2. **Dérive de mise à jour** (avec ``--since <ref>``) : dans l'ensemble de
    fichiers modifiés depuis ``<ref>``, si `X.md` est modifié sans que `X.fr.md`
    le soit (ou l'inverse), avertit : la doc peut avoir dérivé de sa traduction.
    Ce n'est qu'un signal (pas une validation sémantique du contenu traduit).
@@ -40,7 +40,7 @@ _EN_ONLY = {
 
 # Docs délibérément français-seul : journaux de travail append-only, écrits en
 # continu par les agents dans la langue de travail de l'équipe (même logique
-# que specs/). Les traduire à chaque entrée n'aurait aucun sens — ce sont des
+# que specs/). Les traduire à chaque entrée n'aurait aucun sens : ce sont des
 # traces d'exécution, pas de la documentation destinée à être lue en anglais.
 _FR_ONLY = {
     "docs/heal-journal.md",
@@ -51,10 +51,10 @@ _FR_ONLY = {
 # prompts techniques (comme le code) ; specs/ est rédigé directement en
 # français par l'agent sap-planner ; comms/ est la base de communication du
 # projet (messaging, ton de voix, playbooks), rédigée en français, la langue de
-# travail de l'équipe — les *supports* qu'elle produit peuvent, eux, être
+# travail de l'équipe ; les *supports* qu'elle produit peuvent, eux, être
 # bilingues (le deck existe en FR et en EN) ; memory/ est la mémoire projet
 # des assistants IA (fiches de travail anonymisées, rédigées en français, la
-# langue de travail — même logique que specs/).
+# langue de travail, même logique que specs/).
 _SINGLE_LANGUAGE_PREFIXES = (
     ".claude/",
     ".github/chatmodes/",

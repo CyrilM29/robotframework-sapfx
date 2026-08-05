@@ -29,7 +29,7 @@ class GridKeywords:
         """Résout un ``title`` de colonne visible en son identifiant technique.
 
         La correspondance est insensible à la casse et ignore les espaces en bordure.
-        Lève une exception si aucune colonne ne correspond — l'erreur liste les
+        Lève une exception si aucune colonne ne correspond : l'erreur liste les
         titres disponibles pour faciliter le débogage des localisateurs.
         """
         grid = self._grid(table_id)
@@ -54,7 +54,7 @@ class GridKeywords:
     def set_cell_value_by_column_title(self, table_id, row_num, title, text):
         """Comme `Set Cell Value` mais adresse la colonne par son titre visible.
 
-        Le pendant en écriture de `Get Cell Value By Column Title` — évite d'avoir à
+        Le pendant en écriture de `Get Cell Value By Column Title` : évite d'avoir à
         connaître l'identifiant technique de colonne dans le test."""
         col_id = self.get_column_id_by_title(table_id, title)
         self.set_cell_value(table_id, row_num, col_id, text)
@@ -67,7 +67,7 @@ class GridKeywords:
         grande table, appeler `Read Full Grid` au préalable ou paginer. La
         comparaison est exacte par défaut ; ``ignore_case`` la rend insensible à la
         casse. Retourne ``-1`` plutôt que de lever, pour permettre un test
-        d'existence — voir `Select Row By Column Value` pour la variante qui agit."""
+        d'existence : voir `Select Row By Column Value` pour la variante qui agit."""
         grid = self._grid(table_id)
         col_id = self.get_column_id_by_title(table_id, title)
         wanted = value.lower() if ignore_case else value
@@ -94,7 +94,7 @@ class GridKeywords:
     def get_cell_value_by_row_content(self, table_id, anchor_title, anchor_value,
                                       target_title, ignore_case=False):
         """Lit la cellule ``target_title`` de la ligne repérée par son **contenu** :
-        « la ligne dont ``anchor_title`` vaut ``anchor_value`` » — l'adressage
+        « la ligne dont ``anchor_title`` vaut ``anchor_value`` », l'adressage
         ``contenu @ colonne`` (à la RoboSAPiens) appliqué à l'ALV. Aucun index de
         ligne dans le test : l'adressage survit au tri, au filtre et aux insertions.
 
@@ -167,7 +167,7 @@ class GridKeywords:
         protocoles…) : lignes de cellules texte ``[[cellule, ...], ...]``, de
         haut en bas, cellules de gauche à droite.
 
-        Ces écrans n'ont AUCUN objet grille scriptable — l'écran n'est qu'une
+        Ces écrans n'ont AUCUN objet grille scriptable : l'écran n'est qu'une
         nuée de ``GuiLabel`` : la structure est reconstruite par géométrie
         (``sapfx_common.abap_list``, via le même parcours structuré que la
         perception). Complémentaire de `Read Grid` (ALV) : plus besoin de

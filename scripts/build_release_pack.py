@@ -3,7 +3,7 @@
 Produit dans ``dist/`` un dossier de staging puis un zip autonome
 ``sapfx-pack-<version>-win.zip`` déployable sur un PC Windows sans cloner le dépôt :
 
-- ``wheels/`` — le wheel des bibliothèques (`robotframework-sapfx`, qui
+- ``wheels/`` : le wheel des bibliothèques (`robotframework-sapfx`, qui
   contient `SapEccLibrary`, `SapFioriLibrary`, `SapApiLibrary` et `sapfx_common`)
   et le wheel des plugins rf-mcp (`sap-robotmcp`), construits par
   ``pip wheel --no-deps`` ;
@@ -11,18 +11,18 @@ Produit dans ``dist/`` un dossier de staging puis un zip autonome
     les keywords métier (``resources/``), six suites d'exemple (smokes,
   exploration autonome, sentinelle de dérive, flagship écran↔API) ;
 - les scripts de maintenance (``scripts/`` : bot télémétrie→patch
-  ``healing_drift_report.py``, garde spec↔suite ``check_spec_sync.py`` — tous
+  ``healing_drift_report.py``, garde spec↔suite ``check_spec_sync.py``, tous
   deux stdlib pure, exécutables depuis la racine du pack) ;
 - les agents de test (``.claude/agents`` + ``.claude/commands`` pour Claude Code,
   ``.github/chatmodes`` généré pour VS Code/Copilot) et ``specs/`` (contrat +
-  plan d'exemple) — le cycle plan → génération → réparation de docs/test-agents.md ;
+  plan d'exemple), le cycle plan → génération → réparation de docs/test-agents.md ;
 - l'installateur (``install.cmd``/``install.ps1``), les gabarits MCP (Claude Code
   et VS Code) et les READMEs du pack, tous maintenus dans ``packaging/`` (le pack
-  lui-même est un artefact, jamais édité à la main — voir packaging/README.fr.md).
+  lui-même est un artefact, jamais édité à la main : voir packaging/README.fr.md).
 
 C'est un assembleur, pas un générateur de contenu : chaque fichier du pack existe
 tel quel dans le dépôt (ou sort du build backend standard) ; le script se limite à
-la sélection, la copie et le zip — d'où une logique pure testable hors ligne
+la sélection, la copie et le zip, d'où une logique pure testable hors ligne
 (``tests/unit/test_build_release_pack.py``, convention #5 du CLAUDE.md).
 
 Usage ::
@@ -50,7 +50,7 @@ EXCLUDED_FILE_SUFFIXES = (".pyc", ".pyo")
 # Arborescences copiées récursivement (relatif dépôt -> relatif pack).
 # Les définitions d'agents de test (planner/generator/healer) partent telles
 # quelles : .claude/ est lu par Claude Code, .github/chatmodes/ par VS Code /
-# Copilot (cibles GÉNÉRÉES depuis .claude/agents/ — regen_agent_definitions.py).
+# Copilot (cibles GÉNÉRÉES depuis .claude/agents/ : regen_agent_definitions.py).
 PACK_TREES = [
     ("resources", "resources"),
     ("tools/recorder", "tools/recorder"),
@@ -77,7 +77,7 @@ PACK_FILES = [
     ("tests/robot/fixtures/wc_fixture.html",
      "tests/robot/fixtures/wc_fixture.html"),
     # Suite d'exploration AUTONOME (aucune dépendance à resources/) : l'exemple
-    # « données réelles » du pack — inventaire dynamique + vérification SE16.
+    # « données réelles » du pack : inventaire dynamique + vérification SE16.
     ("tests/robot/business_data_exploration.robot",
      "tests/robot/business_data_exploration.robot"),
     # Sentinelle de dérive : surveillance d'écrans sans tests scriptés (les
@@ -103,7 +103,7 @@ PACK_FILES = [
     ("packaging/requirements-deploy.txt", "requirements-deploy.txt"),
     ("packaging/constraints-deploy.txt", "constraints-deploy.txt"),
     # Plans de test des agents : le contrat du répertoire + l'exemple de
-    # référence seulement — les plans locaux de l'équipe restent dans le dépôt.
+    # référence seulement ; les plans locaux de l'équipe restent dans le dépôt.
     ("specs/README.md", "specs/README.md"),
     ("specs/sflight-consultation-se16.md", "specs/sflight-consultation-se16.md"),
 ]
@@ -192,7 +192,7 @@ def assemble(root, stage_dir):
 
     Les lanceurs batch (``.cmd``) sont normalisés en CRLF : cmd.exe exige des
     fins de ligne Windows (un ``install.cmd`` en LF pur crache des
-    « 'M' n'est pas reconnu… » au double-clic — vécu sur le pack 0.6.2), et le
+    « 'M' n'est pas reconnu… » au double-clic, vécu sur le pack 0.6.2), et le
     checkout git du dépôt est en LF (``.gitattributes``).
     """
     for src, dest_rel in build_manifest(root):

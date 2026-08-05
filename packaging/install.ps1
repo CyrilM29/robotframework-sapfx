@@ -79,7 +79,7 @@ if ($WithBrowsers) {
 # --- 4. Rendre les configs MCP ---------------------------------------------------
 if ($WithMcp) {
     Write-Host "[4/5] Génération des configs MCP (.mcp.json, .vscode\mcp.json)"
-    # Lanceur : la surcouche sapfx-mcp (rf-mcp inchangé + outils sapfx_* —
+    # Lanceur : la surcouche sapfx-mcp (rf-mcp inchangé + outils sapfx_* :
     # état par providers, canal image, hot-reload) ; repli robotmcp.exe si un
     # wheel sap-robotmcp antérieur à 0.6.2 est installé.
     $RobotMcpExe = (Join-Path $VenvDir "Scripts\sapfx-mcp.exe")

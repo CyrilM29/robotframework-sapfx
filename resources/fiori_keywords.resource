@@ -17,23 +17,23 @@ Documentation       Mots-clés web Fiori / S/4HANA lisibles métier.
 ...                 | Save And Expect Success  | Save And Expect Success                 |
 ...                 | Close SAP                | Close SAP (→ Close Fiori)               |
 ...                 Divergence assumée : `Go To Transaction` (code transaction) n'a pas
-...                 d'équivalent nominal web — on ouvre une *application* (`Open App`).
+...                 d'équivalent nominal web : on ouvre une *application* (`Open App`).
 ...
 ...                 La resource couvre aussi le **WebGUI classique** (SAP GUI for HTML
-...                 via ITS — moteur `sid`, ids relevés live sur A4H 2026-07-18) :
+...                 via ITS : moteur `sid`, ids relevés live sur A4H 2026-07-18) :
 ...                 `Open WebGui` / `Log In To WebGui` (login ITS au moteur dom),
 ...                 `Go To WebGui Transaction` (l'équivalent WebGUI de
 ...                 `Go To Transaction`, par URL `~transaction`),
 ...                 `Count WebGui Table Entries` (miroir du `Count Table Entries`
 ...                 ECC), `Log Off WebGui` / `Close WebGui` (miroir de `Close SAP`).
 ...                 Sur WebGUI, un SID = l'id de scripting SAP GUI desktop
-...                 (`wnd[0]/usr/...`) — le même espace d'ids que
+...                 (`wnd[0]/usr/...`), le même espace d'ids que
 ...                 `ecc_keywords.resource`.
 
 Library             Browser
 # Import sans argument (défaut ui5_timeout=15s) : une suite qui veut un autre
 # budget appelle `Set Ui5 Timeout` (0.6.1) au lieu de ré-importer la lib avec
-# d'autres arguments — Robot ignorerait le second import avec un warning.
+# d'autres arguments : Robot ignorerait le second import avec un warning.
 Library             SapFioriLibrary
 
 
@@ -44,17 +44,17 @@ ${HEADLESS}             ${False}
 ${FIORI_USER}           ${EMPTY}
 ${FIORI_PASSWORD}       ${EMPTY}
 
-# --- WebGUI (SAP GUI for HTML via ITS) — SIDs et sélecteurs stables, relevés live sur A4H (2026-07-18)
-${WEBGUI_URL}                       ${EMPTY}    # URL du service ICF webgui — fournie par la suite ou -v
+# --- WebGUI (SAP GUI for HTML via ITS) : SIDs et sélecteurs stables, relevés live sur A4H (2026-07-18)
+${WEBGUI_URL}                       ${EMPTY}    # URL du service ICF webgui : fournie par la suite ou -v
 ${WEBGUI_TIMEOUT}                   45s    # le défaut Browser (10 s) a fait échouer le premier New Page live
-${WEBGUI_OKCODE_SID}                wnd[0]/tbar[0]/okcd    # champ transaction — masqué par défaut (présence, pas visibilité)
+${WEBGUI_OKCODE_SID}                wnd[0]/tbar[0]/okcd    # champ transaction : masqué par défaut (présence, pas visibilité)
 ${WEBGUI_TABLE_NAME_SID}            wnd[0]/usr/ctxtDATABROWSE-TABLENAME    # SE16 : nom de table
 ${WEBGUI_TABLE_CONTENTS_SID}        wnd[0]/tbar[1]/btn[7]    # SE16 initial : « Table Contents (F7) »
 ${WEBGUI_COUNT_BUTTON_SID}          wnd[0]/tbar[1]/btn[31]    # écran de sélection : « Number of Entries »
-${WEBGUI_COUNT_RESULT_SID}          wnd[1]/usr/txtG_DBCOUNT    # compteur du popup — SPAN texte, pas un input
+${WEBGUI_COUNT_RESULT_SID}          wnd[1]/usr/txtG_DBCOUNT    # compteur du popup : SPAN texte, pas un input
 ${WEBGUI_POPUP_CLOSE_SID}           wnd[1]/tbar[0]/btn[0]    # popup : « Close (Enter) »
 ${WEBGUI_POPUP_CONFIRM_SID}         wnd[1]/usr/btnSPOP-OPTION1    # popup SPOP : « Yes »
-${WEBGUI_MORE_BUTTON_SELECTOR}      css=[id$="-moreButton"] >> visible=true    # bandeau : bouton « More » (id u… dynamique par écran — jamais en dur)
+${WEBGUI_MORE_BUTTON_SELECTOR}      css=[id$="-moreButton"] >> visible=true    # bandeau : bouton « More » (id u… dynamique par écran, jamais en dur)
 ${WEBGUI_SYSINFO_DYNPRO_SELECTOR}    css=[id="sysInfoAreaMenuItemSAPITS_MBAR_DYNPRO"]    # zone info système : ligne dynpro (id stable)
 
 
@@ -82,11 +82,11 @@ Log In To Fiori
 Wait For UI5 Ready
     [Documentation]    Bloque jusqu'à ce que le moteur SAPUI5 soit *inactif*, pas
     ...                seulement chargé. Équivalent UI5 du mot-clé ECC `Wait Until Busy Done` :
-    ...                exige (1) le runtime présent — Core hérité **ou** module Element
+    ...                exige (1) le runtime présent : Core hérité **ou** module Element
     ...                (UI5 2.x supprime `sap.ui.getCore()`), (2) aucune mise à jour d'UI
     ...                en attente (`getUIDirty`, quand le Core l'expose), et (3) aucun
     ...                indicateur d'occupation visible (BusyIndicator local/global,
-    ...                BusyDialog) — proxy fiable d'une requête OData/XHR en vol. Bien
+    ...                BusyDialog), proxy fiable d'une requête OData/XHR en vol. Bien
     ...                plus fort que le simple test « `sap.ui.require` existe », qui
     ...                passait avant le rendu.
     Wait For Function    () => { const s = window.sap; if (!(s && s.ui)) return false; let E = null; try { E = s.ui.require && s.ui.require('sap/ui/core/Element'); } catch (e) {} const c = s.ui.getCore ? s.ui.getCore() : null; if (!c && !E) return false; if (c && typeof c.getUIDirty === 'function' && c.getUIDirty()) return false; const b = document.querySelectorAll('.sapUiLocalBusyIndicator, .sapMBusyDialog, #sapUiBusyIndicator'); for (let i = 0; i < b.length; i++) { if (b[i].offsetParent !== null) return false; } return true; }
@@ -105,7 +105,7 @@ Open App By Intent
     ...                paramètres nommés en query), puis attend que
     ...                l'application soit rendue et inactive. La voie STABLE :
     ...                le hash d'intent survit aux réorganisations de
-    ...                catalogue, au thème et à la langue — là où `Open App`
+    ...                catalogue, au thème et à la langue, là où `Open App`
     ...                (clic de tuile par titre) reste la voie « comme
     ...                l'utilisateur ». Exemple ::
     ...
@@ -116,7 +116,7 @@ Open App By Intent
 
 Save And Expect Success
     [Documentation]    Déclenche l'action Enregistrer et vérifie l'apparition d'un
-    ...                MessageToast — preuve d'un retour positif — **sans** dépendre du
+    ...                MessageToast (preuve d'un retour positif) **sans** dépendre du
     ...                texte localisé du message (convention : on vérifie le *type* de
     ...                feedback, pas son libellé ; le côté ECC vérifie le type `S`, pas
     ...                le texte). Le MessageToast n'est pas un contrôle UI5 enregistré
@@ -135,7 +135,7 @@ Ui5 Dialog Should Be Visible
 Confirm Ui5 Dialog
     [Documentation]    Clique le bouton ``${button}`` d'une boîte de dialogue UI5 ouverte
     ...                (``sap.m.Dialog`` / MessageBox). On cible le bouton par son libellé
-    ...                — fourni en argument, jamais codé en dur dans un mot-clé métier —
+    ...                (fourni en argument, jamais codé en dur dans un mot-clé métier)
     ...                à l'intérieur du Dialog, ce qui reste une adresse de contrôle UI5.
     [Arguments]    ${button}=OK
     Click Ui5 By Xpath    //Dialog//Button[@text='${button}']
@@ -152,9 +152,9 @@ Close Fiori
     [Documentation]    Ferme le navigateur. Prévu pour Suite Teardown.
     Close Browser
 
-# --- WebGUI classique (SAP GUI for HTML via ITS) — moteur sid -----------------
+# --- WebGUI classique (SAP GUI for HTML via ITS) : moteur sid -----------------
 # La page de login ITS n'est ni UI5 ni WebGUI : on la pilote au moteur dom
-# (rôle ARIA + nom accessible). Ensuite, tout s'adresse par SID — le même espace
+# (rôle ARIA + nom accessible). Ensuite, tout s'adresse par SID : le même espace
 # d'ids que le scripting SAP GUI desktop. Chaque action déclenche un
 # aller-retour serveur qui RE-REND le DOM : on sonde toujours jusqu'au rendu
 # (Wait For Function / keywords sid), jamais de Sleep.
@@ -171,13 +171,13 @@ Open WebGui
     New Page    ${url}    wait_until=domcontentloaded
     ${comp}=    Get Page Composition
     Should Contain    ${comp}[engines]    sid
-    ...    msg=La page ${url} n'expose aucun élément WebGUI (lsdata) — pas une cible du moteur sid
+    ...    msg=La page ${url} n'expose aucun élément WebGUI (lsdata) : pas une cible du moteur sid
     Should Contain    ${comp}[engines]    dom
-    ...    msg=Moteur dom non recommandé sur ${url} — page de login ITS inattendue
+    ...    msg=Moteur dom non recommandé sur ${url} : page de login ITS inattendue
 
 Log In To WebGui
     [Documentation]    S'authentifie sur la page de login ITS par le moteur dom
-    ...                (rôle + nom accessible — la page de login n'est pas du WebGUI).
+    ...                (rôle + nom accessible, la page de login n'est pas du WebGUI).
     ...                Mot de passe : chaîne ou type `Secret` RF 7.4, jamais journalisé.
     ...                Garde post-login : au moins un élément WebGUI (lsdata) rendu.
     [Arguments]    ${user}    ${password}
@@ -191,7 +191,7 @@ Log In To WebGui
 
 WebGui Should Be Rendered
     [Documentation]    Sonde jusqu'au rendu d'au moins un élément WebGUI (attribut
-    ...                `lsdata`) — le pendant WebGUI de `Wait Until Busy Done` / `Wait
+    ...                `lsdata`), le pendant WebGUI de `Wait Until Busy Done` / `Wait
     ...                For UI5 Ready` après une navigation ou un aller-retour serveur.
     Wait For Function    () => document.querySelectorAll('[lsdata]').length > 0
     ...    timeout=${WEBGUI_TIMEOUT}
@@ -202,17 +202,17 @@ WebGui Ok Code Field Should Be Present
     ...                par défaut et le réglage « Show OK Code field » n'est pas
     ...                persistant côté serveur (relevé live A4H). Attente d'état
     ...                `attached` (sondée) : la toolbar est rendue APRÈS les premiers
-    ...                éléments lsdata — un comptage instantané part trop tôt.
+    ...                éléments lsdata : un comptage instantané part trop tôt.
     ${sel}=    Resolve Sid    ${WEBGUI_OKCODE_SID}
     Wait For Elements State    ${sel}    attached    timeout=${WEBGUI_TIMEOUT}
-    ...    message=Champ OK-code introuvable par SID — session WebGUI non connectée ?
+    ...    message=Champ OK-code introuvable par SID : session WebGUI non connectée ?
 
 Go To WebGui Transaction
     [Documentation]    Navigue vers une transaction par le paramètre d'URL
-    ...                `~transaction` — la voie déterministe (le champ OK-code est
-    ...                masqué par défaut) — puis attend le rendu WebGUI. NB : chaque
+    ...                `~transaction`, la voie déterministe (le champ OK-code est
+    ...                masqué par défaut), puis attend le rendu WebGUI. NB : chaque
     ...                navigation `~transaction` ouvre une nouvelle session GUI
-    ...                serveur (l'ancienne expire) — toujours terminer par
+    ...                serveur (l'ancienne expire) : toujours terminer par
     ...                `Log Off WebGui`.
     [Arguments]    ${tcode}    ${url}=${WEBGUI_URL}
     Go To    ${url}&~transaction=${tcode}    wait_until=domcontentloaded
@@ -221,7 +221,7 @@ Go To WebGui Transaction
 WebGui Dynpro Should Contain
     [Documentation]    Vérifie que la ligne « dynpro » de la zone info système du
     ...                bandeau WebGUI contient le fragment donné (id technique
-    ...                programme/écran, ex. `SAPLSETB` — jamais un libellé localisé).
+    ...                programme/écran, ex. `SAPLSETB`, jamais un libellé localisé).
     ...                L'équivalent WebGUI de `Get Screen Signature` pour asserter
     ...                « je suis sur le bon écran ».
     [Arguments]    ${fragment}
@@ -238,8 +238,8 @@ WebGui Data Browser Should Be Open
 
 Read WebGui Popup Count
     [Documentation]    Lit le compteur du popup SE16 « Number of Entries »
-    ...                (`txtG_DBCOUNT` — rendu SPAN texte sur WebGUI, pas un input) et
-    ...                le normalise en entier (chiffres seuls — les séparateurs de
+    ...                (`txtG_DBCOUNT`, rendu SPAN texte sur WebGUI, pas un input) et
+    ...                le normalise en entier (chiffres seuls, les séparateurs de
     ...                milliers varient par locale). Miroir WebGUI du pattern
     ...                « Number of Entries » d'`ecc_keywords.resource`.
     Sid Should Be Visible    ${WEBGUI_COUNT_RESULT_SID}
@@ -268,7 +268,7 @@ No WebGui Popup Should Be Visible
 Count WebGui Table Entries
     [Documentation]    Depuis l'écran initial du Data Browser (SE16), compte les
     ...                entrées de `${table}` via « Table Contents » puis « Number of
-    ...                Entries » — tout au moteur sid — et referme le popup. Retourne
+    ...                Entries » (tout au moteur sid) et referme le popup. Retourne
     ...                l'entier. Miroir WebGUI du `Count Table Entries` ECC ;
     ...                consultation pure (jamais `btn[5]` « Create Entries »).
     [Arguments]    ${table}
@@ -282,7 +282,7 @@ Count WebGui Table Entries
 
 Log Off WebGui
     [Documentation]    Déconnexion propre : bouton « More » du bandeau, menu System
-    ...                repéré par POSITION RELATIVE (avant-dernier — la barre de menus
+    ...                repéré par POSITION RELATIVE (avant-dernier : la barre de menus
     ...                varie par transaction), dernier item (Log Off), confirmation
     ...                SPOP, puis assertion 100 % locale-indépendante de fin de
     ...                session : plus AUCUN élément `lsdata`.
@@ -312,7 +312,7 @@ Log Off WebGui
 Close WebGui
     [Documentation]    Ferme le navigateur, après un log off best-effort si une
     ...                session WebGUI est encore rendue (ne jamais accumuler de
-    ...                sessions GUI serveur). Prévu pour Suite Teardown — miroir
+    ...                sessions GUI serveur). Prévu pour Suite Teardown, miroir
     ...                WebGUI de `Close SAP`.
     ${status}    ${still}=    Run Keyword And Ignore Error
     ...    Evaluate JavaScript    ${None}    () => document.querySelectorAll('[lsdata]').length

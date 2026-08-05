@@ -10,7 +10,7 @@ Library             SapEccLibrary    screenshots_on_error=${True}    default_tim
 
 
 *** Variables ***
-${SAP_CONNECTION}       ${EMPTY}    # ex. "MY S/4HANA SYSTEM [Group]" — à définir par environnement
+${SAP_CONNECTION}       ${EMPTY}    # ex. "MY S/4HANA SYSTEM [Group]" : à définir par environnement
 ${SAP_USER}             ${EMPTY}
 ${SAP_PASSWORD}         ${EMPTY}
 ${SAP_CLIENT}           ${EMPTY}
@@ -24,17 +24,17 @@ ${SE16_SETTINGS_USER_PARAMS_MENU}    wnd[0]/mbar/menu[3]/menu[0]    # Settings >
 ${SE16_ALV_GRID_RADIO}  wnd[1]/usr/tabsG_TABSTRIP/tabp0400/ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/radRSEUMOD-TBALV_GRID
 ${SE38_PROGRAM_FIELD}   wnd[0]/usr/ctxtRS38M-PROGRAMM
 # Écran de sélection SE16 (généré par table ; ids relevés live sur A4H, GUI 8.00).
-${SE16_MAX_HITS_FIELD}      wnd[0]/usr/txtMAX_SEL              # « Maximum No. of Hits » — présent sur tout écran de sélection SE16
-${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]             # « Number of Entries » — compte sans ouvrir la grille (fiable même table vide)
+${SE16_MAX_HITS_FIELD}      wnd[0]/usr/txtMAX_SEL              # « Maximum No. of Hits » : présent sur tout écran de sélection SE16
+${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]             # « Number of Entries » : compte sans ouvrir la grille (fiable même table vide)
 ${SE16_COUNT_RESULT}        wnd[1]/usr/txtG_DBCOUNT            # compteur du popup « Number of Entries »
-# Champs de sélection positionnels (I<n> suit l'ordre des champs de la table — stable par version).
+# Champs de sélection positionnels (I<n> suit l'ordre des champs de la table, stable par version).
 ${DD07L_DOMNAME_FIELD}      wnd[0]/usr/ctxtI1-LOW              # DD07L : DOMNAME est le 1er champ
 ${TADIR_OBJECT_FIELD}       wnd[0]/usr/ctxtI2-LOW              # TADIR : OBJECT (TABL, VIEW…)
 ${TADIR_OBJ_NAME_FIELD}     wnd[0]/usr/txtI3-LOW               # TADIR : OBJ_NAME (champ txt, pas ctxt)
 ${TADIR_DEVCLASS_FIELD}     wnd[0]/usr/ctxtI8-LOW              # TADIR : DEVCLASS (package)
 # Dictionnaires de critères par table pour `Display Table Contents With Filter` :
 # id technique du champ -> localisateur positionnel de l'écran de sélection SE16
-# (relevés live sur A4H, GUI 8.00 — spec specs/scarr-spfli-liaisons-se16.md).
+# (relevés live sur A4H, GUI 8.00 ; spec specs/scarr-spfli-liaisons-se16.md).
 # Le type d'élément varie par champ (ctxt vs txt) : re-sonder avec
 # `Get Screen Signature` avant d'ajouter le dictionnaire d'une nouvelle table.
 &{SCARR_SELECTION_FIELDS}    CARRID=wnd[0]/usr/ctxtI1-LOW    CARRNAME=wnd[0]/usr/txtI2-LOW
@@ -129,7 +129,7 @@ Cancel Popup
 
 Click Popup Button
     [Documentation]    Clique le bouton de barre d'outils ``${button_index}`` de la
-    ...                fenêtre modale (``wnd[1]/tbar[0]/btn[N]``) — utile quand le bouton
+    ...                fenêtre modale (``wnd[1]/tbar[0]/btn[N]``) : utile quand le bouton
     ...                voulu n'est ni le défaut (Entrée) ni Annuler (F12). Lève si aucun
     ...                popup n'est ouvert.
     [Arguments]    ${button_index}=0
@@ -152,7 +152,7 @@ Save And Expect Success
 Use ALV Grid In Data Browser
     [Documentation]    Bascule la sortie du Data Browser (SE16) de l'utilisateur
     ...                courant en **grille ALV** (Settings → User Parameters →
-    ...                ALV Grid Display). Persistant par utilisateur et idempotent —
+    ...                ALV Grid Display). Persistant par utilisateur et idempotent,
     ...                indispensable avant `Display Table Contents` : la « Standard
     ...                SE16 list » (défaut) est une liste ABAP classique sans objet
     ...                grille scriptable.
@@ -168,7 +168,7 @@ Display Table Contents
     [Documentation]    Ouvre la table ``${table}`` dans le Data Browser (SE16) et
     ...                exécute la sélection ; échoue si la grille de résultats
     ...                n'apparaît pas dans ``${timeout}`` (table vide ou inconnue).
-    ...                Suppose la sortie SE16 en grille ALV — voir
+    ...                Suppose la sortie SE16 en grille ALV : voir
     ...                `Use ALV Grid In Data Browser` (à appeler une fois en setup).
     [Arguments]    ${table}    ${timeout}=30s
     Go To Transaction    SE16
@@ -194,7 +194,7 @@ Display Table Contents With Filter
     ...                cette resource (convention 1) : dictionnaire
     ...                ``<TABLE>_SELECTION_FIELDS`` par table, à compléter ici
     ...                pour toute nouvelle table filtrée. Échoue si la grille
-    ...                n'apparaît pas dans ``${timeout}`` — notamment quand aucune
+    ...                n'apparaît pas dans ``${timeout}``, notamment quand aucune
     ...                ligne ne répond au filtre (pour un compte fiable, filtre
     ...                vide compris, préférer `Count Entries On Current Selection
     ...                Screen`). Sans critère, équivaut à `Display Table Contents`.
@@ -208,7 +208,7 @@ Display Table Contents With Filter
     FOR    ${field}    ${value}    IN    &{filters}
         ${locator}=    Evaluate    $map.get($field.upper())
         IF    $locator is None
-            Fail    Table '${table}' has no selection criterion '${field}' — known criteria: ${{ sorted($map) }}
+            Fail    Table '${table}' has no selection criterion '${field}'; known criteria: ${{ sorted($map) }}
         END
         Input Text    ${locator}    ${value}
     END
@@ -220,14 +220,14 @@ Displayed Grid Should Contain Columns
     [Documentation]    Vérifie que la grille SE16 courante (après `Display Table
     ...                Contents` / `Display Table Contents With Filter`) expose
     ...                chacune des colonnes données par son **id technique**
-    ...                (``CARRID``…), lu dans l'ordre des colonnes de la grille —
+    ...                (``CARRID``…), lu dans l'ordre des colonnes de la grille,
     ...                jamais les titres affichés, dépendants de la locale
     ...                (convention 3). L'échec liste les colonnes disponibles.
     [Arguments]    @{columns}
     ${ids}=    Get Grid Column Ids    ${SE16_GRID}
     FOR    ${column}    IN    @{columns}
         Should Contain    ${ids}    ${column}    values=False
-        ...    msg=Displayed grid has no technical column '${column}' — available: ${ids}
+        ...    msg=Displayed grid has no technical column '${column}'; available: ${ids}
     END
 
 Read Column Values From Displayed Grid
@@ -253,14 +253,14 @@ Read Column Values From Displayed Grid
 Try Open Table Selection Screen
     [Documentation]    Ouvre SE16 sur ``${table}`` et tente d'atteindre l'écran de
     ...                sélection. Retourne ``True`` si l'écran s'ouvre, ``False`` si
-    ...                SE16 rejette le nom — message de statut de type ``E``
+    ...                SE16 rejette le nom : message de statut de type ``E``
     ...                (structure, include ou table inconnue) ; l'assertion porte sur
     ...                le *type*, jamais sur le texte localisé. Gère le dialogue
     ...                « choix des champs de sélection » des tables larges
     ...                (> 40 champs) : la première case est repérée dynamiquement
     ...                via `Get Screen Signature` (sa position dépend de la table).
     ...                Referme d'abord toute modale résiduelle d'une sonde
-    ...                précédente — le keyword reste sûr en balayage de masse.
+    ...                précédente : le keyword reste sûr en balayage de masse.
     [Arguments]    ${table}
     Cancel Popup
     Go To Transaction    SE16
@@ -282,7 +282,7 @@ Try Open Table Selection Screen
 
 Open Table Selection Screen
     [Documentation]    Comme `Try Open Table Selection Screen` mais échoue si SE16
-    ...                rejette le nom — pour les tests qui exigent une table consultable.
+    ...                rejette le nom, pour les tests qui exigent une table consultable.
     [Arguments]    ${table}
     ${ok}=    Try Open Table Selection Screen    ${table}
     IF    not ${ok}
@@ -294,7 +294,7 @@ Count Entries On Current Selection Screen
     [Documentation]    Suppose un écran de sélection SE16 déjà ouvert : clique
     ...                « Number of Entries », lit le compteur du popup puis le
     ...                referme (F12). Compte **toutes** les entrées répondant aux
-    ...                critères saisis — indépendant de « Maximum No. of Hits » et
+    ...                critères saisis : indépendant de « Maximum No. of Hits » et
     ...                fiable sur table vide (retourne 0), contrairement à
     ...                l'exécution F8 qui reste sur l'écran de sélection.
     Click Element    ${SE16_COUNT_BUTTON}
@@ -325,7 +325,7 @@ Count Flight Connections For Airline
     [Documentation]    Compte les liaisons de vol (table ``SPFLI``) de la compagnie
     ...                ``${carrid}`` : écran de sélection SE16, critère ``CARRID``
     ...                (localisateur posé dans ``SPFLI_SELECTION_FIELDS``), puis
-    ...                « Number of Entries ». Retourne un entier — 0 sans erreur
+    ...                « Number of Entries ». Retourne un entier : 0 sans erreur
     ...                pour une compagnie sans liaison ou inconnue ; l'écran de
     ...                sélection reste utilisable après l'appel (le popup de
     ...                comptage est refermé par F12).
@@ -337,7 +337,7 @@ Count Flight Connections For Airline
 
 Read Domain Values
     [Documentation]    Lit les valeurs autorisées d'un domaine du dictionnaire
-    ...                (table ``DD07L``) et les retourne triées — p.ex. ``CONTFLAG``
+    ...                (table ``DD07L``) et les retourne triées, p.ex. ``CONTFLAG``
     ...                (classes de livraison) ou ``TABCLASS`` (classes techniques).
     ...                Échoue si le domaine n'a aucune valeur (la grille n'apparaît pas).
     [Arguments]    ${domain}    ${max_hits}=200
@@ -356,7 +356,7 @@ List Repository Tables
     ...                ``R3TR TABL`` filtrés par package (``DEVCLASS``) et/ou motif
     ...                de nom (joker ``*``). Retourne une liste triée, vide si aucun
     ...                objet ne répond. NB : TADIR ne distingue pas tables
-    ...                transparentes et structures — combiner avec
+    ...                transparentes et structures : combiner avec
     ...                `Try Open Table Selection Screen` pour écarter ces dernières.
     ...
     ...                Lève si le nombre de lignes lues atteint exactement ``max_hits``
@@ -383,7 +383,7 @@ List Repository Tables
     ${rows}=    Read Full Grid    ${SE16_GRID}    max_rows=${max_hits}
     IF    len($rows) == int($max_hits) and not ${allow_truncation}
         Fail    List Repository Tables read exactly max_hits=${max_hits} rows for
-        ...    package='${package}' name_pattern='${name_pattern}' — likely truncated.
+        ...    package='${package}' name_pattern='${name_pattern}': likely truncated.
         ...    Increase max_hits, or pass allow_truncation=True to accept a
         ...    possibly-incomplete inventory.
     END

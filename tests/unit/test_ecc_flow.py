@@ -1,9 +1,9 @@
 """Tests end-to-end « hors SAP » du flux ECC, sur une session COM simulée.
 
-Ils exercent le vrai enchaînement de keywords de SapEccLibrary — saisie, exécution
+Ils exercent le vrai enchaînement de keywords de SapEccLibrary : saisie, exécution
 de transaction avec détection robuste *indépendante de la langue* (comparaison de
 ``session.Info.Transaction``, validée en live sur ABAP Platform A4H), et assertions
-sur la barre de statut — sans serveur SAP ni COM Windows.
+sur la barre de statut, sans serveur SAP ni COM Windows.
 """
 import pytest
 
@@ -61,7 +61,7 @@ def make_lib(status_type="S", status_text="Données sauvegardées",
     """Construit une instance SapEccLibrary branchée sur une session simulée.
 
     ``current_tx`` est la transaction que ``session.Info.Transaction`` renverra
-    *après* l'exécution — pour simuler un succès (== tcode demandé) ou un échec
+    *après* l'exécution, pour simuler un succès (== tcode demandé) ou un échec
     (transaction inexistante : reste sur SESSION_MANAGER)."""
     window = FakeWindow()
     objects = {
@@ -128,7 +128,7 @@ def test_run_transaction_namespace_tcode_recoit_bien_le_prefixe_n():
 
 def test_run_transaction_prefixe_n_explicite_sur_tcode_namespace():
     # Un préfixe de navigation explicite + tcode de namespace doit aussi se
-    # comparer correctement. NB : ce fake simule un retour SANS le '/' initial —
+    # comparer correctement. NB : ce fake simule un retour SANS le '/' initial,
     # une tolérance ; la forme constatée live est AVEC (test suivant).
     lib, _, objects = make_lib(current_tx="BEV1/RCA01")
     lib.run_transaction("/n/BEV1/RCA01")
@@ -137,7 +137,7 @@ def test_run_transaction_prefixe_n_explicite_sur_tcode_namespace():
 
 def test_run_transaction_namespace_quand_api_renvoie_le_slash_initial():
     # Forme VÉRIFIÉE LIVE (A4H, SAP GUI 8.00, 2026-07-21) : ``Info.Transaction``
-    # rend le tcode de namespace AVEC son '/' initial (forme sy-tcode —
+    # rend le tcode de namespace AVEC son '/' initial (forme sy-tcode,
     # '/IWFND/MAINT_SERVICE' observé). La comparaison normalise les deux côtés
     # au lieu de parier sur une seule forme de l'API.
     lib, _, objects = make_lib(current_tx="/BEV1/RCA01")
@@ -156,7 +156,7 @@ def test_run_transaction_namespace_commencant_par_i_recoit_le_prefixe_n():
 
 
 def test_run_transaction_prefixe_explicite_sur_namespace_commencant_par_i():
-    # '/n/IWFND/...' : préfixe réel suivi d'un namespace en I — envoyé tel quel,
+    # '/n/IWFND/...' : préfixe réel suivi d'un namespace en I, envoyé tel quel,
     # et la comparaison retire le préfixe PUIS les '/' de tête des deux côtés.
     lib, _, objects = make_lib(current_tx="IWFND/MAINT_SERVICE")
     lib.run_transaction("/n/IWFND/MAINT_SERVICE")

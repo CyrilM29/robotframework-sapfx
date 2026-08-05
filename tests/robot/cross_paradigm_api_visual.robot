@@ -1,18 +1,18 @@
 *** Settings ***
-Documentation       Test cross-canal **API ↔ GUI + assertion visuelle** — le 3ᵉ volet, après
+Documentation       Test cross-canal **API ↔ GUI + assertion visuelle** : le 3ᵉ volet, après
 ...                 les campagnes ECC (SAP GUI) et Fiori (web). Un même fait métier (le
 ...                 nombre de produits EPM) est vérifié par TROIS canaux indépendants du
 ...                 MÊME système A4H :
 ...
-...                 * **API** — le service OData Gateway embarqué ``SEPMRA_SHOP`` : ``$count``
+...                 * **API** : le service OData Gateway embarqué ``SEPMRA_SHOP``, ``$count``
 ...                   de l'entity set ``Products`` et lecture d'entités (``SapApiLibrary``,
-...                   stdlib pure, HTTP — aucune dépendance nouvelle).
-...                 * **GUI** — la table sous-jacente ``SNWD_PD`` comptée par SE16
+...                   stdlib pure, HTTP, aucune dépendance nouvelle).
+...                 * **GUI** : la table sous-jacente ``SNWD_PD`` comptée par SE16
 ...                   (« Number of Entries », ``SapEccLibrary``).
-...                 * **VISUEL** — l'écran SE16 qui produit ce compte est comparé, par
+...                 * **VISUEL** : l'écran SE16 qui produit ce compte est comparé, par
 ...                   **empreinte perceptuelle** (dHash), à une baseline committée
 ...                   (``Screen Should Match Baseline``) : le canal *pixels* atteste que le
-...                   rendu de l'écran n'a pas dérivé — ce que ni l'API ni l'API Scripting ne
+...                   rendu de l'écran n'a pas dérivé, ce que ni l'API ni l'API Scripting ne
 ...                   voient.
 ...
 ...                 C'est le patron recommandé du projet : recouper la donnée par l'API,
@@ -24,7 +24,7 @@ Documentation       Test cross-canal **API ↔ GUI + assertion visuelle** — le
 ...
 ...                 Le canal visuel exige l'extra ``visual`` (Pillow). La baseline est créée
 ...                 au 1er passage (WARNING) puis committée ; ``.gitignore`` exclut ``*.png``
-...                 — ajouter ``tests/robot/visual_baselines/*.png`` à sa liste d'exceptions
+...                 : ajouter ``tests/robot/visual_baselines/*.png`` à sa liste d'exceptions
 ...                 pour committer la référence.
 ...
 ...                 Exécution (`Secret` RF 7.4 : le mot de passe typé dès la ligne de
@@ -57,7 +57,7 @@ ${EPM_PRODUCTS_TABLE}    SNWD_PD                                   # la table qu
 
 # --- Localisateurs SAP GUI (jamais dans les cas de test) ------------------------
 ${SE16_TABLE_FIELD}     wnd[0]/usr/ctxtDATABROWSE-TABLENAME
-${SE16_COUNT_BUTTON}    wnd[0]/tbar[1]/btn[31]     # « Number of Entries » — fiable même à 0
+${SE16_COUNT_BUTTON}    wnd[0]/tbar[1]/btn[31]     # « Number of Entries » : fiable même à 0
 ${SE16_COUNT_POPUP}     wnd[1]/usr/txtG_DBCOUNT
 ${MULTI_LOGON_RADIO}    wnd[1]/usr/radMULTI_LOGON_OPT1
 
@@ -77,7 +77,7 @@ Product Count Agrees Across API And GUI Channels
     [Tags]    api    gui    cross
     ${gui_count}=    Count Table Entries    ${EPM_PRODUCTS_TABLE}
     Should Be True    ${gui_count} > 0
-    ...    msg=Table ${EPM_PRODUCTS_TABLE} vide — données EPM absentes sur ce système ?
+    ...    msg=Table ${EPM_PRODUCTS_TABLE} vide : données EPM absentes sur ce système ?
     ${api_count}=    Get Odata Count    ${EPM_PRODUCTS_PATH}    alias=a4h
     Should Be Equal As Integers    ${api_count}    ${gui_count}
     ...    msg=OData $count (${api_count}) ≠ SE16 ${EPM_PRODUCTS_TABLE} (${gui_count}).
@@ -85,7 +85,7 @@ Product Count Agrees Across API And GUI Channels
 
 OData Products Expose Their Key Fields
     [Documentation]    Profondeur API : au-delà du compte, on lit quelques entités et on
-    ...                vérifie que chacune porte ses champs clés — noms de propriétés
+    ...                vérifie que chacune porte ses champs clés : noms de propriétés
     ...                techniques, donc indépendants de la langue (``Id``, ``Name``,
     ...                ``Price``). Le service n'est pas qu'un compteur : il projette des données.
     [Tags]    api
@@ -96,7 +96,7 @@ OData Products Expose Their Key Fields
         Dictionary Should Contain Key    ${product}    Name
         Dictionary Should Contain Key    ${product}    Price
     END
-    Log    ${products}[0][Id] — ${products}[0][Name] — ${products}[0][Price] ${products}[0][CurrencyCode]
+    Log    ${products}[0][Id], ${products}[0][Name], ${products}[0][Price] ${products}[0][CurrencyCode]
 
 SE16 Product Screen Matches Its Visual Baseline
     [Documentation]    Assertion **visuelle** : l'écran SE16 qui a servi au comptage GUI est
@@ -170,7 +170,7 @@ Start Transaction
 
 Open Table In SE16
     [Documentation]    Ouvre SE16 sur ``${table}`` et atteint son écran de sélection (par
-    ...                navigation fraîche — reproductible au pixel près, ce qui rend l'écran
+    ...                navigation fraîche, reproductible au pixel près, ce qui rend l'écran
     ...                baselinable). Échoue si SE16 rejette le nom (message de type ``E``).
     [Arguments]    ${table}
     Start Transaction    SE16

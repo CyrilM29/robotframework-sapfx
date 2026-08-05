@@ -14,7 +14,7 @@ permissions:
 jobs:
   # Suite pytest hors-SAP/hors-navigateur : s'appuie sur les substituts légers de
   # tests/unit/conftest.py (pythoncom/win32com/robot factices) pour tourner sur un
-  # interpréteur nu sans pywin32 ni Windows — exactement l'usage que ce conftest
+  # interpréteur nu sans pywin32 ni Windows, exactement l'usage que ce conftest
   # documente. Tourne sur ubuntu pour rester rapide et bon marché.
   test:
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
         if: matrix.python-version == '3.12'
         run: ruff check src tools tests integrations scripts
 
-      - name: Type check (mypy — progressive, scoped in pyproject.toml)
+      - name: Type check (mypy, progressive, scoped in pyproject.toml)
         if: matrix.python-version == '3.12'
         run: mypy
 
@@ -69,6 +69,13 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/check_conventions.py
 
+      # Le tiret cadratin est le tic n°1 qui trahit un texte généré : la règle
+      # de rédaction (CLAUDE.md § Language) est tenue mécaniquement, pas
+      # seulement énoncée.
+      - name: No em dash in repository prose
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_no_em_dash.py
+
       # 3.10 = plancher supporté, 3.14 = dernier Python vérifié : les deux
       # extrémités tournent en pytest nu ; la voie complète (lint, gardes,
       # couverture) reste sur 3.12.
@@ -91,14 +98,14 @@ jobs:
           path: coverage.xml
 
   # Côté Windows, deux vérifications que le job ubuntu ne peut pas offrir :
-  # 1. la suite unitaire avec le VRAI pywin32 (pas les stubs de conftest.py —
+  # 1. la suite unitaire avec le VRAI pywin32 (pas les stubs de conftest.py :
   #    _ensure() les ignore quand les modules authentiques s'importent), ce qui
   #    détecterait une dérive entre les substituts COM et la réalité ;
   # 2. la résolution des mots-clés Robot (--dryrun, aucune exécution réelle)
   #    sur toutes les suites tests/robot/, y compris les suites ECC qui
   #    importent SapEccLibrary (pywin32). Ne requiert ni SAP ni navigateur en
   #    direct : le dryrun ne fait que résoudre les noms de mots-clés.
-  # (id de job conservé « dryrun » — historique : une protection de branche
+  # (id de job conservé « dryrun » pour raison historique : une protection de branche
   # pourrait l'exiger sous ce nom.)
   dryrun:
     runs-on: windows-latest
@@ -116,7 +123,7 @@ jobs:
           pip install -e ".[web,dev]"
           rfbrowser init
 
-      - name: Unit tests against real pywin32 (no coverage gate — enforced on ubuntu)
+      - name: Unit tests against real pywin32 (no coverage gate, enforced on ubuntu)
         run: pytest -q tests/unit
 
       - name: Robot Framework keyword-resolution dry run

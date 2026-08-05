@@ -1,9 +1,9 @@
-"""SapFioriLibrary — Automatisation SAP Fiori / S/4HANA web avec support UI5.
+"""SapFioriLibrary : automatisation SAP Fiori / S/4HANA web avec support UI5.
 
 Phase 2 du projet. Une bibliothèque Robot Framework légère qui s'utilise *aux côtés* de
 la bibliothèque Browser (Playwright) : Browser gère la page et effectue les clics/saisies ;
-cette bibliothèque convertit un **sélecteur de contrôle UI5** stable — par type de contrôle
-+ propriétés, ou par un **UI5 XPath** hiérarchique — en cible DOM utilisable par Browser.
+cette bibliothèque convertit un **sélecteur de contrôle UI5** stable (par type de contrôle
++ propriétés, ou par un **UI5 XPath** hiérarchique) en cible DOM utilisable par Browser.
 
 La résolution s'appuie sur un bundle JS injecté (`_ui5_js.py`) qui construit un arbre
 reflétant la hiérarchie des contrôles UI5 et y effectue les correspondances. Les techniques
@@ -25,7 +25,7 @@ Utilisation dans une suite::
     Click      ${sel}
 
 La couche métier (`resources/fiori_keywords.resource`) encapsule ceci afin que les tests
-se lisent de la même façon que du côté ECC — voir `docs/fiori-architecture.md`.
+se lisent de la même façon que du côté ECC : voir `docs/fiori-architecture.md`.
 """
 from robot.api import logger
 from robot.api.types import Secret
@@ -131,7 +131,7 @@ class SapFioriLibrary:
         """Change le ``ui5_timeout`` de la bibliothèque et retourne l'ancienne valeur.
 
         ``ui5_timeout`` est le budget de sondage par défaut de la résolution de
-        contrôles, de l'arbre UI5 et des retries anti *stale element* — fixé à
+        contrôles, de l'arbre UI5 et des retries anti *stale element*, fixé à
         l'import de la bibliothèque, ajustable ici en cours de suite (élargir
         autour d'une app Fiori particulièrement lourde, sans l'imposer à toute
         la suite). Accepte les chaînes de temps Robot (``30s``, ``2 min``).
@@ -143,7 +143,7 @@ class SapFioriLibrary:
         | Set Ui5 Timeout | ${old} | |
 
         Le pendant Fiori de `Set Default Timeout` (SapEccLibrary). Portée :
-        l'instance de bibliothèque (scope ``SUITE``) — le réglage ne déborde
+        l'instance de bibliothèque (scope ``SUITE``) ; le réglage ne déborde
         jamais sur la suite suivante.
         """
         previous = secs_to_timestr(timestr_to_secs(self.ui5_timeout))
@@ -160,7 +160,7 @@ class SapFioriLibrary:
         JS), resserrez-le pour un run local réactif. Accepte les chaînes de
         temps Robot (``0.5s``, ``250 ms``) ; retourne l'ancienne valeur dans le
         même format, restaurable comme pour `Set Ui5 Timeout`. Même nom et même
-        contrat que le keyword miroir de SapEccLibrary — dans une suite
+        contrat que le keyword miroir de SapEccLibrary : dans une suite
         important les deux bibliothèques, qualifier l'appel
         (``SapFioriLibrary.Set Poll Interval``) ou régler
         `Set Library Search Order`. Portée : l'instance (scope ``SUITE``).
@@ -181,7 +181,7 @@ class SapFioriLibrary:
         résolution **dans la frame de l'app** et préfixe tous les sélecteurs
         retournés avec ``<frame> >>>`` (chaînage de frames Browser/Playwright).
 
-        Sans argument (ou vide), revient à la page principale — le mode nominal
+        Sans argument (ou vide), revient à la page principale, le mode nominal
         pour un FLP ABAP classique (apps dans le même document). Exemple::
 
             Set Ui5 Frame    iframe[id*="application-"]
@@ -195,7 +195,7 @@ class SapFioriLibrary:
                     % (self._ui5_frame or "main page (no frame)"))
 
     def push_ui5_frame(self, frame_selector):
-        """**Empile** une frame sur la portée courante — le mode « pages
+        """**Empile** une frame sur la portée courante : le mode « pages
         hybrides » de `Set Ui5 Frame`, pour les frames IMBRIQUÉES (un shell
         Work Zone qui embarque une app, qui embarque elle-même une transaction
         WebGUI) : chaque niveau s'empile, la portée effective est le chaînage
@@ -216,7 +216,7 @@ class SapFioriLibrary:
 
     def pop_ui5_frame(self):
         """Dépile la frame la plus récente (`Push Ui5 Frame`) et retourne son
-        sélecteur. Échoue si la pile est vide — un pop de trop est un bug de
+        sélecteur. Échoue si la pile est vide : un pop de trop est un bug de
         scénario, jamais ignoré silencieusement."""
         stack = self._frame_stack
         if not stack:
@@ -231,7 +231,7 @@ class SapFioriLibrary:
     def get_ui5_frame_stack(self):
         """Retourne la pile de frames courante (liste de sélecteurs, du niveau
         le plus externe au plus interne ; vide = page principale). Lecture
-        seule, JSON-safe — pour le débogage et les agents rf-mcp."""
+        seule, JSON-safe, pour le débogage et les agents rf-mcp."""
         return list(self._frame_stack)
 
     # -- mots-clés de résolution ----------------------------------------------
@@ -247,7 +247,7 @@ class SapFioriLibrary:
         le nombre de correspondances est journalisé afin qu'un sélecteur ambigu soit visible
         et ne soit jamais tronqué silencieusement.
 
-        ``idSuffix`` matche la **fin** de l'id du contrôle — le motif des ids
+        ``idSuffix`` matche la **fin** de l'id du contrôle : le motif des ids
         stables Fiori Elements V4 (``idSuffix=fe::table::<Entity>::LineItem::Table``),
         dont le préfixe app/route varie mais dont le suffixe est déterministe.
         """
@@ -271,7 +271,7 @@ class SapFioriLibrary:
 
         Retourne ``css=[id="<controlId>"]`` pour la ``index``-ième correspondance (la première
         par défaut). Remarque : la correspondance d'attributs XPath est exacte/`contains()`
-        selon XPath 1.0 — utiliser `Resolve Ui5 Control` pour une correspondance insensible
+        selon XPath 1.0 ; utiliser `Resolve Ui5 Control` pour une correspondance insensible
         à la casse ou par sous-chaîne.
         """
         ids = self._resolve(RESOLVE_XPATH_JS, xpath, xpath)
@@ -287,7 +287,7 @@ class SapFioriLibrary:
 
     def get_ui5_match_count(self, **selector_parts):
         """Retourne le nombre de contrôles rendus qui correspondent actuellement au sélecteur (0+).
-        N'attend pas — utile pour les assertions sur la cardinalité de listes/tableaux."""
+        N'attend pas : utile pour les assertions sur la cardinalité de listes/tableaux."""
         selector = build_control_selector(**selector_parts)
         ids = self._evaluate(RESOLVE_ROLE_JS, arg=selector_to_json(selector)) or []
         return len(ids)
@@ -317,10 +317,10 @@ class SapFioriLibrary:
         Le pattern d'auto-réparation des localisateurs (jamais silencieux) : on
         essaie chaque forme de sélecteur fournie, dans l'ordre de stabilité
         décroissante, avec ``attempt_timeout`` par tentative. Si un repli
-        aboutit, un WARNING journalise quel localisateur primaire a dérivé — le
+        aboutit, un WARNING journalise quel localisateur primaire a dérivé : le
         test passe, la dérive est visible et corrigeable dans ``resources/``
         (et consignée dans le journal de télémétrie si ``SAPFX_HEALING_LOG``
-        est défini — voir ``sapfx_common.healing_telemetry``). ::
+        est défini, voir ``sapfx_common.healing_telemetry``). ::
 
             ${sel}=    Resolve Ui5 With Fallback
             ...    controlType=Button    properties={'text': 'Commander'}
@@ -385,7 +385,7 @@ class SapFioriLibrary:
             return resolved
         raise AssertionError(
             "No fallback resolved the control. Attempts: %s\n"
-            "Every engine failed — call Log Fiori Diagnostics for the whole "
+            "Every engine failed. Call Log Fiori Diagnostics for the whole "
             "picture (page composition, UI5 tree, console errors, frame "
             "scope), or Get Page Composition if you only need the engines "
             "to try." % " ; ".join(failures))
@@ -396,7 +396,7 @@ class SapFioriLibrary:
         """Résout un élément **SAP WebGUI** par son ``SID`` stable vers un sélecteur
         Browser. Le SID est l'identifiant de script SAP GUI (``wnd[0]/usr/ctxtVBAK-VBELN``)
         porté dans l'attribut ``lsdata`` de l'élément sur les pages WebGUI classiques /
-        SAP GUI for HTML — *pas* Fiori/UI5. Retourne un sélecteur ``xpath=``.
+        SAP GUI for HTML, *pas* Fiori/UI5. Retourne un sélecteur ``xpath=``.
         Respecte `Set Ui5 Frame` (page WebGUI embarquée dans un launchpad)."""
         return self._scoped_selector(sid_xpath(sid))
 
@@ -425,16 +425,16 @@ class SapFioriLibrary:
         du light DOM ; leurs internals vivent dans des shadow roots ouverts, que
         le CSS de Playwright perce pour le clic/la saisie.
 
-        Clés : ``tag`` (type court ``Button`` ou tag complet ``ui5-button`` —
+        Clés : ``tag`` (type court ``Button`` ou tag complet ``ui5-button``,
         matche aussi les tags **scopés** ``ui5-button-<suffixe>``), ``text``
         (sous-chaîne insensible à la casse ou ``/regex/`` sur le textContent),
-        ``name`` (**nom accessible** de l'hôte — accname simplifié :
+        ``name`` (**nom accessible** de l'hôte, accname simplifié :
         ``aria-labelledby``, ``aria-label``, ``accessible-name``/
-        ``accessibleName`` — la convention UI5 Web Components —, label,
+        ``accessibleName`` (la convention UI5 Web Components), label,
         texte ; le localisateur au plus près de l'intention utilisateur),
         ``properties`` (attributs/propriétés de l'hôte, mêmes règles de matching
         que le moteur role), ``id`` / ``idSuffix``. Retourne un sélecteur
-        ``css=`` — un chemin light-DOM ancré à l'ancêtre à id le plus proche,
+        ``css=`` : un chemin light-DOM ancré à l'ancêtre à id le plus proche,
         car les hôtes WC n'ont souvent pas d'id propre. ::
 
             ${sel}=    Resolve Wc Control    tag=Button    text=Créer
@@ -446,7 +446,7 @@ class SapFioriLibrary:
         if not paths:
             raise AssertionError(
                 "No ui5-* web component matched %s on the current page. This engine "
-                "scans light-DOM custom elements (tag prefix ui5-) — for a classic "
+                "scans light-DOM custom elements (tag prefix ui5-). For a classic "
                 "UI5 app, use Resolve Ui5 Control instead." % (selector,))
         return self._pick_wc(paths, int(index), description)
 
@@ -461,7 +461,7 @@ class SapFioriLibrary:
 
     def get_wc_match_count(self, **selector_parts):
         """Nombre de Web Components ``ui5-*`` rendus qui correspondent au sélecteur
-        (0+). N'attend pas — pendant WC de `Get Ui5 Match Count`."""
+        (0+). N'attend pas ; pendant WC de `Get Ui5 Match Count`."""
         selector = build_wc_selector(**selector_parts)
         paths = self._evaluate(RESOLVE_WC_JS, arg=selector_to_json(selector)) or []
         return len(paths)
@@ -497,25 +497,25 @@ class SapFioriLibrary:
     # -- moteur DOM générique (zones non-SAP d'une page hybride) ---------------
 
     def resolve_dom_element(self, index=0, **selector_parts):
-        """Résout un **élément DOM générique** en sélecteur Browser — le 5e
+        """Résout un **élément DOM générique** en sélecteur Browser : le 5e
         moteur, pour les zones NON-SAP d'une page hybride.
 
         Un shell Fiori peut embarquer un widget React/Angular/vanilla (portlet
         Work Zone, aide custom, composant maison) qu'aucun moteur SAP ne voit :
         pas de registre UI5, pas d'hôte ``ui5-*``, pas de ``lsdata`` WebGUI.
-        Ce moteur le fait entrer dans la même grammaire que les autres —
+        Ce moteur le fait entrer dans la même grammaire que les autres,
         polling jusqu'au rendu, chaîne de fallback (``dom=``) et télémétrie de
-        healing comprises — au lieu de retomber sur des sélecteurs Browser
+        healing comprises, au lieu de retomber sur des sélecteurs Browser
         bruts hors bibliothèque.
 
         Clés : ``css`` (sélecteur CSS de base restreignant le scan), ``tag``,
         ``text`` (sous-chaîne insensible à la casse ou ``/regex/``), ``role``
         (rôle ARIA **calculé** : attribut ``role`` explicite OU rôle implicite
-        de la sémantique HTML — ``button``, ``a[href]`` -> ``link``,
+        de la sémantique HTML : ``button``, ``a[href]`` -> ``link``,
         ``input[type=checkbox]`` -> ``checkbox``, ``h1``-``h6`` ->
-        ``heading``… — insensible à la casse), ``name`` (**nom accessible**,
+        ``heading``… ; insensible à la casse), ``name`` (**nom accessible**,
         accname simplifié : ``aria-labelledby``, ``aria-label``,
-        ``label[for]``/englobant, ``alt``, texte… — le localisateur au plus
+        ``label[for]``/englobant, ``alt``, texte… ; le localisateur au plus
         près de l'intention utilisateur, comme le ``getByRole(name=…)`` de
         Playwright), ``id`` / ``idSuffix``, ``properties`` (attributs, mêmes
         règles de matching que les moteurs role/wc). Seuls les éléments RENDUS
@@ -526,7 +526,7 @@ class SapFioriLibrary:
             Click    ${sel}
 
         Sur une zone SAP, préférer TOUJOURS le moteur dédié (`Resolve Ui5
-        Control`, `Resolve Sid`, `Resolve Wc Control`) — plus stable ; `Get
+        Control`, `Resolve Sid`, `Resolve Wc Control`), plus stable ; `Get
         Page Composition` dit lequel s'applique où."""
         selector = build_dom_selector(**selector_parts)
         description = "dom %s" % selector
@@ -535,7 +535,7 @@ class SapFioriLibrary:
             raise AssertionError(
                 "No DOM element matched %s on the current page (an invalid css= "
                 "value also yields zero matches). For a SAP region, use the "
-                "dedicated engine instead — call Get Page Composition to see "
+                "dedicated engine instead. Call Get Page Composition to see "
                 "which technologies this page hosts." % (selector,))
         return self._pick_wc(paths, int(index), description, noun="DOM element")
 
@@ -551,7 +551,7 @@ class SapFioriLibrary:
 
     def get_dom_match_count(self, **selector_parts):
         """Nombre d'éléments DOM rendus qui correspondent au sélecteur (0+).
-        N'attend pas — pendant DOM de `Get Ui5 Match Count`."""
+        N'attend pas ; pendant DOM de `Get Ui5 Match Count`."""
         selector = build_dom_selector(**selector_parts)
         paths = self._evaluate(RESOLVE_DOM_JS, arg=selector_to_json(selector)) or []
         return len(paths)
@@ -590,23 +590,23 @@ class SapFioriLibrary:
     # -- sonde de composition (perception des pages hybrides) ------------------
 
     def get_page_composition(self, include_frames=True):
-        """Sonde la **composition technologique** de la page courante — la
+        """Sonde la **composition technologique** de la page courante : la
         perception d'une page HYBRIDE (shell UI5 + iframe WebGUI + widget web
         générique cohabitant dans le même écran).
 
         Retourne un dict JSON-safe (utilisable à travers rf-mcp) :
 
-        * ``ui5_runtime`` / ``ui5_version`` / ``ui5_controls`` — runtime UI5
+        * ``ui5_runtime`` / ``ui5_version`` / ``ui5_controls`` : runtime UI5
           classique présent (moteurs *role*/*xpath* utilisables) ;
-        * ``wc_hosts`` — hôtes UI5 Web Components (moteur *wc*) ;
-        * ``webgui_elements`` — éléments ``lsdata`` SAP GUI for HTML (moteur *sid*) ;
-        * ``frameworks`` — indices React/Angular/Vue (moteur *dom*) ;
-        * ``engines`` — les moteurs recommandés pour CETTE région, dans
+        * ``wc_hosts`` : hôtes UI5 Web Components (moteur *wc*) ;
+        * ``webgui_elements`` : éléments ``lsdata`` SAP GUI for HTML (moteur *sid*) ;
+        * ``frameworks`` : indices React/Angular/Vue (moteur *dom*) ;
+        * ``engines`` : les moteurs recommandés pour CETTE région, dans
           l'ordre d'essai de `Resolve Ui5 With Fallback` ;
-        * ``frames`` — chaque iframe du document avec son sélecteur Browser
+        * ``frames`` : chaque iframe du document avec son sélecteur Browser
           réutilisable (`Set Ui5 Frame` / `Push Ui5 Frame`) et, si
           ``include_frames`` (défaut), SA composition sondée à son tour
-          (champ ``composition``) — c'est là que l'hybridation se voit : un
+          (champ ``composition``). C'est là que l'hybridation se voit : un
           launchpad Work Zone rapporte un shell sans contrôles et une app
           UI5 par frame. Une frame insondable porte un champ ``error`` au
           lieu de faire échouer la perception (best-effort). La descente
@@ -614,7 +614,7 @@ class SapFioriLibrary:
           re-sonder.
 
         Respecte `Set Ui5 Frame` / `Push Ui5 Frame` : la sonde part de la
-        portée courante. Lecture seule — le pendant hybride de `Get Ui5 Page
+        portée courante. Lecture seule, le pendant hybride de `Get Ui5 Page
         Tree`, à appeler en premier sur un écran inconnu pour savoir QUEL
         moteur adresser où."""
         composition = self._evaluate(PAGE_COMPOSITION_JS, arg=None)
@@ -645,31 +645,31 @@ class SapFioriLibrary:
                               tree_timeout="3s", full_logs=False,
                               max_log_entries=50, aria_selector="css=body"):
         """Agrège en UN dict JSON-safe les vues de diagnostic de la page
-        courante — la perception « pourquoi ça ne marche pas » d'un écran
+        courante : la perception « pourquoi ça ne marche pas » d'un écran
         Fiori/hybride, pensée pour rf-mcp et le débogage de suite :
 
-        * ``composition`` — la sonde `Get Page Composition` (technologies par
+        * ``composition`` : la sonde `Get Page Composition` (technologies par
           région + moteurs recommandés + iframes) ;
-        * ``ui5_tree`` — l'arbre de contrôles UI5 (XML, portée courante),
+        * ``ui5_tree`` : l'arbre de contrôles UI5 (XML, portée courante),
           sondé pendant ``tree_timeout`` seulement (défaut 3s : un diagnostic
           sur une page non-UI5 ne doit pas bloquer ``ui5_timeout`` entier) ;
-          ``None`` si absent — ce qui devient une anomalie NOMMANT les
+          ``None`` si absent, ce qui devient une anomalie NOMMANT les
           moteurs/frames de repli. Ne touche PAS l'état ``mode=diff`` de
           `Get Ui5 Page Tree` ;
-        * ``console`` / ``page_errors`` — `Get Console Log` / `Get Page
+        * ``console`` / ``page_errors`` : `Get Console Log` / `Get Page
           Errors` de Browser 20, normalisés en dicts à forme stable
           ``{type, text, location, time}`` / ``{name, message, stack, time}``.
           Par défaut (``full_logs=False``, la sémantique Browser), chaque
-          appel ne retourne que les entrées NOUVELLES depuis le précédent —
+          appel ne retourne que les entrées NOUVELLES depuis le précédent,
           l'esprit ``mode=diff`` ; ``full_logs=True`` relit tout. Les listes
           gardent les ``max_log_entries`` plus récentes (troncature annoncée
           dans ``console_dropped``/``page_errors_dropped``, jamais
           silencieuse) ;
-        * ``aria`` — snapshot ARIA YAML (`Get Aria Snapshot`) de
+        * ``aria`` : snapshot ARIA YAML (`Get Aria Snapshot`) de
           ``aria_selector`` (défaut ``css=body``, préfixé par la frame
           courante) : la vue sémantique des zones NON-SAP qu'aucun moteur ne
           modélise ;
-        * ``issues`` — la synthèse actionnable : erreurs JS/console comptées
+        * ``issues`` : la synthèse actionnable, erreurs JS/console comptées
           (première citée), arbre UI5 absent avec les moteurs recommandés à
           la place, sections insondables.
 
@@ -680,7 +680,7 @@ class SapFioriLibrary:
         le diagnostic. Lecture seule. Respecte `Set Ui5 Frame` /
         `Push Ui5 Frame` (composition, arbre et ARIA sondent la portée
         courante ; console et erreurs de page sont PAR PAGE, toutes frames
-        confondues — c'est Playwright qui les collecte). ::
+        confondues, c'est Playwright qui les collecte). ::
 
             ${diag}=    Get Fiori Diagnostics
             Should Be Empty    ${diag}[issues]
@@ -743,7 +743,7 @@ class SapFioriLibrary:
                               tree_timeout="3s", full_logs=False,
                               max_log_entries=50, aria_selector="css=body"):
         """Collecte `Get Fiori Diagnostics` (mêmes paramètres) puis écrit le
-        **rapport Markdown** dans le log Robot — anomalies d'abord, puis chaque
+        **rapport Markdown** dans le log Robot : anomalies d'abord, puis chaque
         section en résumé compact. Retourne le dict complet, pour enchaîner une
         assertion sur ``issues`` après coup. Le réflexe de fin de test en échec::
 
@@ -782,7 +782,7 @@ class SapFioriLibrary:
         """Résout un champ de saisie UI5 et le remplit avec ``text`` via Browser.
 
         Les champs UI5 composites (``sap.m.Input``, ``SearchField``…) rendent un élément
-        interne ``<input>``/``<textarea>`` ; on s'y positionne — il est impossible de saisir
+        interne ``<input>``/``<textarea>`` ; on s'y positionne, il est impossible de saisir
         directement dans le ``<div>`` racine du contrôle. Re-résout puis ré-essaie en
         cas d'échec transitoire (*stale element* après re-rendu).
         """
@@ -805,7 +805,7 @@ class SapFioriLibrary:
         Pendant Fiori de `Read Grid` (ECC). Résout la table (``sap.m.Table`` ou
         ``sap.ui.table.Table``) puis extrait ses lignes via le bundle : clés = textes
         d'en-tête de colonne (ou ``col<i>`` à défaut). Ne lit que les lignes
-        **instanciées** — ``sap.ui.table.Table`` virtualise, faire défiler d'abord
+        **instanciées** : ``sap.ui.table.Table`` virtualise, faire défiler d'abord
         pour les grandes tables. Les lignes d'en-tête de groupe sont ignorées.
         """
         selector = build_control_selector(**selector_parts)
@@ -821,7 +821,7 @@ class SapFioriLibrary:
     def ui5_text_should_be(self, expected, index=0, **selector_parts):
         """Vérifie que le texte visible du contrôle résolu vaut ``expected``
         (comparaison exacte après trim). C'est l'assertion de VALEUR émise par le
-        recorder web (Shift+Alt+clic) — pendant de `Ui5 Control Should Be Visible`
+        recorder web (Shift+Alt+clic), pendant de `Ui5 Control Should Be Visible`
         pour le contenu. ::
 
             Ui5 Text Should Be    42,00 EUR    idSuffix=fe::HeaderInfo::NetAmount
@@ -843,7 +843,7 @@ class SapFioriLibrary:
 
         ``mode=diff`` retourne le **différentiel** depuis l'appel précédent de ce
         keyword sur cette instance (balises ``- `` disparues / ``+ `` apparues,
-        inchangé résumé) — après une action, « ce qui a changé » suffit à l'agent
+        inchangé résumé) : après une action, « ce qui a changé » suffit à l'agent
         pour une fraction des tokens. Premier appel en diff : arbre complet.
         La page est TOUJOURS relue (jamais de cache) ; seul le rendu diffère.
 
@@ -872,7 +872,7 @@ class SapFioriLibrary:
         return tree
 
     # -- carte numérotée + action par référence (@N) ---------------------------
-    # Miroir Fiori de Get Screen Map / Click Screen Ref (ECC) — le patron
+    # Miroir Fiori de Get Screen Map / Click Screen Ref (ECC) : le patron
     # « map / @e1 » agent-first (cf. Vibium) : la carte numérote les cibles
     # actionnables de l'arbre UI5, l'agent agit par numéro. Références
     # éphémères (dernière carte de l'instance), re-vérifiées avant chaque
@@ -880,20 +880,20 @@ class SapFioriLibrary:
 
     def get_ui5_page_map(self, include_types=None):
         """Retourne la **carte numérotée** de la page UI5 courante : une ligne
-        par cible actionnable — champs saisissables (``* ``, valeur courante
-        affichée) et cibles cliquables — avec libellé humain (text/title/
+        par cible actionnable : champs saisissables (``* ``, valeur courante
+        affichée) et cibles cliquables, avec libellé humain (text/title/
         placeholder/tooltip, ``?`` à défaut), id de contrôle et type court ::
 
-            # ui5 page map — 2 actionable target(s)
+            # ui5 page map : 2 actionable target(s)
             @1\t* Search\tcontainer---app--searchField\tSearchField\t=
             @2\t  Go\tcontainer---app--goBtn\tButton
 
         Chaque numéro devient une **référence éphémère** pour `Resolve Ui5
-        Ref`, `Click Ui5 Ref` et `Fill Ui5 Ref` — l'agent lit la carte puis
+        Ref`, `Click Ui5 Ref` et `Fill Ui5 Ref` : l'agent lit la carte puis
         agit par ``@N`` sans recopier l'id (la résolution re-vérifie que le
         contrôle est toujours rendu). ``include_types`` (types courts séparés
         par des virgules, ex. ``ColumnListItem,StandardListItem``) remplace la
-        sélection par défaut — utile pour numéroter les lignes d'une liste.
+        sélection par défaut, utile pour numéroter les lignes d'une liste.
         Respecte `Set Ui5 Frame`. Lecture seule ; ne touche pas la mémoire du
         ``mode=diff`` de `Get Ui5 Page Tree`. Dans une SUITE, rester sur les
         localisateurs de ``resources/`` (convention #1) : les ``@N`` sont
@@ -909,37 +909,37 @@ class SapFioriLibrary:
         if not tree:
             raise AssertionError(
                 "No UI5 control tree on the current page (UI5 not ready, or "
-                "not a UI5 app) — no map to number. Call Get Page Composition "
+                "not a UI5 app). No map to number. Call Get Page Composition "
                 "to see which technologies this page hosts (and which "
                 "engines/frames to use).")
         lines, refs = ui5_page_map(tree, include_types)
         self._ui5_refs = refs
-        header = "# ui5 page map — %d actionable target(s)" % len(refs)
+        header = "# ui5 page map : %d actionable target(s)" % len(refs)
         return "\n".join([header] + lines)
 
     def _validate_ui5_ref(self, ref):
-        """Valide une référence ``@N``/``N`` contre la dernière carte —
+        """Valide une référence ``@N``/``N`` contre la dernière carte :
         échec IMMÉDIAT (hors budget de retry) si aucune carte n'a été relevée
         ou si le numéro est inconnu. Retourne ``(numéro, id de contrôle)``."""
         refs = getattr(self, "_ui5_refs", None)
         if not refs:
             raise AssertionError(
-                "Aucune carte numérotée mémorisée — appeler d'abord "
+                "Aucune carte numérotée mémorisée : appeler d'abord "
                 "Get Ui5 Page Map pour relever les références @N de la page.")
         number = str(ref).strip().lstrip("@")
         if number not in refs:
             raise AssertionError(
-                "Référence @%s inconnue — la dernière carte expose @1..@%d "
+                "Référence @%s inconnue : la dernière carte expose @1..@%d "
                 "(relever la carte à jour avec Get Ui5 Page Map)."
                 % (number, len(refs)))
         return number, refs[number]
 
     def resolve_ui5_ref(self, ref):
         """Résout une référence ``@N`` de la dernière `Get Ui5 Page Map` en
-        **sélecteur Browser** (``css=[id="…"]``, préfixé par la frame active)
-        — jamais en silence : échec actionnable si aucune carte n'a été
+        **sélecteur Browser** (``css=[id="…"]``, préfixé par la frame active),
+        jamais en silence : échec actionnable si aucune carte n'a été
         relevée, si le numéro est inconnu, ou si le contrôle n'est plus rendu
-        (page naviguée, vue redessinée — le remède est nommé : re-percevoir
+        (page naviguée, vue redessinée ; le remède est nommé : re-percevoir
         avec `Get Ui5 Page Map`). Accepte ``3`` ou ``@3``."""
         number, control_id = self._validate_ui5_ref(ref)
         try:
@@ -950,7 +950,7 @@ class SapFioriLibrary:
             ids = []
         if not ids:
             raise AssertionError(
-                "La cible @%s (%s) n'est plus rendue sur la page — "
+                "La cible @%s (%s) n'est plus rendue sur la page : "
                 "re-percevoir avec Get Ui5 Page Map avant d'agir par "
                 "référence." % (number, control_id))
         return self._scoped_selector('css=[id="%s"]' % control_id)
@@ -960,7 +960,7 @@ class SapFioriLibrary:
         `Resolve Ui5 Ref` (fraîcheur re-vérifiée) puis clic Browser, avec la
         même absorption des *stale elements* que `Click Ui5 Control`
         (re-résolution à chaque tentative). Retourne le sélecteur cliqué
-        (journalisé — la trace reste rejouable dans une suite)."""
+        (journalisé : la trace reste rejouable dans une suite)."""
         number, _control_id = self._validate_ui5_ref(ref)
 
         def _do():
@@ -972,7 +972,7 @@ class SapFioriLibrary:
         return selector
 
     def fill_ui5_ref(self, ref, text):
-        """Saisit ``text`` dans la cible ``@N`` de la dernière carte — même
+        """Saisit ``text`` dans la cible ``@N`` de la dernière carte : même
         chemin composite que `Fill Ui5 Input` (l'élément interne
         ``<input>``/``<textarea>`` du contrôle, jamais son ``<div>`` racine),
         fraîcheur re-vérifiée avant chaque tentative. Retourne le sélecteur
@@ -995,7 +995,7 @@ class SapFioriLibrary:
 
     def get_ui5_perceptual_hash(self, hash_size=8):
         """Capture la page courante (bibliothèque Browser) et retourne son
-        **hash perceptuel** (dHash hexadécimal, ``hash_size²`` bits) — le
+        **hash perceptuel** (dHash hexadécimal, ``hash_size²`` bits) : le
         pendant Fiori de `Get Screen Perceptual Hash` (ECC), même cœur pur
         ``sapfx_common.visual_hash``.
 
@@ -1008,7 +1008,7 @@ class SapFioriLibrary:
     def ui5_screen_should_match_baseline(self, name, threshold=5,
                                          baseline_directory="visual_baselines",
                                          hash_size=8):
-        """Assertion de **non-régression visuelle** de la page Fiori courante —
+        """Assertion de **non-régression visuelle** de la page Fiori courante,
         même sémantique *snapshot* que `Screen Should Match Baseline` (ECC),
         même module partagé (``sapfx_common.visual_baseline``) :
 
@@ -1025,7 +1025,7 @@ class SapFioriLibrary:
                                  str(baseline_directory), int(threshold),
                                  int(hash_size), what="La page")
         if outcome.created:
-            logger.warn("Baseline visuelle créée (%s) — premier passage : "
+            logger.warn("Baseline visuelle créée (%s), premier passage : "
                         "committer ce PNG s'il fait référence."
                         % outcome.baseline_path)
         else:
@@ -1034,7 +1034,7 @@ class SapFioriLibrary:
         return outcome.distance
 
     # -- navigation launchpad, authentification IDP, vocabulaire métier ---------
-    # (concepts issus de l'analyse de playwright-praman, Apache-2.0 — NOTICE ;
+    # (concepts issus de l'analyse de playwright-praman, Apache-2.0, voir NOTICE ;
     #  réimplémentés sur nos moteurs, jamais portés verbatim)
 
     def open_fiori_app(self, intent, **params):
@@ -1045,7 +1045,7 @@ class SapFioriLibrary:
             Open Fiori App    SalesOrder-manage    SalesOrder=1234
 
         C'est la voie STABLE de navigation FLP : le hash d'intent survit aux
-        réorganisations de catalogue, au thème et à la langue — contrairement
+        réorganisations de catalogue, au thème et à la langue, contrairement
         au clic de tuile par titre (`Open App` de la resource, qui reste la
         voie « comme l'utilisateur »). Intent invalide = échec immédiat avec
         la forme attendue. Ne fait QUE naviguer : enchaîner avec
@@ -1063,11 +1063,11 @@ class SapFioriLibrary:
                                      password_selector=None,
                                      submit_selector=None, timeout=None):
         """Déroule le formulaire de connexion d'un **fournisseur d'identité**
-        (IDP) — le passage obligé d'un launchpad d'entreprise, qui redirige
+        (IDP) : le passage obligé d'un launchpad d'entreprise, qui redirige
         vers SAP IAS, Azure AD/Entra ou un IDP maison plutôt que d'afficher
         un login SAP classique.
 
-        ``preset`` choisit la fiche de sélecteurs (``sap-ias`` — défaut BTP —,
+        ``preset`` choisit la fiche de sélecteurs (``sap-ias``, défaut BTP,
         ``azure-ad``, ``generic``) ; chaque sélecteur reste surchargeable
         individuellement (IDP maison = ``generic`` + les trois sélecteurs).
         Gère les DEUX déroulés : une page (utilisateur + mot de passe
@@ -1078,7 +1078,7 @@ class SapFioriLibrary:
 
         La valeur du mot de passe n'est pas journalisée par ce keyword ;
         ``password`` accepte aussi le type ``Secret`` de Robot Framework 7.4
-        (``-v "IDP_PASSWORD: Secret:<motdepasse>"`` en ligne de commande) —
+        (``-v "IDP_PASSWORD: Secret:<motdepasse>"`` en ligne de commande) :
         la valeur est alors masquée partout, même en TRACE. À appeler après
         ``New Page <url du launchpad>`` ; enchaîner avec ``Wait For UI5
         Ready``."""
@@ -1088,7 +1088,7 @@ class SapFioriLibrary:
         budget = timestr_to_secs(timeout if timeout is not None else self.ui5_timeout)
 
         def _count(selector):
-            # `>> visible=true` : ne compter que les éléments VISIBLES — un
+            # `>> visible=true` : ne compter que les éléments VISIBLES : un
             # formulaire deux-étapes garde son champ mot de passe caché dans le
             # DOM dès la première page (constaté sur la fixture IDP : compter
             # les éléments attachés fait prendre à tort la branche une-page).
@@ -1115,7 +1115,7 @@ class SapFioriLibrary:
                               budget, step=self.poll_interval):
                 raise AssertionError(
                     "Le champ mot de passe (%r) n'est jamais apparu après "
-                    "l'étape utilisateur (preset %s) — utilisateur inconnu de "
+                    "l'étape utilisateur (preset %s) : utilisateur inconnu de "
                     "l'IDP, ou sélecteur à surcharger."
                     % (idp.password_selector, idp.name))
             browser.fill_text(idp.password_selector, reveal_secret(password))
@@ -1123,7 +1123,7 @@ class SapFioriLibrary:
         if not poll_until(lambda: _count(idp.username_selector) == 0,
                           budget, step=self.poll_interval):
             raise AssertionError(
-                "Toujours sur le formulaire IDP (%s) après soumission — "
+                "Toujours sur le formulaire IDP (%s) après soumission : "
                 "identifiants refusés, ou étape supplémentaire (MFA ?) non "
                 "couverte par ce keyword." % idp.name)
         logger.info("IDP login (%s) submitted for user %s." % (idp.name, username))
@@ -1137,13 +1137,13 @@ class SapFioriLibrary:
 
         Vocabulaire partagé ECC↔Fiori (``sapfx_common.vocabulary`` : MM/SD/FI
         + modèle Flight de démo). Ambiguïté ou score sous ``threshold`` =
-        échec listant les candidats — jamais de premier-match silencieux.
+        échec listant les candidats, jamais de premier-match silencieux.
         ``domain`` (``MM``/``SD``/``FI``/``FLIGHT``) restreint la recherche.
         Dict JSON-safe (utilisable à travers rf-mcp)."""
         return lookup_as_dict(term, domain=domain, threshold=float(threshold))
 
     def _page_png(self):
-        """Capture PNG de la page active via la bibliothèque Browser —
+        """Capture PNG de la page active via la bibliothèque Browser :
         ``return_as=bytes`` quand disponible (Browser récents), sinon repli
         sur le fichier retourné par `Take Screenshot`. Stubbable en test."""
         browser = self._browser()
@@ -1162,7 +1162,7 @@ class SapFioriLibrary:
 
     @staticmethod
     def _decode_image_to_gray(image_bytes):
-        """PNG → matrice de gris — la même frontière image que le canal ECC
+        """PNG → matrice de gris, la même frontière image que le canal ECC
         (impl partagée ``sapfx_common.visual_baseline``, Pillow importé à
         l'appel seulement). Stubbable en test."""
         from sapfx_common.visual_baseline import decode_image_to_gray
@@ -1174,7 +1174,7 @@ class SapFioriLibrary:
         """Sélecteur Browser du contexte d'exécution JS : ``<frame> >>> css=body``
         quand une iframe est ciblée (`Set Ui5 Frame`), sinon ``None`` (page).
         Avec un sélecteur, Browser passe l'élément résolu à la fonction et
-        l'exécute dans le contexte JS de SA frame — voir `build_call`."""
+        l'exécute dans le contexte JS de SA frame ; voir `build_call`."""
         return ("%s >>> css=body" % self._ui5_frame) if self._ui5_frame else None
 
     def _evaluate(self, js, arg=None):
@@ -1192,7 +1192,7 @@ class SapFioriLibrary:
 
         Les applications Fiori rendent les vues de manière asynchrone, donc un contrôle
         n'est souvent pas dans l'arbre au moment où le noyau UI5 est prêt. Le sondage est
-        l'équivalent web du `Wait Until Element Present` ECC — jamais une pause fixe.
+        l'équivalent web du `Wait Until Element Present` ECC ; jamais une pause fixe.
         Retourne une liste d'identifiants (potentiellement vide).
         """
         def _check():
@@ -1210,7 +1210,7 @@ class SapFioriLibrary:
         """Exécute ``action`` en la retentant sur exception, bornée par ``ui5_timeout``.
 
         ``action`` doit ré-résoudre son élément à chaque appel (le passer en lambda)
-        afin qu'une nouvelle tentative reparte d'un id frais — c'est ce qui absorbe les
+        afin qu'une nouvelle tentative reparte d'un id frais : c'est ce qui absorbe les
         *stale elements* après un re-rendu Fiori. Le budget de relance est borné dans
         le temps (pas par un nombre fixe de tentatives) afin de couvrir réellement
         ``ui5_timeout``, y compris pour un re-rendu qui se stabilise après plus d'une
@@ -1246,7 +1246,7 @@ class SapFioriLibrary:
 
     def _pick_wc(self, paths, index, description, noun="web component"):
         """Pendant WC/DOM de `_pick` : les correspondances sont des CHEMINS CSS
-        light-DOM (pas des ids — les hôtes WC et les éléments DOM génériques
+        light-DOM (pas des ids : les hôtes WC et les éléments DOM génériques
         n'en ont souvent pas)."""
         path = self._pick_id(paths, index, description, noun=noun)
         if len(paths) > 1:
@@ -1257,7 +1257,7 @@ class SapFioriLibrary:
     def _relaxed_hint(self, selector_parts):
         """Suffixe de message d'erreur AUTO-CORRIGIBLE quand un sélecteur role ne
         matche rien : re-sonde (sans attente) avec le ``controlType`` seul pour
-        dire si le type est rendu du tout, et combien — l'agent (ou l'humain)
+        dire si le type est rendu du tout, et combien : l'agent (ou l'humain)
         sait immédiatement si ce sont les propriétés qui ont dérivé ou si le
         contrôle n'existe pas. Best-effort : jamais d'erreur masquée."""
         ctype = selector_parts.get("controlType")
@@ -1271,9 +1271,9 @@ class SapFioriLibrary:
         except Exception:
             return ""
         if not ids:
-            return (" No control of type %s is rendered at all — wrong screen, "
+            return (" No control of type %s is rendered at all: wrong screen, "
                     "or the view is still loading." % ctype)
-        return (" %d control(s) of type %s ARE rendered — the other selector "
+        return (" %d control(s) of type %s ARE rendered; the other selector "
                 "parts (properties/bindingPath/idSuffix) likely diverged; call "
                 "Get Ui5 Page Tree to compare." % (len(ids), ctype))
 
@@ -1282,7 +1282,7 @@ class SapFioriLibrary:
         sous sa forme **enum** (``ElementState.visible``) : en appel Python
         direct (``get_library_instance``), la conversion d'arguments de Robot
         n'a pas lieu et l'API interne de Browser rejette la chaîne ``"visible"``
-        (KeyError — attrapé live par le smoke hybride). ``timeout`` accepte une
+        (KeyError, attrapé live par le smoke hybride). ``timeout`` accepte une
         chaîne de temps Robot et est converti en ``timedelta`` pour la même
         raison. Repli chaîne si Browser n'est pas installé (fakes de test)."""
         try:

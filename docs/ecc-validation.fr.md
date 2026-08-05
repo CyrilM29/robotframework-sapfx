@@ -1,17 +1,17 @@
 > [🇬🇧 English](ecc-validation.md) · **🇫🇷 Français**
 
-# Validation ECC « live » — système ABAP (CAL ou Docker) + SAP GUI
+# Validation ECC « live » : système ABAP (CAL ou Docker) + SAP GUI
 
 Procédure de bout en bout pour exécuter `tests/robot/ecc_smoke.robot` contre un vrai
 système SAP (système A4H), avec le client **SAP GUI for Windows**.
 
 > 🚧 **Disponibilité de l'image Docker (2026)** : à ce jour, l'image
 > `sapse/abap-cloud-developer-trial` est **introuvable / 404 sur Docker Hub**
-> d'après plusieurs retours communautaires — SAP semble l'avoir retirée (au moins
+> d'après plusieurs retours communautaires : SAP semble l'avoir retirée (au moins
 > temporairement). L'ancienne `sapse/abap-platform-trial` est également retirée et
 > *AS ABAP 7.xx Developer Edition* est **EOL (mai 2026)**.
 >
-> ➡️ **Chemin recommandé aujourd'hui : SAP Cloud Appliance Library (CAL)** — voir
+> ➡️ **Chemin recommandé aujourd'hui : SAP Cloud Appliance Library (CAL)**, voir
 > **§ A**. Le **§ B (Docker)** reste valable *si/quand* l'image redevient
 > disponible sur Docker Hub. Une fois un système joignable (CAL ou Docker), les
 > **§ 5 → § 10** (connexion SAP GUI, scripting, exécution) sont communs.
@@ -30,7 +30,7 @@ système SAP (système A4H), avec le client **SAP GUI for Windows**.
 | SAP GUI for Windows | oui | **8.00 64-bit ✓** (`C:\Program Files\SAP\FrontEnd\SAPgui\saplogon.exe`) |
 | `pywin32` | oui | **✓** |
 
-> ✅ **Vérification client + scripting (sans serveur)** — déjà validée en live sur
+> ✅ **Vérification client + scripting (sans serveur)** : déjà validée en live sur
 > cette machine. Reproductible à tout moment :
 > `python tests/manual/check_sap_gui_connection.py`. Ce script lance SAP Logon,
 > s'attache au moteur de scripting (COM) et lit le `GuiApplication` (ici SAP GUI
@@ -41,7 +41,7 @@ système SAP (système A4H), avec le client **SAP GUI for Windows**.
 > (conteneur local). Pour l'**option A (CAL)**, le système tourne dans le cloud ; il
 > te faut surtout le **client SAP GUI** local + `pywin32` (déjà ✓).
 
-## A. Option recommandée — SAP Cloud Appliance Library (CAL)
+## A. Option recommandée : SAP Cloud Appliance Library (CAL)
 
 Même produit (ABAP/ECC Developer Edition), mais en **appliance hébergée** : le
 logiciel SAP est gratuit, tu paies uniquement l'**hébergement cloud** (AWS/Azure/GCP)
@@ -57,14 +57,14 @@ pendant que l'instance tourne (et tu peux la *suspendre* pour réduire les coût
    défini à la création, master password de l'instance).
 4. Ouvrir les ports SAP GUI (3200 + 33xx) dans le pare-feu / security group de la VM,
    ou utiliser l'accès fourni par CAL.
-5. Continuer directement au **§ 5** (connexion SAP GUI) — en remplaçant l'hôte
+5. Continuer directement au **§ 5** (connexion SAP GUI), en remplaçant l'hôte
    `vhcala4hci` par le **nom d'hôte public de la VM CAL** et les identifiants par ceux
    affichés dans CAL.
 
-> Astuce coût : **suspendre** l'instance dans CAL dès que tu ne l'utilises pas — tu
+> Astuce coût : **suspendre** l'instance dans CAL dès que tu ne l'utilises pas, tu
 > ne paies alors quasiment que le stockage.
 
-## B. Option Docker — prérequis manuels (si l'image est disponible)
+## B. Option Docker : prérequis manuels (si l'image est disponible)
 
 > Ne s'applique que si `sapse/abap-cloud-developer-trial` est de nouveau **présente
 > sur Docker Hub** (cf. note de disponibilité en haut). Sinon, utiliser l'**option A**.
@@ -100,7 +100,7 @@ docker pull sapse/abap-cloud-developer-trial:<TAG>
 
 > Le flag `-agree-to-sap-license` vaut **acceptation de la licence développeur SAP**.
 > Contrairement à l'ancienne image, l'ABAP Cloud Developer Trial a un **mot de passe
-> par défaut fixe selon la version** (pas de `-master-password`) — voir §5.
+> par défaut fixe selon la version** (pas de `-master-password`), voir §5.
 
 ```powershell
 docker run --stop-timeout 3600 -i --name a4h -h vhcala4hci `
@@ -137,7 +137,7 @@ Ouvrir **SAP Logon** → *Nouveau* → *Connexion à un serveur d'applications p
 | Champ | Valeur |
 |---|---|
 | Description | `A4H` (doit correspondre à `SAP_CONNECTION`, voir §8) |
-| Serveur d'application | **option B (Docker)** : `vhcala4hci` (ou `localhost`) — **option A (CAL)** : nom d'hôte public de la VM |
+| Serveur d'application | **option B (Docker)** : `vhcala4hci` (ou `localhost`) ; **option A (CAL)** : nom d'hôte public de la VM |
 | Numéro d'instance | `00` |
 | ID système (SID) | `A4H` |
 
@@ -195,7 +195,7 @@ robot --pythonpath src `
   tests/robot/ecc_smoke.robot
 ```
 
-(Adapter `SAP_PASSWORD` au mot de passe par défaut de la version choisie — cf. §5.
+(Adapter `SAP_PASSWORD` au mot de passe par défaut de la version choisie, cf. §5.
 La forme `: Secret:` est la syntaxe de variable typée de Robot Framework 7.4 :
 la valeur est masquée partout, même dans les logs TRACE.)
 
@@ -212,7 +212,7 @@ Résultats dans `output.xml` / `log.html` / `report.html`.
 | `Cannot open connection 'A4H'` | La *Description* SAP Logon ≠ `SAP_CONNECTION`. |
 | Login refusé / mot de passe expiré | Changer le mot de passe au login ; vérifier client `001` / user `DEVELOPER`. |
 | Message licence au login | Installer une licence minisap via `SLICENSE` (§6). |
-| `Logon not possible (error in license check)` (client 001 — GUI *et* OData) | Licence expirée/invalide (§6). En attendant, `SAP*` / client `000` se connecte pour les tâches d'admin (§11.7). |
+| `Logon not possible (error in license check)` (client 001, GUI *et* OData) | Licence expirée/invalide (§6). En attendant, `SAP*` / client `000` se connecte pour les tâches d'admin (§11.7). |
 | `SAP Gateway has been deactivated` (OData HTTP 500, `/IWFND/CM_COS/003`) | Conteneur re-créé : exécuter l'activité IMG `/IWFND/IWF_ACTIVATE` en `SAP*`/000 → *Activate* (§11.7). |
 | Démarrage très long / HANA pas prête | Attendre la fin dans `docker logs -f a4h` avant de tester. |
 
@@ -224,10 +224,10 @@ docker start a4h     # redémarrage (plus rapide que le 1er boot)
 docker rm a4h        # suppression (perte des données du système)
 ```
 
-## 11. Validé en live — points durs rencontrés (✅ ecc_smoke 5/5)
+## 11. Validé en live : points durs rencontrés (✅ ecc_smoke 5/5)
 
 Validation réelle effectuée avec une **image 1909** (l'officielle étant retirée :
-re-upload tiers `toberic/abap-platform-trial:1909`, ⚠️ non-officiel — cf. réserves
+re-upload tiers `toberic/abap-platform-trial:1909`, ⚠️ non-officiel ; cf. réserves
 licence/sécurité). Ces points sont **génériques** à l'ABAP Platform Trial sous Docker
 Desktop/Windows :
 
@@ -271,7 +271,7 @@ Desktop/Windows :
 
 5. **Connexion sans entrée SAP Logon :** chaîne `/H/vhcala4hci/S/3200` via le keyword
    **`Open Connection By String`** (le `Open Connection` standard exige une entrée
-   enregistrée). Login **`DEVELOPER` / client `001` / `Htods70334`** — le mot de
+   enregistrée). Login **`DEVELOPER` / client `001` / `Htods70334`** : le mot de
    passe par défaut publié par SAP lui-même pour cette image trial, pas un vrai
    secret ; néanmoins, préférez le passer via `-v "SAP_PASSWORD: Secret:..."`
    (la variable typée RF 7.4, masquée même dans les logs TRACE) ou une variable
@@ -289,15 +289,15 @@ Desktop/Windows :
    → **5/5 PASS** (login, navigation SE16, parcours T000, lecture **grille ALV**
    SM50, transaction inconnue).
 
-7. **Un conteneur re-créé repart nu — et ses licences meurent avec l'ancienne
+7. **Un conteneur re-créé repart nu, et ses licences meurent avec l'ancienne
    MAC.** `docker rm` + `docker run` remet à zéro tout ce qui a été fait depuis
    le premier provisionnement : la clé matérielle ABAP dérive de l'adresse MAC
-   de eth0 (la figer avec `--mac-address` au `docker run`, sinon la clé — et la
-   licence — change ; sous Docker 29 un conteneur créé *sans* `--mac-address`
+   de eth0 (la figer avec `--mac-address` au `docker run`, sinon la clé change,
+   et la licence avec elle ; sous Docker 29 un conteneur créé *sans* `--mac-address`
    change même de MAC à chaque `docker start`), et la ligne de profil scripting
    (point 3), le service ICF `webgui` (SICF) et l'**activation de la SAP
    Gateway** sont perdus. Tout se répare **sans licence valide**, car `SAP*`
-   en client `000` se connecte quand même — seul le client `001` est bloqué
+   en client `000` se connecte quand même : seul le client `001` est bloqué
    par le contrôle de licence, en GUI *et* en OData (même « error in license
    check ») :
    - OData répond HTTP 500 `/IWFND/CM_COS/003` *« SAP Gateway has been
@@ -305,15 +305,15 @@ Desktop/Windows :
      (« Activate or Deactivate SAP Gateway », SPRO → SAP Gateway → OData
      Channel → Configuration) et cliquer *Activate*. Son tcode généré se lit
      dans la table `CUS_IMGACH` (`/IWFND/50000003` sur l'image 1909) ; le
-     réglage est **inter-mandants** — un seul passage suffit (vérifié live le
+     réglage est **inter-mandants** : un seul passage suffit (vérifié live le
      2026-08-02 : catalogue du client 000 = 38 services aussitôt après).
    - Piège au passage : `Run Transaction` sur un tcode IMG généré échoue en
-     **faux négatif** — la transaction a bien démarré, mais sous son nom
+     **faux négatif** : la transaction a bien démarré, mais sous son nom
      interne (`active='/IWFND/IWF_ACTIVATE'`). Percevoir l'écran avant de
      conclure (voir `memory/run-transaction-tcodes-parametres.md`).
 
 > Note réelle : sur ce système, une transaction inexistante renvoie un statut de type
-> **`S`** (pas `E`) — `Run Transaction` a donc été corrigé pour comparer la
+> **`S`** (pas `E`) : `Run Transaction` a donc été corrigé pour comparer la
 > **transaction active** (`session.Info.Transaction`), seul critère vraiment
 > indépendant de la langue.
 
@@ -330,5 +330,5 @@ Desktop/Windows :
 - SAP Cloud Appliance Library (option A) : <https://cal.sap.com/catalog>
 - Doc officielle de l'image : <https://github.com/SAP-docs/abap-platform-trial-image>
 - Image Docker Hub (option B, actuellement 404) : <https://hub.docker.com/r/sapse/abap-cloud-developer-trial>
-- SAP Community — ABAP Cloud Developer Trial 2023 :
+- SAP Community, ABAP Cloud Developer Trial 2023 :
   <https://community.sap.com/t5/technology-blog-posts-by-sap/abap-cloud-developer-trial-2023-available-now/ba-p/14057183>

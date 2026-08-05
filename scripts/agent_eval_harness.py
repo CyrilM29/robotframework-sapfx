@@ -1,22 +1,22 @@
-"""Harnais d'évaluation des agents de test — dérive simulée, rejouable.
+"""Harnais d'évaluation des agents de test : dérive simulée, rejouable.
 
 Le test « en aveugle » du sap-healer (release 0.3.0 : dérive simulée
 ``btn[31]`` → ``btn[13]``, diagnostic par perception live, patch d'UNE ligne de
 ``resources/``, zéro test modifié) avait été déroulé à la main, une fois. Ce
 harnais le rend **rejouable** : c'est le filet de sécurité pour faire évoluer
 les définitions d'agents et la guidance rf-mcp sans régression silencieuse du
-comportement agentique — l'équivalent, pour les agents, des tests unitaires
+comportement agentique, l'équivalent, pour les agents, des tests unitaires
 pour le code.
 
 Trois actions (orchestrées par la slash-command ``/sap-eval-healer``) :
 
 - ``inject <scenario>``  : applique la dérive simulée au fichier resource visé
-  (sauvegarde octet à octet + empreintes de la surface « interdite » — les
-  tests et les autres resources — dans ``results/agent_eval/``). Refuse un
+  (sauvegarde octet à octet + empreintes de la surface « interdite », les
+  tests et les autres resources, dans ``results/agent_eval/``). Refuse un
   état déjà injecté ou une cible ambiguë.
 - ``verify <scenario>``  : après le passage du healer, vérifie que la dérive a
   été réparée (l'ancien localisateur est revenu, l'injecté a disparu) et que
-  RIEN d'autre n'a bougé (tests intacts, autres resources intactes — le
+  RIEN d'autre n'a bougé (tests intacts, autres resources intactes : le
   contrat « patcher resources/, jamais les tests »). PASS supprime l'état.
 - ``restore <scenario>`` : restaure la sauvegarde (éval interrompue).
 
@@ -50,13 +50,13 @@ STATE_DIR = os.path.join("results", "agent_eval")
 PROTECTED_DIRS = ("tests", "resources", "variables")
 
 # Scénarios de dérive simulée. `old` doit apparaître EXACTEMENT une fois dans
-# `file` (sinon inject refuse — cible ambiguë). `suite` documente la suite à
+# `file` (sinon inject refuse : cible ambiguë). `suite` documente la suite à
 # donner au healer en aveugle.
 SCENARIOS: Dict[str, Dict[str, str]] = {
     "se16-count-button": {
         "description": (
             "Dérive simulée du bouton SE16 « Number of Entries » "
-            "(btn[31] -> btn[13]) — l'exercice en aveugle de la release 0.3.0."),
+            "(btn[31] -> btn[13]), l'exercice en aveugle de la release 0.3.0."),
         "file": "resources/ecc_keywords.resource",
         "old": "wnd[0]/tbar[1]/btn[31]",
         "new": "wnd[0]/tbar[1]/btn[13]",
@@ -74,7 +74,7 @@ def _scenario(name: str) -> Dict[str, str]:
         return SCENARIOS[name]
     except KeyError:
         raise HarnessError(
-            "scénario inconnu : %r — scénarios valides : %s"
+            "scénario inconnu : %r ; scénarios valides : %s"
             % (name, ", ".join(sorted(SCENARIOS)))) from None
 
 
@@ -113,7 +113,7 @@ def inject(name: str, root: str | None = None) -> List[str]:
     state_path, backup_path = _state_paths(root, name)
     if os.path.exists(state_path):
         raise HarnessError(
-            "le scénario %r est déjà injecté (état : %s) — lancer verify ou "
+            "le scénario %r est déjà injecté (état : %s) ; lancer verify ou "
             "restore d'abord." % (name, state_path))
     target = os.path.join(root, scenario["file"])
     try:
@@ -126,12 +126,12 @@ def inject(name: str, root: str | None = None) -> List[str]:
     occurrences = original.count(old)
     if occurrences != 1:
         raise HarnessError(
-            "cible ambiguë : %r apparaît %d fois dans %s (1 attendue) — "
+            "cible ambiguë : %r apparaît %d fois dans %s (1 attendue) ; "
             "mettre à jour le scénario." % (scenario["old"], occurrences,
                                             scenario["file"]))
     if new in original:
         raise HarnessError(
-            "l'id injecté %r est déjà présent dans %s — fichier déjà dérivé ?"
+            "l'id injecté %r est déjà présent dans %s. Fichier déjà dérivé ?"
             % (scenario["new"], scenario["file"]))
     os.makedirs(os.path.dirname(state_path), exist_ok=True)
     with open(backup_path, "wb") as f:
@@ -164,7 +164,7 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
     state_path, backup_path = _state_paths(root, name)
     if not os.path.exists(state_path):
         raise HarnessError(
-            "aucun état pour %r — lancer inject d'abord." % name)
+            "aucun état pour %r : lancer inject d'abord." % name)
     with open(state_path, "r", encoding="utf-8") as f:
         state = json.load(f)
     target = os.path.join(root, scenario["file"])
@@ -175,12 +175,12 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
     if scenario["new"].encode("utf-8") in current:
         ok = False
         messages.append(
-            "ECHEC : l'id dérivé %r est toujours présent dans %s — la "
+            "ECHEC : l'id dérivé %r est toujours présent dans %s. La "
             "réparation n'a pas eu lieu." % (scenario["new"], scenario["file"]))
     if scenario["old"].encode("utf-8") not in current:
         ok = False
         messages.append(
-            "ECHEC : l'id d'origine %r n'est pas revenu dans %s — réparé vers "
+            "ECHEC : l'id d'origine %r n'est pas revenu dans %s. Réparé vers "
             "autre chose ? Examiner le diff." % (scenario["old"],
                                                  scenario["file"]))
     if ok:
@@ -191,7 +191,7 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
         else:
             messages.append(
                 "OK (avec note) : la dérive est réparée mais %s diffère de "
-                "l'original — examiner le diff (commentaire ajouté ? "
+                "l'original ; examiner le diff (commentaire ajouté ? "
                 "réparation par ancre de libellé ?)." % scenario["file"])
     drifted = []
     for rel, digest in sorted(state["protected"].items()):
@@ -208,12 +208,12 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
             "ECHEC : fichiers protégés modifiés (le healer ne touche NI les "
             "tests NI les autres resources) : %s" % ", ".join(drifted))
     if ok:
-        messages.append("VERDICT : PASS — comportement healer conforme.")
+        messages.append("VERDICT : PASS, comportement healer conforme.")
         os.remove(state_path)
         os.remove(backup_path)
     else:
         messages.append(
-            "VERDICT : FAIL — état conservé (%s) ; restore pour revenir à "
+            "VERDICT : FAIL, état conservé (%s) ; restore pour revenir à "
             "l'original." % state_path)
     return ok, messages
 
@@ -225,7 +225,7 @@ def restore(name: str, root: str | None = None) -> List[str]:
     state_path, backup_path = _state_paths(root, name)
     if not os.path.exists(backup_path):
         raise HarnessError(
-            "aucune sauvegarde pour %r — rien à restaurer." % name)
+            "aucune sauvegarde pour %r : rien à restaurer." % name)
     with open(backup_path, "rb") as f:
         original = f.read()
     with open(os.path.join(root, scenario["file"]), "wb") as f:

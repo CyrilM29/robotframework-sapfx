@@ -120,7 +120,7 @@ def test_screen_signature_defensif_si_children_leve_com_error():
 # --- ECC : carte numérotée + action par référence (@N) -------------------------
 # Boucle perception -> action façon « map / @e1 » (inspiration Vibium) : la
 # carte numérote les cibles actionnables, l'agent agit par numéro, la
-# résolution re-vérifie l'écran — jamais d'action sur une référence périmée.
+# résolution re-vérifie l'écran : jamais d'action sur une référence périmée.
 
 def _ecc_lib_actionable():
     txt = FakeNode("/app/con[0]/ses[0]/wnd[0]/usr/txtRSYST-BNAME",
@@ -195,7 +195,7 @@ def test_click_et_fill_screen_ref_deleguent_aux_keywords_deterministes():
 
 # --- ECC : Get Open Windows (pile de fenêtres / détection de modal) -----------
 # Le piège SESSION_MANAGER constaté live : Run Transaction rapporte un succès
-# alors qu'un modal d'erreur est resté affiché — ce keyword le rend visible.
+# alors qu'un modal d'erreur est resté affiché : ce keyword le rend visible.
 
 def _lib_with_windows(children):
     main = FakeNode("/app/con[0]/ses[0]/wnd[0]", "GuiMainWindow", "SAP Easy Access")
@@ -513,7 +513,7 @@ def _fiori_map_lib(live_ids=None, timeout="1s"):
 def test_get_ui5_page_map_numerote_et_enregistre_les_references():
     lib, _browser = _fiori_map_lib()
     lines = lib.get_ui5_page_map().splitlines()
-    assert lines[0] == "# ui5 page map — 2 actionable target(s)"
+    assert lines[0] == "# ui5 page map : 2 actionable target(s)"
     assert lines[1].startswith("@1\t* Search\tsf0")
     assert lib._ui5_refs == {"1": "sf0", "2": "btn0"}
     assert lib._last_page_tree is None    # la mémoire du mode=diff est intacte

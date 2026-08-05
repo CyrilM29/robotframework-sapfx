@@ -5,12 +5,12 @@ pratique (rf-mcp compacte déjà les perceptions byte-identiques) convergent :
 après une action, ce qui intéresse l'agent est « **ce qui a changé** », pas la
 re-description complète d'un écran déjà vu. Ce module rend un diff ligne à
 ligne compact : lignes retirées (``- ``), ajoutées (``+ ``), et un simple
-compteur pour l'inchangé — de l'ordre de 10× moins de tokens qu'une perception
+compteur pour l'inchangé : de l'ordre de 10× moins de tokens qu'une perception
 complète sur un écran qui n'a bougé qu'à la marge.
 
 ``pair_renames=True`` ajoute le **diff intelligent** : dans chaque bloc
 modifié, les lignes disparues/apparues dont les ids se ressemblent (scoring de
-:mod:`sapfx_common.healing` — le même qui répare les localisateurs) sont
+:mod:`sapfx_common.healing`, le même qui répare les localisateurs) sont
 appariées en une seule ligne ``~ ancien -> nouveau`` au lieu d'une paire
 ``-``/``+`` brute. Un sous-écran renuméroté (``SAPLMEGUI:0013`` → ``:0015``)
 passe de « 40 lignes ont bougé » à « N renommages, 2 vrais changements ».
@@ -45,7 +45,7 @@ def split_xml_lines(xml_text: str) -> list[str]:
 
 def _parse_perception_line(line: str) -> Optional[tuple[str, str, str]]:
     """Décompose une ligne de signature ECC (``[* ]<id>\\t<Type>\\t<texte>``) en
-    ``(id, type, texte)`` — ``None`` si la ligne n'a pas ce format (entête,
+    ``(id, type, texte)``, ``None`` si la ligne n'a pas ce format (entête,
     balise XML Fiori…), auquel cas elle ne participe pas à l'appariement."""
     body = line[2:] if line[:2] in ("* ", "  ") else line
     parts = body.split("\t")
@@ -134,7 +134,7 @@ def diff_perception(previous: str | None, current: str, xml: bool = False,
     courante. Au premier appel, retourne la perception complète (rien à differ).
     ``xml=True`` éclate d'abord les deux côtés en une balise par ligne.
     ``pair_renames=True`` active l'appariement des renommages (voir
-    :func:`diff_lines`) — pensé pour les signatures ECC à 3 colonnes."""
+    :func:`diff_lines`), pensé pour les signatures ECC à 3 colonnes."""
     if previous is None:
         return current
     if xml:

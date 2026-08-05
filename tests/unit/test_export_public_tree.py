@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """Tests hors-SAP des briques pures de l'export public
-(``scripts/export_public_tree.py`` — convention #5 du CLAUDE.md).
+(``scripts/export_public_tree.py``, convention #5 du CLAUDE.md).
 
 Le script est volontairement EXCLU de l'arbre public exporté (il énumère les
 motifs interdits) : ce test, lui, est livré et se saute proprement quand le
-script est absent. Aucun littéral sensible ici — tout est synthétique.
+script est absent. Aucun littéral sensible ici : tout est synthétique.
 """
 import importlib.util
 import os

@@ -1,10 +1,21 @@
 > [🇬🇧 English](deployment-pack.md) · **🇫🇷 Français**
 
-# Pack de déploiement — déroulé de bout en bout
+# Pack de déploiement : déroulé de bout en bout
 
 Comment amener les bibliothèques, les recorders et les plugins rf-mcp de ce
 dépôt jusqu'à un PC de test Windows qui n'a pas de clone du dépôt. Cinq étapes,
 ~10 minutes hors téléchargements.
+
+Le pack est le **canal de distribution « installation complète »**, le seul
+qui embarque tout : bibliothèques, recorders (GUI desktop + extension web
+MV3), plugins rf-mcp avec le lanceur `sapfx-mcp`, resources métier, suites
+d'exemple, scripts de maintenance et agents de test, dans UN zip auditable
+(SHA-256 + SBOM + provenance). PyPI (`pip install robotframework-sapfx`)
+livre les **bibliothèques seules** : le bon choix pour ajouter les keywords à
+un projet Robot Framework existant, pas pour provisionner un poste de test
+complet. C'est ce qui fait du pack la voie recommandée pour les postes de
+test cibles (l'installateur a toujours besoin de PyPI ou d'un miroir interne
+pour les dépendances épinglées, voir l'étape 3).
 
 ```
 PC dev (ce dépôt)                       PC Windows cible
@@ -29,7 +40,7 @@ maintenance `healing_drift_report.py`/`check_spec_sync.py`, les agents de
 test, installateur, LICENSE/NOTICE) et zippe. `--skip-wheels` ré-assemble sans reconstruire les
 wheels ; la version vient de `pyproject.toml`. Les sources de tout ce que le
 pack ajoute (installateur, READMEs, gabarit MCP) vivent dans
-[`packaging/`](../packaging/) — corrigez là et regénérez, ne modifiez jamais
+[`packaging/`](../packaging/) : corrigez là et regénérez, ne modifiez jamais
 `dist/` sur place.
 
 ## 2. Transférer
@@ -39,17 +50,17 @@ Copiez le zip sur le PC cible (partage, USB…) et dézippez-le n'importe où en
 relatifs à sa racine.
 
 Le pack est aussi **téléchargeable publiquement** (aucun compte GitHub requis)
-depuis le dépôt « releases only »
-[CyrilM29/robotframework-sapfx](https://github.com/CyrilM29/robotframework-sapfx/releases)
-— depuis la 0.5.2, chaque release est publiée deux fois : sur ce dépôt (privé)
-et là-bas, avec des notes adaptées au public. Le source reste privé ; seuls le
-zip, LICENSE/NOTICE et un README bilingue sont exposés.
+depuis
+[CyrilM29/robotframework-sapfx](https://github.com/CyrilM29/robotframework-sapfx/releases).
+Chaque release y est publiée avec des notes adaptées au public, aux côtés
+de l'arbre source public (ouvert depuis la 0.6.4) et de la distribution PyPI
+« bibliothèques seules ».
 
 ## 3. Installer (PC cible)
 
 Prérequis : Windows 10/11, Python 3.10+ dans le `PATH`, accès Internet
 **pendant cette étape seulement** (pip télécharge Robot Framework, pywin32,
-robotframework-browser… — les wheels de *ce* dépôt sont déjà dans le pack).
+robotframework-browser… ; les wheels de *ce* dépôt sont déjà dans le pack).
 
 ```bat
 cd C:\sapfx\sapfx-pack-<version>-win
@@ -60,7 +71,7 @@ install.cmd -WithBrowsers   REM + Chromium Playwright (sinon : Chrome système, 
 
 L'installateur crée `.venv\` dans le dossier du pack, applique les versions
 qualifiées de `constraints-deploy.txt`,
-exécute un smoke check d'import, et — avec `-WithMcp` — rend
+exécute un smoke check d'import, et, avec `-WithMcp`, rend
 `mcp.generated.json` avec le chemin absolu du `robotmcp.exe` du venv. Rien de
 global n'est modifié (pas de changement de `PATH`, pas de site-packages
 système).
@@ -69,11 +80,11 @@ système).
 
 ```bat
 .venv\Scripts\robot.exe tests\robot\fiori_wc_smoke.robot REM hors ligne, sans SAP
-.venv\Scripts\robot.exe tests\robot\fiori_smoke.robot     REM côté web — réseau requis, pas de SAP
+.venv\Scripts\robot.exe tests\robot\fiori_smoke.robot     REM côté web : réseau requis, pas de SAP
 .venv\Scripts\robot.exe -v SAP_CONNECTION:"..." -v SAP_USER:... -v "SAP_PASSWORD: Secret:..." tests\robot\ecc_smoke.robot
 ```
 
-La forme `: Secret:` est la syntaxe de variable typée de Robot Framework 7.4 —
+La forme `: Secret:` est la syntaxe de variable typée de Robot Framework 7.4 :
 le mot de passe n'apparaît jamais dans les logs, même en niveau TRACE.
 
 Côté ECC, SAP GUI for Windows doit être installé avec le scripting activé
@@ -101,7 +112,7 @@ propre, supprimez d'abord `.venv\`.
 
 - L'étape d'installation a besoin de PyPI (ou d'un miroir interne). Pour des
   cibles isolées du réseau, demandez la variante offline (wheels de dépendances
-  embarqués dans `wheels/`) — non construite par défaut car les wheels pywin32
+  embarqués dans `wheels/`), non construite par défaut car les wheels pywin32
   sont spécifiques à la version de Python.
 - Le pack embarque six suites d'exemple (les smokes ECC/Fiori, le smoke WC hors ligne, la campagne
   d'exploration autonome, la sentinelle de dérive et le flagship

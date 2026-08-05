@@ -8,7 +8,7 @@ Sert deux usages :
 La même idée de signature structurelle existe dans l'enregistreur desktop
 (``tools/recorder/sapgui_recorder.py:screen_signature``) ; on la ré-implémente ici
 en autonomie pour ne pas faire dépendre ``src/`` de ``tools/``. Les ids surfacés
-sont **relatifs à la session** (``wnd[0]/usr/txt...``) — donc directement collables
+sont **relatifs à la session** (``wnd[0]/usr/txt...``), donc directement collables
 dans un test ou ``resources/``.
 """
 import base64
@@ -74,7 +74,7 @@ _MAGIC_MIMES = (
 
 def _sniff_mime(data, fallback="image/png"):
     """MIME réel d'un buffer image par ses magic bytes (l'énumération
-    GuiImageType a varié selon les versions — on ne lui fait pas confiance)."""
+    GuiImageType a varié selon les versions, on ne lui fait pas confiance)."""
     for magic, mime in _MAGIC_MIMES:
         if data[:len(magic)] == magic:
             return mime
@@ -117,7 +117,7 @@ class PerceptionKeywords:
         """Contrôles de la fenêtre active en liste de :class:`ScreenElement`
         (ids **relatifs à la session**, ordre du document).
 
-        Chemin rapide : ``session.GetObjectTree`` — un seul appel COM pour tout
+        Chemin rapide : ``session.GetObjectTree``, un seul appel COM pour tout
         le sous-arbre, avec texte, éditabilité et géométrie (voir
         ``sapfx_common.object_tree``). Repli : la marche COM historique nœud par
         nœud. Une ``AttributeError`` (API absente de cette version de SAP GUI)
@@ -165,7 +165,7 @@ class PerceptionKeywords:
         ]
 
     def _screen_header(self):
-        """Ligne d'identité de l'écran actif (``# screen P/T/N``) — partagée
+        """Ligne d'identité de l'écran actif (``# screen P/T/N``), partagée
         par la signature, la carte numérotée et le contrôle de fraîcheur des
         références. Défensif : ``# screen ?`` si la session est illisible."""
         try:
@@ -187,34 +187,34 @@ class PerceptionKeywords:
 
         ``mode=diff`` retourne le **différentiel** depuis l'appel précédent de ce
         keyword sur cette instance (lignes ``- `` disparues / ``+ `` apparues,
-        inchangé résumé en ``= N unchanged line(s)``) — après une action, c'est
+        inchangé résumé en ``= N unchanged line(s)``) : après une action, c'est
         « ce qui a changé » qui intéresse l'agent, pour une fraction des tokens.
         Le premier appel en diff retourne la vue complète (rien à comparer).
         L'écran est TOUJOURS relu en entier (jamais de cache d'état) ; seul le
         rendu diffère. ``pair_renames=True`` (avec ``mode=diff``) active le
         **diff intelligent** : les lignes disparues/apparues dont les ids se
         ressemblent (scoring de ``sapfx_common.healing``) sont appariées en
-        ``~ ancien -> nouveau`` — un sous-écran renuméroté se lit comme un
+        ``~ ancien -> nouveau`` : un sous-écran renuméroté se lit comme un
         renommage, pas comme deux blocs de lignes.
 
         ``mode=semantic`` retourne la vue **formulaire** de l'écran : une ligne
-        par cible actionnable — champ modifiable ou bouton/onglet — portant son
+        par cible actionnable (champ modifiable ou bouton/onglet) portant son
         localisateur humain *vérifié* (émis seulement s'il re-résout vers ce
         seul élément, sinon ``?``), l'id technique, le type et la valeur
         courante : ``* Table Name\\twnd[0]/usr/ctxtDATABROWSE-TABLENAME\\t
         GuiCTextField\\t= T000``. C'est la perception la plus directement
         actionnable pour un agent (chaque ligne se rejoue en ``Fill Field By
-        Label``/``Click Button By Label`` — ou par id) et la moins chère en
+        Label``/``Click Button By Label``, ou par id) et la moins chère en
         tokens. Cette vue ne participe pas à la mémoire du ``mode=diff``.
 
         ``include_geometry=True`` ajoute une 4e colonne ``@gauche,haut LxH``
-        (coordonnées écran) aux contrôles qui en ont — utile pour situer un
+        (coordonnées écran) aux contrôles qui en ont, utile pour situer un
         champ ou déboguer un localisateur par libellé. Le format par défaut à
         3 colonnes reste inchangé (contrat du filtrage rf-mcp).
 
         La lecture passe par le chemin rapide ``GetObjectTree`` quand l'API est
         disponible (un appel COM au lieu d'un par contrôle), avec repli
-        automatique sur la marche COM historique — voir ``_screen_elements``.
+        automatique sur la marche COM historique : voir ``_screen_elements``.
 
         Lecture seule et indépendant de la locale (on n'expose que types et ids,
         pas de message localisé). C'est le keyword de perception consommé par le
@@ -252,20 +252,20 @@ class PerceptionKeywords:
     # -- carte numérotée + action par référence (@N) ---------------------------
     # Boucle perception -> action resserrée pour un agent, dans l'esprit du
     # ``map`` / ``@e1`` de Vibium : la carte numérote les cibles actionnables,
-    # l'agent agit ensuite par le numéro — plus court et moins sujet aux
+    # l'agent agit ensuite par le numéro, plus court et moins sujet aux
     # erreurs de recopie qu'un id SAP complet. Les références sont éphémères
     # (dernière perception de l'instance) et re-vérifiées avant chaque action.
 
     def _register_screen_refs(self, refs, header):
         """Mémorise la table ``numéro -> id`` de la dernière perception
-        numérotée (carte OU screenshot annoté — la dernière gagne), avec
+        numérotée (carte OU screenshot annoté, la dernière gagne), avec
         l'identité d'écran du moment pour le contrôle de fraîcheur."""
         self._screen_refs = dict(refs)
         self._screen_refs_header = header
 
     def get_screen_map(self):
         """Retourne la **carte numérotée** de l'écran SAP actif : une ligne
-        par cible actionnable — ``@N`` suivi de la ligne d'affordance de
+        par cible actionnable, ``@N`` suivi de la ligne d'affordance de
         ``mode=semantic`` (libellé humain vérifié, id, type, valeur) ::
 
             # screen SAPLSE16/SE16/0102
@@ -273,7 +273,7 @@ class PerceptionKeywords:
             @2\t  Number of Entries\twnd[0]/tbar[1]/btn[31]\tGuiButton
 
         Chaque numéro devient une **référence éphémère** utilisable par
-        `Resolve Screen Ref`, `Click Screen Ref` et `Fill Screen Ref` — l'agent
+        `Resolve Screen Ref`, `Click Screen Ref` et `Fill Screen Ref` : l'agent
         lit la carte puis agit par ``@N`` sans recopier l'id (la résolution
         re-vérifie l'écran avant d'agir). Même numérotation que la légende de
         `Get Annotated Screenshot` quand tous les éléments ont une géométrie.
@@ -297,22 +297,22 @@ class PerceptionKeywords:
 
     def resolve_screen_ref(self, ref):
         """Résout une référence ``@N`` de la dernière perception numérotée
-        (`Get Screen Map` ou `Get Annotated Screenshot`) en **id d'élément**
-        — jamais en silence : échec actionnable si aucune perception n'a été
+        (`Get Screen Map` ou `Get Annotated Screenshot`) en **id d'élément**,
+        jamais en silence : échec actionnable si aucune perception n'a été
         faite, si la référence est inconnue, si l'écran a changé depuis la
         perception, ou si l'élément a disparu (dans ces deux derniers cas le
         remède est nommé : re-percevoir). Accepte ``3`` ou ``@3``. Retourne
-        l'id (chaîne — MCP-safe)."""
+        l'id (chaîne, MCP-safe)."""
         refs = getattr(self, "_screen_refs", None)
         if not refs:
             raise AssertionError(
-                "Aucune perception numérotée mémorisée — appeler d'abord "
+                "Aucune perception numérotée mémorisée : appeler d'abord "
                 "Get Screen Map (ou Get Annotated Screenshot) pour relever "
                 "les références @N de l'écran.")
         number = str(ref).strip().lstrip("@")
         if number not in refs:
             raise AssertionError(
-                "Référence @%s inconnue — la dernière perception numérotée "
+                "Référence @%s inconnue : la dernière perception numérotée "
                 "expose @1..@%d (relever la carte à jour avec Get Screen Map)."
                 % (number, len(refs)))
         element_id = refs[number]
@@ -320,7 +320,7 @@ class PerceptionKeywords:
         current = self._screen_header()
         if registered and current != registered:
             raise AssertionError(
-                "L'écran a changé depuis la perception numérotée (%r -> %r) — "
+                "L'écran a changé depuis la perception numérotée (%r -> %r), "
                 "les références @N sont périmées : re-percevoir avec "
                 "Get Screen Map avant d'agir par référence."
                 % (registered, current))
@@ -328,16 +328,16 @@ class PerceptionKeywords:
             self.session.findById(element_id)
         except (AttributeError, com_error):
             raise AssertionError(
-                "La cible @%s (%s) n'existe plus à l'écran — re-percevoir "
+                "La cible @%s (%s) n'existe plus à l'écran : re-percevoir "
                 "avec Get Screen Map avant d'agir par référence."
                 % (number, element_id))
         return element_id
 
     def click_screen_ref(self, ref):
         """Clique la cible ``@N`` de la dernière perception numérotée : la
-        référence est résolue en id (`Resolve Screen Ref` — fraîcheur et
+        référence est résolue en id (`Resolve Screen Ref` : fraîcheur et
         présence re-vérifiées), puis le clic passe par le keyword
-        **déterministe** `Click Element`. Retourne l'id cliqué (journalisé —
+        **déterministe** `Click Element`. Retourne l'id cliqué (journalisé :
         la trace reste rejouable par id dans une suite)."""
         element_id = self.resolve_screen_ref(ref)
         logger.info("Click Screen Ref @%s -> %s"
@@ -347,7 +347,7 @@ class PerceptionKeywords:
 
     def fill_screen_ref(self, ref, text):
         """Saisit ``text`` dans la cible ``@N`` de la dernière perception
-        numérotée — résolution `Resolve Screen Ref` puis `Input Text`
+        numérotée : résolution `Resolve Screen Ref` puis `Input Text`
         déterministe. Retourne l'id rempli. La valeur saisie n'est jamais
         utilisée comme localisateur (même règle que le recorder sémantique)."""
         element_id = self.resolve_screen_ref(ref)
@@ -364,8 +364,8 @@ class PerceptionKeywords:
         C'est le garde-fou du piège constaté live sur SESSION_MANAGER :
         ``Run Transaction`` peut rapporter un succès (``Info.Transaction`` porte
         déjà le tcode) alors qu'un **modal d'erreur est resté affiché** et
-        neutralise le champ OK-code. Vérifier ``modal`` ici — ou ``modal_open``
-        dans l'état applicatif rf-mcp, qui appelle ce keyword — avant d'enchaîner.
+        neutralise le champ OK-code. Vérifier ``modal`` ici (ou ``modal_open``
+        dans l'état applicatif rf-mcp, qui appelle ce keyword) avant d'enchaîner.
         Lecture seule, indépendant de la locale (le titre est du contexte humain,
         jamais une ancre d'assertion). Défensif : fenêtre illisible ignorée,
         session indisponible -> liste vide."""
@@ -394,17 +394,17 @@ class PerceptionKeywords:
 
     def get_screenshot_as_base64(self, image_format="png"):
         """Capture la fenêtre SAP active **en mémoire** et retourne l'image en
-        base64 (chaîne — sûre à travers la frontière rf-mcp, rien n'est écrit
+        base64 (chaîne sûre à travers la frontière rf-mcp, rien n'est écrit
         sur disque).
 
         Passe par ``ActiveWindow.HardCopyToMemory`` (API scripting : capture
-        fidèle de la fenêtre, y compris hors focus — contrairement à une
+        fidèle de la fenêtre, y compris hors focus, contrairement à une
         capture GDI de l'écran). ``image_format`` : ``png`` (défaut), ``jpeg``,
         ``bmp``, ``gif``. Le format réellement retourné est re-vérifié par
         magic bytes, pas supposé.
 
         Complète `Get Screen Signature` (texte) d'un canal **visuel** : un
-        agent — ou un rapport — peut joindre la preuve d'écran ; voir
+        agent (ou un rapport) peut joindre la preuve d'écran ; voir
         `Log Screenshot` pour l'ancrer dans le log Robot. Échec explicite si
         l'API est absente (SAP GUI ancien) : `Take Screenshot` (fichier) reste
         le repli."""
@@ -415,12 +415,12 @@ class PerceptionKeywords:
         except (AttributeError, com_error) as exc:
             raise AssertionError(
                 "HardCopyToMemory indisponible sur cette session (SAP GUI trop "
-                "ancien ?) — utiliser Take Screenshot (fichier) en repli : %s" % exc)
+                "ancien ?). Utiliser Take Screenshot (fichier) en repli : %s" % exc)
         return base64.b64encode(_as_bytes(raw)).decode("ascii")
 
     def log_screenshot(self, message=""):
         """Capture la fenêtre SAP active et l'**incruste dans le log Robot**
-        (image inline en data-URI — le ``log.html`` reste autoporteur, aucune
+        (image inline en data-URI : le ``log.html`` reste autoporteur, aucune
         pièce jointe à archiver à côté). ``message`` : texte optionnel affiché
         au-dessus de l'image. Retourne le MIME réellement incrusté."""
         b64 = self.get_screenshot_as_base64()
@@ -441,14 +441,14 @@ class PerceptionKeywords:
 
         C'est le pont entre la perception visuelle et l'effecteur : un agent
         (ou un humain) qui regarde l'image n'a plus à *deviner* des
-        coordonnées — il lit le numéro, la légende lui donne l'id, et l'id
+        coordonnées : il lit le numéro, la légende lui donne l'id, et l'id
         alimente un keyword déterministe (`Click Element`, ou `Click Element
         At Offset` pour l'intérieur d'une zone opaque). Le patron
         « Set-of-Mark » des agents à vision, appliqué à SAP GUI.
 
         ``include_types`` (liste ou chaîne d'IDs de types séparés par des
         virgules, ex. ``GuiShell,GuiCustomControl``) remplace la sélection par
-        défaut — utile pour n'annoter que les zones opaques. Seuls les
+        défaut, utile pour n'annoter que les zones opaques. Seuls les
         éléments avec géométrie sont annotés. Nécessite Pillow (extra
         ``visual``).
 
@@ -490,7 +490,7 @@ class PerceptionKeywords:
 
     def log_annotated_screenshot(self, message="", include_types=None):
         """Capture annotée (voir `Get Annotated Screenshot`) **incrustée dans
-        le log Robot** avec sa légende ``numéro -> id`` en tableau — le
+        le log Robot** avec sa légende ``numéro -> id`` en tableau, le
         débogage de localisateurs d'un coup d'œil : chaque cible actionnable
         est numérotée sur l'image, son id copiable juste en dessous.
         Retourne la légende (dict)."""
@@ -512,7 +512,7 @@ class PerceptionKeywords:
 
     def get_screen_perceptual_hash(self, hash_size=8, mask_elements=None):
         """Capture la fenêtre SAP active et retourne son **hash perceptuel**
-        (dHash hexadécimal, ``hash_size²`` bits — voir
+        (dHash hexadécimal, ``hash_size²`` bits, voir
         ``sapfx_common.visual_hash``).
 
         Le canal *pixels* de la perception : couvre précisément ce que l'API
@@ -524,13 +524,13 @@ class PerceptionKeywords:
 
         ``mask_elements`` **neutralise les zones légitimement volatiles** avant
         hachage (remplies de gris neutre) : ``auto`` masque la barre de statut
-        et la barre de titre (l'horloge, le titre localisé — les sources
+        et la barre de titre (l'horloge, le titre localisé : les sources
         classiques de faux positifs des snapshots), ou une liste d'ids séparés
         par des virgules pour masquer des régions choisies. Un id absent de
         l'écran est journalisé et ignoré (le masque est déclaratif, pas une
         assertion).
 
-        Nécessite Pillow (``pip install Pillow`` — extra ``visual`` du paquet)
+        Nécessite Pillow (``pip install Pillow``, extra ``visual`` du paquet)
         pour décoder le PNG ; l'algorithme lui-même est pur et testé hors SAP."""
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         pixels = self._decode_image_to_gray(png)
@@ -542,7 +542,7 @@ class PerceptionKeywords:
         return dhash_hex(pixels, int(hash_size))
 
     def get_element_perceptual_hash(self, element_id, hash_size=8):
-        """Hash perceptuel de la **région d'UN élément** (dHash hexadécimal) —
+        """Hash perceptuel de la **région d'UN élément** (dHash hexadécimal),
         l'assertion visuelle ciblée là où elle a le plus de valeur : la grille
         dHash couvre l'élément seul au lieu de l'écran entier, donc un
         changement DANS un GuiShell opaque ou un GuiChart pèse sur tous les
@@ -563,7 +563,7 @@ class PerceptionKeywords:
     def get_screen_tile_hashes(self, tiles_x=4, tiles_y=4, hash_size=8):
         """Empreintes perceptuelles **par tuile** : la fenêtre est découpée en
         grille ``tiles_x × tiles_y`` (défaut 4×4) et chaque tuile reçoit son
-        propre dHash — retourne la liste des hex, ligne par ligne.
+        propre dHash. Retourne la liste des hex, ligne par ligne.
 
         Là où le hash global dilue un changement local dans l'écran entier, la
         grille le **localise** : comparer deux passages tuile à tuile
@@ -582,18 +582,18 @@ class PerceptionKeywords:
         sémantique *snapshot testing* :
 
         * premier passage (aucune baseline ``<name>.png``) : la capture devient
-          la baseline — WARNING journalisé, le test passe (à committer si le
+          la baseline. WARNING journalisé, le test passe (à committer si le
           rendu fait référence) ;
         * passages suivants : distance de Hamming entre le hash perceptuel de
           l'écran et celui recalculé depuis la baseline ; ``<= threshold``
-          (défaut 5 sur 64 bits) = succès, sinon échec **auto-corrigible** —
+          (défaut 5 sur 64 bits) = succès, sinon échec **auto-corrigible** :
           distance mesurée, chemins de la baseline et de la capture
           ``<name>.actual.png`` sauvegardée à côté pour comparaison, et le
           remède (supprimer la baseline si le changement est voulu).
 
         ``mask_elements`` (``auto`` ou ids séparés par des virgules) neutralise
         les zones volatiles AVANT hachage, identiquement pour la baseline et la
-        capture — voir `Get Screen Perceptual Hash`. C'est le remède nominal à
+        capture : voir `Get Screen Perceptual Hash`. C'est le remède nominal à
         une baseline qui échoue à cause de l'horloge de la barre de statut.
 
         ``baseline_directory`` est relatif au répertoire courant du run (le
@@ -620,8 +620,8 @@ class PerceptionKeywords:
     def element_should_match_baseline(self, name, element_id, threshold=5,
                                       baseline_directory="visual_baselines",
                                       hash_size=8):
-        """Assertion de non-régression visuelle de la **région d'UN élément**
-        — même sémantique snapshot que `Screen Should Match Baseline`, mais la
+        """Assertion de non-régression visuelle de la **région d'UN élément** :
+        même sémantique snapshot que `Screen Should Match Baseline`, mais la
         baseline est le PNG *recadré* sur l'élément : l'assertion est immune à
         tout ce qui change ailleurs sur l'écran (horloge, messages, autres
         champs) et les 64 bits du hash couvrent la seule zone qui compte.
@@ -649,17 +649,17 @@ class PerceptionKeywords:
     @staticmethod
     def _log_baseline_outcome(outcome, threshold):
         """Journalisation commune des deux assertions snapshot (création en
-        WARNING — un PNG à committer — conformité en info)."""
+        WARNING, un PNG à committer ; conformité en info)."""
         if outcome.created:
             logger.warn(
-                "Baseline visuelle créée (%s) — premier passage : committer "
+                "Baseline visuelle créée (%s), premier passage : committer "
                 "ce PNG s'il fait référence." % outcome.baseline_path)
         else:
             logger.info("Conforme à la baseline (distance %d <= %d)."
                         % (outcome.distance, threshold))
 
     def _window_origin(self):
-        """Origine écran de la fenêtre active — pour convertir une géométrie
+        """Origine écran de la fenêtre active, pour convertir une géométrie
         absolue (ScreenLeft/ScreenTop) dans le repère de la capture
         ``HardCopyToMemory`` (qui photographie la fenêtre, pas l'écran).
         Best-effort : (0, 0) si illisible."""
@@ -671,7 +671,7 @@ class PerceptionKeywords:
 
     def _element_image_region(self, element_id):
         """Région d'un élément dans le repère de la capture de fenêtre :
-        ``(left, top, width, height)`` — le relevé écran de `Get Element
+        ``(left, top, width, height)``, le relevé écran de `Get Element
         Screen Region` (mixin pointeur), translaté de l'origine de la fenêtre."""
         rect = self.get_element_screen_region(element_id)
         ox, oy = self._window_origin()
@@ -685,7 +685,7 @@ class PerceptionKeywords:
     def _mask_regions_for(self, mask_elements):
         """Traduit ``mask_elements`` (None / ``auto`` / ids séparés par des
         virgules / liste) en régions du repère capture. Un id absent est
-        journalisé et ignoré — le masque décrit des zones à neutraliser, il
+        journalisé et ignoré : le masque décrit des zones à neutraliser, il
         n'affirme pas leur présence."""
         if not mask_elements:
             return []
@@ -702,7 +702,7 @@ class PerceptionKeywords:
             try:
                 rect = self.get_element_screen_region(element_id)
             except AssertionError:
-                logger.info("Masque visuel : élément '%s' absent de l'écran — "
+                logger.info("Masque visuel : élément '%s' absent de l'écran, "
                             "ignoré." % element_id)
                 continue
             regions.append((rect["left"] - ox, rect["top"] - oy,
@@ -714,20 +714,20 @@ class PerceptionKeywords:
     def check_screen_against_watch(self, name, directory="screen_watch",
                                    fail_on_drift=False, visual_threshold=5,
                                    tiles_x=4, tiles_y=4):
-        """**Sentinelle** : compare l'écran SAP actif à sa référence mémorisée
-        — la détection de dérive SANS test scripté (voir
+        """**Sentinelle** : compare l'écran SAP actif à sa référence mémorisée,
+        la détection de dérive SANS test scripté (voir
         ``sapfx_common.screen_watch``).
 
         Première visite de ``name`` : la perception structurée (et les
-        empreintes visuelles — hash global + grille de tuiles — si Pillow est
-        présent) devient la référence dans ``directory`` — WARNING journalisé,
+        empreintes visuelles, hash global + grille de tuiles, si Pillow est
+        présent) devient la référence dans ``directory`` : WARNING journalisé,
         statut ``baseline-created``. Ensuite, TROIS canaux :
 
-        * **structurel** — diff *intelligent* ligne à ligne (les ids qui se
+        * **structurel** : diff *intelligent* ligne à ligne (les ids qui se
           ressemblent sont appariés en ``~ ancien -> nouveau`` par le scoring
           de healing : un sous-écran renuméroté se lit comme un renommage) ;
-        * **visuel global** — distance de Hamming du hash plein écran ;
-        * **visuel localisé** — comparaison tuile à tuile (grille ``tiles_x ×
+        * **visuel global** : distance de Hamming du hash plein écran ;
+        * **visuel localisé** : comparaison tuile à tuile (grille ``tiles_x ×
           tiles_y``, défaut 4×4) : une dérive locale trop diluée pour le hash
           global est rattrapée par SA tuile, nommée avec sa position, son
           rectangle et les éléments qui la recouvrent.
@@ -736,7 +736,7 @@ class PerceptionKeywords:
         ``<name>.actual.*`` à côté de la référence. ``fail_on_drift=True``
         transforme la dérive en échec (sentinelle-assertion) ; par défaut la
         sentinelle **rapporte** et retourne le verdict (dict : ``status``,
-        ``structural_diff``, ``visual_distance``, ``visual_tiles``) — c'est au
+        ``structural_diff``, ``visual_distance``, ``visual_tiles``) ; c'est au
         run de veille d'agréger.
 
         La référence est faite pour être committée : la supprimer revalide
@@ -767,7 +767,7 @@ class PerceptionKeywords:
                     fh.write("%d %d %d %d %d\n%s" % (
                         int(tiles_x), int(tiles_y), 8, width, height,
                         " ".join(tile_hashes)))
-            logger.warn("Sentinelle : référence '%s' créée (%s) — première "
+            logger.warn("Sentinelle : référence '%s' créée (%s), première "
                         "visite, à committer si l'écran fait référence."
                         % (safe, signature_path))
             outcome = WatchOutcome(name=safe, status="baseline-created")
@@ -814,7 +814,7 @@ class PerceptionKeywords:
 
     def _try_tile_capture(self, tiles_x, tiles_y, hash_size=8):
         """Grille de tuiles **best-effort** : ``(hashes, largeur, hauteur)`` ou
-        ``None`` — même politique que ``_try_perceptual_hash`` (le canal tuiles
+        ``None``, même politique que ``_try_perceptual_hash`` (le canal tuiles
         est un raffinement, jamais une condition de fonctionnement)."""
         try:
             png = base64.b64decode(self.get_screenshot_as_base64("png"))
@@ -830,7 +830,7 @@ class PerceptionKeywords:
         le découpage ET le hash_size **de la référence** (un changement de
         configuration ne fabrique jamais une fausse dérive). Retourne le
         rapport localisé (tuiles au-delà du seuil + éléments recouvrants) ou
-        ``None`` — best-effort intégral."""
+        ``None``, best-effort intégral."""
         import os
         if not os.path.exists(tiles_path):
             return None
@@ -867,7 +867,7 @@ class PerceptionKeywords:
 
     @staticmethod
     def _watch_outcome_dict(outcome):
-        """Le verdict en dict de chaînes/entiers — MCP-safe, lisible en Robot."""
+        """Le verdict en dict de chaînes/entiers : MCP-safe, lisible en Robot."""
         return {"name": outcome.name, "status": outcome.status,
                 "structural_diff": outcome.structural_diff,
                 "visual_distance": outcome.visual_distance,
@@ -879,7 +879,7 @@ class PerceptionKeywords:
     def _decode_image_to_gray(image_bytes):
         """PNG/JPEG/BMP → matrice de gris (frontière image, stubbable en test).
         Impl partagée avec le canal Fiori dans
-        ``sapfx_common.visual_baseline`` — Pillow y est importé seulement à
+        ``sapfx_common.visual_baseline``, où Pillow est importé seulement à
         l'appel : l'assertion visuelle est opt-in (extra ``visual``), le reste
         de la bibliothèque n'en dépend jamais."""
         from sapfx_common.visual_baseline import decode_image_to_gray
@@ -887,7 +887,7 @@ class PerceptionKeywords:
 
     @staticmethod
     def _crop_image(image_bytes, region):
-        """Recadre un PNG sur ``region`` (left, top, width, height — repère
+        """Recadre un PNG sur ``region`` (left, top, width, height, repère
         capture) et retourne le PNG recadré. Frontière Pillow, stubbable.
         Lève ``ValueError`` si l'intersection avec la capture est vide."""
         try:
@@ -905,7 +905,7 @@ class PerceptionKeywords:
         y1 = min(int(region[1]) + int(region[3]), image.size[1])
         if x1 <= x0 or y1 <= y0:
             raise ValueError(
-                "Région (%s, %s, %sx%s) hors de la capture %dx%d — l'élément "
+                "Région (%s, %s, %sx%s) hors de la capture %dx%d : l'élément "
                 "est-il visible dans la fenêtre ?" %
                 (region[0], region[1], region[2], region[3],
                  image.size[0], image.size[1]))
@@ -916,7 +916,7 @@ class PerceptionKeywords:
     @staticmethod
     def _draw_annotations(image_bytes, boxes):
         """Dessine les boîtes numérotées (``(étiquette, left, top, width,
-        height)`` — repère capture) sur un PNG et retourne le PNG annoté.
+        height)``, repère capture) sur un PNG et retourne le PNG annoté.
         Frontière Pillow, stubbable en test."""
         try:
             from PIL import Image, ImageDraw
