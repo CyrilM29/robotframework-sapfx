@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Smoke **authentification IDP** : exerce `Log In Via Identity
-...                 Provider` contre ``fixtures/idp_login_fixture.html`` — un IDP
+...                 Provider` contre ``fixtures/idp_login_fixture.html``, un IDP
 ...                 factice au déroulé DEUX ÉTAPES (utilisateur → Suivant → mot
 ...                 de passe → connexion, le cas Azure AD) portant les ids du
 ...                 preset ``sap-ias`` (#j_username / #j_password /
@@ -23,7 +23,7 @@ Suite Teardown      Close Browser
 
 *** Variables ***
 ${HEADLESS}         ${True}
-# Identifiants du FAUX IDP embarqué dans la fixture — publics par nature.
+# Identifiants du FAUX IDP embarqué dans la fixture : publics par nature.
 ${IDP_USER}         TESTER
 ${IDP_PASSWORD}     s3cret
 

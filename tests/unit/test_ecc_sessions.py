@@ -1,5 +1,5 @@
 """Tests hors SAP du **registre de sessions par alias** (multi-session ECC) et
-de ses rails de sûreté — affinité de thread COM STA, ``Secret`` aux frontières,
+de ses rails de sûreté : affinité de thread COM STA, ``Secret`` aux frontières,
 teardown isolé. Fake COM (convention #5), aucun serveur SAP ni pywin32 requis.
 """
 import threading

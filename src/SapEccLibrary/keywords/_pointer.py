@@ -2,21 +2,21 @@
 
 Certaines zones de SAP GUI sont officiellement hors de portée du scripting :
 l'intérieur des GuiShell opaques (listes modernes sans mode accessibilité),
-GuiChart/GuiMap (record-only), le drag & drop (jamais scriptable — position
+GuiChart/GuiMap (record-only), le drag & drop (jamais scriptable, position
 officielle SAP). La stratégie du projet y est **hybride, déterministe
 d'abord** : l'API pour tout ce qu'elle voit (rapide, fiable), et en repli un
-**clic matériel** aux coordonnées écran — le geste qu'un humain ferait.
+**clic matériel** aux coordonnées écran, le geste qu'un humain ferait.
 
 Le partage des rôles avec un agent (rf-mcp) : l'agent obtient l'image
 (`Get Screenshot As Base64`) et la géométrie de la zone aveugle
 (`Get Element Screen Region`), décide *où* cliquer (c'est lui la « vision »),
-puis appelle `Click Element At Offset` — l'effecteur reste déterministe,
+puis appelle `Click Element At Offset` : l'effecteur reste déterministe,
 journalisé, et exprimé relativement à un élément SAP (les offsets survivent à
 un déplacement de fenêtre, contrairement à des coordonnées absolues).
 
 Contraintes assumées d'un clic matériel : la fenêtre SAP doit être visible à
 l'écran (l'effecteur la met au premier plan, best-effort) et le curseur bouge
-réellement — c'est un outil de dernier recours, pas le chemin nominal (les
+réellement ; c'est un outil de dernier recours, pas le chemin nominal (les
 ids et libellés de ``resources/`` restent la règle, convention 1).
 """
 from pythoncom import com_error
@@ -36,7 +36,7 @@ class PointerKeywords:
 
     def get_element_screen_region(self, element_id):
         """Région **écran** (pixels physiques) d'un élément : dict ``left`` /
-        ``top`` / ``width`` / ``height`` — les propriétés ``ScreenLeft`` /
+        ``top`` / ``width`` / ``height``, les propriétés ``ScreenLeft`` /
         ``ScreenTop`` de l'API (position absolue à l'écran, pas relative à la
         fenêtre). C'est la moitié « perception » du repli coordonnées : un
         agent la croise avec la capture d'écran pour choisir un point dans une
@@ -55,15 +55,15 @@ class PointerKeywords:
 
     def click_element_at_offset(self, element_id, x_pct=0.5, y_pct=0.5,
                                 button="left", focus=True):
-        """Clic **matériel** à une position relative DANS un élément — le repli
+        """Clic **matériel** à une position relative DANS un élément, le repli
         pour les zones que l'API ne scripte pas (intérieur d'un GuiShell,
         GuiChart, cibles de drag & drop).
 
         ``x_pct``/``y_pct`` : position dans l'élément, de 0.0 (bord gauche/haut)
-        à 1.0 (bord droit/bas) — défaut le centre. ``button`` : ``left`` /
+        à 1.0 (bord droit/bas), défaut le centre. ``button`` : ``left`` /
         ``right`` / ``double``. ``focus=True`` met d'abord la fenêtre SAP au
         premier plan (un clic matériel atterrit sur ce qui est VISIBLE à ces
-        coordonnées). Retourne le point cliqué ``{"x": ..., "y": ...}`` —
+        coordonnées). Retourne le point cliqué ``{"x": ..., "y": ...}``,
         journalisé, jamais silencieux.
 
         Exemple (croiser avec la perception visuelle)::
@@ -86,14 +86,14 @@ class PointerKeywords:
         if str(focus).strip().lower() in _TRUTHY:
             self._focus_sap_window()
         self._send_hardware_click(x, y, button)
-        logger.info("Clic matériel %s à (%d, %d) — %s @ (%.0f%%, %.0f%%)."
+        logger.info("Clic matériel %s à (%d, %d) : %s @ (%.0f%%, %.0f%%)."
                     % (button, x, y, element_id, x_pct * 100, y_pct * 100))
         return {"x": x, "y": y}
 
     # -- plomberie (stubbable en test) -----------------------------------------
 
     def _focus_sap_window(self):
-        """Fenêtre SAP active au premier plan — best-effort : un refus Windows
+        """Fenêtre SAP active au premier plan, best-effort : un refus Windows
         (règles de focus) ne doit pas faire échouer le clic, l'utilisateur peut
         avoir mis la fenêtre devant lui-même."""
         try:
@@ -101,7 +101,7 @@ class PointerKeywords:
             handle = int(self.session.ActiveWindow.Handle)
             win32gui.SetForegroundWindow(handle)
         except Exception as err:
-            logger.info("Mise au premier plan impossible (%s) — le clic part "
+            logger.info("Mise au premier plan impossible (%s) : le clic part "
                         "sur la fenêtre actuellement visible." % err)
 
     @staticmethod

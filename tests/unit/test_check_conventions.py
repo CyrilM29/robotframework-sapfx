@@ -1,5 +1,5 @@
 """Tests du garde mécanique des conventions #1 (localisateurs bruts) et #2
-(``Sleep``) — ``scripts/check_conventions.py``.
+(``Sleep``) : ``scripts/check_conventions.py``.
 
 Couvre la nuance propre à ce dépôt : la convention #1 est bloquante dans les
 suites GÉNÉRÉES (marqueur de provenance) et seulement informative dans les
@@ -97,7 +97,7 @@ class TestConventionUnSuitesNonGenerees:
 
 
 class TestConventionDeux:
-    """Le Sleep est bloquant partout — généré ou pas, test ou resource."""
+    """Le Sleep est bloquant partout : généré ou pas, test ou resource."""
 
     def test_sleep_dans_suite_generee(self, tmp_path):
         repo = _repo(tmp_path)

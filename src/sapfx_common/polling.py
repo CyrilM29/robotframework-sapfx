@@ -17,7 +17,7 @@ T = TypeVar("T")
 def poll_until(check: Callable[[], T], timeout_secs: float, step: float = 0.2) -> T:
     """Répète ``check()`` jusqu'à ce qu'il retourne une valeur *truthy* ou que
     ``timeout_secs`` soit écoulé. Retourne la dernière valeur obtenue (truthy en
-    cas de succès, falsy en cas d'expiration) — l'appelant décide du message
+    cas de succès, falsy en cas d'expiration) : l'appelant décide du message
     d'échec. ``check`` ne doit pas lever : envelopper les sondes COM/JS fragiles
     dans un try/except retournant falsy.
 
@@ -42,7 +42,7 @@ def retry_call(action: Callable[[], T], attempts: int = 3, interval: float = 0.2
 
     ``deadline`` (epoch, optionnel) borne les relances dans le temps en plus du
     compte : plus aucune tentative n'est lancée une fois l'échéance passée.
-    ``on_error(attempt, err)`` (optionnel) est appelé après chaque échec — pour
+    ``on_error(attempt, err)`` (optionnel) est appelé après chaque échec, pour
     journaliser sans dupliquer la boucle chez l'appelant.
     """
     attempts = int(attempts)
@@ -65,7 +65,7 @@ def retry_call(action: Callable[[], T], attempts: int = 3, interval: float = 0.2
 def retry_until(action: Callable[[], T], timeout_secs: float, step: float = 0.5) -> T:
     """Appelle ``action()`` jusqu'à ce qu'il réussisse (aucune exception) ou que
     ``timeout_secs`` soit écoulé ; relève alors la dernière exception. Variante
-    bornée par le temps (et non par un compte d'essais) de `retry_call` — le
+    bornée par le temps (et non par un compte d'essais) de `retry_call` : le
     rythme d'attente est ``step`` secondes entre deux tentatives."""
     deadline = time.time() + float(timeout_secs)
     while True:

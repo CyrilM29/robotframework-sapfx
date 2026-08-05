@@ -146,7 +146,7 @@ def test_api_application_state_degrades_with_the_reason(monkeypatch):
 
 # --- state providers : la cause réelle d'un échec doit remonter à l'agent -----
 # (régression : get_page_source renvoyait un "keyword absent ?" générique quel
-# que soit le problème réel — cf. _rf_context.run_keyword_in_context)
+# que soit le problème réel, cf. _rf_context.run_keyword_in_context)
 
 def test_ecc_state_provider_surfaces_the_real_failure_reason(monkeypatch):
     def boom(session, keyword_name):
@@ -227,7 +227,7 @@ def test_ecc_state_provider_compacts_two_identical_perceptions_in_a_row(monkeypa
 
 def test_ecc_state_provider_never_compacts_a_real_change(monkeypatch):
     # Toujours interroger l'écran réel : si le contenu a changé (une action a eu
-    # lieu entre les deux appels), le second appel doit renvoyer le vrai écran —
+    # lieu entre les deux appels), le second appel doit renvoyer le vrai écran :
     # ici l'écran est ENTIÈREMENT remplacé, donc le diff ne fait rien gagner et
     # l'arbitrage doit servir la vue complète, pas un diff plus long.
     outputs = iter(["# screen X\n", "# screen Y\n"])
@@ -319,22 +319,22 @@ def test_fiori_state_provider_serves_a_diff_on_tree_change(monkeypatch):
 
 def test_ecc_state_provider_flags_stale_library_code(monkeypatch):
     monkeypatch.setattr(ecc_plugin, "staleness_warning",
-                        lambda: "code modifié — redémarrer rf-mcp")
+                        lambda: "code modifié, redémarrer rf-mcp")
     monkeypatch.setattr(ecc_plugin, "run_keyword_in_context",
                         lambda session, keyword_name: "# screen X\n")
     provider = SapEccPlugin().get_state_provider()
     result = asyncio.run(provider.get_page_source(_FakeSession()))
-    assert result["stale_code_warning"] == "code modifié — redémarrer rf-mcp"
+    assert result["stale_code_warning"] == "code modifié, redémarrer rf-mcp"
 
 
 def test_fiori_state_provider_flags_stale_library_code(monkeypatch):
     monkeypatch.setattr(fiori_plugin, "staleness_warning",
-                        lambda: "code modifié — redémarrer rf-mcp")
+                        lambda: "code modifié, redémarrer rf-mcp")
     monkeypatch.setattr(fiori_plugin, "run_keyword_in_context",
                         lambda session, keyword_name: "<UI5Tree/>")
     provider = SapFioriPlugin().get_state_provider()
     result = asyncio.run(provider.get_page_source(_FakeSession()))
-    assert result["stale_code_warning"] == "code modifié — redémarrer rf-mcp"
+    assert result["stale_code_warning"] == "code modifié, redémarrer rf-mcp"
 
 
 def test_fiori_state_provider_compacts_two_identical_perceptions_in_a_row(monkeypatch):
@@ -420,7 +420,7 @@ def test_ecc_application_state_reports_the_live_screen_state(monkeypatch):
 
 def test_ecc_application_state_flags_a_leftover_modal(monkeypatch):
     # Le piège SESSION_MANAGER vu live : Run Transaction "réussit" alors qu'un
-    # modal d'erreur est resté affiché — l'état applicatif doit le crier.
+    # modal d'erreur est resté affiché : l'état applicatif doit le crier.
     monkeypatch.setattr(ecc_plugin, "run_keyword_in_context", _state_dispatch({
         "Get Current Transaction": "SESSION_MANAGER",
         "Get Open Windows": [

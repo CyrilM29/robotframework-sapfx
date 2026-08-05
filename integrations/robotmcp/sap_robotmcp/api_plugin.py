@@ -1,9 +1,9 @@
-"""Plugin rf-mcp pour SapApiLibrary — le 3e canal (OData v2/v4, RFC).
+"""Plugin rf-mcp pour SapApiLibrary : le 3e canal (OData v2/v4, RFC).
 
 Le canal API n'a pas d'écran : ``get_page_source`` répond par une explication
 actionnable (la perception EST la valeur de retour des keywords), et
 ``get_application_state`` sert l'état réel du canal via le keyword
-``List Api Sessions`` (alias ouverts, base_url, sap-client, authentifié —
+``List Api Sessions`` (alias ouverts, base_url, sap-client, authentifié,
 jamais de credentials). Comme pour l'ECC, cet état n'est routé par aucun
 chemin rf-mcp 0.31 : il se consomme via l'outil ``sapfx_state`` de la
 surcouche (voir ``sap_robotmcp.server``).
@@ -36,7 +36,7 @@ _NO_SCREEN = (
 
 
 class ApiStateProvider(LibraryStateProvider):
-    """État du canal API — pas de page source, un état applicatif réel."""
+    """État du canal API : pas de page source, un état applicatif réel."""
 
     async def get_page_source(
         self,
@@ -76,7 +76,7 @@ class SapApiPlugin(StaticLibraryPlugin):
             package_name="SapApiLibrary",
             import_path="SapApiLibrary",
             description="Canal API SAP : OData v2/v4 (Gateway, CAP/S4) et RFC "
-            "optionnel — préparation et recoupement des données de test, "
+            "optionnel ; préparation et recoupement des données de test, "
             "stdlib pure.",
             library_type="external",
             categories=["api", "sap"],

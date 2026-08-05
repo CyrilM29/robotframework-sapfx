@@ -1,7 +1,7 @@
 """Tests hors navigateur du support **pages hybrides** de SapFioriLibrary :
 sonde de composition (`Get Page Composition`), pile de frames imbriquées
 (`Push/Pop Ui5 Frame`), moteur DOM générique (`Resolve/Click/Fill Dom …`) et
-son repli ``dom=`` dans la chaîne de fallback. Fake Browser — convention #5."""
+son repli ``dom=`` dans la chaîne de fallback. Fake Browser, convention #5."""
 import pytest
 
 from SapFioriLibrary import SapFioriLibrary as _pkg  # noqa: F401  (import path sanity)
@@ -76,7 +76,7 @@ def test_build_dom_selector_coerces_properties_literal():
 
 
 def test_build_dom_selector_accepts_accessibility_keys():
-    # role (explicite OU implicite) + name (nom accessible) — la grammaire
+    # role (explicite OU implicite) + name (nom accessible) : la grammaire
     # « intention utilisateur » du moteur dom, façon getByRole(name=…).
     sel = build_dom_selector(role="button", name="Valider")
     assert sel == {"role": "button", "name": "Valider"}
@@ -278,7 +278,7 @@ def test_bundle_exposes_dom_engine_and_composition_probe():
 
 def test_bundle_dom_engine_uses_the_accessibility_helpers():
     # Le rôle est CALCULÉ (explicite ou implicite) et le nom accessible est un
-    # accname simplifié — tous deux câblés dans resolveByDom. La regex \s+ doit
+    # accname simplifié, tous deux câblés dans resolveByDom. La regex \s+ doit
     # survivre à l'échappement Python de la chaîne du bundle (leçon du \D
     # défangé par Robot, test_se16_exploration_logic).
     assert "function ariaRole" in BUNDLE

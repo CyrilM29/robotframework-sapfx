@@ -1,4 +1,4 @@
-"""SapEccLibrary — un fork robuste de robotframework-sapguilibrary pour SAP ECC.
+"""SapEccLibrary : un fork robuste de robotframework-sapguilibrary pour SAP ECC.
 
 Hérite de tous les keywords de l'upstream ``SapGuiBase`` (vendored, Apache 2.0)
 et ajoute :
@@ -60,7 +60,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     En complément, les keywords `Find Element By Label`, `Fill Field By Label`,
     `Read Field By Label` et `Click Button By Label` acceptent des localisateurs
     **humains** (libellé visible, ``Gauche @ Haut``, ``N @ Libellé``/``Libellé
-    @ N`` pour une grille, ``Ancre >> Reste`` pour une portée, ``= contenu`` —
+    @ N`` pour une grille, ``Ancre >> Reste`` pour une portée, ``= contenu`` ;
     voir `Find Element By Label`), résolus géométriquement sur l'écran réel ; et
     `Resolve Element With Healing` accepte une ancre ``label=`` de secours.
 
@@ -80,7 +80,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     # commence lui aussi par ``/`` mais n'EST PAS un préfixe de navigation.
     _NAV_PREFIXES = ("/n", "/o", "/i")
 
-    # Alias de la session historique (hors registre) — voir keywords/_sessions.py.
+    # Alias de la session historique (hors registre) : voir keywords/_sessions.py.
     _DEFAULT_ALIAS = "default"
 
     def _context_state(self):
@@ -90,7 +90,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     # -- registre de sessions par alias (multi-session : keywords/_sessions.py) --
     # ``sapapp`` (le moteur de scripting, un par process saplogon) reste PARTAGÉ
     # au niveau du namespace ; ``session``/``connection`` sont routés vers le
-    # slot de l'alias ACTIF — la compatibilité est totale : sans keyword de
+    # slot de l'alias ACTIF ; la compatibilité est totale : sans keyword de
     # registre, tout vit dans l'alias ``default`` comme avant.
 
     def _session_registry(self):
@@ -108,9 +108,9 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     def _touch_com_thread(self, slot):
         """Rail de sûreté **STA** : la session appartient au thread COM qui l'a
         bindée. Un accès depuis un AUTRE thread initialise COM défensivement
-        (marshaling — le mode dont dépendent les state providers rf-mcp,
+        (marshaling, le mode dont dépendent les state providers rf-mcp,
         validé live) et se journalise une fois ; ``SAPFX_STRICT_COM_THREAD=1``
-        en fait une erreur actionnable — au lieu du ``RPC_E_WRONG_THREAD``
+        en fait une erreur actionnable, au lieu du ``RPC_E_WRONG_THREAD``
         cryptique de COM, ou pire d'un plantage différé."""
         ident = threading.get_ident()
         owner = slot.get("com_thread")
@@ -121,7 +121,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
                 "SAP session '%s' is COM-bound to thread %s but accessed from "
                 "thread %s, and SAPFX_STRICT_COM_THREAD=1 forbids cross-thread "
                 "access. SAP GUI Scripting is STA COM: drive every keyword of "
-                "a session from the thread that bound it — multiplex sessions "
+                "a session from the thread that bound it: multiplex sessions "
                 "with `Switch Sap Session`, never with threads."
                 % (self._active_alias(), owner, ident))
         seen = slot.setdefault("threads_seen", set())
@@ -217,7 +217,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
         vrai préfixe ne peut venir qu'un tcode simple (sans ``/``) ou un tcode de
         namespace (commençant par ``/``, ex. ``/n/BEV1/RCA01``). Un reste
         contenant ``/`` sans commencer par ``/`` (``WFND/MAINT_SERVICE``) n'est
-        pas un tcode valide — le ``/X`` initial appartenait à un namespace.
+        pas un tcode valide : le ``/X`` initial appartenait à un namespace.
         """
         if transaction[:2].lower() not in cls._NAV_PREFIXES:
             return False
@@ -229,17 +229,17 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
 
         Remplace le keyword upstream, qui détectait une transaction inconnue en
         comparant le *texte* de la barre de statut en néerlandais/anglais/allemand
-        uniquement — fragile dans toute autre langue SAP. Ici, on compare la
+        uniquement, fragile dans toute autre langue SAP. Ici, on compare la
         **transaction réellement active** (``session.Info.Transaction``) au code
         demandé : c'est totalement indépendant de la locale et robuste (validé en
         live, où une transaction inexistante renvoie un message de type ``S`` et non
-        ``E`` — l'ancienne hypothèse « type ``E`` » était donc fausse).
+        ``E`` : l'ancienne hypothèse « type ``E`` » était donc fausse).
 
         Préfixe automatiquement ``/n`` pour démarrer la transaction même depuis un
-        autre écran — y compris pour un tcode de **namespace** (``/BEV1/RCA01``),
+        autre écran, y compris pour un tcode de **namespace** (``/BEV1/RCA01``),
         dont le ``/`` initial fait partie du code et n'est pas un préfixe de
         navigation : seul un vrai préfixe déjà présent (``/n``, ``/o``, ``/i``)
-        dispense d'en rajouter un — même quand le namespace commence par la même
+        dispense d'en rajouter un, même quand le namespace commence par la même
         lettre qu'un préfixe (``/IWFND/MAINT_SERVICE``), voir `_has_nav_prefix`.
         Définissez ``skip_if_error=True`` pour journaliser au lieu d'échouer
         (étapes de navigation optionnelles).
@@ -276,7 +276,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
         """Saisit un mot de passe dans le champ identifié, sans le journaliser.
 
         Remplace le keyword upstream pour accepter, en plus d'une chaîne, le
-        type ``Secret`` de Robot Framework 7.4 — créez la variable typée dès la
+        type ``Secret`` de Robot Framework 7.4 ; créez la variable typée dès la
         ligne de commande (``-v "SAP_PASSWORD: Secret:<motdepasse>"``) : sa
         valeur est alors masquée partout, y compris en niveau de log TRACE. Le
         secret n'est déballé qu'ici, juste avant la frontière COM ; le
@@ -287,14 +287,14 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     def get_current_transaction(self):
         """Retourne le **code de la transaction active** (``session.Info.Transaction``),
         p.ex. ``SE16`` ou ``SESSION_MANAGER`` sur l'écran SAP Easy Access.
-        Indépendant de la langue — idéal pour les assertions de navigation."""
+        Indépendant de la langue, idéal pour les assertions de navigation."""
         return self.session.Info.Transaction
 
     def get_status_message(self):
         """Retourne ``(message_type, text)`` de la barre de statut courante.
 
         ``message_type`` vaut ``S`` (succès), ``W`` (avertissement), ``E`` (erreur),
-        ``I`` (info), ``A`` (abandon), ou ``""`` quand la barre est vide — tous
+        ``I`` (info), ``A`` (abandon), ou ``""`` quand la barre est vide ; tous
         indépendants de la locale."""
         status = self.session.findById("wnd[0]/sbar")
         return status.messageType, status.text

@@ -1,9 +1,9 @@
 """Tests unitaires hors navigateur des raccourcis d'action de SapFioriLibrary.
 
 La résolution en page (le JS injecté) est exercée par la suite de fumée contre
-l'OpenUI5 Demo Kit ; ici on valide la logique Python *autour* du navigateur — la
+l'OpenUI5 Demo Kit ; ici on valide la logique Python *autour* du navigateur (la
 lecture de table, le retry anti *stale element* du clic/saisie, et le clic par
-XPath — avec une doublure de la bibliothèque Browser (convention #5 du CLAUDE.md).
+XPath) avec une doublure de la bibliothèque Browser (convention #5 du CLAUDE.md).
 """
 import pytest
 

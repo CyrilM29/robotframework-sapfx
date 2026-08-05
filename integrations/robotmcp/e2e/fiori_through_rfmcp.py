@@ -1,7 +1,7 @@
 """Smoke END-TO-END Fiori *à travers* rf-mcp (validation rejouable).
 
 On pilote les VRAIS handlers de tools de rf-mcp (manage_session / execute_step /
-get_session_state) en process — exactement ce qu'un agent ferait via MCP. Cela
+get_session_state) en process, exactement ce qu'un agent ferait via MCP. Cela
 valide, dans le pipeline réel :
 
   * la découverte du plugin SapFioriPlugin par rf-mcp ;
@@ -23,7 +23,7 @@ Lancer depuis la racine du dépôt :
 Sortie : "N/8 checks OK" + code retour 0 si tout passe.
 
 NB côté ECC : l'équivalent (Run Transaction / Get Screen Signature via le state
-provider) nécessite l'ABAP Platform A4H en Docker — non couvert ici.
+provider) nécessite l'ABAP Platform A4H en Docker, non couvert ici.
 """
 import asyncio
 import os

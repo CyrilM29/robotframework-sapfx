@@ -2,13 +2,13 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>UI5 2.x fixture (nightly — après suppression des APIs legacy)</title>
+  <title>UI5 2.x fixture (nightly, après suppression des APIs legacy)</title>
   <!-- Runtime OpenUI5 2.0 NIGHTLY servi par le CDN officiel : 2.x supprime les
        APIs dépréciées de la baseline 1.136 (sap.ui.getCore() façade, globals de
        bibliothèques, Element.registry). Cette fixture prouve que le bundle
        __SAPFX résout via le module ElementRegistry (branche 1 de
        registryForEach) et que rien chez nous ne dépend d'une API supprimée.
-       NB : le loader AMD (sap.ui.require/define) reste global en 2.x — c'est
+       NB : le loader AMD (sap.ui.require/define) reste global en 2.x, c'est
        l'API du loader, pas un « global de bibliothèque ». Réseau requis. -->
   <script id="sap-ui-bootstrap"
     src="https://sdk.openui5.org/nightly/2/resources/sap-ui-core.js"

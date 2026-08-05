@@ -1,16 +1,16 @@
-"""Vocabulaire métier SAP — logique pure, partagée ECC↔Fiori.
+"""Vocabulaire métier SAP : logique pure, partagée ECC↔Fiori.
 
-Concept issu de l'analyse de playwright-praman (Apache-2.0 — attribution dans
+Concept issu de l'analyse de playwright-praman (Apache-2.0, attribution dans
 ``NOTICE``), réimplémenté sur notre modèle : un **terme métier** (anglais ou
-français, synonymes compris — « vendor », « fournisseur », « supplier ») se
-résout vers sa fiche — nom canonique, **champ ABAP**, table de référence,
-domaine (module SAP) — exploitable par les agents (sap-planner qui parle
+français, synonymes compris : « vendor », « fournisseur », « supplier ») se
+résout vers sa fiche : nom canonique, **champ ABAP**, table de référence,
+domaine (module SAP). Exploitable par les agents (sap-planner qui parle
 métier, sap-generator qui remplit des écrans de sélection SE16) comme par un
 humain qui écrit une suite.
 
 Contrat, aligné sur ``sapfx_common.semantic`` : la résolution retourne TOUS
 les candidats scorés (:func:`resolve_term`) et le raccourci :func:`lookup_term`
-tranche selon un **seuil de refus** — score insuffisant ou ambiguïté (deux
+tranche selon un **seuil de refus** : score insuffisant ou ambiguïté (deux
 candidats confondables) = erreur **avec la liste des candidats**, jamais de
 premier-match silencieux.
 
@@ -20,7 +20,7 @@ par défaut (0.8) n'accepte donc que l'exact ; baisser ``threshold`` assume le
 flou en connaissance de cause.
 
 Le vocabulaire livré couvre les champs SAP archi-connus des modules MM/SD/FI
-et le modèle de démonstration Flight (SCARR/SPFLI/SFLIGHT — nos suites A4H).
+et le modèle de démonstration Flight (SCARR/SPFLI/SFLIGHT, nos suites A4H).
 Un site l'étend en passant sa propre liste ``extra`` (termes locaux, Z-champs)
 sans toucher au module.
 """
@@ -97,7 +97,7 @@ DEFAULT_VOCABULARY: tuple = (
     BusinessTerm("gl account", "SAKNR", "FI", "SKA1",
                  ("compte général", "compte general", "general ledger account"),
                  "G/L account number"),
-    # --- Modèle Flight (données de démo A4H — nos suites SE16) -------------------
+    # --- Modèle Flight (données de démo A4H, nos suites SE16) -------------------
     BusinessTerm("airline", "CARRID", "FLIGHT", "SCARR",
                  ("compagnie aérienne", "compagnie aerienne", "transporteur",
                   "carrier"),
@@ -187,7 +187,7 @@ def lookup_term(term: str,
                 extra: Optional[Iterable[BusinessTerm]] = None,
                 domain: Optional[str] = None,
                 threshold: float = DEFAULT_THRESHOLD) -> TermMatch:
-    """LE candidat pour ``term`` — ou ``ValueError`` actionnable.
+    """LE candidat pour ``term``, ou ``ValueError`` actionnable.
 
     Échoue (avec les candidats) si aucun score n'atteint ``threshold`` ou si
     deux candidats confondables le dépassent (fiches différentes à moins de

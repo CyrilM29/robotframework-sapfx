@@ -1,7 +1,7 @@
 *** Settings ***
 Documentation       Smoke **compatibilité UI5 ancien** : exerce SapFioriLibrary contre
-...                 un vrai runtime OpenUI5 **1.60.14 (2018)** — antérieur à
-...                 ``Element.registry`` (1.67) — chargé depuis le miroir npm jsDelivr
+...                 un vrai runtime OpenUI5 **1.60.14 (2018)**, antérieur à
+...                 ``Element.registry`` (1.67), chargé depuis le miroir npm jsDelivr
 ...                 par ``fixtures/ui5_legacy_fixture.html``. Prouve que le repli DOM
 ...                 de ``registryForEach`` (balayage ``[data-sap-ui]`` + ``byId``)
 ...                 résout les contrôles rendus là où le registre n'existe pas :
@@ -28,7 +28,7 @@ Open Legacy Fixture
     New Browser    chromium    headless=${HEADLESS}
     Set Browser Timeout    150s
     # Le runtime 1.60 « src » charge des centaines de modules individuels : l'événement
-    # `load` met bien plus de 10 s — on n'attend que le DOM puis le drapeau du fixture.
+    # `load` met bien plus de 10 s : on n'attend que le DOM puis le drapeau du fixture.
     New Page       ${url}    wait_until=domcontentloaded
     Wait For Function    () => window.__fixtureReady === true    timeout=150s
 
@@ -36,11 +36,11 @@ Open Legacy Fixture
 *** Test Cases ***
 Runtime Predates The Element Registry
     [Documentation]    Garde-fou : vérifie que ce runtime n'a NI ``Element.registry``
-    ...                (1.67+) NI le module ``ElementRegistry`` (2.x) — sinon le test
+    ...                (1.67+) NI le module ``ElementRegistry`` (2.x) : sinon le test
     ...                ne prouverait pas le chemin de repli.
     ${legacy}=    Evaluate JavaScript    ${None}
     ...    () => { const E = sap.ui.require('sap/ui/core/Element'); const R = sap.ui.require('sap/ui/core/ElementRegistry'); return !!E && !E.registry && !R; }
-    Should Be True    ${legacy}    msg=Runtime exposes a registry — not a pre-1.67 target
+    Should Be True    ${legacy}    msg=Runtime exposes a registry: not a pre-1.67 target
 
 Role Engine Resolves Controls Via The DOM Fallback
     [Documentation]    La résolution role/propriétés fonctionne sans registre.
@@ -50,7 +50,7 @@ Role Engine Resolves Controls Via The DOM Fallback
     Should Be True    ${pressed}
 
 Inputs And Tables Work On The Legacy Runtime
-    [Documentation]    Saisie dans un ``sap.m.Input`` et lecture de table — les deux
+    [Documentation]    Saisie dans un ``sap.m.Input`` et lecture de table : les deux
     ...                passent par la résolution role (repli DOM) puis Browser.
     Fill Ui5 Input    bonjour    controlType=sap.m.Input    properties={'placeholder': 'legacy input'}
     ${rows}=    Read Ui5 Table    controlType=sap.m.Table
@@ -64,7 +64,7 @@ Xpath Engine Works On The Legacy Runtime
     Should Not Be Empty    ${sel}
     # Contrat aller-retour : le xpath « le plus court unique » retourné doit se
     # résoudre vers le même contrôle. (Sur ce vieux rendu, le type court Table
-    # apparaît deux fois dans l'arbre, d'où un index — c'est correct.)
+    # apparaît deux fois dans l'arbre, d'où un index : c'est correct.)
     ${xp}=    Get Ui5 Xpath    id=legacyTable
     Should Match Regexp    ${xp}    ^//Table(\\[\\d+\\])?$
     ${roundtrip}=    Resolve Ui5 By Xpath    ${xp}

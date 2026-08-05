@@ -2,7 +2,7 @@
 
 C'est l'équivalent SAP de ``get_locator_guidance`` de rf-mcp (qui ne connaît que
 Browser/Selenium/Appium). On encode ici les conventions du projet (cf. CLAUDE.md)
-pour que l'agent — autonome **ou** assistant IDE — adresse les bons sélecteurs et
+pour que l'agent (autonome **ou** assistant IDE) adresse les bons sélecteurs et
 écrive des assertions stables.
 """
 
@@ -31,51 +31,51 @@ FIORI_HINTS = [
     "Get Ui5 Xpath renvoie le plus court unique.",
     "Boucle courte perception -> action : Get Ui5 Page Map numérote les cibles "
     "actionnables (@1, @2…) puis Click Ui5 Ref / Fill Ui5 Ref agissent par "
-    "NUMÉRO — pas d'id à recopier, la résolution re-vérifie que le contrôle "
+    "NUMÉRO : pas d'id à recopier, la résolution re-vérifie que le contrôle "
     "est toujours rendu et échoue proprement sinon (re-percevoir). Dans une "
     "SUITE, rester sur les localisateurs de contrôles/resources (les @N sont "
     "éphémères, réservés au pilotage interactif).",
     "Écran qui ne répond pas comme attendu ? Get Fiori Diagnostics agrège en "
     "UN dict JSON-safe : composition hybride, arbre UI5 (absent = anomalie "
     "nommant les moteurs/frames de repli), erreurs console et erreurs de page "
-    "(Browser 20), snapshot ARIA des zones non-SAP — lire d'abord sa synthèse "
+    "(Browser 20), snapshot ARIA des zones non-SAP ; lire d'abord sa synthèse "
     "`issues`. Log Fiori Diagnostics écrit le rapport Markdown dans le log.",
     "Apps Fiori Elements V4 : préférer idSuffix=fe::table::<Entity>::LineItem::"
-    "Table (ids stables documentés — le préfixe app/route varie, le suffixe non).",
-    "Launchpad Work Zone / cFLP : l'app tourne dans une IFRAME — appeler "
+    "Table (ids stables documentés : le préfixe app/route varie, le suffixe non).",
+    "Launchpad Work Zone / cFLP : l'app tourne dans une IFRAME ; appeler "
     "Set Ui5 Frame <sélecteur iframe> avant de résoudre, sinon le shell (vide) "
     "est interrogé. Set Ui5 Frame sans argument revient à la page principale ; "
     "frames IMBRIQUÉES (Work Zone -> app -> WebGUI) : Push Ui5 Frame / "
     "Pop Ui5 Frame empilent la portée (sélecteurs chaînés a >>> b).",
     "Localisateur fragile ou en dérive ? Resolve Ui5 With Fallback (role -> "
-    "xpath -> sid -> wc -> dom) répare avec un warning journalisé — jamais en "
+    "xpath -> sid -> wc -> dom) répare avec un warning journalisé, jamais en "
     "silence.",
     "Pages SAP GUI for HTML (non-UI5) : moteur sid (Resolve Sid / Click Sid / "
     "Fill Sid Input), qui matche le SID stable de l'attribut lsdata.",
     "Pages « pur UI5 Web Components » (home SuccessFactors, apps "
-    "ui5-webcomponents) : PAS de registre UI5, Get Ui5 Page Tree échoue — "
+    "ui5-webcomponents) : PAS de registre UI5, Get Ui5 Page Tree échoue ; "
     "utiliser le moteur wc (Resolve/Click/Fill Wc …) qui scanne les custom "
     "elements ui5-* du light DOM (tag=Button matche aussi les tags scopés "
     "ui5-button-<suffixe>).",
     "Zones NON-SAP d'une page hybride (widget React/Angular/vanilla) : moteur "
-    "dom (Resolve/Click/Fill Dom …) — CSS + texte + rôle ARIA CALCULÉ (explicite "
+    "dom (Resolve/Click/Fill Dom …) : CSS + texte + rôle ARIA CALCULÉ (explicite "
     "ou implicite : un <button> nu matche role=button) + nom accessible name= "
     "(le localisateur « intention utilisateur », façon getByRole(name=…) ; "
     "name= existe aussi côté wc). Page inconnue ? Get Page Composition dit "
     "quelles technologies cohabitent où, avec les moteurs recommandés par région.",
     "Compatibilité : la résolution fonctionne d'UI5 1.4x (launchpads pré-2019, "
-    "repli DOM automatique) jusqu'à UI5 2.x — aucun réglage à faire côté agent.",
-    "Navigation launchpad STABLE : Open Fiori App <SemanticObject-action> — le "
+    "repli DOM automatique) jusqu'à UI5 2.x, aucun réglage à faire côté agent.",
+    "Navigation launchpad STABLE : Open Fiori App <SemanticObject-action> ; le "
     "hash d'intent survit aux changements de catalogue/thème/langue (la "
     "resource Open App By Intent enchaîne le Wait For UI5 Ready).",
     "Login d'entreprise : Log In Via Identity Provider (presets sap-ias / "
     "azure-ad / generic ; déroulés une-page ET deux-étapes détectés "
     "dynamiquement ; mot de passe jamais journalisé).",
     "Exploration : Set Ui5 Timeout (p.ex. 5s) fait échouer vite les sondes de "
-    "localisateurs — l'ancienne valeur est retournée, la restaurer en teardown ; "
+    "localisateurs (l'ancienne valeur est retournée, la restaurer en teardown) ; "
     "Set Poll Interval règle la fréquence de sondage.",
     "Assertion visuelle : Get Ui5 Perceptual Hash / Ui5 Screen Should Match "
-    "Baseline — même cycle snapshot que l'ECC (baseline créée au 1er passage, "
+    "Baseline : même cycle snapshot que l'ECC (baseline créée au 1er passage, "
     ".actual.png sauvé en cas de dérive).",
     "Terme métier FR/EN -> champ ABAP/table : Lookup Business Term (exposé par "
     "les DEUX bibliothèques ; ambiguïté toujours remontée avec les candidats, "
@@ -91,14 +91,14 @@ ECC_HINTS = [
     "Pour des assertions locale-indépendantes, comparer les ids TECHNIQUES de "
     "colonnes (Get Grid Column Ids), pas les titres affichés.",
     "SE16 : la sortie par défaut est la liste ABAP classique, SANS objet grille "
-    "scriptable — appeler d'abord `Use ALV Grid In Data Browser` (resource ECC, "
+    "scriptable : appeler d'abord `Use ALV Grid In Data Browser` (resource ECC, "
     "persistant par utilisateur) ; SE16N n'existe pas sur l'ABAP Platform Trial.",
     "Écran inconnu ? Appeler Get Screen Signature pour voir les ids/types réels "
     "avant de deviner un localisateur. Après une action, préférer mode=diff : "
     "seul ce qui a changé est retourné (fraction des tokens).",
     "En Suite Setup, appeler Scripting Should Be Fully Enabled : les modes "
     "readonly/per_user/disable_recording du serveur dégradent le scripting SANS "
-    "erreur franche — ce préflight échoue tôt avec le paramètre RZ11 à corriger.",
+    "erreur franche ; ce préflight échoue tôt avec le paramètre RZ11 à corriger.",
     "Id périmé (sous-écran renuméroté) ? Resolve Element With Healing score les "
     "contrôles réels et répare au-dessus d'un seuil, avec warning journalisé ; "
     "avec label=<libellé visible> il tente aussi l'ancre de libellé (un libellé "
@@ -107,7 +107,7 @@ ECC_HINTS = [
     "Pas d'id sous la main ? Localisateurs HUMAINS : Find Element By Label / "
     "Fill Field By Label / Read Field By Label / Click Button By Label ciblent "
     "par libellé visible (grammaire : `Libellé`, `@ Libellé` = dessous, "
-    "`Gauche @ Haut` = intersection, `= contenu`) — résolution géométrique sur "
+    "`Gauche @ Haut` = intersection, `= contenu`) : résolution géométrique sur "
     "l'écran réel, ambiguïté remontée avec la liste des candidats, jamais de "
     "premier-match silencieux. Les ids restent le chemin nominal dans resources/.",
     "Écran illisible en texte ou preuve visuelle requise ? Get Screenshot As "
@@ -116,19 +116,19 @@ ECC_HINTS = [
     "Sortie de report en LISTE ABAP classique (SE38/SA38, pas d'ALV) : lire avec "
     "Read Abap List (reconstruction géométrique). Prérequis POSTE : sans le mode "
     "accessibilité SAP GUI, ces listes sont rendues dans un shell opaque sans "
-    "aucun label — appeler Get List Rendering Status / Abap List Should Be "
+    "aucun label ; appeler Get List Rendering Status / Abap List Should Be "
     "Readable pour le constater et le NOMMER (c'est un réglage à provisionner, "
     "jamais à basculer depuis un test : il exige un redémarrage du client).",
     "Données de démo A4H : garanties par resources/a4h_demo_data.resource "
-    "(Ensure Flight/EPM Demo Data Exists) — SE16 sur SFLIGHT/SNWD_PO jamais vide.",
+    "(Ensure Flight/EPM Demo Data Exists) ; SE16 sur SFLIGHT/SNWD_PO jamais vide.",
     "Perception en un appel : Get Screen Signature mode=semantic = vue FORMULAIRE "
-    "(une ligne par cible actionnable, libellé humain vérifié + id + valeur) — "
+    "(une ligne par cible actionnable, libellé humain vérifié + id + valeur) ; "
     "souvent le meilleur point de départ sur un écran inconnu. Get/Log Annotated "
     "Screenshot = screenshot Set-of-Mark (boîtes numérotées + légende "
     "numéro -> id) pour croiser vision et action déterministe.",
     "Boucle courte perception -> action : Get Screen Map numérote les cibles "
     "actionnables (@1, @2…) puis Click Screen Ref / Fill Screen Ref agissent "
-    "par NUMÉRO — pas d'id à recopier, la résolution re-vérifie l'écran et "
+    "par NUMÉRO : pas d'id à recopier, la résolution re-vérifie l'écran et "
     "échoue proprement si les références sont périmées (re-percevoir). La "
     "légende du screenshot annoté alimente la même table @N. Dans une SUITE, "
     "rester sur les ids/resources (les @N sont éphémères, réservés au pilotage "
@@ -139,23 +139,23 @@ ECC_HINTS = [
     "Windows liste les fenêtres ouvertes (modal_open dans l'état applicatif) ; "
     "refermer via Cancel Popup.",
     "Multi-session par ALIAS : Open Sap Session (nouvelle connexion) / "
-    "Create Gui Session (2e fenêtre de la MÊME connexion — zéro re-login, la "
+    "Create Gui Session (2e fenêtre de la MÊME connexion : zéro re-login, la "
     "voie recommandée pour « écrire dans une session, vérifier dans l'autre ») / "
     "Switch Sap Session / List Sap Sessions / Close Sap Session. C'est du "
     "MULTIPLEXAGE (une session active à la fois, bascule explicite), jamais du "
     "parallélisme de threads.",
     "Session SAP GUI déjà ouverte (replay, reprise) ? Attach To Open Session "
-    "rattache moteur + connexion + session par INDEX — Connect To Session seul "
+    "rattache moteur + connexion + session par INDEX ; Connect To Session seul "
     "n'obtient que le moteur. TOUJOURS refermer les sessions ouvertes en fin de "
     "mission, MÊME SUR ÉCHEC (Close SAP / Close All Sap Sessions) : une "
     "connexion orpheline décale les indices du prochain attach.",
     "Zones officiellement HORS API (intérieur d'un GuiShell opaque, GuiChart, "
     "drag & drop) : Get Element Screen Region (la moitié perception) + Click "
-    "Element At Offset (clic matériel à une position RELATIVE dans l'élément) — "
+    "Element At Offset (clic matériel à une position RELATIVE dans l'élément) ; "
     "le repli hybride : déterministe d'abord, geste matériel en dernier recours.",
     "Exploration : Set Default Timeout (p.ex. 5s) fait échouer vite les sondes "
-    "de localisateurs — l'ancienne valeur est retournée, la restaurer en "
-    "teardown ; Set Poll Interval règle la fréquence de sondage.",
+    "de localisateurs (l'ancienne valeur est retournée, la restaurer en "
+    "teardown) ; Set Poll Interval règle la fréquence de sondage.",
     "Assertion visuelle (ce que l'API Scripting ne voit pas) : Screen Should "
     "Match Baseline (mask_elements=auto neutralise sbar/titl), Element Should "
     "Match Baseline (zone d'UN élément), Get Screen Tile Hashes (dérive "
@@ -169,12 +169,12 @@ ECC_HINTS = [
 API_HINTS = [
     "Le canal API n'a PAS d'écran : la perception EST la valeur de retour des "
     "keywords (listes/dicts JSON). List Api Sessions donne l'état du canal "
-    "(alias ouverts, base_url, sap-client, authentifié — jamais de credentials).",
+    "(alias ouverts, base_url, sap-client, authentifié, jamais de credentials).",
     "Patron recommandé (suite flagship) : préparer et RECOUPER les données par "
-    "l'API, ne piloter l'écran que pour ce qu'on teste — le même fait métier "
+    "l'API, ne piloter l'écran que pour ce qu'on teste : le même fait métier "
     "vérifié par deux canaux indépendants vaut plus que deux fois le même canal.",
     "Sessions par ALIAS : Open Api Session <base_url> user=... password=... "
-    "sap_client=... (password de type Secret RF — jamais en clair dans une "
+    "sap_client=... (password de type Secret RF, jamais en clair dans une "
     "suite ni un fichier de variables) ; plusieurs systèmes simultanés ; "
     "Close All Api Sessions en teardown.",
     "OData v2 ET v4 avec les MÊMES keywords : Get Odata Entities aplatit "
@@ -182,16 +182,16 @@ API_HINTS = [
     "($count serveur) à un chargement d'entités pour compter ; les options "
     "système passent en arguments nommés (top=5 -> $top=5).",
     "Post Odata applique le protocole CSRF SAP automatiquement (fetch du "
-    "token + rejeu) — ne jamais le réimplémenter à la main.",
+    "token + rejeu) ; ne jamais le réimplémenter à la main.",
     "RFC optionnel via pyrfc (SAP NW RFC SDK requis) : Open Rfc Connection / "
-    "Call Rfc — l'erreur donne la marche à suivre si pyrfc manque.",
+    "Call Rfc ; l'erreur donne la marche à suivre si pyrfc manque.",
 ]
 
 API_RECOMMENDATION = (
     "Canal API SAP (OData v2/v4, RFC) : SapApiLibrary, stdlib pure. Ouvrir "
     "une session par alias (Open Api Session, password Secret), lire par "
     "Get Odata Entities / Get Odata Count, écrire par Post Odata (CSRF "
-    "automatique). Le canal de PRÉPARATION et de RECOUPEMENT des données — "
+    "automatique). Le canal de PRÉPARATION et de RECOUPEMENT des données : "
     "l'écran ne sert qu'à tester l'écran."
 )
 
@@ -210,5 +210,5 @@ ECC_RECOMMENDATION = (
     "SAP GUI desktop (ECC/S4) via COM : SapEccLibrary pilote le client lourd. "
     "Naviguer par Run Transaction, attendre via Wait Until Busy Done, lire les "
     "grilles ALV par titre de colonne, et vérifier le TYPE du message de barre "
-    "d'état (E/S/W/I) — jamais le texte localisé."
+    "d'état (E/S/W/I), jamais le texte localisé."
 )

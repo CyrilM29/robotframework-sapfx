@@ -5,7 +5,7 @@ Convention #5 du CLAUDE.md.
 
 Ces mots-clés sont pour l'essentiel un enchaînement de primitives SapEccLibrary
 déjà testées ailleurs (Input Text, Send Vkey, Wait Until Busy Done, Get Screen
-Signature, Read Full Grid...) — un aller-retour est aussi validé bout-en-bout en
+Signature, Read Full Grid...) ; un aller-retour est aussi validé bout-en-bout en
 live par `tests/robot/ecc_exploration.robot`. Reconstruire ici une session SAP
 GUI factice complète pour rejouer tout l'enchaînement n'apporterait rien de plus
 que ces deux couvertures. En revanche, trois fragments contiennent de la VRAIE
@@ -13,7 +13,7 @@ logique conditionnelle : le repérage dynamique de la case à cocher, la
 normalisation des séparateurs de milliers, et le garde-fou anti-troncature. On
 les exécute ici via le VRAI moteur Robot (``robot.run`` sur un snippet
 temporaire) plutôt que de les rejouer à la main en Python, pour reproduire
-fidèlement l'échappement de backslash propre à Robot Framework — un piège qui a
+fidèlement l'échappement de backslash propre à Robot Framework, un piège qui a
 déjà une fois changé le sens d'une regex en silence (voir
 ``test_count_parser_*`` ci-dessous, qui a détecté le bug avant ce correctif).
 
@@ -38,7 +38,7 @@ def _resource_text():
 
 
 def _extract_line(marker):
-    """Retourne la ligne (dépouillée) du .resource contenant ``marker`` — lève
+    """Retourne la ligne (dépouillée) du .resource contenant ``marker`` ; lève
     explicitement si absente, pour que ce test échoue bruyamment (plutôt que de
     passer silencieusement) si la logique visée a été renommée/déplacée."""
     for line in _resource_text().splitlines():
@@ -57,7 +57,7 @@ def _robot_escaped(text):
     """Échappe une chaîne Python multi-lignes/tabulée pour une cellule Robot
     plain-text : ``\\n``/``\\t`` littéraux (reconvertis en vrais retours à la
     ligne/tabulations par l'échappement natif de Robot), et CHAQUE espace en
-    ``\\ `` — une tabulation, ou juste deux espaces réels consécutifs, dans une
+    ``\\ `` : une tabulation, ou juste deux espaces réels consécutifs, dans une
     cellule seraient lus comme un séparateur de colonnes et éclateraient la
     valeur en plusieurs arguments au lieu d'une seule chaîne."""
     return (text.replace("\\", "\\\\")
@@ -84,7 +84,7 @@ _CHECKBOX_MARKER = "l.startswith('* wnd[1]/usr/chk')"
 def test_checkbox_picker_selects_first_popup_checkbox_in_signature_order(tmp_path):
     expr = _extract_evaluate_expr(_CHECKBOX_MARKER)
     # NB : pas de ligne d'en-tête "# screen ..." ici (non nécessaire à ce
-    # fragment, qui ne regarde que les lignes "* wnd[1]/usr/chk...") — un "#" en
+    # fragment, qui ne regarde que les lignes "* wnd[1]/usr/chk...") : un "#" en
     # tout début de cellule Robot serait lu comme un commentaire et viderait
     # ${sig} silencieusement.
     sig = "\n".join([
@@ -142,10 +142,10 @@ def test_count_parser_is_not_the_backslash_regex_that_silently_broke():
     # `\D`/`\d` écrit dans une cellule .resource traverse DEUX couches
     # d'échappement (parsing du fichier, puis Evaluate) qui rongent le backslash
     # et transforment silencieusement la regex en un motif sans rapport (`D` au
-    # lieu de `\D`) — aucune erreur de syntaxe, juste un mauvais résultat.
+    # lieu de `\D`) : aucune erreur de syntaxe, juste un mauvais résultat.
     expr = _extract_evaluate_expr(_COUNT_MARKER)
     assert "\\" not in expr, (
-        "L'expression de comptage réintroduit un backslash — cf. le piège "
+        "L'expression de comptage réintroduit un backslash ; cf. le piège "
         "d'échappement Robot documenté dans ecc_keywords.resource avant de "
         "le retirer.")
 

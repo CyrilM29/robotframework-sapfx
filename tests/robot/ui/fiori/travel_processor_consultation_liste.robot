@@ -1,8 +1,8 @@
 *** Settings ***
-Documentation       Consultation de la liste des voyages — application Fiori Elements
-...                 Spec: specs/travel-processor-consultation-liste.md (sha256:85cf71c662da, 2026-07-25)
+Documentation       Consultation de la liste des voyages, application Fiori Elements
+...                 Spec: specs/travel-processor-consultation-liste.md (sha256:495673b5cbaf, 2026-08-04)
 ...                 v4 « Travel processor » (`sap.fe.cap.travel`, List Report
-...                 `TravelList`) servie par la cible locale **cap-sflight** —
+...                 `TravelList`) servie par la cible locale **cap-sflight** :
 ...                 generated from specs/travel-processor-consultation-liste.md by
 ...                 sap-generator (re-run the generator rather than hand-editing
 ...                 locators here). Un test par scénario du plan, dans son ordre.
@@ -15,7 +15,7 @@ Documentation       Consultation de la liste des voyages — application Fiori E
 ...                 Assertions **indépendantes de la langue** : nombres extraits du
 ...                 compteur (le rendu live est en français, séparateur de milliers
 ...                 U+202F), comptages de contrôles UI5, contenu de DONNÉES des
-...                 lignes — jamais un libellé d'interface ni un en-tête de colonne
+...                 lignes, jamais un libellé d'interface ni un en-tête de colonne
 ...                 (convention 3). Assertions **relationnelles** plutôt que calées
 ...                 sur le jeu de démonstration (filtré < total, restauré = mesuré
 ...                 avant filtrage dans le MÊME run) : la volumétrie de cap-sflight
@@ -62,7 +62,7 @@ La liste des voyages se charge et affiche des lignes
 Le compteur d'en-tête reflète la volumétrie totale
     [Documentation]    Scénario 2 du plan. Le compteur d'en-tête est la SEULE source
     ...                de volumétrie. L'assertion porte sur la valeur numérique
-    ...                extraite — jamais sur le libellé qui la précède (« Voyages » /
+    ...                extraite, jamais sur le libellé qui la précède (« Voyages » /
     ...                « Travels ») ni sur le format du nombre.
     ${total}=    Get Travel Count
     Should Be True    ${total} > 0

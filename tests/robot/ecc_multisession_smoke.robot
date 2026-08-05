@@ -29,7 +29,7 @@ ${SAP_PASSWORD}         ${EMPTY}      # OBLIGATOIRE : fournir via -v "SAP_PASSWO
 ${SAP_CLIENT}           001
 ${SAP_LANGUAGE}         EN
 
-# --- Localisateurs SAP GUI (jamais dans les cas de test — relevés live A4H) ------
+# --- Localisateurs SAP GUI (jamais dans les cas de test ; relevés live A4H) ------
 ${MULTI_LOGON_RADIO}    wnd[1]/usr/radMULTI_LOGON_OPT1
 
 
@@ -48,7 +48,7 @@ Second Window Session Opens Without Any Re-Login
 
 Sessions Multiplex With Independent State
     [Documentation]    Le scénario cible « agir dans une session, vérifier dans
-    ...                l'autre » : chaque alias garde SA transaction active — la
+    ...                l'autre » : chaque alias garde SA transaction active, la
     ...                bascule est explicite, l'état ne fuit jamais d'une session
     ...                à l'autre.
     ${tx_verif}=    Get Current Transaction
@@ -56,14 +56,14 @@ Sessions Multiplex With Independent State
     Switch Sap Session    default
     ${tx_default}=    Get Current Transaction
     Should Not Be Equal    ${tx_default}    SE16
-    ...    msg=La session « default » a hérité de l'état de « verif » — le registre fuit.
+    ...    msg=La session « default » a hérité de l'état de « verif » : le registre fuit.
     Switch Sap Session    verif
     ${tx_back}=    Get Current Transaction
     Should Be Equal    ${tx_back}    SE16
 
 List Reports Both Sessions Json Safe
     [Documentation]    `List Sap Sessions` inventorie le registre : deux alias
-    ...                connectés, le même utilisateur, exactement un actif —
+    ...                connectés, le même utilisateur, exactement un actif,
     ...                uniquement des chaînes/booléens (contrainte rf-mcp).
     ${sessions}=    List Sap Sessions
     Length Should Be    ${sessions}    2
@@ -75,7 +75,7 @@ List Reports Both Sessions Json Safe
     Length Should Be    ${actives}    1
 
 Closing One Alias Leaves The Other Alive
-    [Documentation]    Teardown isolé : fermer « verif » ne ferme QUE sa fenêtre —
+    [Documentation]    Teardown isolé : fermer « verif » ne ferme QUE sa fenêtre,
     ...                « default » (même connexion) reste debout et pilotable, et
     ...                redevient l'alias actif.
     Close Sap Session    verif
@@ -93,8 +93,8 @@ Closing One Alias Leaves The Other Alive
 *** Keywords ***
 Open SAP And Log In
     [Documentation]    Suite Setup. Lance le Logon Pad, ouvre la connexion (chaîne
-    ...                directe ou entrée enregistrée), s'authentifie — mot de passe
-    ...                jamais journalisé — et gère le popup « connexion multiple ».
+    ...                directe ou entrée enregistrée), s'authentifie (mot de passe
+    ...                jamais journalisé) et gère le popup « connexion multiple ».
     ...                Cette session historique EST l'alias « default » du registre.
     # Should Not Be Equal (et non Should Not Be Empty) : tolère un mot de passe
     # de type Secret RF 7.4, qui n'a pas de longueur mesurable.
@@ -120,7 +120,7 @@ Open SAP And Log In
 
 Close SAP Cleanly
     [Documentation]    Suite Teardown. Ferme toutes les sessions du registre (best-
-    ...                effort), quitte (/nex, tolérant) et arrête le Logon Pad —
+    ...                effort), quitte (/nex, tolérant) et arrête le Logon Pad :
     ...                aucune étape ne masque l'échec réel d'un test.
     Run Keyword And Ignore Error    Close All Sap Sessions
     Run Keyword And Ignore Error    Run Transaction    /nex

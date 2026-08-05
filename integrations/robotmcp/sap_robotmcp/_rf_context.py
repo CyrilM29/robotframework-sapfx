@@ -22,12 +22,12 @@ def run_keyword_in_context(session, keyword_name: str, *,
     keyword (chaînes, comme en Robot).
 
     ``allow_structured=True`` accepte aussi une valeur de retour structurée
-    (dict/list/tuple JSON-safe — jamais un objet COM, cf. field notes MCP × COM)
+    (dict/list/tuple JSON-safe, jamais un objet COM, cf. field notes MCP × COM)
     au lieu d'exiger du texte : le canal des keywords d'état applicatif
     (``Get Open Windows``, ``Get Session Telemetry``…).
 
     Lève ``RuntimeError`` (message explicite) si le gestionnaire de contexte RF
-    est indisponible, si le keyword échoue côté RF, ou si sa sortie est vide —
+    est indisponible, si le keyword échoue côté RF, ou si sa sortie est vide ;
     les appelants (state providers) sont responsables de convertir cette
     exception en réponse ``{"success": False, "error": ...}`` afin que la vraie
     cause reste visible côté agent, plutôt qu'un "keyword absent ?" générique.
@@ -36,7 +36,7 @@ def run_keyword_in_context(session, keyword_name: str, *,
     doivent l'envelopper dans ``asyncio.to_thread``. ``asyncio.to_thread`` pioche
     un thread dans le pool par défaut de l'event loop, potentiellement différent
     (et non sérialisé par le verrou d'exécution de rf-mcp) de celui qui a fait le
-    login SAP GUI — sur ce thread-là, COM peut n'avoir jamais été initialisé,
+    login SAP GUI : sur ce thread-là, COM peut n'avoir jamais été initialisé,
     d'où le même `ensure_com_initialized` défensif que
     `ConnectionKeywords.connect_to_session` (voir
     `src/SapEccLibrary/keywords/_connection.py`) pour éviter RPC_E_WRONG_THREAD.

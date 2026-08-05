@@ -1,12 +1,12 @@
 """Bundle JavaScript en page pour la résolution et la capture de contrôles UI5.
 
 Porté (et simplifié pour fonctionner comme un bundle injecté unique, sans fork de Playwright)
-depuis **playwright-sap** par Arpit Sureka — https://github.com/ArpitSureka/playwright-sap
+depuis **playwright-sap** par Arpit Sureka, https://github.com/ArpitSureka/playwright-sap
 Sous licence Apache-2.0. Voir le fichier NOTICE du projet.
 
 Techniques adoptées depuis ce projet :
   * un *arbre de contrôles* UI5 reflétant la hiérarchie des contrôles, permettant des localisateurs
-    XPath hiérarchiques (`//Table//Button[@text='Create']`) — bien plus expressifs
+    XPath hiérarchiques (`//Table//Button[@text='Create']`) : bien plus expressifs
     qu'un parcours à plat du registre ;
   * extraction des propriétés propres et héritées via les métadonnées du contrôle ;
   * un comparateur de propriétés robuste (sous-chaîne insensible à la casse, plus /regex/) ;
@@ -35,7 +35,7 @@ OBVIOUS_TEXT_PROPERTIES = [
     "noDataText",
 ]
 
-# Types de contrôles adressables par type seul (sans propriété) — par ex. pour nth().
+# Types de contrôles adressables par type seul (sans propriété), par ex. pour nth().
 ALLOW_WITHOUT_PROPERTIES = [
     "SearchField", "PullToRefresh", "Row", "ColumnListItem", "Column",
     "CustomListItem", "GridListItem", "StandardListItem", "Table", "List",
@@ -45,6 +45,50 @@ ALLOW_WITHOUT_PROPERTIES = [
 
 def _js_string_array(items):
     return "[" + ",".join("'%s'" % i for i in items) + "]"
+
+
+# Picto aicabra (medaillon du projet, assets/logo.png redimensionne 28px) embarque
+# en data-URI pour le panneau du recorder : le bundle reste auto-contenu (aucune
+# requete reseau, CSP-safe ; si une CSP img-src stricte bloque le data:, l'onerror
+# masque l'image, purement cosmetique). Regenere par gen_icons/gen_aicabra_uri.
+_AICABRA_ICON = (
+    "data:image/png;base64,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"
+    "WeSwAAAABJRU5ErkJggg=="
+)
 
 
 # Le bundle injecté. Idempotent (garde sur window.__SAPFX). Utilise des chaînes JS
@@ -79,9 +123,9 @@ BUNDLE = ("""
   }
 
   // Itère sur tous les contrôles, quel que soit l'âge du runtime UI5 :
-  //  1. module 'sap/ui/core/ElementRegistry' (UI5 2.x — Element.registry supprimé) ;
+  //  1. module 'sap/ui/core/ElementRegistry' (UI5 2.x : Element.registry supprimé) ;
   //  2. Element.registry via le module ou l'espace global (UI5 1.67+) ;
-  //  3. balayage DOM [data-sap-ui] + byId (UI5 < 1.67, ex. launchpads 1.44/1.52) —
+  //  3. balayage DOM [data-sap-ui] + byId (UI5 < 1.67, ex. launchpads 1.44/1.52),
   //     ne voit que les contrôles RENDUS, ce qui suffit : resolveByRole ne retourne
   //     de toute façon que les contrôles ayant un getDomRef().
   function registryForEach(fn) {
@@ -134,9 +178,9 @@ BUNDLE = ("""
   // Correspondance par sous-chaîne insensible à la casse ; supporte /pattern/flags pour une valeur de propriété.
   // La forme regex doit être EXPLICITE et bien formée : `/motif/drapeaux` avec des drapeaux
   // valides ([a-z]*) et un motif compilable. Sinon (ex. une valeur de chemin '/sap/bc/' ou
-  // '/Orders'), on retombe sur la sous-chaîne — au lieu de la traiter à tort comme une regex.
+  // '/Orders'), on retombe sur la sous-chaîne, au lieu de la traiter à tort comme une regex.
   // Bornes défensives contre un pattern/haystack forgé (properties=/pattern/flags
-  // vient d'un argument de test — potentiellement fourni par un agent MCP) : un
+  // vient d'un argument de test, potentiellement fourni par un agent MCP) : un
   // regex à quantificateurs imbriqués peut bloquer le thread JS (ReDoS). On ne
   // détecte pas les patterns pathologiques eux-mêmes (analyse statique hors de
   // portée ici), mais borner la longueur du pattern et de la chaîne testée borne
@@ -145,7 +189,7 @@ BUNDLE = ("""
   const MATCH_PROPS_MAX_HAYSTACK_LENGTH = 500;
 
   // Comparaison d'UNE valeur (sous-chaîne insensible à la casse, ou /regex/flags
-  // explicite et bien formée) — partagée par le moteur role (propriétés de
+  // explicite et bien formée), partagée par le moteur role (propriétés de
   // contrôle) et le moteur Web Components (attributs/propriétés d'hôte).
   function valueMatches(haystack, want) {
     const w = String(want);
@@ -188,7 +232,7 @@ BUNDLE = ("""
   }
 
   // Construit un XMLDocument reflétant la hiérarchie des contrôles UI5. Balise = type court du contrôle ;
-  // attributs = id, controlType, et les propriétés primitives autorisées — ainsi les prédicats
+  // attributs = id, controlType, et les propriétés primitives autorisées : ainsi les prédicats
   // XPath comme [@text='Create'] fonctionnent nativement via document.evaluate.
   function buildTree() {
     const doc = document.implementation.createDocument(null, 'UI5Tree', null);
@@ -234,10 +278,10 @@ BUNDLE = ("""
   }
 
   // Résout un sélecteur rôle/propriété vers les ids de contrôles via le registre
-  // (avec repli DOM pour les runtimes sans registre — voir registryForEach).
+  // (avec repli DOM pour les runtimes sans registre, voir registryForEach).
   // `idSuffix` matche la FIN de l'id du contrôle : c'est le motif des ids stables
   // Fiori Elements (« <AppId>::<PageId>--fe::table::<Entity>::LineItem::Table »),
-  // dont seul le suffixe `fe::…` est déterministe — le préfixe varie par app/route.
+  // dont seul le suffixe `fe::…` est déterministe : le préfixe varie par app/route.
   function resolveByRole(selJson) {
     if (!isUI5()) return null;
     const sel = JSON.parse(selJson);
@@ -333,7 +377,7 @@ BUNDLE = ("""
     return '';
   }
   // Lit une table sap.m.Table (getItems/getCells) ou sap.ui.table.Table (getRows, lignes
-  // VISIBLES seulement — virtualisation) vers une liste d'objets {en-tête: valeur}.
+  // VISIBLES seulement, virtualisation) vers une liste d'objets {en-tête: valeur}.
   function readTable(controlId) {
     if (!isUI5()) return null;
     const t = byId(controlId);
@@ -397,9 +441,9 @@ BUNDLE = ("""
 
   // ---- Support du 'sid' SAP WebGUI (SAP GUI for HTML) -----------------------
   // Les éléments ABAP classiques WebGUI portent un attribut `lsdata` où le "SID" stable
-  // (ex. wnd[0]/usr/ctxtVBAK-VBELN — l'id de scripting SAP GUI) apparaît sous DEUX
+  // (ex. wnd[0]/usr/ctxtVBAK-VBELN, l'id de scripting SAP GUI) apparaît sous DEUX
   // encodages : JSON `"SID":"…"` (fixtures, anciens ITS) ou littéral JS `SID:'…'`
-  // (clé non citée, guillemets simples — le WebGUI live S/4 1909, constaté 2026-07-18).
+  // (clé non citée, guillemets simples : le WebGUI live S/4 1909, constaté 2026-07-18).
   // Porté depuis playwright-sap sidSelectorGenerator.ts (regex au lieu d'eval).
   function sidFromElement(el) {
     if (!el || !el.getAttribute) return undefined;
@@ -442,10 +486,10 @@ BUNDLE = ("""
   // ---- Accessibilité : rôle implicite + nom accessible ----------------------
   // Les zones web génériques (React/Angular/vanilla) et les UI5 Web Components
   // s'adressent au plus près de l'INTENTION utilisateur via l'arbre
-  // d'accessibilité : le rôle ARIA (explicite OU implicite — la sémantique
+  // d'accessibilité : le rôle ARIA (explicite OU implicite, la sémantique
   // HTML native, sous-ensemble pragmatique de HTML-AAM) et le nom accessible
   // (calcul accname SIMPLIFIÉ, dans l'ordre de précédence de la spec W3C).
-  // Consommés par les clés `role=`/`name=` des moteurs dom et wc — jamais
+  // Consommés par les clés `role=`/`name=` des moteurs dom et wc, jamais
   // requis : les clés structurelles (css/tag/id) restent disponibles.
   const IMPLICIT_ROLES = {
     button: 'button', textarea: 'textbox', img: 'img', nav: 'navigation',
@@ -530,7 +574,7 @@ BUNDLE = ("""
   // Les pages « pur Web Components » (home SuccessFactors, apps ui5-webcomponents)
   // rendent des custom elements <ui5-button>… SANS runtime UI5 classique : le
   // registre est vide, resolveByRole/resolveByXPath sont aveugles. On scanne le
-  // light DOM du document — le contenu applicatif (slots) y reste ; seuls les
+  // light DOM du document, le contenu applicatif (slots) y reste ; seuls les
   // internals des composants vivent dans leurs shadow roots (ouverts : le CSS de
   // Playwright les perce pour le clic/la saisie). Le scoping UI5 WC peut suffixer
   // les tags (ui5-button-abc123) : un type court 'Button' matche les deux formes.
@@ -554,7 +598,7 @@ BUNDLE = ("""
     return !!(r.width || r.height);
   }
   // Chemin CSS light-DOM ancré au plus proche ancêtre à id (sinon body) : les
-  // hôtes WC n'ont souvent PAS d'id — contrairement aux contrôles UI5 classiques,
+  // hôtes WC n'ont souvent PAS d'id, contrairement aux contrôles UI5 classiques,
   // on ne peut pas retourner un simple [id=…]. Les ids contenant un guillemet
   // (littéral CSS cassé) sont ignorés comme ancre.
   function wcCssPath(el) {
@@ -629,9 +673,9 @@ BUNDLE = ("""
     }
     return null;
   }
-  // Capture sérialisable pour le recorder ({tag, text}) — jamais l'élément DOM.
+  // Capture sérialisable pour le recorder ({tag, text}), jamais l'élément DOM.
   // Texte NORMALISÉ (wsCollapse) : un textContent multi-nœuds porterait des
-  // retours à la ligne — invalides dans une cellule RF, introuvables au replay.
+  // retours à la ligne, invalides dans une cellule RF, introuvables au replay.
   function captureWc(node) {
     const el = closestWcElement(node);
     if (!el) return null;
@@ -642,7 +686,7 @@ BUNDLE = ("""
   }
 
   // Recorder : cible INTERACTIVE du moteur dom la plus proche (rôle ARIA calculé
-  // parmi les rôles actionnables) — le repli du recorder pour les zones non-SAP
+  // parmi les rôles actionnables) : le repli du recorder pour les zones non-SAP
   // d'une page hybride. On refuse les conteneurs passifs (body, div nu) : un
   // clic hors de tout élément interactif ne doit produire AUCUN step (bruit).
   const INTERACTIVE_ROLES = { button: 1, link: 1, textbox: 1, searchbox: 1,
@@ -659,7 +703,7 @@ BUNDLE = ("""
   }
   // Capture sérialisable du moteur dom ({role, name, css}) : rôle + nom
   // accessible quand ils existent (le localisateur « intention utilisateur »),
-  // chemin CSS light-DOM ancré sinon — jamais l'élément DOM lui-même.
+  // chemin CSS light-DOM ancré sinon, jamais l'élément DOM lui-même.
   function captureDom(node) {
     const el = interactiveDomTarget(node);
     if (!el) return null;
@@ -678,7 +722,7 @@ BUNDLE = ("""
   // générique (CSS de base + texte + rôle ARIA explicite OU implicite +
   // nom accessible + attributs, mêmes règles de matching valueMatches que
   // role/wc) fait entrer ces zones dans la même
-  // grammaire — chaîne de fallback et télémétrie de healing comprises — au
+  // grammaire, chaîne de fallback et télémétrie de healing comprises, au
   // lieu de retomber sur des sélecteurs Browser bruts hors bibliothèque.
   // Retourne des CHEMINS CSS light-DOM (wcCssPath), comme le moteur wc.
   function resolveByDom(selJson) {
@@ -714,7 +758,7 @@ BUNDLE = ("""
   // courant : runtime UI5 classique (moteurs role/xpath), hôtes UI5 Web
   // Components (wc), éléments WebGUI lsdata (sid), indices de frameworks web
   // génériques (dom), et les iframes à sonder séparément (chacune avec un
-  // sélecteur Browser réutilisable). Lecture seule, ne lève jamais — chaque
+  // sélecteur Browser réutilisable). Lecture seule, ne lève jamais : chaque
   // sous-sonde est isolée pour qu'une page exotique dégrade en champs vides.
   function frameworkHints() {
     const hints = [];
@@ -774,7 +818,7 @@ BUNDLE = ("""
     return { left: r.left, top: r.top, width: r.width, height: r.height };
   }
   // Pour le nœud DOM sous le curseur, retourne {rect, label} du contrôle propriétaire
-  // (UI5) ou de l'élément WebGUI `lsdata` le plus proche — ou null si aucun ne s'applique.
+  // (UI5) ou de l'élément WebGUI `lsdata` le plus proche, ou null si aucun ne s'applique.
   function highlightInfo(node) {
     if (!node || node.nodeType !== 1) node = node ? node.parentElement : null;
     if (!node) return null;
@@ -847,14 +891,14 @@ BUNDLE = ("""
 
 def build_call(method):
     """Retourne une expression de fonction qui (ré)installe le bundle puis appelle
-    ``window.__SAPFX.<method>(arg)``. Commence par '(' — Playwright ne *lance* pas
+    ``window.__SAPFX.<method>(arg)``. Commence par '(' : Playwright ne *lance* pas
     un littéral de fonction commençant par un espace.
 
     Double forme d'appel (même fonction) :
     * sans sélecteur Browser  -> Playwright appelle ``fn(arg)`` ;
     * avec sélecteur Browser (support iframe Work Zone/cFLP) -> Playwright
       appelle ``fn(element, arg)`` et exécute la fonction **dans le contexte de
-      la frame de l'élément** — ``window`` y est la fenêtre de la frame, donc le
+      la frame de l'élément** : ``window`` y est la fenêtre de la frame, donc le
       bundle s'installe et résout dans l'app embarquée, pas dans le shell.
     On détecte la forme au nombre d'arguments réellement reçus."""
     return ("(first, second) => { const arg = (second === undefined) ? first : second; "
@@ -875,9 +919,9 @@ def sid_xpath(sid):
     """Sélecteur navigateur pour un élément SAP WebGUI par son ``SID`` stable.
 
     Les éléments WebGUI (SAP GUI for HTML) portent un attribut ``lsdata`` où le ``SID``
-    (``wnd[0]/usr/...`` — le même espace d'ids que le scripting SAP GUI) apparaît sous DEUX
+    (``wnd[0]/usr/...``, le même espace d'ids que le scripting SAP GUI) apparaît sous DEUX
     encodages constatés : JSON ``"SID":"…"`` (fixtures, anciens ITS) ou littéral JS ``SID:'…'``
-    (clé non citée, guillemets simples — le WebGUI live S/4 1909, découvert par l'exploration
+    (clé non citée, guillemets simples : le WebGUI live S/4 1909, découvert par l'exploration
     agent du 2026-07-18 : l'ancien sélecteur JSON-seul ne matchait RIEN sur un vrai système).
     On compare donc avec deux ``contains()`` XPath, un par encodage. ``sid`` ne doit jamais
     contenir de guillemet (les ids SAP GUI n'en ont jamais) : un guillemet casserait le
@@ -937,7 +981,7 @@ _SPY_LISTENER = """
   // un .robot : sans échappement, ${...} y serait résolu comme variable RF à
   // l'exécution (« Variable not found »), un run de 2+ espaces couperait la
   // cellule, un '#' de tête ouvrirait un commentaire, et une valeur « mot=... »
-  // deviendrait un argument nommé. rfUnescape est l'inverse exact — le replay
+  // deviendrait un argument nommé. rfUnescape est l'inverse exact : le replay
   // in-page l'applique avant d'utiliser la valeur.
   function rfEscape(value, isValue) {
     if (value === undefined || value === null || value === '') return '${EMPTY}';
@@ -994,20 +1038,36 @@ _SPY_LISTENER = """
       btn.textContent = label;
       setTimeout(function () { btn.textContent = btn.__ui5CopyLabel; }, 700);
     }
-    // writeText rejette en asynchrone (document sans focus, iframe cross-origin
-    // sous permissions policy...) — un try/catch synchrone ne le voit pas, et
-    // le bouton ne doit pas afficher « copied » quand rien n'a été copié.
+    // Repli des contextes SANS presse-papier asynchrone : une origine non
+    // sécurisée (WebGUI intranet servi en http) n'a PAS navigator.clipboard,
+    // et writeText rejette en asynchrone (document sans focus, iframe
+    // cross-origin sous permissions policy...). Textarea temporaire parenté
+    // AU PANNEAU (inOurUI, comme l'ancre de download) + execCommand('copy') :
+    // le bouton affiche le résultat RÉEL, jamais « copied » quand rien n'a
+    // été copié (l'ancien code le prétendait quand clipboard était absent).
+    function legacyCopy() {
+      var ok = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        panel.appendChild(ta);
+        ta.select();
+        ok = !!(document.execCommand && document.execCommand('copy'));
+        ta.remove();
+      } catch (e) { ok = false; }
+      flash(ok ? 'copied' : 'copy failed');
+    }
     try {
       if (navigator.clipboard) {
         var p = navigator.clipboard.writeText(text);
         if (p && typeof p.then === 'function') {
-          p.then(function () { flash('copied'); },
-                 function () { flash('copy failed'); });
+          p.then(function () { flash('copied'); }, legacyCopy);
           return;
         }
       }
-      flash('copied');
-    } catch (e) { flash('copy failed'); }
+      legacyCopy();
+    } catch (e) { legacyCopy(); }
   }
 
   // --- superposition de survol (pointer-events none afin de ne jamais intercepter la souris) ---
@@ -1027,15 +1087,45 @@ _SPY_LISTENER = """
   var STORE_KEY = '__ui5RecorderSteps';
   var NAME_KEY = '__ui5RecorderName';
   var REC_KEY = '__ui5RecorderRecording';
+  // Une ÉCRITURE sessionStorage qui échoue (quota plein, stockage bloqué par
+  // la politique du site) perdrait steps et état de record en silence au
+  // prochain rechargement : prévenir UNE fois dans la console, sans jamais
+  // bloquer l'enregistrement. Les lectures, elles, retombent sur les défauts.
+  var storageWarned = false;
+  function warnStorage(e) {
+    if (storageWarned) return;
+    storageWarned = true;
+    try {
+      console.warn('[SAPFX recorder] sessionStorage en \\u00e9chec (' +
+        (e && e.message ? e.message : e) +
+        ') : le d\\u00e9roul\\u00e9 ne survivra pas \\u00e0 un rechargement.');
+    } catch (e2) {}
+  }
   function loadSteps() { try { var s = sessionStorage.getItem(STORE_KEY); return s ? JSON.parse(s) : []; } catch (e) { return []; } }
-  function saveSteps() { try { sessionStorage.setItem(STORE_KEY, JSON.stringify(steps)); } catch (e) {} }
+  function saveSteps() { try { sessionStorage.setItem(STORE_KEY, JSON.stringify(steps)); } catch (e) { warnStorage(e); } }
   function loadName() { try { return sessionStorage.getItem(NAME_KEY) || 'Scenario enregistre'; } catch (e) { return 'Scenario enregistre'; } }
   // L'ÉTAT d'enregistrement survit aussi à la navigation : après un reload +
   // ré-injection (snippet recollé ou raccourci extension), l'enregistrement
-  // reprend tout seul au lieu de perdre silencieusement les interactions —
+  // reprend tout seul au lieu de perdre silencieusement les interactions,
   // une navigation cross-app du launchpad recharge la page entière.
-  function saveRecording() { try { sessionStorage.setItem(REC_KEY, recording ? '1' : ''); } catch (e) {} }
+  function saveRecording() { try { sessionStorage.setItem(REC_KEY, recording ? '1' : ''); } catch (e) { warnStorage(e); } }
   function loadRecording() { try { return sessionStorage.getItem(REC_KEY) === '1'; } catch (e) { return false; } }
+  // L'URL de DÉBUT d'enregistrement (portée de rf-web-recorder) : les exports
+  // amorcent New Page sur la page où le déroulé a COMMENCÉ, pas sur celle du
+  // moment de l'export (constaté live : un record login -> dashboard exporté
+  // depuis le dashboard rejouait au mauvais endroit). Posée au démarrage du
+  // record et jamais écrasée ensuite : la reprise post-navigation repasse par
+  // setRecording(true) avec l'URL d'arrivée, qui ne doit pas gagner. Purgée
+  // par clear, restaurée par l'import d'un .robot (round-trip).
+  var URL_KEY = '__ui5RecorderStartUrl';
+  function rememberUrl() {
+    try {
+      if (!sessionStorage.getItem(URL_KEY)) sessionStorage.setItem(URL_KEY, location.href);
+    } catch (e) { warnStorage(e); }
+  }
+  function startUrl() {
+    try { return sessionStorage.getItem(URL_KEY) || location.href; } catch (e) { return location.href; }
+  }
 
   // --- panneau intégré listant les sélecteurs capturés -----------------------
   var captures = [];
@@ -1044,7 +1134,7 @@ _SPY_LISTENER = """
   var panel = document.createElement('div');
   panel.id = '__ui5SpyPanel';
   // 470px : à 380 l'en-tête débordait ses 7 boutons, et `overflow:hidden` rognait
-  // « stop » — bouton réellement inatteignable à la souris (vu à l'image sur une
+  // « stop » : bouton réellement inatteignable à la souris (vu à l'image sur une
   // app Fiori Elements). Largeur + titre qui s'ellipse = en-tête sur UNE ligne.
   panel.style.cssText = 'position:fixed;z-index:2147483647;right:12px;bottom:12px;' +
     'width:470px;max-height:55vh;display:flex;flex-direction:column;background:#fff;' +
@@ -1053,10 +1143,22 @@ _SPY_LISTENER = """
   var head = document.createElement('div');
   head.style.cssText = 'display:flex;align-items:center;gap:6px;padding:8px 10px;' +
     'background:#0a6ed1;color:#fff;font-weight:600;cursor:move;';   // cursor:move -> déplaçable
+  head.title = 'SAPFX Recorder : glisser l\\'en-t\\u00eate pour d\\u00e9placer le panneau';
+  // Picto aicabra (identité du projet) : data-URI embarqué, jamais de requête
+  // réseau. onerror = repli silencieux si une CSP img-src stricte bloque le
+  // data: (purement décoratif). Le curseur move sur l'image renforce l'indice
+  // « ce panneau se déplace » (constaté utile : le drag existait mais restait
+  // invisible tant qu'on ne survolait pas l'en-tête).
+  var logo = document.createElement('img');
+  logo.src = '__AICABRA_ICON__';
+  logo.alt = 'aicabra';
+  logo.style.cssText = 'width:20px;height:20px;border-radius:50%;flex:0 0 auto;' +
+    'cursor:move;background:#fff;';
+  logo.onerror = function () { logo.style.display = 'none'; };
   var dot = document.createElement('span');   // indicateur d'enregistrement (rouge clignotant)
   dot.style.cssText = 'width:9px;height:9px;border-radius:50%;background:#ff3b30;display:none;' +
     'flex:0 0 auto;box-shadow:0 0 4px #ff3b30;';
-  // min-width:0 + ellipsis : sans quoi un titre long (« Recording — 12 step(s) »)
+  // min-width:0 + ellipsis : sans quoi un titre long (« Recording : 12 step(s) »)
   // pousse les boutons hors du panneau au lieu de se tronquer lui-même.
   var title = document.createElement('span');
   title.style.cssText = 'flex:1 1 auto;min-width:0;white-space:nowrap;' +
@@ -1077,7 +1179,7 @@ _SPY_LISTENER = """
   btnRec.textContent = 'rec'; btnPlay.textContent = 'play';
   btnNewTest.textContent = '+test'; btnExport.textContent = 'export';
   btnClear.textContent = 'clear'; btnClose.textContent = 'stop';
-  head.appendChild(dot); head.appendChild(title); head.appendChild(btnCollapse);
+  head.appendChild(logo); head.appendChild(dot); head.appendChild(title); head.appendChild(btnCollapse);
   head.appendChild(btnRec); head.appendChild(btnPlay); head.appendChild(btnNewTest);
   head.appendChild(btnExport); head.appendChild(btnClear); head.appendChild(btnClose);
   var nameRow = document.createElement('div');
@@ -1086,7 +1188,7 @@ _SPY_LISTENER = """
   var nameInput = document.createElement('input');
   nameInput.type = 'text'; nameInput.value = loadName();
   nameInput.style.cssText = 'flex:1;font:11px monospace;border:1px solid #ccc;border-radius:3px;padding:2px 5px;';
-  nameInput.addEventListener('input', function () { try { sessionStorage.setItem(NAME_KEY, nameInput.value); } catch (e) {} });
+  nameInput.addEventListener('input', function () { try { sessionStorage.setItem(NAME_KEY, nameInput.value); } catch (e) { warnStorage(e); } });
   nameRow.appendChild(nameLbl); nameRow.appendChild(nameInput);
   var list = document.createElement('div');
   list.style.cssText = 'overflow:auto;padding:6px;';
@@ -1095,7 +1197,7 @@ _SPY_LISTENER = """
   hint.textContent = 'Hover + click to capture. rec to record, play to replay in-page. Right-click / Alt+click = assert. Esc to stop.';
   // Frames cross-origin : ce panneau ne peut PAS les instrumenter (le snippet
   // collé en console ne voit que sa frame). L'extension, elle, injecte en
-  // allFrames — un panneau séparé apparaît DANS chaque frame accessible.
+  // allFrames : un panneau séparé apparaît DANS chaque frame accessible.
   var frameWarn = document.createElement('div');
   frameWarn.style.cssText = 'padding:4px 10px;color:#a15c00;background:#fff8ec;' +
     'border-top:1px solid #f0e0c0;display:none;';
@@ -1113,7 +1215,7 @@ _SPY_LISTENER = """
     var n = (window.top === window.self) ? crossOriginFrameCount() : 0;
     if (n) {
       frameWarn.textContent = '\\u26a0 ' + n + ' iframe(s) cross-origin non instrument\\u00e9e(s) ' +
-        'par ce panneau \\u2014 utiliser l\\'extension (allFrames : un panneau par frame).';
+        'par ce panneau : utiliser l\\'extension (allFrames : un panneau par frame).';
       frameWarn.style.display = '';
     } else { frameWarn.style.display = 'none'; }
   }
@@ -1173,7 +1275,7 @@ _SPY_LISTENER = """
   function flashGreen() {
     // Le fond de repos n'est photographié qu'à l'arrêt : deux flashs qui se
     // chevauchent (fill + Entrée différée dans le même tick) photographieraient
-    // le vert et restaureraient le vert — définitivement.
+    // le vert et restaureraient le vert, définitivement.
     if (flashTimer) clearTimeout(flashTimer);
     else flashOrig = box.style.background;
     box.style.background = 'rgba(16,179,16,0.25)';
@@ -1218,18 +1320,26 @@ _SPY_LISTENER = """
   }
   // Déclenche le téléchargement d'un fichier texte (sans dépendance, via un Blob).
   // L'ancre est parentée AU PANNEAU (inOurUI) : sinon la capture dom intercepte
-  // son propre clic synthétique — une ancre href a le rôle 'link', donc cible
+  // son propre clic synthétique : une ancre href a le rôle 'link', donc cible
   // interactive → preventDefault → téléchargement annulé (attrapé par le smoke
   // recorder_web_smoke lors du passage à captureDom, 2026-07-19).
   function download(text, filename) {
-    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = filename; a.style.display = 'none';
-    panel.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    try {
+      var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename; a.style.display = 'none';
+      panel.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+      // Un échec (CSP sandbox, Blob/objectURL interdits...) était avalé en
+      // silence : l'utilisateur croyait son export parti. Remonté dans le
+      // bandeau du panneau ; la copie presse-papiers reste le secours.
+      hint.textContent = '\\u00c9chec du t\\u00e9l\\u00e9chargement de ' + filename + ' : ' +
+        (e && e.message ? e.message : e) + '. Utiliser la copie presse-papiers.';
+    }
   }
   function testName() { return (nameInput.value || '').trim() || 'Scenario enregistre'; }
   // Le keyword Wait For UI5 Ready (copie de resources/fiori_keywords.resource) est
@@ -1248,7 +1358,7 @@ _SPY_LISTENER = """
   // --- multi-scénarios : un marqueur (commentaire RF) sépare les tests --------
   // « +test » insère le marqueur ; chaque export le convertit en un nouveau
   // *** Test Case *** (le bootstrap New Browser/New Page ne vit que dans le
-  // premier — les suivants continuent la même session).
+  // premier : les suivants continuent la même session).
   var TEST_MARKER = /^# --- test: (.+)$/;
   function testMarkerLine(name) { return '# --- test: ' + cleanCell(name); }
   function splitScenarios() {
@@ -1268,7 +1378,7 @@ _SPY_LISTENER = """
       s += group.name + '\\n';
       if (gi === 0) {
         s += '    New Browser    chromium    headless=False\\n';
-        s += '    New Page    ' + location.href + '\\n';
+        s += '    New Page    ' + startUrl() + '\\n';
       }
       group.steps.forEach(function (st) { s += '    ' + st + '\\n'; });
       s += '\\n';
@@ -1279,7 +1389,7 @@ _SPY_LISTENER = """
   }
   // --- export resource-first : la paire .resource + .robot sans localisateur ---
   // (convention n°1 du projet : les tests parlent métier, les localisateurs
-  // vivent dans la couche resources — celle que sap-healer sait réparer).
+  // vivent dans la couche resources, celle que sap-healer sait réparer).
   function slugFromArgs(argCells, fallback) {
     var text = null, id = null, tag = null, role = null, name = null, m;
     argCells.forEach(function (c) {
@@ -1346,7 +1456,7 @@ _SPY_LISTENER = """
         var resolveLine = '    ${cible}=    Resolve Ui5 With Fallback    xpath=' +
           parsed.xpath + '    ' + locCells.join('    ');
         // Saisie : on descend dans l'<input>/<textarea> INTERNE, comme le fait
-        // Fill Ui5 Input — un champ UI5 composite (sap.m.Input, SearchField…)
+        // Fill Ui5 Input : un champ UI5 composite (sap.m.Input, SearchField…)
         // a une <div> pour racine, que Fill Text ne peut pas remplir.
         // (Attrapé par le run live de la paire exportée contre Fiori Elements.)
         var action = (cells[0] === 'Click Ui5 Control')
@@ -1366,7 +1476,7 @@ _SPY_LISTENER = """
       return kwName + (value !== null ? '    ' + value : '');
     }
     // Paire d'assertion texte (menu clic droit) : `${texte} =    Get Wc/Dom
-    // Text    <loc>` suivi de `Should Be Equal    ${texte}    <attendu>` —
+    // Text    <loc>` suivi de `Should Be Equal    ${texte}    <attendu>`,
     // enveloppée en UN keyword métier, sinon les localisateurs de la paire
     // resteraient dans la suite (convention n°1).
     function textAssertPair(line, nextLine) {
@@ -1393,7 +1503,7 @@ _SPY_LISTENER = """
       robot += group.name + '\\n';
       if (gi === 0) {
         robot += '    New Browser    chromium    headless=False\\n';
-        robot += '    New Page    ' + location.href + '\\n';
+        robot += '    New Page    ' + startUrl() + '\\n';
       }
       for (var si = 0; si < group.steps.length; si++) {
         var pair = textAssertPair(group.steps[si], group.steps[si + 1]);
@@ -1450,10 +1560,10 @@ _SPY_LISTENER = """
   }
   function buildSpec() {
     var md = '# ' + testName() + '\\n\\n';
-    md += '> **Brouillon g\\u00e9n\\u00e9r\\u00e9 par le recorder web** \\u2014 \\u00e0 retravailler\\n';
+    md += '> **Brouillon g\\u00e9n\\u00e9r\\u00e9 par le recorder web** : \\u00e0 retravailler\\n';
     md += '> (r\\u00e9sultats attendus, donn\\u00e9es) avant passage au sap-generator.\\n\\n';
     md += '- **Canal** : Fiori (web)\\n';
-    md += '- **Syst\\u00e8me / URL** : ' + location.href + '\\n';
+    md += '- **Syst\\u00e8me / URL** : ' + startUrl() + '\\n';
     md += '- **Pr\\u00e9conditions** : application accessible.\\n\\n';
     md += '## Donn\\u00e9es observ\\u00e9es\\n\\n- Valeurs saisies pendant l\\'enregistrement : voir les \\u00e9tapes.\\n\\n';
     md += '## Sc\\u00e9narios\\n\\n';
@@ -1473,7 +1583,7 @@ _SPY_LISTENER = """
         }
         if (human === null) {
           // Étape inconnue : la ligne exacte ne va dans les étapes QUE si elle
-          // ne porte aucun localisateur (contrat specs/ — pas d'id dans les
+          // ne porte aucun localisateur (contrat specs/ : pas d'id dans les
           // étapes) ; sinon elle vit en « Points de vigilance », déjà relevée.
           human = hasLocator
             ? '\\u00c9tape technique \\u00e0 traduire (ligne exacte en \\u00ab Points de vigilance \\u00bb)'
@@ -1503,7 +1613,7 @@ _SPY_LISTENER = """
     // visible au lieu d'un .robot silencieusement manquant.
     setTimeout(function () { download(pair.robot, 'recorded.robot'); }, 350);
     copy(pair.robot, btnExport);
-    hint.textContent = 'Export de 2 fichiers (.resource + .robot) \\u2014 autoriser ' +
+    hint.textContent = 'Export de 2 fichiers (.resource + .robot) : autoriser ' +
       'les t\\u00e9l\\u00e9chargements multiples si le navigateur le demande.';
   }
   function exportSpec() {
@@ -1513,9 +1623,9 @@ _SPY_LISTENER = """
   }
 
   // --- export rapport HTML : la documentation humaine d'un enregistrement ----
-  // Concept observé chez RoboSAPiens (saveHtmlReport — NOTICE) : page HTML
+  // Concept observé chez RoboSAPiens (saveHtmlReport, NOTICE) : page HTML
   // AUTO-CONTENUE (CSS minimal inline, aucune dépendance) documentant le
-  // déroulé — phrase métier + ligne RF exacte par step, un chapitre par
+  // déroulé : phrase métier + ligne RF exacte par step, un chapitre par
   // scénario. Documentation, jamais un test : l'enregistrement brut fait foi.
   // Pas de capture d'écran depuis la page (une page ne se photographie pas
   // elle-même) : le log Robot et la démo vidéo couvrent ce besoin.
@@ -1538,8 +1648,8 @@ _SPY_LISTENER = """
     var page = '<!doctype html>\\n<html lang="fr">\\n<head>\\n<meta charset="utf-8">\\n' +
       '<title>' + escapeHtml(testName()) + '</title>\\n<style>' + css + '</style>\\n' +
       '</head>\\n<body>\\n<h1>' + escapeHtml(testName()) + '</h1>\\n' +
-      '<p class="meta">Rapport g\\u00e9n\\u00e9r\\u00e9 par le recorder web \\u2014 ' +
-      escapeHtml(location.href) + '. Documentation du d\\u00e9roul\\u00e9 ' +
+      '<p class="meta">Rapport g\\u00e9n\\u00e9r\\u00e9 par le recorder web : ' +
+      escapeHtml(startUrl()) + '. Documentation du d\\u00e9roul\\u00e9 ' +
       'enregistr\\u00e9 : l\\u2019enregistrement brut fait foi, ce rapport ' +
       'n\\u2019est pas un test.</p>\\n';
     splitScenarios().forEach(function (group, gi) {
@@ -1640,7 +1750,7 @@ _SPY_LISTENER = """
   }
   // Affectation via le setter NATIF du prototype : React trace la dernière
   // valeur posée par l'accesseur natif et déduplique les événements `input`
-  // dont la valeur « n'a pas changé » — un simple t.value = x est exactement
+  // dont la valeur « n'a pas changé » : un simple t.value = x est exactement
   // ce qui est dédupliqué, donc les fills rejoués no-opaient sur les zones
   // React (la cible même du moteur dom).
   function setNativeValue(el, value) {
@@ -1800,7 +1910,7 @@ _SPY_LISTENER = """
     function finishOk() {
       replaying = false;
       replayState.current = -1;
-      hint.textContent = 'Replay OK \\u2014 ' + steps.length + ' step(s).';
+      hint.textContent = 'Replay OK : ' + steps.length + ' step(s).';
       render();
     }
     function next() {
@@ -1849,7 +1959,13 @@ _SPY_LISTENER = """
         else out.push(testMarkerLine(trimmed));      // test suivant -> marqueur
         return;
       }
-      if (/^(New Browser|New Page|\\[)/.test(trimmed)) { skipped++; return; }
+      if (/^(New Browser|New Page|\\[)/.test(trimmed)) {
+        // Round-trip : le New Page importé restaure l'URL de départ (le
+        // bootstrap reste re-généré à l'export, donc toujours compté ignoré).
+        var mNP = trimmed.match(/^New Page\\s{2,}(\\S+)/);
+        if (mNP) { try { sessionStorage.setItem(URL_KEY, mNP[1]); } catch (e) { warnStorage(e); } }
+        skipped++; return;
+      }
       out.push(trimmed);
     });
     return { name: name, steps: out, skipped: skipped };
@@ -1859,11 +1975,11 @@ _SPY_LISTENER = """
     steps = parsed.steps;
     if (parsed.name) {
       nameInput.value = parsed.name;
-      try { sessionStorage.setItem(NAME_KEY, parsed.name); } catch (e) {}
+      try { sessionStorage.setItem(NAME_KEY, parsed.name); } catch (e) { warnStorage(e); }
     }
     saveSteps(); render();
     hint.textContent = parsed.steps.length + ' step(s) import\\u00e9(s)' +
-      (parsed.skipped ? ' \\u2014 ' + parsed.skipped + ' ligne(s) de bootstrap ignor\\u00e9e(s)' : '') + '.';
+      (parsed.skipped ? ' : ' + parsed.skipped + ' ligne(s) de bootstrap ignor\\u00e9e(s)' : '') + '.';
   }
   function importRobot() {
     var inp = document.createElement('input');
@@ -1924,7 +2040,7 @@ _SPY_LISTENER = """
     input.addEventListener('blur', commit);
   }
   function renderSteps() {
-    title.textContent = (recording ? 'Recording' : 'Steps') + ' \\u2014 ' + steps.length + ' step(s)' + frameTag;
+    title.textContent = (recording ? 'Recording' : 'Steps') + ' : ' + steps.length + ' step(s)' + frameTag;
     list.textContent = '';
     steps.forEach(function (line, i) {
       var row = document.createElement('div');
@@ -1948,7 +2064,7 @@ _SPY_LISTENER = """
   }
   function render() {
     if (recording || steps.length) { renderSteps(); return; }   // steps restaurés -> visibles
-    title.textContent = 'UI5 Recorder \\u2014 ' + captures.length + ' captured' + frameTag;
+    title.textContent = 'UI5 Recorder : ' + captures.length + ' captured' + frameTag;
     list.textContent = '';
     captures.forEach(function (rec, i) {
       var row = document.createElement('div');
@@ -2078,7 +2194,7 @@ _SPY_LISTENER = """
       // En record, le clic n'est JAMAIS bloqué : l'application doit continuer à
       // réagir pour dérouler un vrai parcours (l'ancien preventDefault global
       // gelait l'app pendant l'enregistrement). Seuls les gestes MÉTA
-      // (Alt+clic = assertion) sont avalés — ils ne font pas partie du flux.
+      // (Alt+clic = assertion) sont avalés : ils ne font pas partie du flux.
       if (event.altKey && cap) {
         event.preventDefault(); event.stopPropagation();
         if (event.shiftKey && cap.text) {   // Shift+Alt+clic = assertion de VALEUR
@@ -2110,10 +2226,36 @@ _SPY_LISTENER = """
     flashGreen();
   }
   // mode record : une saisie validée (change) devient un Fill Ui5 Input ordonné.
-  // Les champs password ne sont jamais capturés en clair (ils finiraient dans
-  // recorded.robot / sessionStorage / le presse-papier) : on insère un placeholder.
+  // Les champs SENSIBLES ne sont jamais capturés en clair (ils finiraient dans
+  // recorded.robot / sessionStorage / le presse-papier) : on insère un
+  // placeholder. type=password est le cas évident ('Password' est la graphie
+  // UI5 WC) ; les tokens autocomplete couvrent paiement + OTP + gestionnaires
+  // de mots de passe ; les motifs name/id/aria-label rattrapent les formulaires
+  // sans autocomplete. Motifs volontairement étroits : un faux positif masque
+  // en silence une valeur que l'utilisateur voulait enregistrer.
+  var SENSITIVE_AUTOCOMPLETE = /^(cc-number|cc-csc|cc-exp(-month|-year)?|one-time-code|current-password|new-password)$/;
+  var SENSITIVE_HINT = /passw|pwd|cvv|cvc|card.?number|cardnum|(^|[^a-z])(csc|otp)([^a-z]|$)|one.?time.?code|security.?code/;
   function isPasswordField(t) {
     return t.type === 'password' || (t.getAttribute && t.getAttribute('type') === 'Password');
+  }
+  function attrLower(t, name) {
+    try {
+      if (t && typeof t.getAttribute === 'function') return String(t.getAttribute(name) || '').toLowerCase();
+    } catch (e) {}
+    return '';
+  }
+  // Placeholder à enregistrer à la place de la vraie valeur : '<REDACTED>'
+  // pour un password, '<SECRET>' pour paiement/OTP, null si la valeur est
+  // sûre à enregistrer.
+  function sensitiveMask(t) {
+    if (isPasswordField(t)) return '<REDACTED>';
+    // autocomplete est une liste de tokens séparés par des blancs ('billing cc-number')
+    var tokens = attrLower(t, 'autocomplete').split(/\\s+/);
+    for (var i = 0; i < tokens.length; i++) {
+      if (SENSITIVE_AUTOCOMPLETE.test(tokens[i])) return '<SECRET>';
+    }
+    var hintText = attrLower(t, 'name') + ' ' + attrLower(t, 'id') + ' ' + attrLower(t, 'aria-label');
+    return SENSITIVE_HINT.test(hintText) ? '<SECRET>' : null;
   }
   function onChange(event) {
     if (replaying || !recording || inOurUI(event.target)) return;
@@ -2126,20 +2268,21 @@ _SPY_LISTENER = """
     var sidObj = cap ? null : window.__SAPFX.captureSid(t);
     var sid = sidObj && sidObj.sid;
     // NB : le `change` natif d'un <input> INTERNE à un shadow root n'est pas
-    // composed — il n'atteint ce listener document que si le composant le
+    // composed : il n'atteint ce listener document que si le composant le
     // re-émet (les UI5 WC réels re-émettent ui5-change/change sur l'hôte).
     var wc = (!cap && !sid) ? window.__SAPFX.captureWc(t) : null;
     var dom = (!cap && !sid && !wc) ? window.__SAPFX.captureDom(t) : null;
     if (!cap && !sid && !wc && !dom) return;
     // Une valeur enregistrée est TOUJOURS échappée façon RF (variables ${...},
-    // runs d'espaces, '#', 'mot='...) — le replay in-page la déséchappe.
-    var value = isPasswordField(t) ? '<REDACTED>' : rfEscape(t.value, true);
+    // runs d'espaces, '#', 'mot='...) : le replay in-page la déséchappe.
+    var mask = sensitiveMask(t);
+    var value = mask || rfEscape(t.value, true);
     if (cap) {
-      // Valeur redacted pour les champs password, mais id ET xpath conservés :
+      // Valeur masquée pour les champs sensibles, mais id ET xpath conservés :
       // le locator du champ reste exploitable pour rejouer le test (avec une
       // vraie valeur injectée à la main). Même logique de masquage côté WebGUI (sid).
       addStep(withXpathHint(fillLine(cap, value), cap));
-      if (isPasswordField(t)) {
+      if (mask) {
         var x = xpathLine(cap);
         if (x) addStep(x);
       }
@@ -2165,7 +2308,7 @@ _SPY_LISTENER = """
     }
     // Entrée pendant le record : la touche de VALIDATION fait partie du déroulé
     // (soumission de formulaire, recherche). Différé d'un tick : le `change` du
-    // champ — émis pendant l'action par défaut d'Entrée — doit précéder le
+    // champ, émis pendant l'action par défaut d'Entrée, doit précéder le
     // Keyboard Key dans l'ordre des steps. Textarea exclu (Entrée = nouvelle ligne).
     // Parqué dans pendingEnter : si Entrée déclenche une navigation pleine page,
     // onBeforeUnload le flush avant que le tick ne meure avec la page.
@@ -2181,13 +2324,13 @@ _SPY_LISTENER = """
   }
   // navigation Fiori (routing par hash / history) -> insère une attente rejouable :
   // Wait For UI5 Ready (moteur inactif, pas seulement chargé) quand le runtime UI5
-  // est là — le keyword est embarqué dans l'export — sinon Wait For Load State.
+  // est là, le keyword est embarqué dans l'export, sinon Wait For Load State.
   function onNav() {
     if (!recording) return;
     addStep(window.__SAPFX.isUI5() ? 'Wait For UI5 Ready' : 'Wait For Load State    load');
   }
   // Navigation PLEINE PAGE (soumission, lien hors routing) : flusher l'Entrée
-  // différée puis marquer l'attente — les steps sont déjà persistés au fil de
+  // différée puis marquer l'attente : les steps sont déjà persistés au fil de
   // l'eau, mais sans ce hook la touche qui a soumis disparaissait avec la page.
   function onBeforeUnload() {
     if (!recording || replaying) return;
@@ -2198,6 +2341,7 @@ _SPY_LISTENER = """
   function setRecording(on) {
     recording = !!on;
     saveRecording();
+    if (on) rememberUrl();
     btnRec.textContent = on ? 'pause' : 'rec';
     btnRec.style.background = on ? '#d0021b' : 'transparent';
     dot.style.display = on ? 'inline-block' : 'none';
@@ -2207,7 +2351,7 @@ _SPY_LISTENER = """
       : 'Hover + click to capture. rec to record, play to replay in-page. Right-click / Alt+click = assert. Esc to stop.';
     updateFrameWarn();
     render();
-    // notifie le pont d'extension (badge) — voir extension/bridge.js
+    // notifie le pont d'extension (badge), voir extension/bridge.js
     try { document.dispatchEvent(new CustomEvent('__ui5RecorderState', { detail: on })); } catch (e) {}
   }
   btnRec.addEventListener('click', function () { setRecording(!recording); });
@@ -2230,7 +2374,12 @@ _SPY_LISTENER = """
       { label: 'importer un .robot\\u2026', run: importRobot }
     ], r.left, r.bottom + 4);
   });
-  btnClear.addEventListener('click', function () { captures = []; steps = []; saveSteps(); render(); });
+  btnClear.addEventListener('click', function () {
+    captures = []; steps = [];
+    saveSteps();
+    try { sessionStorage.removeItem(URL_KEY); } catch (e) {}
+    render();
+  });
   btnClose.addEventListener('click', function () { window.__ui5SpyStop(); });
 
   document.addEventListener('mousemove', onMove, true);
@@ -2250,7 +2399,7 @@ _SPY_LISTENER = """
   // API pilotable depuis le popup de l'extension / le raccourci clavier (monde MAIN).
   window.__ui5RecorderApi = {
     toggleRec: function () { setRecording(!recording); },
-    // setRec(on) : état EXPLICITE — le raccourci/popup calcule UNE cible pour
+    // setRec(on) : état EXPLICITE : le raccourci/popup calcule UNE cible pour
     // toutes les frames au lieu de toggles par frame qui dérivent en anti-phase.
     setRec: function (on) { setRecording(!!on); },
     exportScript: exportScript,
@@ -2288,7 +2437,7 @@ _SPY_LISTENER = """
 
 _SPY_HEADER = """\
 /*
- * Recorder de localisation UI5 / WebGUI — survolez pour surligner, cliquez pour capturer,
+ * Recorder de localisation UI5 / WebGUI : survolez pour surligner, cliquez pour capturer,
  * ou « rec » pour enregistrer un déroulé d'actions rejouable.
  *
  * Deux façons de l'exécuter sur n'importe quelle page Fiori / SAPUI5 / OpenUI5 (ou une page
@@ -2296,13 +2445,13 @@ _SPY_HEADER = """\
  *   1. collez ce fichier entier dans la console DevTools, ou
  *   2. chargez l'extension navigateur dans tools/recorder_web/extension et cliquez sur son icône.
  *
- * Mode capture (au clic) — lignes prêtes à coller, copiées dans le presse-papiers :
+ * Mode capture (au clic) : lignes prêtes à coller, copiées dans le presse-papiers :
  *   Resolve Ui5 Control    controlType=...    properties={...}
  *   Resolve Ui5 By Xpath    //PlusCourt/Unique/Chemin
  *   Resolve Sid    wnd[0]/usr/...        (éléments WebGUI classiques uniquement)
  *   Resolve Wc Control    tag=...    text=...   (pages UI5 Web Components, hors registre UI5)
  *   Resolve Dom Element    role=...    name=...   (zones non-SAP : React/Angular/vanilla)
- * Mode record (bouton « rec ») — suit vos manipulations en steps ordonnés
+ * Mode record (bouton « rec ») : suit vos manipulations en steps ordonnés
  *   (Click/Fill sur les 5 moteurs role/xpath/sid/wc/dom ; clic droit = menu d'assertions
  *   visible/texte, Alt+clic = raccourci ; Entrée capturée en Keyboard Key ; nav -> Wait For
  *   UI5 Ready quand le runtime UI5 est là, Wait For Load State sinon ; re-saisie du même
@@ -2310,22 +2459,22 @@ _SPY_HEADER = """\
  *   Steps éditables (déplacer/supprimer/ÉDITER au double-clic), nommables, persistés
  *   (sessionStorage : survivent à un rechargement de page). « play » REJOUE le déroulé
  *   dans la page (mêmes moteurs de résolution, repli xpath essayé, arrêt sur le premier
- *   échec — validation avant export). « +test » démarre un nouveau scénario (marqueur ;
+ *   échec, validation avant export). « +test » démarre un nouveau scénario (marqueur ;
  *   chaque export produit alors plusieurs *** Test Cases ***). Les steps UI5 naissent
  *   avec leur repli xpath en commentaire : l'export resource-first les convertit en
  *   Resolve Ui5 With Fallback (auto-réparables au replay). « export » ouvre un menu :
  *   .robot COMPLET (Settings + New Browser/New Page + steps, keyword Wait For UI5 Ready
  *   embarqué), paire resource-first (.resource keywords métier + .robot sans
- *   localisateur — convention n°1), plan specs/ (.spec.md, l'entrée du cycle
+ *   localisateur, convention n°1), plan specs/ (.spec.md, l'entrée du cycle
  *   plan -> generate -> heal), rapport HTML auto-contenu (documentation du déroulé :
- *   phrase métier + ligne exacte par step — jamais un test), et IMPORT d'un .robot
+ *   phrase métier + ligne exacte par step, jamais un test), et IMPORT d'un .robot
  *   exporté (le cycle d'édition se
  *   referme). Un panneau ne peut pas instrumenter une iframe cross-origin :
  *   avertissement affiché, l'extension (allFrames) injecte un panneau par frame.
  *
  * GÉNÉRÉ depuis src/SapFioriLibrary/_ui5_js.py (BUNDLE + écouteur recorder) afin que la
  * logique de capture ne diverge jamais du résolveur de la bibliothèque. Ne pas éditer
- * manuellement — exécuter `python -m SapFioriLibrary.regen_recorder`. Techniques portées depuis
+ * manuellement : exécuter `python -m SapFioriLibrary.regen_recorder`. Techniques portées depuis
  * playwright-sap (Apache-2.0) ; voir le NOTICE du projet.
  *
  * Le survol met en surbrillance le contrôle ; Échap ou window.__ui5SpyStop() arrête.
@@ -2337,4 +2486,7 @@ def spy_snippet():
     """Retourne le programme Spy autonome complet (en-tête + bundle + écouteur de survol/clic).
     Utilisé à la fois comme extrait à coller dans DevTools et comme script de contenu injecté
     par l'extension."""
-    return "%s\n%s\n%s\n" % (_SPY_HEADER, BUNDLE, _SPY_LISTENER)
+    # Le picto aicabra (data-URI) est injecté par token : _SPY_LISTENER est un
+    # littéral brut (ses '%' sont littéraux), donc pas de formatage %s dedans.
+    listener = _SPY_LISTENER.replace("__AICABRA_ICON__", _AICABRA_ICON)
+    return "%s\n%s\n%s\n" % (_SPY_HEADER, BUNDLE, listener)

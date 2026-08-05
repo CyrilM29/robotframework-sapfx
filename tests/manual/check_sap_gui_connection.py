@@ -1,4 +1,4 @@
-"""Vérification de connectivité SAP GUI — sans serveur (test manuel, hors CI).
+"""Vérification de connectivité SAP GUI sans serveur (test manuel, hors CI).
 
 Valide en live le « pont » de SapEccLibrary contre le client **SAP GUI for Windows**
 installé localement, *avant même* de disposer d'un système : lancement de
@@ -12,7 +12,7 @@ Windows + SAP GUI + pywin32, et ouvre une fenêtre). Lancement manuel :
 
 Sortie attendue si tout est bon : « OK : ... validees en live ». S'il affiche
 « scripting probablement desactive », activer le scripting côté client
-(SAP Logon → Options → Accessibility & Scripting → Scripting → Enable) — cf.
+(SAP Logon → Options → Accessibility & Scripting → Scripting → Enable) ; cf.
 docs/ecc-validation.fr.md §7.
 """
 import os

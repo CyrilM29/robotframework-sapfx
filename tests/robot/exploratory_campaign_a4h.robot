@@ -1,22 +1,22 @@
 *** Settings ***
-Documentation       Campagne de tests exploratoires SAP ECC — ABAP Platform Trial « A4H ».
+Documentation       Campagne de tests exploratoires SAP ECC sur l'ABAP Platform Trial « A4H ».
 ...
 ...                 Pilotée de bout en bout par la librairie Python ``SapEccLibrary``
 ...                 (API SAP GUI Scripting via COM). Suite AUTO-SUFFISANTE : elle n'importe
-...                 aucune resource ni aucune suite existante du projet — tous les mots-clés
+...                 aucune resource ni aucune suite existante du projet : tous les mots-clés
 ...                 métier sont définis localement au-dessus de ``SapEccLibrary``.
 ...
 ...                 Trois scénarios, chacun relevé PUIS validé live sur le système cible
 ...                 (SAP GUI 8.00 / A4H, client 001, 2026-07-17) :
 ...
-...                 1. Analyse de l'existant — inventaire des *classes de livraison*
+...                 1. Analyse de l'existant : inventaire des *classes de livraison*
 ...                    (« classes métier »), domaine ``CONTFLAG`` de la table dictionnaire
 ...                    DD07L. Sur cette version : exactement A / C / E / G / L / S / W.
-...                 2. Test d'écriture — cycle CRUD idempotent et RÉVERSIBLE sur SCARR
+...                 2. Test d'écriture : cycle CRUD idempotent et RÉVERSIBLE sur SCARR
 ...                    (classe A, cohérent avec le modèle de données Flight) : création d'un
 ...                    transporteur de test via SE16 « Create Entries », relecture des
 ...                    valeurs, suppression, contrôle du retour à zéro. Aucune trace laissée.
-...                 3. Vérification en profondeur — chaque table du modèle Flight est ouverte
+...                 3. Vérification en profondeur : chaque table du modèle Flight est ouverte
 ...                    via SE16 puis comptée : accessible (pas de message de type E) ET non
 ...                    vide. Data-driven (un verdict par table).
 ...
@@ -51,20 +51,20 @@ ${SAP_PASSWORD}         ${EMPTY}      # OBLIGATOIRE : fournir via -v "SAP_PASSWO
 ${SAP_CLIENT}           001
 ${SAP_LANGUAGE}         EN
 
-# --- Localisateurs SAP GUI (jamais dans les cas de test — relevés live A4H, GUI 8.00) -----
+# --- Localisateurs SAP GUI (jamais dans les cas de test ; relevés live A4H, GUI 8.00) -----
 # Écran initial / écran de sélection SE16
 ${SE16_TABLE_FIELD}         wnd[0]/usr/ctxtDATABROWSE-TABLENAME
 ${SE16_GRID}                wnd[0]/usr/cntlGRID1/shellcont/shell
 ${SE16_MAX_HITS_FIELD}      wnd[0]/usr/txtMAX_SEL
 ${SE16_FIRST_SEL_FIELD}     wnd[0]/usr/ctxtI1-LOW      # 1er critère positionnel (= CARRID pour SCARR, DOMNAME pour DD07L)
-${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]     # « Number of Entries » — fiable même quand le résultat est 0
+${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]     # « Number of Entries » : fiable même quand le résultat est 0
 ${SE16_COUNT_POPUP}         wnd[1]/usr/txtG_DBCOUNT    # compteur affiché dans le popup « Number of Entries »
 # Bascule de sortie SE16 en grille ALV (Settings > User Parameters)
 ${SE16_SETTINGS_MENU}       wnd[0]/mbar/menu[3]/menu[0]
 ${SE16_ALV_GRID_RADIO}      wnd[1]/usr/tabsG_TABSTRIP/tabp0400/ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/radRSEUMOD-TBALV_GRID
 # Chemin de suppression depuis la grille de résultats SE16
 ${SE16_MENU_SELECT_ALL}     wnd[0]/mbar/menu[1]/menu[0]    # Edit > Select All
-${SE16_MENU_DELETE_SEL}     wnd[0]/mbar/menu[0]/menu[6]    # Table Entry > Delete  (⚠ menu[5] = « Delete all » — NE JAMAIS utiliser)
+${SE16_MENU_DELETE_SEL}     wnd[0]/mbar/menu[0]/menu[6]    # Table Entry > Delete  (⚠ menu[5] = « Delete all », NE JAMAIS utiliser)
 ${SE16_DELETE_ENTRY_BUTTON}    wnd[0]/tbar[1]/btn[14]      # « Delete Entry » sur l'écran de suppression mono-enregistrement
 # Popup « connexion multiple »
 ${MULTI_LOGON_RADIO}        wnd[1]/usr/radMULTI_LOGON_OPT1
@@ -74,7 +74,7 @@ ${SCARR_FIELD_CARRID}       wnd[0]/usr/ctxtSCARR-CARRID
 ${SCARR_FIELD_CARRNAME}     wnd[0]/usr/txtSCARR-CARRNAME
 ${SCARR_FIELD_CURRCODE}     wnd[0]/usr/ctxtSCARR-CURRCODE
 ${SCARR_FIELD_URL}          wnd[0]/usr/txtSCARR-URL
-# Écran de sélection TADIR (inventaire du référentiel) — champs positionnels I<n>, types vérifiés live
+# Écran de sélection TADIR (inventaire du référentiel) : champs positionnels I<n>, types vérifiés live
 ${TADIR_OBJECT_FIELD}       wnd[0]/usr/ctxtI2-LOW     # OBJECT (TABL, VIEW…)
 ${TADIR_DEVCLASS_FIELD}     wnd[0]/usr/ctxtI8-LOW     # DEVCLASS (package)
 
@@ -85,7 +85,7 @@ ${TEST_CURRCODE}        EUR
 ${TEST_URL}             http://qa.example.test
 
 # Classes de livraison attendues sur cette version A4H (domaine CONTFLAG / DD07L),
-# triées — l'inventaire exhaustif « classes métier » relevé live.
+# triées : l'inventaire exhaustif « classes métier » relevé live.
 @{EXPECTED_DELIVERY_CLASSES}    A    C    E    G    L    S    W
 
 # Packages des deux modèles de données démo balayés en profondeur (relevés live via TADIR) :
@@ -96,7 +96,7 @@ ${TEST_URL}             http://qa.example.test
 *** Test Cases ***
 Delivery Classes Available On This System
     [Documentation]    Analyse de l'existant. Le domaine ``CONTFLAG`` (table dictionnaire
-    ...                DD07L) énumère les *classes de livraison* — la classification
+    ...                DD07L) énumère les *classes de livraison*, la classification
     ...                « métier » des tables du Dictionnaire ABAP. On vérifie que cette
     ...                version A4H expose exactement les 7 classes A/C/E/G/L/S/W.
     [Tags]    exploration    dictionary
@@ -113,7 +113,7 @@ Write Read And Delete A Carrier
     [Documentation]    Test d'écriture réversible sur SCARR. Cycle CRUD complet et
     ...                idempotent : pré-nettoyage, création via SE16 « Create Entries »,
     ...                relecture des valeurs écrites, suppression, contrôle du retour à 0.
-    ...                Le test ne laisse aucune trace dans la base — il est ré-exécutable
+    ...                Le test ne laisse aucune trace dans la base : il est ré-exécutable
     ...                autant de fois que voulu.
     [Tags]    write    crud
     # Départ propre : retire un éventuel reliquat d'un run précédent interrompu.
@@ -156,7 +156,7 @@ Deep Catalog Sweep Of Flight And EPM Models
     ...                ``S_NWDEMO_MODEL_DDIC`` (modèle EPM / SNWD). Chaque objet reçoit un
     ...                verdict : soit une table réelle consultable (comptée via SE16, 0
     ...                admis), soit une structure / include rejetée par SE16 (message de
-    ...                type E — TADIR ne distingue pas les deux). Le test échoue si un
+    ...                type E ; TADIR ne distingue pas les deux). Le test échoue si un
     ...                package ne livre aucune table réelle ou aucune donnée. Les tables
     ...                vides et les structures sont journalisées, jamais mises en échec :
     ...                une table démo légitimement vide reste « accessible ».
@@ -243,7 +243,7 @@ Start Transaction
 Open Table In SE16
     [Documentation]    Ouvre SE16 sur ``${table}`` et atteint son écran de sélection.
     ...                Échoue explicitement si SE16 rejette le nom (message de statut de
-    ...                type ``E`` : structure, include ou table inconnue) — l'assertion
+    ...                type ``E`` : structure, include ou table inconnue). L'assertion
     ...                porte sur le *type*, jamais sur le texte localisé.
     [Arguments]    ${table}
     Start Transaction    SE16
@@ -296,7 +296,7 @@ Create Test Carrier
     [Documentation]    Insère le transporteur de test dans SCARR via SE16 > Create Entries,
     ...                puis enregistre (Ctrl+S). Exige un message de statut de succès (S).
     ...                « Create Entries » se déclenche depuis l'écran INITIAL de SE16 (menu
-    ...                Table) — on n'avance donc PAS jusqu'à l'écran de sélection, où
+    ...                Table) : on n'avance donc PAS jusqu'à l'écran de sélection, où
     ...                ``menu[0]/menu[1]`` serait « Execute and Print ».
     Start Transaction    SE16
     Input Text    ${SE16_TABLE_FIELD}    SCARR
@@ -397,7 +397,7 @@ Classify And Count Table
     [Documentation]    Donne un verdict à un objet TADIR ``TABL``. Ouvre SE16 sur
     ...                ``${table}`` : un message de statut de type ``E`` = structure /
     ...                include (non consultable) ; sinon c'est une table réelle, comptée via
-    ...                « Number of Entries ». Renvoie DEUX valeurs — le genre
+    ...                « Number of Entries ». Renvoie DEUX valeurs : le genre
     ...                (``table`` | ``structure``) et le nombre de lignes (``-1`` pour une
     ...                structure). L'assertion porte sur le *type* du message, jamais sur son
     ...                texte localisé.

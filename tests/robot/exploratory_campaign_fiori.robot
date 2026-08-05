@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Campagne exploratoire Fiori / UI5 — pendant WEB de
+Documentation       Campagne exploratoire Fiori / UI5, pendant WEB de
 ...                 ``exploratory_campaign_a4h.robot`` (côté ECC/SAP GUI). Cette fois le
 ...                 **navigateur est visible** (Playwright, ``headless=False``).
 ...
@@ -9,7 +9,7 @@ Documentation       Campagne exploratoire Fiori / UI5 — pendant WEB de
 ...                 playwright-sap). Suite AUTO-SUFFISANTE : aucune resource ni suite
 ...                 existante du projet n'est importée.
 ...
-...                 Cible par défaut : l'**OpenUI5 Demo Kit** public (``sdk.openui5.org``) —
+...                 Cible par défaut : l'**OpenUI5 Demo Kit** public (``sdk.openui5.org``),
 ...                 aucun SAP, aucun login, aucun serveur local requis (donc pleinement
 ...                 ré-exécutable). ``${FIORI_URL}`` est surchargeable pour viser une autre
 ...                 app UI5 (p. ex. cap-sflight ``http://localhost:4004/…`` après
@@ -35,7 +35,7 @@ Documentation       Campagne exploratoire Fiori / UI5 — pendant WEB de
 ...                 5. Échec explicite sur contrôle absent ↔ rejet SE16 de type E.
 ...
 ...                 Bonnes pratiques : adressage 100 % **locale-indépendant** par
-...                 ``controlType`` (jamais par texte — le Demo Kit s'affiche dans la langue
+...                 ``controlType`` (jamais par texte : le Demo Kit s'affiche dans la langue
 ...                 du navigateur) ; pas d'attente fixe (les moteurs de résolution *pollent*
 ...                 jusqu'au rendu) ; aucun sélecteur DOM brut dans les cas de test.
 ...
@@ -62,7 +62,7 @@ ${SEARCH_TEXT}      SapFioriLibrary rocks
 ${COOKIE_ACCEPT_BUTTON}    css=#truste-consent-button
 
 # Types de contrôles UI5 attendus sur la page cible (adressage locale-indépendant par
-# controlType) — relevés live dans l'arbre du Demo Kit. Sert d'inventaire de référence et
+# controlType) relevés live dans l'arbre du Demo Kit. Sert d'inventaire de référence et
 # de jeu de données pour la vérification en profondeur multi-moteurs.
 @{EXPECTED_CONTROL_TYPES}
 ...    sap.m.SearchField    sap.m.Button    sap.m.Text
@@ -74,7 +74,7 @@ UI5 Runtime And Control Tree Are Available
     [Documentation]    Analyse de l'existant (pendant web de « Delivery Classes »). Le
     ...                runtime SAPUI5 est chargé et ``Get Ui5 Page Tree`` sérialise la
     ...                hiérarchie des contrôles en XML (la perception que consomme un agent).
-    ...                L'arbre porte ``@controlType`` — indépendant de la langue. On vérifie
+    ...                L'arbre porte ``@controlType``, indépendant de la langue. On vérifie
     ...                qu'au moins une occurrence de chaque type attendu est rendue.
     [Tags]    exploration    ui5
     ${tree}=    Get Ui5 Page Tree
@@ -89,8 +89,8 @@ UI5 Runtime And Control Tree Are Available
 
 Search Field Accepts And Reflects Input
     [Documentation]    Interaction vérifiée et RÉVERSIBLE (pendant web du cycle d'écriture
-    ...                ECC). On remplit le SearchField — le convenience keyword descend
-    ...                jusqu'au ``<input>`` interne du contrôle composite —, on relit la
+    ...                ECC). On remplit le SearchField (le convenience keyword descend
+    ...                jusqu'au ``<input>`` interne du contrôle composite), on relit la
     ...                valeur, puis on remet le champ à vide : aucun état laissé, test
     ...                ré-exécutable. La cible est adressée par type (locale-indépendant).
     [Tags]    interaction    ui5
@@ -104,7 +104,7 @@ Search Field Accepts And Reflects Input
 Core Controls Resolve Consistently Across Engines
     [Documentation]    Vérification EN PROFONDEUR (pendant web de « Flight Data Tables »).
     ...                Data-driven : pour chaque type de contrôle, les DEUX moteurs de
-    ...                localisation portés de playwright-sap CONVERGENT — le moteur ``role``
+    ...                localisation portés de playwright-sap CONVERGENT : le moteur ``role``
     ...                (scan du registre) et le moteur ``xpath`` (arbre hiérarchique)
     ...                désignent le même élément, et le *plus court xpath unique* re-résout
     ...                vers ce même contrôle. Un verdict par type dans le rapport.
@@ -140,7 +140,7 @@ Full Control Type Catalog Resolves Consistently
     ${types}=    Evaluate    sorted(set(re.findall('controlType="([^"]+)"', $tree)))    modules=re
     ${discovered}=    Get Length    ${types}
     Should Be True    ${discovered} >= 10
-    ...    msg=Trop peu de types de contrôles découverts (${discovered}) — l'app a-t-elle rendu ?
+    ...    msg=Trop peu de types de contrôles découverts (${discovered}) : l'app a-t-elle rendu ?
     ${convergent}=    Set Variable    ${0}
     @{divergent}=    Create List
     FOR    ${type}    IN    @{types}
@@ -193,7 +193,7 @@ Control Should Resolve Consistently
     ...                occurrence rendue, (2) le moteur ``role`` renvoie un sélecteur CSS,
     ...                (3) le *plus court xpath unique* est bien un xpath, (4) le moteur
     ...                ``xpath`` re-résout ce plus court xpath vers EXACTEMENT le même
-    ...                sélecteur que le moteur ``role`` — les deux moteurs convergent.
+    ...                sélecteur que le moteur ``role`` : les deux moteurs convergent.
     [Arguments]    ${control_type}
     ${count}=    Get Ui5 Match Count    controlType=${control_type}
     Should Be True    ${count} >= 1
@@ -205,14 +205,14 @@ Control Should Resolve Consistently
     ${by_xpath}=    Resolve Ui5 By Xpath    ${shortest}
     Should Be Equal    ${by_role}    ${by_xpath}
     ...    msg=Les moteurs role et xpath divergent pour ${control_type} : ${by_role} vs ${by_xpath}
-    Log    ${control_type} : ${count} rendu(s) — sélecteur ${by_role} — xpath ${shortest}
+    Log    ${control_type} : ${count} rendu(s), sélecteur ${by_role}, xpath ${shortest}
 
 Accept Cookies
     [Documentation]    La bannière de consentement du Demo Kit est un widget TrustArc **DOM**
     ...                (hors registre UI5), au bouton « Tout accepter » d'id stable
     ...                ``truste-consent-button`` (locale-indépendant). On l'accepte si elle
     ...                apparaît dans le délai imparti ; sinon on ne fait rien (consentement
-    ...                déjà mémorisé, ou bannière absente) — le keyword reste sûr en
+    ...                déjà mémorisé, ou bannière absente) : le keyword reste sûr en
     ...                ré-exécution et hors ligne.
     ${shown}=    Run Keyword And Return Status
     ...    Wait For Elements State    ${COOKIE_ACCEPT_BUTTON}    visible    timeout=8s

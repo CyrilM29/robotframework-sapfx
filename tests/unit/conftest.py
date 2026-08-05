@@ -2,7 +2,7 @@
 
 SapEccLibrary dépend de `robot.*` et des modules COM pywin32. Pour les tests
 unitaires, il n'est pas nécessaire d'avoir un vrai serveur SAP ni même Robot
-Framework — seulement la logique Python déterministe (analyse des délais,
+Framework : seulement la logique Python déterministe (analyse des délais,
 boucles de relance, résolution des titres de grille). Ce conftest installe des
 substituts légers pour tous les modules manquants, afin que `pytest` tourne sur
 un interpréteur nu. Lorsque les vrais paquets sont installés

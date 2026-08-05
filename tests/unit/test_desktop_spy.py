@@ -1,9 +1,9 @@
 """Tests unitaires hors SAP du recorder bureau (``tools/recorder/sapgui_recorder.py``).
 
 Le spy ne peut être validé bout-en-bout que contre une session SAP GUI live, mais
-sa logique pure — parcours de l'arbre d'objets (`walk`), aplatissement
+sa logique pure (parcours de l'arbre d'objets (`walk`), aplatissement
 connexions→sessions (`collect`), lecture défensive (`_safe`), filtre et export
-JSON (`main`) — se teste sans serveur ni COM Windows avec des doublures qui
+JSON (`main`)) se teste sans serveur ni COM Windows avec des doublures qui
 reproduisent le modèle objet SAP GUI Scripting (convention #5 du CLAUDE.md).
 
 `sapgui_recorder.py` vit sous ``tools/`` (hors paquet `src/`) ; on le charge par chemin.

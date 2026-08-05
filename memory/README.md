@@ -1,8 +1,8 @@
-# memory/ — mémoire projet des assistants IA
+# memory/ : mémoire projet des assistants IA
 
 Fiches de travail persistantes des assistants IA (Claude Code, GitHub Copilot,
 Codex…) travaillant sur ce dépôt. Rédigées en français, la langue de travail
-(hors contrat bilingue, comme `specs/` — exemption dans
+(hors contrat bilingue, comme `specs/` : exemption dans
 `scripts/check_bilingual_docs.py`).
 
 **Cette mémoire est committée et part avec le dépôt : tout son contenu doit
@@ -17,7 +17,7 @@ Codex…) travaillant sur ce dépôt. Rédigées en français, la langue de trav
    journal de session, pas de duplication de ce que documentent déjà
    CLAUDE.md, les docs ou le git.
 3. **Dates absolues** ; une fiche est une observation datée, pas un état
-   vivant — vérifier avant d'affirmer.
+   vivant : vérifier avant d'affirmer.
 4. **`MEMORY.md` est l'index** : une ligne par fiche, mis à jour dans la même
    opération que toute création/suppression. Mettre à jour plutôt que
    dupliquer ; supprimer ce qui est devenu faux.
@@ -27,7 +27,7 @@ Format d'une fiche :
 ```markdown
 ---
 name: slug-kebab-case
-description: résumé en une ligne — décide si on ouvre la fiche
+description: résumé en une ligne (décide si on ouvre la fiche)
 type: projet | reference | recherche
 date: AAAA-MM-JJ
 ---

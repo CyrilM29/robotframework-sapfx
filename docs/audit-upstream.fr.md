@@ -1,6 +1,6 @@
 > [🇬🇧 English](audit-upstream.md) · **🇫🇷 Français**
 
-# Audit — `robotframework-sapguilibrary` (upstream)
+# Audit : `robotframework-sapguilibrary` (upstream)
 
 Commit examiné : pointe de `master` (version **v1.2.1**, mars 2022). Licence **Apache 2.0**.
 Source auditée : `SapGuiLibrary/SapGuiLibrary.py` (module unique d'environ 780 lignes, une seule classe).
@@ -9,7 +9,7 @@ Source auditée : `SapGuiLibrary/SapGuiLibrary.py` (module unique d'environ 780 
 
 Une base solide et ciblée, qu'il vaut mieux forker que réécrire. La plomberie COM et un
 vocabulaire de mots-clés cohérent sont déjà en place et éprouvés. Les lacunes sont
-circonscrites et bien définies — exactement ce que nous ajoutons dans `SapEccLibrary`.
+circonscrites et bien définies : exactement ce que nous ajoutons dans `SapEccLibrary`.
 
 ## Ce qu'elle fait déjà bien
 
@@ -41,7 +41,7 @@ circonscrites et bien définies — exactement ce que nous ajoutons dans `SapEcc
 | 2 | **Vérification de transaction dépendante de la locale.** La détection d'une tcode inconnue compare par correspondance de chaîne dans la barre de statut en **néerlandais/anglais/allemand uniquement**. | `run_transaction` compare avec `"Transactie %s bestaat niet"`, `"Transaction %s does not exist"`, `"Transaktion %s existiert nicht"`. | Le remplacement lit `sbar.messageType == "E"` (indépendant de la locale). |
 | 3 | **Pas de bootstrap de connexion.** Suppose que le Logon Pad est déjà en cours d'exécution ; la documentation demande de le démarrer avec la bibliothèque AutoIt/Process. | `connect_to_session` lève « is Sap Logon Pad open? » si ce n'est pas le cas. | `keywords/_connection.py` : `Open Sap Logon` (lancement de l'exe + attente du moteur), `Close Sap Logon`, `Connect To Session With Retry`. |
 | 4 | **Grille adressée uniquement par identifiant de colonne technique.** Il faut connaître `"MATNR"` etc. (trouvé via le Scripting Tracker externe). | `get_cell_value(table_id, row, col_id)` prend un `col_id` brut. | `keywords/_grid.py` : résolution des colonnes par titre visible, `Read Grid` → liste de dicts. |
-| 5 | **Pas d'utilitaires pour les messages de statut.** | — | `Get Status Message`, `Status Message Should Be Success`. |
+| 5 | **Pas d'utilitaires pour les messages de statut.** | (sans objet) | `Get Status Message`, `Status Message Should Be Success`. |
 
 ## Observations mineures (non corrigées, notées pour plus tard)
 
@@ -53,7 +53,7 @@ circonscrites et bien définies — exactement ce que nous ajoutons dans `SapEcc
   sans conséquence, mais bavard sur COM.
 - `select_node` avec `expand=True` avale toutes les `com_error`s (un `# TODO` est laissé
   en néerlandais). Acceptable.
-- Classificateurs Python 2.7 dans `setup.py` — supprimés dans notre `pyproject.toml`.
+- Classificateurs Python 2.7 dans `setup.py`, supprimés dans notre `pyproject.toml`.
 
 ## Stratégie de resynchronisation
 

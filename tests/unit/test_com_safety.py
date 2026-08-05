@@ -4,7 +4,7 @@ Cette aide était dupliquée à l'identique dans ``_connection.py`` (ECC) et
 ``_rf_context.py`` (rf-mcp) ; centralisée ici, elle n'a plus qu'un seul jeu de
 tests à maintenir. Les deux modules appelants ont leurs propres tests qui
 vérifient qu'ils délèguent bien à cette fonction (test_logic.py,
-tests/unit — pas de duplication de couverture, juste de délégation).
+tests/unit) : pas de duplication de couverture, juste de délégation.
 """
 import pytest
 

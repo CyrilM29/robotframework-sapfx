@@ -1,23 +1,23 @@
 """Rapport de dérive des localisateurs depuis la télémétrie de healing.
 
 Le maillon qui transforme le healing en **maintenance préventive** : la
-télémétrie (``SAPFX_HEALING_LOG``, JSONL cumulatif — voir
+télémétrie (``SAPFX_HEALING_LOG``, JSONL cumulatif, voir
 ``sapfx_common.healing_telemetry``) enregistre chaque réparation au fil des
 runs ; ce script la relit, agrège par localisateur d'origine, et sépare :
 
-* les **dérives stables** — le même localisateur réparé N fois (``--min-count``)
+* les **dérives stables** : le même localisateur réparé N fois (``--min-count``)
   vers LA même cible : le vrai id a changé, la correction dans ``resources/``
   est sans ambiguïté. Le script la localise dans les fichiers ``.resource`` et
   propose le remplacement (``--apply`` l'exécute) ;
-* les **dérives instables** — réparé vers des cibles différentes selon les
+* les **dérives instables** : réparé vers des cibles différentes selon les
   runs : à examiner par un humain (ou l'agent sap-healer), jamais auto-patché.
 
-Règle maison respectée : on ne patche QUE la couche ``resources/`` — jamais
+Règle maison respectée : on ne patche QUE la couche ``resources/``, jamais
 les tests, jamais silencieusement (le rapport liste tout, ``--apply`` est
 opt-in et re-liste ce qu'il a fait).
 
 Codes retour : 0 = aucune dérive récurrente (ou toutes appliquées via
-``--apply``) ; 1 = dérives détectées à traiter — utilisable tel quel dans un
+``--apply``) ; 1 = dérives détectées à traiter, utilisable tel quel dans un
 job planifié pour alerter.
 
 Usage::
@@ -68,10 +68,10 @@ class Patch:
 
 
 def load_events(log_path: Path) -> list[dict]:
-    """Lit le JSONL en best-effort (les lignes illisibles sont ignorées —
-    même contrat tolérant que l'écriture de la télémétrie). ``utf-8-sig`` :
+    """Lit le JSONL en best-effort (les lignes illisibles sont ignorées, c'est
+    le même contrat tolérant que l'écriture de la télémétrie). ``utf-8-sig`` :
     un journal retouché/concaténé sous Windows arrive volontiers avec un BOM
-    (constaté au premier essai CLI — Out-File PowerShell)."""
+    (constaté au premier essai CLI, Out-File PowerShell)."""
     events = []
     for line in log_path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
@@ -89,7 +89,7 @@ def load_events(log_path: Path) -> list[dict]:
 def aggregate(events: Iterable[dict], min_count: int = DEFAULT_MIN_COUNT,
               since: str = "") -> list[Drift]:
     """Agrège par (canal, localisateur d'origine) ; ne retient que les dérives
-    vues au moins ``min_count`` fois (``since`` : ISO — ignore le plus ancien)."""
+    vues au moins ``min_count`` fois (``since`` : ISO, ignore le plus ancien)."""
     drifts: dict[tuple[str, str], Drift] = {}
     for event in events:
         timestamp = str(event.get("timestamp", ""))
@@ -109,7 +109,7 @@ def aggregate(events: Iterable[dict], min_count: int = DEFAULT_MIN_COUNT,
 
 def find_in_resources(resources_dir: Path, locator: str) -> list[tuple[Path, int, str]]:
     """Occurrences (fichier, ligne 1-based, contenu) du localisateur dans les
-    ``.resource`` — recherche de sous-chaîne exacte, les ids SAP ne se
+    ``.resource`` : recherche de sous-chaîne exacte, les ids SAP ne se
     prêtent pas aux faux positifs."""
     hits = []
     for path in sorted(resources_dir.glob("*.resource")):
@@ -123,7 +123,7 @@ def find_in_resources(resources_dir: Path, locator: str) -> list[tuple[Path, int
 def propose_patches(drifts: Iterable[Drift], resources_dir: Path) -> list[Patch]:
     """Patches pour les dérives **stables** dont l'origine vit dans
     ``resources/`` (les instables et les localisateurs inline restent au
-    rapport — à traiter par un humain ou sap-healer)."""
+    rapport, à traiter par un humain ou sap-healer)."""
     patches = []
     for drift in drifts:
         if not drift.stable:
@@ -162,7 +162,7 @@ def render_markdown(drifts: list[Drift], patches: list[Patch]) -> str:
     stable = [d for d in drifts if d.stable]
     unstable = [d for d in drifts if not d.stable]
     if stable:
-        lines += ["## Stables — correction sans ambiguïté", ""]
+        lines += ["## Stables : correction sans ambiguïté", ""]
         for drift in stable:
             lines.append("- `%s` (%s) réparé %d fois vers `%s` "
                          "(vu %s → %s)" % (drift.original, drift.channel,
@@ -184,7 +184,7 @@ def render_markdown(drifts: list[Drift], patches: list[Patch]) -> str:
         lines += ["- `%s`" % d.original for d in orphans]
         lines.append("")
     if unstable:
-        lines += ["## Instables — cibles multiples, examen humain requis", ""]
+        lines += ["## Instables : cibles multiples, examen humain requis", ""]
         for drift in unstable:
             targets = ", ".join("`%s` (%d×)" % (t, n)
                                 for t, n in drift.targets.most_common())
@@ -196,7 +196,7 @@ def render_markdown(drifts: list[Drift], patches: list[Patch]) -> str:
 
 def main(argv: Optional[list[str]] = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors
-    # page de code (flèches) — on force UTF-8 en best-effort plutôt que de
+    # page de code (flèches) : on force UTF-8 en best-effort plutôt que de
     # planter à l'affichage (constaté au premier essai CLI).
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -224,7 +224,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(render_markdown(drifts, patches))
     if args.apply and patches:
         changed = apply_patches(patches)
-        print("%d ligne(s) de resources/ mises à jour — relancer la suite "
+        print("%d ligne(s) de resources/ mises à jour : relancer la suite "
               "pour valider, puis committer." % changed)
         return 0
     return 1 if drifts else 0

@@ -1,4 +1,4 @@
-"""Données d'environnement — cible **locale** cap-sflight (`npx cds watch`).
+"""Données d'environnement : cible **locale** cap-sflight (`npx cds watch`).
 
 Ce que ce fichier porte : les adresses et identifiants techniques d'un
 environnement, pas des localisateurs (ils vivent dans
@@ -9,7 +9,7 @@ Format Python et non YAML, volontairement : un fichier de variables ``.py``
 n'ajoute **aucune dépendance** au projet, là où un ``.yaml`` exigerait PyYAML
 dans ``requirements.txt``.
 
-Aucun secret ici — la cible cap-sflight locale ne demande aucune
+Aucun secret ici : la cible cap-sflight locale ne demande aucune
 authentification. Un mot de passe ne se met JAMAIS dans un fichier de
 variables : il se passe en ligne de commande, typé Secret
 (``-v "SAP_PASSWORD: Secret:…"``), pour rester masqué jusqu'au niveau TRACE.

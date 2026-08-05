@@ -1,7 +1,7 @@
 """Tests hors navigateur du moteur **Web Components** (custom elements ``ui5-*``,
-pages sans runtime UI5 — home SuccessFactors, apps ui5-webcomponents) :
+pages sans runtime UI5 : home SuccessFactors, apps ui5-webcomponents) :
 sélecteur pur, contenu du bundle et du recorder générés, keywords
-``SapFioriLibrary`` (fake Browser — convention #5) et repli ``wc=`` de la
+``SapFioriLibrary`` (fake Browser, convention #5) et repli ``wc=`` de la
 chaîne de fallback."""
 import pytest
 
@@ -66,8 +66,8 @@ def test_wc_selector_coerces_properties_literal_string():
 
 
 def test_wc_selector_accepts_accessible_name():
-    # name = nom accessible de l'hôte (aria-label/labelledby, accessible-name —
-    # la convention UI5 Web Components —, label, texte) : l'intention utilisateur.
+    # name = nom accessible de l'hôte (aria-label/labelledby, accessible-name,
+    # la convention UI5 Web Components, label, texte) : l'intention utilisateur.
     sel = build_wc_selector(tag="Button", name="Créer une commande")
     assert sel == {"tag": "Button", "name": "Créer une commande"}
 
@@ -103,7 +103,7 @@ def test_bundle_wc_matches_scoped_tags_and_builds_css_paths():
 def test_bundle_shares_value_matcher_between_role_and_wc_engines():
     # le comparateur (sous-chaîne insensible à la casse + /regex/ borné anti-ReDoS)
     # est factorisé : une évolution du matching role profite au moteur wc, et
-    # réciproquement — jamais deux implémentations qui divergent.
+    # réciproquement : jamais deux implémentations qui divergent.
     assert "function valueMatches" in BUNDLE
     assert "valueMatches(have[k], want[k])" in BUNDLE          # moteur role
     # moteur wc : même comparateur, haystack DOM normalisé (wsCollapse)

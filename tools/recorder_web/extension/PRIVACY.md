@@ -1,6 +1,6 @@
 > **🇬🇧 English** · [🇫🇷 Français](PRIVACY.fr.md)
 
-# Privacy Policy — SAP UI5 / WebGUI Locator Recorder
+# Privacy Policy: SAP UI5 / WebGUI Locator Recorder
 
 _Last updated: 2026-06-26_
 
@@ -15,7 +15,7 @@ locators and record action flows on the page you are looking at.
   browser**.
 - **Password fields are never captured in clear text.** Recorded `Fill Ui5 Input` /
   `Fill Sid Input` steps for a `type="password"` field record `<REDACTED>` as the
-  value (the field's locator — id/xpath/sid — is still recorded, so the step stays
+  value (the field's locator, id/xpath/sid, is still recorded, so the step stays
   usable once you substitute a real value by hand).
 
 ## The recording indicator is advisory only
@@ -26,13 +26,13 @@ locators and record action flows on the page you are looking at.
   page script could in principle spoof it (show "not recording" while it's actually
   on, or vice versa). This has no impact on what data is captured or where it goes
   (still nowhere but your machine), but don't treat the badge as a tamper-proof
-  guarantee — it's a convenience indicator, not a security boundary.
+  guarantee: it's a convenience indicator, not a security boundary.
 
 ## What it does with that data
 
 - The generated locator/step lines are **copied to your clipboard**, shown in an
   in-page panel, **saved to the page's `sessionStorage`** (so a recording survives a
-  page reload), and — on **Export** — **downloaded as a `.robot` file** to your
+  page reload), and, on **Export**, **downloaded as a `.robot` file** to your
   computer.
 - **Nothing is sent anywhere.** The extension has **no servers, no analytics, no
   telemetry, and no network requests of its own.** No data leaves your machine.
@@ -40,7 +40,7 @@ locators and record action flows on the page you are looking at.
 ## Permissions
 
 - `activeTab` + `scripting`: inject the recorder into the tab **only when you click the
-  toolbar icon or press the shortcut**. There are **no host permissions** — the
+  toolbar icon or press the shortcut**. There are **no host permissions**: the
   extension cannot access sites you don't explicitly act on.
 
 ## Data retention

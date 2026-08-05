@@ -1,9 +1,9 @@
 *** Settings ***
 Documentation       Smoke du **moteur Web Components** (`Resolve/Click/Fill Wc …`) contre
-...                 la fixture locale `fixtures/wc_fixture.html` — une page « pur UI5
+...                 la fixture locale `fixtures/wc_fixture.html`, une page « pur UI5
 ...                 Web Components » SANS runtime UI5 (registre vide : les moteurs
 ...                 role/xpath sont aveugles, c'est précisément le cas d'usage du 3e
-...                 moteur — home SuccessFactors et apps ui5-webcomponents). Prouve :
+...                 moteur : home SuccessFactors et apps ui5-webcomponents). Prouve :
 ...                 le matching type court/tag complet Y COMPRIS les tags scopés
 ...                 (`ui5-button-x1b2`), le matching attributs/texte, le clic et la
 ...                 saisie à travers un shadow root ouvert, le repli `wc=` de
@@ -46,7 +46,7 @@ Attributes And Text Are Matchable Properties
 
 Accessible Name Addresses Hosts By User Intent
     [Documentation]    Le cran accessibilité du moteur wc : `name=` matche le NOM
-    ...                ACCESSIBLE de l'hôte — la convention UI5 Web Components
+    ...                ACCESSIBLE de l'hôte, la convention UI5 Web Components
     ...                `accessible-name` (attribut) puis `accessibleName`
     ...                (propriété JS non reflétée), puis le texte visible. Le
     ...                localisateur suit l'intention utilisateur, pas la structure.

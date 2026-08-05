@@ -1,7 +1,7 @@
 """Tests hors navigateur de la couche **diagnostic Fiori agrégé** :
 le module pur ``sapfx_common.fiori_diagnostics`` (normalisation console/erreurs,
 troncature annoncée, synthèse actionnable, rapport Markdown) et les keywords
-`Get/Log Fiori Diagnostics` de SapFioriLibrary. Fake Browser — convention #5."""
+`Get/Log Fiori Diagnostics` de SapFioriLibrary. Fake Browser, convention #5."""
 import json
 
 import pytest
@@ -125,7 +125,7 @@ def test_summarize_issues_empty_when_all_clean():
 def test_render_report_leads_with_issues_and_announces_truncation():
     report = render_diagnostics_report({
         "url": "https://flp/", "title": "FLP", "frame_scope": None,
-        "issues": ["2 erreur(s) console — première : boom"],
+        "issues": ["2 erreur(s) console, première : boom"],
         "console": [{"type": "error", "text": "boom"}],
         "console_dropped": 7,
         "page_errors": [],

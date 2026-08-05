@@ -1,23 +1,23 @@
 """Pont contrôle-navigateur-embarqué (WebView2/CDP) vers la bibliothèque Browser.
 
 Certains écrans SAP GUI/Business Client récents embarquent un contrôle
-navigateur (Edge WebView2 — aide F1 moderne, certains écrans Business Client)
+navigateur (Edge WebView2 : aide F1 moderne, certains écrans Business Client)
 DANS une fenêtre SAP GUI classique. Idée documentée par RoboSAPiens (imbus,
-Apache-2.0 — voir NOTICE) : activer le débogage distant du contrôle WebView2
+Apache-2.0, voir NOTICE) : activer le débogage distant du contrôle WebView2
 puis piloter la page qu'il héberge avec la bibliothèque Browser (Playwright) via
-CDP (Chrome DevTools Protocol) — sans jamais quitter la session SAP GUI ni le
+CDP (Chrome DevTools Protocol), sans jamais quitter la session SAP GUI ni le
 canal ECC.
 
 Ce mixin ne fait QUE le pont :
 
 1. `Enable Embedded Browser Debugging` positionne la variable d'environnement
-   lue par WebView2 à son démarrage — à appeler AVANT `Open Sap Logon` (ou tout
+   lue par WebView2 à son démarrage : à appeler AVANT `Open Sap Logon` (ou tout
    lancement du client SAP), jamais après ;
 2. `Get Embedded Browser Page Id` / `Switch To Embedded Browser Page` retrouvent
    puis activent, dans la bibliothèque Browser, la page hébergée par le contrôle
    embarqué (recherche par titre, sondée jusqu'à rendu).
 
-Le pilotage lui-même (clic, saisie) reste celui de la bibliothèque Browser —
+Le pilotage lui-même (clic, saisie) reste celui de la bibliothèque Browser ;
 même méthode d'accès (``BuiltIn().get_library_instance``) que
 ``SapFioriLibrary``, avec laquelle elle est déjà utilisée côté Fiori.
 
@@ -56,7 +56,7 @@ def _as_bool(value):
 
 class EmbeddedBrowserKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.default_timeout``/
-    ``self.poll_interval`` (secondes, float) — définis par ``__init__``."""
+    ``self.poll_interval`` (secondes, float), définis par ``__init__``."""
 
     def enable_embedded_browser_debugging(self, port=_DEFAULT_CDP_PORT):
         """Active le débogage distant CDP des contrôles WebView2 embarqués.
@@ -65,7 +65,7 @@ class EmbeddedBrowserKeywords:
         du **process courant**. WebView2 ne lit cette variable qu'à la création
         du contrôle : ce keyword doit donc être appelé AVANT `Open Sap Logon`
         (ou tout lancement de SAP Logon/Business Client héritant de cet
-        environnement, p.ex. via la bibliothèque Process) — l'appeler après
+        environnement, p.ex. via la bibliothèque Process) : l'appeler après
         coup n'a aucun effet sur un client déjà démarré.
 
         Retourne le port effectif (à repasser à `Get Embedded Browser Page Id`
@@ -96,14 +96,14 @@ class EmbeddedBrowserKeywords:
         Se connecte au point de terminaison CDP ``http://localhost:<port>``
         (``Connect To Browser`` de la bibliothèque Browser, ``use_cdp=True``)
         s'il n'est pas déjà atteint, puis sonde le catalogue des pages jusqu'à
-        ``timeout`` (``default_timeout`` de la bibliothèque par défaut) — le
+        ``timeout`` (``default_timeout`` de la bibliothèque par défaut) : le
         contrôle se rend de façon asynchrone après l'action SAP GUI qui
         l'affiche.
 
         ``exact=False`` (défaut) : correspondance par sous-chaîne insensible à
         la casse (les titres de page WebView2 embarquent souvent un suffixe
         dynamique). Échoue en listant les titres de page réellement ouverts si
-        aucun ne correspond — erreur auto-corrigible."""
+        aucun ne correspond, erreur auto-corrigible."""
         browser = self._browser()
         timeout_secs = self._timeout_secs(timeout)
         exact = _as_bool(exact)
@@ -141,7 +141,7 @@ class EmbeddedBrowserKeywords:
     # -- helpers (méthodes internes) ------------------------------------------
 
     def _browser(self):
-        """Instance active de la bibliothèque Browser — message d'erreur clair
+        """Instance active de la bibliothèque Browser : message d'erreur clair
         si la suite a oublié de l'importer (même garde que côté
         ``SapFioriLibrary``)."""
         try:

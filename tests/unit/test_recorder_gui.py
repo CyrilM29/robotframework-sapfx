@@ -1,6 +1,6 @@
 """Tests unitaires de la logique du lanceur visuel (`tools/recorder/recorder_gui.py`).
 
-Seule la construction des arguments CLI (`build_args`) est testée — le câblage Tkinter
+Seule la construction des arguments CLI (`build_args`) est testée ; le câblage Tkinter
 ne l'est pas (il n'est importé que dans `main()`, donc importer le module ne requiert
 pas d'affichage). Le module vit sous ``tools/`` ; on le charge par chemin.
 """
@@ -154,3 +154,20 @@ def test_resolve_record_out_respects_a_user_typed_name():
     out, auto = gui.resolve_record_out("mon_scenario.robot", "record_x.robot")
     assert out == "mon_scenario.robot"
     assert auto == "record_x.robot"
+
+
+# --- bandeau identite : poignee de deplacement (2026-08-05) -------------------
+
+def test_banner_drag_position_follows_the_mouse_delta():
+    # la fenetre suit le delta souris depuis l'enfoncement : meme contrat que
+    # le drag de l'en-tete du panneau du recorder web
+    assert gui.banner_drag_position((100, 200), (10, 20), (130, 250)) == (40, 70)
+
+
+def test_banner_drag_position_is_stable_without_motion():
+    assert gui.banner_drag_position((5, 5), (300, 400), (5, 5)) == (300, 400)
+
+
+def test_banner_drag_position_supports_negative_screen_coordinates():
+    # multi-ecrans : l'ecran secondaire a gauche donne des coordonnees negatives
+    assert gui.banner_drag_position((0, 0), (-1920, 10), (-50, -8)) == (-1970, 2)

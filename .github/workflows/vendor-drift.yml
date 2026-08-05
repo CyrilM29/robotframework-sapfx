@@ -2,7 +2,7 @@ name: Vendor drift check
 
 # Périodique (pas sur chaque push/PR) : clone l'upstream réel depuis GitHub et
 # vérifie que src/SapEccLibrary/_vendor/sapgui_base.py n'en diverge que par les
-# changements tolérés (convention #4 du CLAUDE.md — voir scripts/check_vendor_drift.py
+# changements tolérés (convention #4 du CLAUDE.md : voir scripts/check_vendor_drift.py
 # et docs/audit-upstream.md). Un échec ici signale soit une édition directe du
 # fichier vendorisé, soit une nouvelle release amont à auditer avant re-sync.
 on:

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Fixture champs sensibles (masquage du recorder web)</title>
+</head>
+<body>
+<h1>Formulaire avec champs sensibles</h1>
+<!-- Fixture HORS LIGNE (aucun CDN) : page sans runtime UI5, la capture record
+     passe par le moteur dom. Les quatre champs couvrent les trois voies de
+     masquage (type=password, token autocomplete cc-number, motif de nom otp)
+     plus un champ ordinaire qui doit rester capturé en clair. Le champ carte
+     n'a volontairement AUCUN indice card/number dans name/id/aria-label :
+     seul son token autocomplete peut le masquer (la voie testée). -->
+<form>
+  <p>
+    <label for="pwd">Mot de passe</label>
+    <input type="password" id="pwd" name="user_password">
+  </p>
+  <p>
+    <label for="card">Moyen de paiement</label>
+    <input type="text" id="card" autocomplete="cc-number" aria-label="Payment field">
+  </p>
+  <p>
+    <label for="otp">Code a usage unique</label>
+    <input type="text" id="otp" name="otp_code">
+  </p>
+  <p>
+    <label for="q">Recherche</label>
+    <input type="text" id="q" name="query">
+  </p>
+</form>
+</body>
+</html>

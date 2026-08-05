@@ -7,14 +7,14 @@ autre différence signale soit une édition directe du fichier vendorisé
 (interdite par la convention 4), soit une nouvelle version amont à auditer
 avant de re-synchroniser.
 
-Usage (nécessite un clone local de l'upstream — voir docs/audit-upstream.md
+Usage (nécessite un clone local de l'upstream : voir docs/audit-upstream.md
 pour la procédure de re-sync manuelle que ce script automatise le contrôle) ::
 
     python scripts/check_vendor_drift.py
     python scripts/check_vendor_drift.py --upstream-file path/to/SapGuiLibrary.py
 
 Si le fichier upstream n'est pas trouvé (clone local ``_upstream/`` absent,
-c'est le cas par défaut — il est gitignored, cf. CLAUDE.md), le script réussit
+c'est le cas par défaut, il est gitignored, cf. CLAUDE.md), le script réussit
 en le signalant : ce n'est pas un échec bloquant pour la CI principale. Un
 clone frais et la vérification tournent séparément, périodiquement, dans
 ``.github/workflows/vendor-drift.yml``.

@@ -4,7 +4,7 @@ L'upstream `SapGuiBase.connect_to_session` suppose que le SAP Logon Pad est *dé
 en cours d'exécution* (l'utilisateur est censé le démarrer lui-même via la bibliothèque
 Process ou AutoIt). Ce mixin supprime cette étape manuelle : il peut lancer
 ``saplogon.exe`` lui-même, attendre que le moteur de scripting soit disponible,
-puis se connecter — permettant un amorçage de test entièrement autonome.
+puis se connecter, permettant un amorçage de test entièrement autonome.
 
 Rien ici ne communique avec un serveur réel tant que `Open Connection` /
 `Connect To Session` (hérités de la base) ne sont pas appelés, ce qui rend la
@@ -48,16 +48,16 @@ class ConnectionKeywords:
         return super().connect_to_session(explicit_wait)
 
     def attach_to_open_session(self, connection_index=0, session_index=0):
-        """Rattache la bibliothèque à une session SAP GUI **déjà ouverte** —
+        """Rattache la bibliothèque à une session SAP GUI **déjà ouverte**,
         sans Logon Pad à lancer ni login à rejouer : le prérequis exact d'un
         replay d'enregistrement du recorder bureau (dont les suites générées
         utilisent ce keyword en Suite Setup).
 
         `Connect To Session` seul n'obtient que le MOTEUR de scripting
         (``sapapp``) ; la session, elle, n'est posée que par
-        `Connect To Existing Connection` — qui exige le libellé exact de la
+        `Connect To Existing Connection`, qui exige le libellé exact de la
         connexion. Ce keyword complète la chaîne par **index** (défaut : la
-        première connexion, sa première session — la seule situation d'un
+        première connexion, sa première session : la seule situation d'un
         poste de replay typique), avec des erreurs actionnables si rien n'est
         ouvert."""
         self.connect_to_session()
@@ -66,26 +66,26 @@ class ConnectionKeywords:
             count = connections.Count
         except (AttributeError, com_error) as exc:
             raise RuntimeError(
-                "Impossible de lister les connexions SAP GUI (%s) — "
+                "Impossible de lister les connexions SAP GUI (%s) : "
                 "SAP Logon est-il ouvert ?" % exc)
         index = int(connection_index)
         if count <= index:
             raise RuntimeError(
-                "Aucune connexion SAP GUI ouverte à l'index %d (%d ouverte(s)) — "
+                "Aucune connexion SAP GUI ouverte à l'index %d (%d ouverte(s)) : "
                 "ouvrez une session et connectez-vous avant le replay." % (index, count))
         sess_index = int(session_index)
         try:
             self.connection = connections(index)
             if self.connection.Children.Count <= sess_index:
                 raise RuntimeError(
-                    "La connexion %d n'a pas de session à l'index %d — "
+                    "La connexion %d n'a pas de session à l'index %d : "
                     "terminez le login avant le replay." % (index, sess_index))
             self.session = self.connection.Children(sess_index)
         except com_error as exc:
             # connexion/session refermée entre le comptage et l'accès (course)
             raise RuntimeError(
                 "La connexion ou la session visée s'est refermée pendant le "
-                "rattachement (%s) — relancez le replay avec SAP GUI ouvert." % exc)
+                "rattachement (%s) : relancez le replay avec SAP GUI ouvert." % exc)
 
     def open_sap_logon(self, path=None, timeout="30s"):
         """Lance le SAP Logon Pad et attend que son moteur de scripting soit
@@ -145,7 +145,7 @@ class ConnectionKeywords:
 
         Contrairement à `Open Connection`, qui attend la *description* d'une entrée
         enregistrée dans le SAP Logon, ce keyword utilise
-        ``OpenConnectionByConnectionString`` — indispensable pour les systèmes sans
+        ``OpenConnectionByConnectionString``, indispensable pour les systèmes sans
         entrée préenregistrée (image Docker, serveur local) où l'on se connecte
         directement à un serveur d'applications (``/H/<hôte>/S/<port dispatcher>``,
         le port étant ``32<n° instance>``, p.ex. ``3200`` pour l'instance ``00``).

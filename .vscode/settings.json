@@ -23,7 +23,7 @@
   },
   // Les clones de référence locaux (gitignorés, jamais poussés) ne doivent
   // pas apparaître dans le panneau Source Control ni piloter la barre d'état
-  // (_pwsap est sur sa branche par défaut `sap/dev` — s'affiche comme « dev »).
+  // (_pwsap est sur sa branche par défaut `sap/dev`, affichée « dev »).
   "git.ignoredRepositories": [
     "_upstream",
     "_pwsap",

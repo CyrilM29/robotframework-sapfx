@@ -10,7 +10,7 @@ lui-même sous peine de ``RPC_E_WRONG_THREAD``. Cette même logique était dupli
 qu'une fois.
 
 Optionnel par construction : ``pythoncom`` n'est importé qu'à l'appel, et son
-absence (stub de test, plateforme non-Windows) est silencieuse — ce module ne
+absence (stub de test, plateforme non-Windows) est silencieuse : ce module ne
 crée donc pas de dépendance dure sur pywin32 pour le reste de ``sapfx_common``.
 """
 
@@ -29,7 +29,7 @@ def ensure_com_initialized() -> None:
         pythoncom.CoInitialize()
     except (AttributeError, pythoncom.com_error):
         # AttributeError : stub de test sans CoInitialize ; com_error : COM déjà
-        # initialisé sur ce thread (S_FALSE) — bénin dans les deux cas. Volontairement
+        # initialisé sur ce thread (S_FALSE), bénin dans les deux cas. Volontairement
         # PAS un `except Exception` large : une vraie panne COM doit remonter ici
         # plutôt que d'être masquée et ressurgir plus tard sous une erreur confuse.
         pass

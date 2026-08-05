@@ -10,7 +10,7 @@ A4H en Docker). Valide dans le pipeline réel :
   * le routing des keywords (Run Transaction, Get Current Transaction) ;
   * le keyword de perception **Get Screen Signature** exécuté à travers rf-mcp ;
   * **le state provider** : appel direct de EccStateProvider.get_page_source sur la
-    session live — ce que rf-mcp fait pour donner l'écran à l'agent. Le provider
+    session live, ce que rf-mcp fait pour donner l'écran à l'agent. Le provider
     exécute "Get Screen Signature" dans le contexte RF natif (run_keyword_in_context).
 
 Prérequis : A4H Docker démarré + scripting activé. Connexion par variables (les
@@ -34,7 +34,7 @@ SID = "ecc_e2e"
 RESOURCE = os.path.join(_ROOT, "resources", "ecc_keywords.resource")
 CONN = os.environ.get("SAP_CONNECTION", "/H/vhcala4hci/S/3200")
 # Défauts = identifiants publics du trial ABAP Platform A4H (documentés par SAP,
-# pas un secret) — voir docs/ecc-validation.md. Surchargeables par env pour ne
+# pas un secret) : voir docs/ecc-validation.md. Surchargeables par env pour ne
 # jamais coder en dur de vrais identifiants d'un système non-trial.
 USER = os.environ.get("SAP_USER", "DEVELOPER")
 PWD = os.environ.get("SAP_PASSWORD", "Htods70334")

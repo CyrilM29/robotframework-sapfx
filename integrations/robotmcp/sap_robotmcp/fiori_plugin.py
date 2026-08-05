@@ -1,4 +1,4 @@
-"""Plugin rf-mcp pour SapFioriLibrary — perception UI5 + guidance.
+"""Plugin rf-mcp pour SapFioriLibrary : perception UI5 + guidance.
 
 Subtilité vérifiée dans rf-mcp : le state provider de page source n'est invoqué
 que pour la **bibliothèque web active**, résolue à ``Browser`` ici (SapFioriLibrary
@@ -6,8 +6,8 @@ ne pilote pas la page, elle s'appuie sur la page de Browser). Le provider Browse
 builtin l'emporte donc, et CE provider n'est en pratique pas appelé pour la page.
 
 La perception UI5 passe donc avant tout par un **keyword** que l'agent appelle
-explicitement — ``Get Ui5 Page Tree`` (implémenté dans SapFioriLibrary : il exécute
-le JS d'arbre de _ui5_js.py sur la page Browser active ; validé e2e) — plus les
+explicitement, ``Get Ui5 Page Tree`` (implémenté dans SapFioriLibrary : il exécute
+le JS d'arbre de _ui5_js.py sur la page Browser active ; validé e2e), plus les
 hints qui l'y invitent. On fournit tout de même un state provider en repli, au cas
 où SapFioriLibrary serait la lib active (sessions hybrides), via le même pattern
 RF-context.
@@ -39,7 +39,7 @@ PERCEPTION_KEYWORD = "Get Ui5 Page Tree"
 
 _UNCHANGED_MARKER = "(unchanged since the previous perception call for this session)"
 
-# En-tête auto-descriptif du mode différentiel (cf. ecc_plugin._DIFF_HEADER) —
+# En-tête auto-descriptif du mode différentiel (cf. ecc_plugin._DIFF_HEADER) :
 # ici le diff porte sur l'arbre XML éclaté une balise par ligne.
 _DIFF_HEADER = (
     "(diff since the previous perception for this session, one XML tag per "
@@ -81,7 +81,7 @@ class FioriStateProvider(LibraryStateProvider):
             page_source = _UNCHANGED_MARKER
         elif previous is not None and not full_source:
             # Arbre déjà vu qui a changé : servir le diff (une balise par
-            # ligne) — sauf s'il ne fait pas gagner de place (page remplacée).
+            # ligne), sauf s'il ne fait pas gagner de place (page remplacée).
             candidate = _DIFF_HEADER + diff_perception(previous, tree, xml=True)
             if len(candidate) < len(tree):
                 page_source = candidate
@@ -165,7 +165,7 @@ class SapFioriPlugin(StaticLibraryPlugin):
     def get_keyword_library_map(self) -> Dict[str, str]:
         # Surface publique complète de SapFioriLibrary (rf-mcp retombe sur sa
         # découverte standard pour le reste, mais la carte d'intention doit être
-        # exhaustive — vérifiée par test contre la lib réelle).
+        # exhaustive, vérifiée par test contre la lib réelle).
         return {
             kw.lower(): "SapFioriLibrary"
             for kw in (

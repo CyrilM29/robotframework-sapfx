@@ -1,9 +1,9 @@
-"""SapApiLibrary — le canal **API** du projet : OData (Gateway/CAP) et RFC.
+"""SapApiLibrary, le canal **API** du projet : OData (Gateway/CAP) et RFC.
 
 Le troisième canal, à côté du GUI desktop (``SapEccLibrary``) et du web
 (``SapFioriLibrary``). Raison d'être : un test SAP robuste **prépare et
 vérifie ses données par l'API** et ne passe par l'écran que pour ce qu'il
-teste vraiment — le setup/teardown GUI est lent et fragile, l'API est
+teste vraiment : le setup/teardown GUI est lent et fragile, l'API est
 rapide et déterministe. Le keyword métier type croise les canaux :
 compter par SE16 ET par OData, puis exiger l'égalité (voir
 ``tests/robot/flagship_cross_paradigm.robot``).
@@ -12,12 +12,12 @@ Volontairement en **stdlib pure** (``urllib`` + ``http.cookiejar``) : aucune
 dépendance nouvelle à épingler (la leçon pywin32 de la convention 6). Couvre :
 
 * OData **v2** (Gateway embarqué ECC/S4 : enveloppe ``{"d": ...}``) et **v4**
-  (CAP, S/4 moderne : ``{"value": [...]}``) — mêmes keywords, détection de
+  (CAP, S/4 moderne : ``{"value": [...]}``), mêmes keywords, détection de
   l'enveloppe ;
 * le protocole **CSRF** SAP (``X-CSRF-Token: Fetch`` puis rejeu du token et
   des cookies sur les écritures) ;
 * le **RFC** en option : ``Call Rfc`` s'appuie sur `pyrfc` (SAP NW RFC SDK)
-  s'il est installé, sinon échoue avec la marche à suivre — jamais de
+  s'il est installé, sinon échoue avec la marche à suivre ; jamais de
   dépendance dure à un SDK propriétaire.
 
 Erreurs auto-corrigibles (politique maison) : un échec HTTP nomme le statut,
@@ -121,7 +121,7 @@ class SapApiLibrary:
 
     == RFC (optionnel) ==
     `Open Rfc Connection` / `Call Rfc` utilisent `pyrfc` si installé
-    (SAP NW RFC SDK requis) — sinon l'erreur donne la marche à suivre.
+    (SAP NW RFC SDK requis) ; sinon l'erreur donne la marche à suivre.
     """
 
     __version__ = "0.6.4"
@@ -179,7 +179,7 @@ class SapApiLibrary:
         JAMAIS de credentials : ``authenticated`` dit seulement si la session
         porte une authentification Basic, ``csrf_token_cached`` si un token
         CSRF a déjà été obtenu. C'est la perception du canal API (il n'a pas
-        d'écran) — consommée par le state provider rf-mcp (`SapApiPlugin`)
+        d'écran), consommée par le state provider rf-mcp (`SapApiPlugin`)
         et utile en débogage de suite multi-alias."""
         return {
             "api_sessions": [
@@ -199,7 +199,7 @@ class SapApiLibrary:
         """GET OData → JSON décodé tel quel (enveloppe v2/v4 comprise). Les
         arguments nommés deviennent des paramètres de requête (``top=5`` →
         ``$top=5`` : le préfixe ``$`` des options système OData est ajouté aux
-        noms connus — top/skip/filter/select/orderby/format/expand/count)."""
+        noms connus : top/skip/filter/select/orderby/format/expand/count)."""
         status, _, body = self._request(alias, "GET", path, query)
         return self._decode_json(body, status, path)
 
@@ -220,7 +220,7 @@ class SapApiLibrary:
             return payload
         raise AssertionError(
             "Réponse OData inattendue pour '%s' : ni enveloppe v2 (d.results) "
-            "ni v4 (value) — reçu %r" % (path, type(payload).__name__))
+            "ni v4 (value), reçu %r" % (path, type(payload).__name__))
 
     def get_odata_count(self, entity_path: str, alias: str = "default",
                         **query: str) -> int:
@@ -265,14 +265,14 @@ class SapApiLibrary:
     def open_rfc_connection(self, alias: str = "default", **params: Any) -> str:
         """Ouvre une connexion RFC via `pyrfc` (``ashost=``, ``sysnr=``,
         ``client=``, ``user=``, ``passwd=``...). Échec explicite avec la marche
-        à suivre si `pyrfc`/le SDK NW RFC ne sont pas installés — le RFC reste
+        à suivre si `pyrfc`/le SDK NW RFC ne sont pas installés : le RFC reste
         **optionnel**, rien d'autre dans la bibliothèque n'en dépend."""
         try:
             import pyrfc
         except ImportError:
             raise RuntimeError(
                 "Call Rfc a besoin de pyrfc (et du SAP NW RFC SDK) : "
-                "pip install pyrfc — voir https://github.com/SAP/PyRFC. "
+                "pip install pyrfc, voir https://github.com/SAP/PyRFC. "
                 "Les keywords OData, eux, fonctionnent sans.")
         self._rfc_connections()[alias] = pyrfc.Connection(
             **{name: reveal_secret(value) for name, value in params.items()})
@@ -286,7 +286,7 @@ class SapApiLibrary:
         connection = self._rfc_connections().get(alias)
         if connection is None:
             raise RuntimeError(
-                "Aucune connexion RFC '%s' — appeler Open Rfc Connection "
+                "Aucune connexion RFC '%s' : appeler Open Rfc Connection "
                 "d'abord." % alias)
         return connection.call(function_name, **params)
 
@@ -308,7 +308,7 @@ class SapApiLibrary:
         session = sessions.get(alias)
         if session is None:
             raise RuntimeError(
-                "Aucune session API '%s' — appeler Open Api Session d'abord "
+                "Aucune session API '%s' : appeler Open Api Session d'abord "
                 "(sessions ouvertes : %s)."
                 % (alias, ", ".join(sorted(sessions)) or "aucune"))
         return session
@@ -375,6 +375,6 @@ class SapApiLibrary:
         except (UnicodeDecodeError, json.JSONDecodeError) as err:
             excerpt = body[:_BODY_EXCERPT].decode("utf-8", errors="replace")
             raise AssertionError(
-                "Réponse de '%s' (statut %d) illisible en JSON (%s) — ajouter "
+                "Réponse de '%s' (statut %d) illisible en JSON (%s) : ajouter "
                 "format=json ou vérifier le chemin.\nDébut : %s"
                 % (path, status, err, excerpt))

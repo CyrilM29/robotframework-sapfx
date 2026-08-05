@@ -1,15 +1,15 @@
 *** Settings ***
 Documentation       Smoke **injection sous CSP stricte** : la page de
 ...                 ``fixtures/csp_fixture.html`` n'autorise en scripts QUE le CDN
-...                 UI5 et les balises porteuses de son nonce — pas de
+...                 UI5 et les balises porteuses de son nonce, pas de
 ...                 ``unsafe-inline``, pas de ``unsafe-eval``. Le premier test
 ...                 prouve que la politique bloque réellement un ``<script>``
 ...                 injecté au DOM sans nonce ; les suivants prouvent que le
-...                 bundle ``__SAPFX`` (injecté via l'evaluate Playwright — canal
+...                 bundle ``__SAPFX`` (injecté via l'evaluate Playwright, canal
 ...                 CDP, hors de portée de la CSP de page) et les moteurs
 ...                 role/xpath fonctionnent quand même. Conclusion opérationnelle
 ...                 (docs/hardening-test-environment.md §4) : AUCUN
-...                 assouplissement CSP n'est à demander sur un système testé —
+...                 assouplissement CSP n'est à demander sur un système testé,
 ...                 la posture CSP durcie vers laquelle SAP pousse (ligne
 ...                 legacy-free) ne gêne pas l'outillage.
 ...                 Nécessite le réseau (CDN OpenUI5), aucun SAP.
@@ -45,7 +45,7 @@ Page CSP Actually Blocks Non Nonce Script Injection
     ...                comptée par l'écouteur du fixture).
     ${blocked}=    Evaluate JavaScript    ${None}
     ...    () => new Promise((res) => { const s = document.createElement('script'); s.textContent = 'window.__cspLeak = true'; document.head.appendChild(s); setTimeout(() => res(window.__cspLeak !== true && window.__cspViolations > 0), 300); })
-    Should Be True    ${blocked}    msg=La CSP du fixture n'a pas bloqué un script sans nonce — la politique n'est pas effective
+    Should Be True    ${blocked}    msg=La CSP du fixture n'a pas bloqué un script sans nonce : la politique n'est pas effective
 
 Sapfx Bundle Injects And Role Engine Works Under Strict CSP
     [Documentation]    Le canal d'injection (evaluate Playwright → CDP) n'est pas

@@ -1,7 +1,7 @@
 > [🇬🇧 English](README.md) · **🇫🇷 Français**
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/assets/logo.png" alt="SAPFX — ECC UI5 API Library &amp; Recorder" width="240">
+  <img src="https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/assets/logo.png" alt="SAPFX : ECC UI5 API Library &amp; Recorder" width="240">
 </p>
 
 # SAPFX
@@ -14,15 +14,23 @@
 pip install robotframework-sapfx
 ```
 
-Automatisation de tests SAP pour Robot Framework (distribution
-`robotframework-sapfx`) avec **un vocabulaire métier unique pour
-trois canaux** :
+> PyPI livre les **bibliothèques** (les trois canaux ci-dessous). La **boîte à
+> outils complète** (recorders, intégration rf-mcp/MCP, agents de test,
+> resources métier) est livrée par le **pack de déploiement Windows** attaché
+> à chaque [GitHub Release](https://github.com/CyrilM29/robotframework-sapfx/releases) ;
+> voir [Installation](#installation).
 
-- **`SapEccLibrary`** (phase 1) — client lourd SAP GUI (backend ECC, S/4HANA),
+SAPFX est une **solution d'automatisation de tests SAP** pour Robot Framework
+(distribution `robotframework-sapfx`) : pas une simple librairie, mais un
+ensemble d'outils conçus ensemble autour de toute la vie d'un test SAP :
+écrire, enregistrer, générer, exécuter, réparer, surveiller. Son cœur : **un
+vocabulaire métier unique pour trois canaux** :
+
+- **`SapEccLibrary`** (phase 1) : client lourd SAP GUI (backend ECC, S/4HANA),
   un fork renforcé de
   [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary)
   (Apache 2.0), via COM.
-- **`SapFioriLibrary`** (phase 2) — SAP Fiori / S/4HANA web (SAPUI5), via Playwright
+- **`SapFioriLibrary`** (phase 2) : SAP Fiori / S/4HANA web (SAPUI5), via Playwright
   (bibliothèque Browser) avec des **sélecteurs de contrôles UI5 stables** (sans rotation
   d'identifiants dynamiques) : correspondance par rôle/propriété *et* un moteur
   **UI5 XPath** hiérarchique (`//Table//Button[@text='Edit']`), plus un **moteur
@@ -30,10 +38,10 @@ trois canaux** :
   Components** pour les pages `ui5-*` sans runtime UI5 classique. Le moteur de
   localisateurs est porté depuis
   [playwright-sap](https://github.com/ArpitSureka/playwright-sap) (Apache-2.0).
-- **`SapApiLibrary`** — le canal API (stdlib pure) : OData **v2 et v4**
+- **`SapApiLibrary`**, le canal API (stdlib pure) : OData **v2 et v4**
   derrière un seul jeu de keywords (protocole CSRF SAP compris), RFC optionnel
   via pyrfc. Préparer et recouper les données par l'API ; ne piloter l'écran
-  que pour ce qu'on teste vraiment — voir la suite flagship cross-paradigme
+  que pour ce qu'on teste vraiment ; voir la suite flagship cross-paradigme
   (`tests/robot/flagship_cross_paradigm.robot` : compte SE16 == `$count` OData
   sur le même système vivant).
 
@@ -52,11 +60,29 @@ puis `scripts/healing_drift_report.py` localise le patch à faire dans
 
 https://github.com/user-attachments/assets/0a471849-30a9-47f5-a48c-7071b16be8fb
 
-
 3 min 20 : VS Code et les keywords métier, puis SAP GUI, Fiori et le canal API
 pilotés en direct, et un agent MCP qui génère une suite depuis une vraie session.
 
-## Où ça se situe — wdi5 compris
+## Une solution, tout le cycle de vie du test
+
+Les bibliothèques sont le cœur d'exécution. Autour, chaque besoin d'un projet
+de test SAP a son outil dans la même boîte, avec partout le même vocabulaire
+métier, les mêmes moteurs de localisation, les mêmes conventions :
+
+| Besoin | L'outil dans la boîte |
+| --- | --- |
+| Écrire des tests lisibles | les trois bibliothèques + la couche de keywords métier `resources/` : aucun id SAP brut dans les tests (convention tenue par la CI) |
+| Capturer un déroulé existant | deux recorders : SAP GUI desktop (moteur d'événements natifs, lanceur graphique) et web Fiori/UI5 (extension Chrome MV3), avec exports resource-first, brouillons de spec et enregistrements rejouables |
+| Générer et réparer les tests avec l'IA, sous contrôle | l'intégration rf-mcp (MCP) et les agents `plan → generate → heal` : chaque étape générée est exécutée en direct avant d'être écrite, et le healer patche `resources/`, jamais les tests |
+| Surveiller des écrans sans écrire de scénario | la sentinelle de dérive : perception structurelle + visuelle contre des références committées |
+| Anticiper la dérive des localisateurs | la télémétrie de healing qui alimente `healing_drift_report.py`, lequel localise le correctif à faire dans `resources/` |
+| Provisionner un poste de test | le pack de déploiement Windows : l'installation complète ([voir Installation](#installation)) |
+
+C'est la vue d'ensemble qui compte : enregistrement, génération, exécution,
+réparation et surveillance parlent les mêmes keywords métier ; ce que produit
+un outil, les autres savent l'entretenir.
+
+## Où ça se situe : wdi5 compris
 
 [wdi5](https://github.com/ui5-community/wdi5) est la référence du test
 end-to-end UI5 hors Robot Framework (projet de la communauté UI5, basé sur
@@ -78,25 +104,25 @@ Le détail dans [docs/fiori-architecture.fr.md](docs/fiori-architecture.fr.md)
 
 La bibliothèque originale constitue une base solide avec une bonne couverture de mots-clés
 (y compris les grilles ALV). Ce fork conserve **tout** cela et ajoute ce dont
-l'automatisation SAP en production a besoin — voir l'[audit](docs/audit-upstream.fr.md)
-complet :
+l'automatisation SAP en production a besoin (voir l'[audit](docs/audit-upstream.fr.md)
+complet) :
 
-- **Synchronisation réelle** à la place des `sleep` fixes — `Wait Until Busy Done`,
+- **Synchronisation réelle** à la place des `sleep` fixes : `Wait Until Busy Done`,
   `Wait Until Element Present`, `Wait Until Element Value Is`.
-- **Démarrage autonome** — `Open Sap Logon` lance le Logon Pad et attend
+- **Démarrage autonome** : `Open Sap Logon` lance le Logon Pad et attend
   le moteur de scripting ; `Connect To Session With Retry` ; `Close Sap Logon`.
 - **`Run Transaction` indépendant de la locale** (lit le *type* du message de la barre
   d'état, non le texte en anglais/néerlandais/allemand) + `Status Message Should Be Success`.
-- **Grilles ALV par titre de colonne** — `Get Cell Value By Column Title`, `Read Grid`
+- **Grilles ALV par titre de colonne** : `Get Cell Value By Column Title`, `Read Grid`
   (→ liste de dictionnaires), `Get Column Id By Title`.
-- **Perception d'écran** — `Get Screen Signature` (ECC) et `Get Ui5 Page Tree`
+- **Perception d'écran** : `Get Screen Signature` (ECC) et `Get Ui5 Page Tree`
   (Fiori) : une vue texte/XML en lecture seule de l'écran vivant, pour le débogage de
   localisateurs et l'intégration d'agents IA. Les deux supportent `mode=diff`
   (uniquement ce qui a changé depuis la perception précédente).
-- **Préflight scripting & télémétrie** (ECC) — `Scripting Should Be Fully Enabled`
+- **Préflight scripting & télémétrie** (ECC) : `Scripting Should Be Fully Enabled`
   échoue tôt avec le paramètre RZ11 exact à corriger ; `Enable Test Tool Mode`,
   `Get Session Telemetry`.
-- **Réparation de localisateurs, jamais silencieuse** — les échecs suggèrent les
+- **Réparation de localisateurs, jamais silencieuse** : les échecs suggèrent les
   ids les plus proches à l'écran (scorés) ; `Resolve Element With Healing` (ECC) et
   `Resolve Ui5 With Fallback` (Fiori : chaîne role→xpath→sid→wc) réparent un
   localisateur périmé avec un WARNING journalisé, en alimentant un journal de
@@ -104,30 +130,30 @@ complet :
   transforme en maintenance préventive (dérives stables localisées dans
   `resources/`, patch proposé, `--apply` l'exécute).
 - **Localisateurs humains** (ECC, portés de RoboSAPiens avec une politique plus
-  stricte) — `Find/Fill/Read Field By Label`, `Click Button By Label` : libellé
+  stricte) : `Find/Fill/Read Field By Label`, `Click Button By Label` : libellé
   visible + géométrie, positions de grille (`N @ Libellé` / `Libellé @ N`),
   portée ancrée (`Ancre >> Reste`, rayon `scope_radius` ajustable) ;
   l'ambiguïté toujours remontée avec les candidats, jamais de premier match
   silencieux.
-- **Assertions visuelles** (ECC) — `Screen Should Match Baseline` (dHash
+- **Assertions visuelles** (ECC) : `Screen Should Match Baseline` (dHash
   perceptuel sur captures en mémoire, sémantique snapshot) : la couverture
   pixels pour exactement ce que l'API Scripting ne voit pas (listes GuiShell
   opaques, graphiques record-only). Extra optionnel `visual` (Pillow).
-- **Pont WebView2 embarqué** (ECC) — `Switch To Embedded Browser Page` confie
+- **Pont WebView2 embarqué** (ECC) : `Switch To Embedded Browser Page` confie
   un contrôle WebView2 embarqué dans une fenêtre SAP GUI/Business Client à la
   bibliothèque Browser via CDP : les deux canaux dans une même suite.
-- **Iframes de launchpad & Fiori Elements** — `Set Ui5 Frame` pour les applications
+- **Iframes de launchpad & Fiori Elements** : `Set Ui5 Frame` pour les applications
   Work Zone/cFLP embarquées dans une iframe (cross-origin) ; sélecteurs stables
   `idSuffix=fe::…`. UI5 multi-versions : 1.60 → 2.0 nightly, prouvé en live.
-- **Des enregistreurs**, pas de simples spies — bureau (`tools/recorder` :
+- **Des enregistreurs**, pas de simples spies : bureau (`tools/recorder` :
   surbrillance, capture au clic, survol, `--record` produisant une séquence de
-  mots-clés rejouable avec un **moteur natif à événements** — boutons/grilles/arbres
+  mots-clés rejouable avec un **moteur natif à événements** (boutons/grilles/arbres
   exacts via les événements `Change` de l'API de scripting, repli polling
-  automatique ; lanceur Tkinter + `recorder.cmd` à la racine) et web
+  automatique) ; lanceur Tkinter + `recorder.cmd` à la racine) et web
   (`tools/recorder_web` : snippet **et** extension Chrome MV3 qui exporte un corps
   `*** Test Cases ***`, avec assertions de valeur et support des iframes).
   Aucun traceur tiers.
-- **Intégration rf-mcp (RobotMCP)** (`integrations/robotmcp/`) — `SapEccPlugin` /
+- **Intégration rf-mcp (RobotMCP)** (`integrations/robotmcp/`) : `SapEccPlugin` /
   `SapFioriPlugin` se branchent sur le serveur
   [rf-mcp](https://github.com/manykarim/robotframework-mcp) : routage de mots-clés,
   guidance de sélecteurs SAP et perception d'écran en direct pour agents IA.
@@ -136,7 +162,7 @@ complet :
 ## Structure
 
 ```text
-src/SapEccLibrary/          # phase 1 — client lourd SAP GUI (COM)
+src/SapEccLibrary/          # phase 1 : client lourd SAP GUI (COM)
   _vendor/sapgui_base.py    #   original, vendorisé tel quel (classe renommée uniquement)
   keywords/_connection.py   #   mixin de démarrage (Logon Pad, retry, CoInitialize)
   keywords/_waits.py        #   mixin de synchronisation (+ suggestions d'ids proches)
@@ -148,7 +174,7 @@ src/SapEccLibrary/          # phase 1 — client lourd SAP GUI (COM)
   keywords/_semantic.py     #   localisateurs humains (libellé + géométrie, grilles, portée >>)
   keywords/_embedded_browser.py  # pont WebView2/CDP vers la bibliothèque Browser
   SapEccLibrary.py          #   les compose + Run Transaction sécurisé pour la locale
-src/SapFioriLibrary/        # phase 2 — Fiori / S/4HANA web (Playwright + UI5)
+src/SapFioriLibrary/        # phase 2 : Fiori / S/4HANA web (Playwright + UI5)
   _ui5_runtime.py           #   modèle de sélecteurs de contrôles UI5 (données pures)
   _ui5_js.py                #   bundle __SAPFX injecté : arbre, moteurs XPath/rôle, sid
   regen_recorder.py         #   régénère l'enregistreur web (snippet + extension)
@@ -158,7 +184,7 @@ src/SapApiLibrary/          # canal API : OData v2/v4 + CSRF, RFC optionnel (std
 src/sapfx_common/           # primitives partagées : sondage/relance, sûreté COM,
                             #   scoring + télémétrie de réparation, diff de perception,
                             #   arbre d'objets, moteur sémantique, hash visuel
-resources/                  # mots-clés métier — ecc_keywords + fiori_keywords (en miroir)
+resources/                  # mots-clés métier : ecc_keywords + fiori_keywords (en miroir)
                             # + a4h_demo_data (garanties de données SFLIGHT/EPM)
 tests/unit/                 # tests de logique hors SAP/hors navigateur (exécutables partout)
 tests/robot/                # ecc_smoke + ecc_data_smoke + ecc_exploration (nécessitent SAP),
@@ -175,10 +201,41 @@ packaging/ + scripts/       # sources du pack de déploiement Windows + outillag
                             # (build_release_pack.py -> dist/sapfx-pack-<v>-win.zip)
 docs/                       # architecture, fiori-architecture, mcp-integration,
                             # audit-upstream, testing-without-sap, ecc-validation,
-                            # sap-test-data, deployment-pack — tous bilingues EN/FR
+                            # sap-test-data, deployment-pack (tous bilingues EN/FR)
 ```
 
 ## Installation
+
+Deux canaux de distribution, par choix :
+
+**Bibliothèques seules : PyPI.** Les quatre paquets Python (`SapEccLibrary`,
+`SapFioriLibrary`, `SapApiLibrary`, `sapfx_common`), pour utiliser les keywords
+dans votre propre projet Robot Framework :
+
+```bash
+pip install robotframework-sapfx           # + extras : [web] Browser, [visual] Pillow
+rfbrowser init                             # unique : navigateurs Playwright (côté Fiori)
+```
+
+Les recorders, les plugins rf-mcp/la surcouche `sapfx-mcp`, les resources
+métier et les agents de test ne sont **pas** sur PyPI.
+
+**Installation complète : le pack de déploiement Windows**
+(`sapfx-pack-<version>-win.zip` attaché à chaque
+[GitHub Release](https://github.com/CyrilM29/robotframework-sapfx/releases)).
+C'est le **seul canal qui embarque tout** : les deux wheels (bibliothèques +
+plugins rf-mcp avec le lanceur `sapfx-mcp`), la couche resources métier, les
+deux recorders (GUI desktop + extension web MV3), les suites d'exemple, les
+scripts de maintenance, les agents de test plan → generate → heal, et un
+`install.cmd`/`install.ps1` qui construit un venv local et rend les configs
+MCP. L'intégrité est vérifiable (sommes SHA-256 + SBOM CycloneDX + attestation
+de provenance). Recommandé pour provisionner les postes de test cibles : le
+code SAPFX arrive dans UN zip auditable ; à noter, l'installateur a toujours
+besoin de Python et d'un accès à PyPI *ou à un miroir interne* pour les
+dépendances épinglées. Guide complet :
+[docs/deployment-pack.fr.md](docs/deployment-pack.fr.md).
+
+**Depuis un clone de ce dépôt** (développement) :
 
 ```bash
 pip install -r requirements.txt      # robotframework + pywin32 (épinglé, Windows) + browser
@@ -188,7 +245,7 @@ rfbrowser init                       # unique : téléchargement des navigateurs
 Les prérequis côté SAP (scripting activé côté serveur/client) sont détaillés dans
 [docs/testing-without-sap.fr.md](docs/testing-without-sap.fr.md), qui explique également
 comment obtenir un **système SAP local gratuit** pour les tests (ABAP Platform Trial
-sous Docker). Le côté Fiori ne nécessite aucun SAP — il effectue ses tests contre le
+sous Docker). Le côté Fiori ne nécessite aucun SAP : il effectue ses tests contre le
 kit de démonstration public OpenUI5.
 
 ## Démarrage rapide
@@ -228,14 +285,14 @@ Read Displayed Grid
     RETURN    ${rows}
 ```
 
-Exécution (contre un système — identifiants via des variables ; `Secret` est la
+Exécution (contre un système, identifiants via des variables ; `Secret` est la
 syntaxe de variable typée de Robot Framework 7.4 : le mot de passe n'apparaît
 jamais dans les logs, même en niveau TRACE) :
 
 ```bash
 robot -v SAP_CONNECTION:"MY SYSTEM" -v SAP_USER:DEVELOPER \
       -v "SAP_PASSWORD: Secret:secret" tests/robot/ecc_smoke.robot
-robot tests/robot/fiori_smoke.robot   # Fiori — aucun SAP requis (OpenUI5 Demo Kit)
+robot tests/robot/fiori_smoke.robot   # Fiori : aucun SAP requis (OpenUI5 Demo Kit)
 ```
 
 ## Tests
@@ -247,5 +304,5 @@ python -m pytest tests/unit -q       # tests de logique, SAP non requis
 ## Licence
 
 Apache 2.0. Contient du code vendorisé provenant de robotframework-sapguilibrary et des
-moteurs de localisateurs portés depuis playwright-sap — voir [LICENSE](LICENSE) et
+moteurs de localisateurs portés depuis playwright-sap ; voir [LICENSE](LICENSE) et
 [NOTICE](NOTICE).

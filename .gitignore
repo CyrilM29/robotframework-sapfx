@@ -26,11 +26,11 @@ playwright-log.txt
 !tools/recorder_web/extension/icon48.png
 !tools/recorder_web/extension/icon128.png
 !tools/recorder_web/extension/store/screenshot-1280x800.png
-# Baselines d'assertion visuelle (empreinte perceptuelle) — committées comme référence ;
+# Baselines d'assertion visuelle (empreinte perceptuelle) : committées comme référence ;
 # les diffs de dérive `*.actual.png` restent ignorés (artefacts transitoires).
 !tests/robot/visual_baselines/*.png
 tests/robot/visual_baselines/*.actual.png
-# Images clés des démos vidéo (livrables comm, extraites des prises validées) —
+# Images clés des démos vidéo (livrables comm, extraites des prises validées) :
 # régénérables par script, non committés ; les .webm sont les intermédiaires
 # Playwright des prises (le livrable est le MP4 composé).
 
@@ -38,10 +38,10 @@ tests/robot/visual_baselines/*.actual.png
 /tools/recorder/captures/
 /tools/recorder_web/captures/
 
-# Captures live du GIF de démo (spécifiques au poste, régénérables —
+# Captures live du GIF de démo (spécifiques au poste, régénérables :
 # seuls les GIF/MP4 composés sont versionnés)
 
-# Secrets / clés — ne jamais committer
+# Secrets / clés : ne jamais committer
 /_keys/
 
 # Supports de présentation (documents de travail, hors périmètre du dépôt)
@@ -53,7 +53,7 @@ tests/robot/visual_baselines/*.actual.png
 # Cible Fiori Elements locale (clone de SAP-samples/cap-sflight, `npx cds watch`)
 /_cap-sflight/
 
-# rf-mcp runtime output (artifacts, session state) — not committed
+# rf-mcp runtime output (artifacts, session state): not committed
 /.robotmcp_artifacts/
 /.robotmcp/
 

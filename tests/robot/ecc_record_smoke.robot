@@ -7,13 +7,13 @@ Documentation       Live smoke for the **desktop Recorder's record engine** agai
 ...                 scripting enabled. (The OK-code -> `Run Transaction` path is covered
 ...                 by the off-SAP unit tests in tests/unit/test_desktop_spy.py.)
 ...
-...                 The recorder lives under tools/ (not a package) — imported as a
+...                 The recorder lives under tools/ (not a package), imported as a
 ...                 Library by path. SapEccLibrary is imported by the resource. Run e.g.:
 ...                   robot --pythonpath src ^
 ...                     -v SAP_CONNECTION:/H/vhcala4hci/S/3200 -v SAP_USER:DEVELOPER ^
 ...                     -v "SAP_PASSWORD: Secret:..." -v SAP_CLIENT:001 tests/robot/ecc_record_smoke.robot
 ...
-...                 FR — Smoke live du **moteur record du Recorder bureau** contre un vrai
+...                 FR : Smoke live du **moteur record du Recorder bureau** contre un vrai
 ...                 A4H : pilote un déroulé via SapEccLibrary et vérifie que le moteur
 ...                 transcrit une saisie de champ en un step `Input Text` + sa soumission.
 

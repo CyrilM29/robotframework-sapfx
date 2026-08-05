@@ -1,5 +1,5 @@
 """Tests off-SAP du harnais d'évaluation des agents
-(``scripts/agent_eval_harness.py`` — convention #5 appliquée à l'outillage).
+(``scripts/agent_eval_harness.py``, convention #5 appliquée à l'outillage).
 
 On rejoue le cycle inject → (healer simulé) → verify sur un mini-dépôt
 temporaire : aucun robot, aucun agent, aucun SAP.
@@ -155,7 +155,7 @@ def test_restore_without_backup_is_an_actionable_error(fake_repo):
 
 def test_the_default_scenario_matches_the_real_repo_resource():
     # Garde vivant : la cible du scénario canonique existe (exactement une
-    # occurrence) dans la vraie resource du dépôt — sinon le harnais est mort.
+    # occurrence) dans la vraie resource du dépôt : sinon le harnais est mort.
     scenario = mod.SCENARIOS["se16-count-button"]
     real = os.path.normpath(os.path.join(
         os.path.dirname(__file__), "..", "..", scenario["file"]))

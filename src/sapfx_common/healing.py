@@ -2,7 +2,7 @@
 
 Le pattern (état de l'art Healenium / Katalon / UiPath) : quand un localisateur
 ne résout plus, on **score** les candidats présents à l'écran contre ce qu'on
-sait de la cible, et on ne « répare » qu'au-dessus d'un seuil — jamais en
+sait de la cible, et on ne « répare » qu'au-dessus d'un seuil, jamais en
 silence (l'appelant journalise la réparation et le score).
 
 Un id SAP GUI (``wnd[0]/usr/subSUB0:SAPLMEGUI:0013/.../ctxtMEPO_TOPLINE-BSART``)
@@ -62,7 +62,7 @@ def _sequence_ratio(a: Sequence[str], b: Sequence[str]) -> float:
     """Similarité entre deux chemins (séquences de segments), comparés au niveau
     CARACTÈRE sur leur forme jointe : un segment renuméroté
     (``subSUB0:SAPLMEGUI:0013`` -> ``:0015``) reste presque identique et doit
-    garder son crédit — le traiter en atome (match/mismatch binaire) écraserait
+    garder son crédit : le traiter en atome (match/mismatch binaire) écraserait
     le score des dérives les plus courantes."""
     if not a and not b:
         return 1.0

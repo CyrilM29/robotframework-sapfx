@@ -2,7 +2,7 @@
 
 Le comportement réel est prouvé par les smokes live (`fiori_smoke` = UI5 courant,
 `fiori_legacy_smoke` = OpenUI5 1.60 sans registre) ; ici on verrouille la présence
-des trois chemins de `registryForEach` dans le JS généré — bundle **et** recorder —
+des trois chemins de `registryForEach` dans le JS généré (bundle **et** recorder)
 pour qu'une régression soit visible sans navigateur (convention #5 du CLAUDE.md).
 """
 import os

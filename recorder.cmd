@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================================
-REM  Lanceur du SAP GUI Recorder — double-cliquez ce fichier.
+REM  Lanceur du SAP GUI Recorder : double-cliquez ce fichier.
 REM  Ouvre l'interface visuelle (tools\recorder\recorder_gui.py) d'ou l'on choisit
 REM  le mode (dump / capture / survol / record / surlignage) et on lance.
 REM  Prerequis : Python installe, SAP Logon ouvert avec une session active.

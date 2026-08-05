@@ -2,15 +2,15 @@
 
 Une liste ABAP (sortie SE38, SE16 sans ALV, protocoles…) n'expose **aucun objet
 table scriptable** : l'écran n'est qu'une nuée de ``GuiLabel`` disposés en
-grille. L'idée (observée chez RoboSAPiens, Apache-2.0 — ``AbapList.cs``) : la
-géométrie suffit à retrouver la structure — les labels d'une même bande
+grille. L'idée (observée chez RoboSAPiens, Apache-2.0, ``AbapList.cs``) : la
+géométrie suffit à retrouver la structure : les labels d'une même bande
 horizontale forment une ligne, l'ordre ``left`` donne les colonnes.
 
 Version volontairement simple : des lignes de cellules texte, sans typage de
 colonnes (assez pour « le rapport contient X » et les comparaisons ligne à
 ligne). Module pur sur :class:`~sapfx_common.object_tree.ScreenElement`, typé,
 testé hors SAP. NB : SAP GUI ne peuple finement les labels de liste qu'avec le
-**mode accessibilité** activé (Options SAP GUI → Accessibilité) — même
+**mode accessibilité** activé (Options SAP GUI → Accessibilité), même
 prérequis que RoboSAPiens documente.
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ def reconstruct_rows(elements: Sequence[ScreenElement],
     haut en bas, cellules de gauche à droite.
 
     Ne retient que les ``GuiLabel`` porteurs de texte ET de géométrie ; les
-    écrans sans liste (aucun label positionné) donnent ``[]`` — l'appelant en
+    écrans sans liste (aucun label positionné) donnent ``[]`` : l'appelant en
     fait une erreur explicite s'il attendait une liste."""
     cells = [(int(el.top), int(el.left), el.id, el.text.strip())
              for el in elements

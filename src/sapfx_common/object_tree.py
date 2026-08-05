@@ -3,7 +3,7 @@
 L'API SAP GUI Scripting expose ``GetObjectTree(rootId, properties)`` (SAP GUI
 récents ; absent des versions anciennes) : **un seul appel COM** retourne tout
 le sous-arbre en JSON avec les propriétés demandées, là où la marche COM
-classique coûte un aller-retour par nœud — sur un écran riche, c'est l'écart
+classique coûte un aller-retour par nœud : sur un écran riche, c'est l'écart
 entre 1 et plusieurs centaines d'appels inter-process. Usage observé chez
 RoboSAPiens (imbus, Apache-2.0), qui s'en sert pour ses localisateurs par
 libellé ; on en fait ici le chemin rapide de la perception ECC (avec repli
@@ -35,7 +35,7 @@ class ScreenElement:
     """Un contrôle de l'écran, normalisé (id, type, texte, géométrie).
 
     ``left``/``top`` sont les coordonnées écran absolues quand disponibles
-    (``ScreenLeft``/``ScreenTop``), sinon les relatives (``Left``/``Top``) —
+    (``ScreenLeft``/``ScreenTop``), sinon les relatives (``Left``/``Top``) ;
     ``None`` pour un nœud non visuel. C'est la monnaie d'échange entre la
     perception, le healing et le moteur de localisateurs par libellé.
     """
@@ -143,10 +143,10 @@ def _iter_nodes(node: Any) -> Iterator[ScreenElement]:
 
 def flatten_object_tree(payload: Union[str, dict]) -> list[ScreenElement]:
     """Aplati le JSON de ``GetObjectTree`` en liste de :class:`ScreenElement`
-    (parcours en profondeur, ordre du document — le même que la marche COM).
+    (parcours en profondeur, ordre du document, le même que la marche COM).
 
     ``payload`` : la chaîne JSON brute retournée par l'API, ou le dict déjà
-    parsé. Lève ``ValueError`` si la chaîne n'est pas du JSON exploitable —
+    parsé. Lève ``ValueError`` si la chaîne n'est pas du JSON exploitable :
     l'appelant y voit le signal de replier sur la marche COM."""
     if isinstance(payload, str):
         try:

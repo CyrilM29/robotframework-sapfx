@@ -1,7 +1,7 @@
 """Tests off-SAP du pont contexte-RF (``sap_robotmcp._rf_context``) : le contrat
 texte historique et le canal ``allow_structured`` des keywords d'état
 (convention #5 du CLAUDE.md). Le vrai gestionnaire de contexte rf-mcp est
-doublé — aucune session SAP/Robot réelle.
+doublé : aucune session SAP/Robot réelle.
 """
 import pytest
 

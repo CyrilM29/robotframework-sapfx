@@ -1,17 +1,17 @@
 # Compagnies aériennes et liaisons de vol (SCARR / SPFLI) via SE16
 
 - **Canal** : ECC (SAP GUI)
-- **Système / URL** : ABAP Platform Trial A4H (S/4HANA 1909) — connexion
+- **Système / URL** : ABAP Platform Trial A4H (S/4HANA 1909), connexion
   `/H/vhcala4hci/S/3200`, client 001, langue EN, utilisateur de test avec
   autorisations SE16. Périmètre **strictement consultation** (SE16 display /
-  « Number of Entries ») — aucune écriture.
+  « Number of Entries »), aucune écriture.
 - **Préconditions** :
-  - Données de démonstration vol présentes — garde
+  - Données de démonstration vol présentes : garde
     `Ensure Flight Demo Data Exists` (`resources/a4h_demo_data.resource`,
     génération `SAPBC_DATA_GENERATOR` uniquement si les tables sont vides).
     Lors du relevé, SCARR et SPFLI étaient déjà peuplées (la garde n'a rien
     déclenché).
-  - Sortie SE16 en **grille ALV** pour l'utilisateur de test — keyword
+  - Sortie SE16 en **grille ALV** pour l'utilisateur de test : keyword
     `Use ALV Grid In Data Browser` (réglage persistant par utilisateur,
     idempotent ; la liste ABAP classique par défaut n'a pas d'objet grille
     scriptable).
@@ -21,7 +21,7 @@
 Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
 `Scripting Should Be Fully Enabled` passé).
 
-### SCARR — catalogue des compagnies (18 entrées)
+### SCARR : catalogue des compagnies (18 entrées)
 
 - « Number of Entries » : **18**. Colonnes techniques de la grille ALV :
   `MANDT`, `CARRID`, `CARRNAME`, `CURRCODE`, `URL`.
@@ -46,7 +46,7 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   `MANDT` n'est **pas** proposé comme critère (mais apparaît en 1re colonne de
   la grille). Pas de dialogue « choix des champs de sélection » (table étroite).
 
-### SPFLI — liaisons de vol (14 entrées)
+### SPFLI : liaisons de vol (14 entrées)
 
 - « Number of Entries » : **14**. Colonnes techniques de la grille ALV :
   `MANDT`, `CARRID`, `CONNID`, `COUNTRYFR`, `CITYFROM`, `AIRPFROM`,
@@ -54,7 +54,7 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   `DISTANCE`, `DISTID`, `FLTYPE`, `PERIOD`.
 - Répartition par compagnie (comptes vérifiés au filtre `CARRID` +
   « Number of Entries », recoupés avec la grille complète) :
-  **AA 1, AZ 2, DL 1, JL 2, LH 4, QF 1, SQ 2, UA 1** — total 14.
+  **AA 1, AZ 2, DL 1, JL 2, LH 4, QF 1, SQ 2, UA 1**, total 14.
   Les 10 autres compagnies du catalogue (AB, AC, AF, BA, CO, FJ, NG, NW, SA,
   SR) n'ont **aucune** liaison.
 - Les 14 liaisons (extrait des colonnes clés) :
@@ -93,7 +93,7 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   | I15 | `PERIOD` | `txtI15-LOW` | GuiTextField |
 
   `MAX_SEL` (« Maximum No. of Hits », `wnd[0]/usr/txtMAX_SEL`) vaut **200**
-  par défaut — supérieur aux 14 entrées, aucune troncature à craindre ici.
+  par défaut : supérieur aux 14 entrées, aucune troncature à craindre ici.
 
 ### Comportements SE16 vérifiés live
 
@@ -104,10 +104,10 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
 - Les critères saisis sur l'écran de sélection **ne persistent pas** après un
   retour par `/nSE16` : `Display Table Contents SPFLI` juste après le filtre
   `XX` a bien affiché les 14 lignes (écran de sélection re-généré vierge).
-- `CONNID` est restitué avec zéros de tête (`0017`) — comparer en **chaîne**,
+- `CONNID` est restitué avec zéros de tête (`0017`) : comparer en **chaîne**,
   jamais en entier.
 - `DISTANCE` est rendue avec séparateur de milliers (`2.572`, `9.100`) selon le
-  profil utilisateur — même piège que le compteur du popup (déjà normalisé par
+  profil utilisateur : même piège que le compteur du popup (déjà normalisé par
   `Count Entries On Current Selection Screen`).
 - `FLTYPE` est vide sur les 14 liaisons (vol régulier ; aucune valeur charter
   dans ce jeu de démo).
@@ -120,7 +120,7 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   2. `Ensure Flight Demo Data Exists` (Suite Setup, conditionnel).
   3. `Count Table Entries    SCARR`.
 - **Résultat attendu** : compte entier strictement positif (18 observé sur le
-  jeu de démo standard — valeur de calage, ne pas en faire une assertion dure
+  jeu de démo standard : valeur de calage, ne pas en faire une assertion dure
   si le trial a été regénéré différemment).
 - **Keywords métier manquants** : aucun.
 
@@ -134,7 +134,7 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   titres affichés) ; les codes `AA`, `LH`, `SQ` figurent parmi les `CARRID`
   lus ; au moins une ligne.
 - **Keywords métier manquants** : `Displayed Grid Should Contain Columns`
-  (confort — assertion directe sur les ids techniques de colonnes, aujourd'hui
+  (confort : assertion directe sur les ids techniques de colonnes, aujourd'hui
   à refaire en `Evaluate` dans chaque test).
 
 ### 3. La table des liaisons contient des données
@@ -153,20 +153,20 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   standard ; l'assertion robuste minimale est : compte(LH) > compte(AA) > 0 et
   somme des comptes par compagnie = compte total SPFLI).
 - **Keywords métier manquants** : `Count Flight Connections For Airline`
-  (ouvre SPFLI, saisit le `CARRID` dans le champ de sélection dédié — locator
-  `ctxtI1-LOW` à poser dans `resources/` — puis compte ; l'étape 2 n'a
+  (ouvre SPFLI, saisit le `CARRID` dans le champ de sélection dédié, locator
+  `ctxtI1-LOW` à poser dans `resources/`, puis compte ; l'étape 2 n'a
   aujourd'hui aucun keyword métier et impose un `Input Text` avec id brut dans
   le test, ce qui violerait la convention 1).
 
 ### 5. Une compagnie sans liaison donne un compte zéro, sans erreur
 - **Étapes** :
   1. Ouvrir l'écran de sélection SPFLI, filtrer sur un `CARRID` inexistant
-     (ex. `XX`) — même mécanique que le scénario 4.
+     (ex. `XX`) : même mécanique que le scénario 4.
   2. Compter via « Number of Entries ».
 - **Résultat attendu** : 0, sans message d'erreur ni popup résiduel (le popup
   de comptage se referme par F12 ; l'écran de sélection reste actif). Variante
   métier : un code du catalogue sans liaison (ex. `AF`, `BA`) doit aussi
-  donner 0 — vérifie la cohérence catalogue/liaisons.
+  donner 0 (vérifie la cohérence catalogue/liaisons).
 - **Keywords métier manquants** : le même `Count Flight Connections For
   Airline` que le scénario 4.
 
@@ -178,10 +178,10 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
      des `CARRID` porteurs de liaisons.
   3. Vérifier l'inclusion du second ensemble dans le premier.
 - **Résultat attendu** : inclusion vraie (observé : {AA, AZ, DL, JL, LH, QF,
-  SQ, UA} ⊂ les 18 du catalogue). Assertion ensembliste sur ids techniques —
+  SQ, UA} ⊂ les 18 du catalogue). Assertion ensembliste sur ids techniques,
   indépendante de la locale et du tri d'affichage.
 - **Keywords métier manquants** : `Read Column Values From Displayed Grid`
-  (confort — extraire la liste/ensemble d'une colonne technique de la grille
+  (confort : extraire la liste/ensemble d'une colonne technique de la grille
   courante ; aujourd'hui un `Evaluate` par test).
 
 ### 7. Détail d'une liaison connue (lecture ciblée)
@@ -194,29 +194,29 @@ Relevé live sur A4H le 2026-07-12 (session rf-mcp, préflight
   soit la langue de connexion). `CONNID` comparé comme chaîne `0400`.
 - **Keywords métier manquants** : `Display Table Contents With Filter`
   (généralisation : ouvre la table, applique des critères nommés sur l'écran
-  de sélection avant F8 — les locators positionnels `I<n>-LOW` restant dans
+  de sélection avant F8, les locators positionnels `I<n>-LOW` restant dans
   `resources/`).
 
 ## Points de vigilance
 
-- `SE16N` n'existe pas sur A4H — toujours SE16.
+- `SE16N` n'existe pas sur A4H : toujours SE16.
 - Champs de sélection **positionnels** (`I<n>-LOW/HIGH` suit l'ordre des champs
   de la table) et de **type variable** : sur SPFLI, `FLTIME`/`DISTANCE`/`PERIOD`
-  sont des `txt<...>` alors que le reste est `ctxt<...>` — les relevés exacts
+  sont des `txt<...>` alors que le reste est `ctxt<...>`. Les relevés exacts
   sont dans « Données observées » ; re-sonder avec `Get Screen Signature` après
   tout changement de version/structure.
 - Sur l'écran de sélection SPFLI, les champs heure/durée vides **affichent**
   `0:00` / `00:00:00` : ne jamais lire ces valeurs comme des critères saisis.
 - Séparateurs de milliers possibles dans le popup de comptage **et** dans les
-  colonnes numériques de la grille (`DISTANCE`) — normaliser avant toute
+  colonnes numériques de la grille (`DISTANCE`) : normaliser avant toute
   comparaison numérique (filtrage caractère par caractère, pas de `\d` dans
-  une cellule Robot — piège d'échappement documenté dans
+  une cellule Robot, piège d'échappement documenté dans
   `resources/ecc_keywords.resource`).
 - Les critères de sélection ne survivent pas à `/nSE16`, mais le réglage
   « ALV Grid » et le choix des champs de sélection sont **persistants par
-  utilisateur** — d'où `Use ALV Grid In Data Browser` en setup, une fois.
+  utilisateur**, d'où `Use ALV Grid In Data Browser` en setup, une fois.
 - Ni SCARR ni SPFLI n'ouvrent le dialogue « choix des champs de sélection »
-  (tables < 40 champs) — pas de garde nécessaire ici, `Try Open Table
+  (tables < 40 champs) : pas de garde nécessaire ici, `Try Open Table
   Selection Screen` la fournit déjà pour les tables larges.
 - rf-mcp × COM : terminer tout batch MCP par `Element Should Be Present`
   (jamais `Wait Until Element Present` en dernière étape) ; une seule session

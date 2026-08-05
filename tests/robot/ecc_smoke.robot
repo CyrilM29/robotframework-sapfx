@@ -1,5 +1,5 @@
 *** Settings ***
-Documentation       Live ECC smoke test — validated against a real ABAP Platform A4H
+Documentation       Live ECC smoke test: validated against a real ABAP Platform A4H
 ...                 (ABAP Platform Trial 1909 in Docker). Drives SAP GUI via the
 ...                 Scripting API: login, transaction navigation checked with the
 ...                 locale-independent current-transaction code, table browse in SE16,
@@ -18,7 +18,7 @@ Documentation       Live ECC smoke test — validated against a real ABAP Platfo
 ...                 (`Secret` is the Robot Framework 7.4 typed-variable syntax: the
 ...                 password value then never appears in logs, even at TRACE level.)
 ...
-...                 FR — Test smoke ECC en live, validé contre un vrai ABAP Platform
+...                 FR : Test smoke ECC en live, validé contre un vrai ABAP Platform
 ...                 A4H (ABAP Platform Trial 1909 sous Docker). Pilote SAP GUI via
 ...                 l'API Scripting : login, navigation de transaction vérifiée par le
 ...                 code de transaction courant (indépendant de la langue), parcours

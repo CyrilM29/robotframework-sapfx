@@ -3,12 +3,12 @@
 Complète les ids techniques (qui restent le chemin nominal dans ``resources/``)
 avec l'adressage qu'un utilisateur fonctionnel emploie spontanément : « le champ
 à droite du libellé Table », « le bouton Exécuter ». Résolution géométrique pure
-dans ``sapfx_common.semantic`` (portée de RoboSAPiens, Apache-2.0 — NOTICE) sur
+dans ``sapfx_common.semantic`` (portée de RoboSAPiens, Apache-2.0, NOTICE) sur
 la perception structurée ``_screen_elements`` (chemin rapide ``GetObjectTree``).
 
 Deux garanties de la maison : l'ambiguïté n'est **jamais** tranchée en silence
 (échec avec la liste des candidats), et les keywords retournent des **chaînes**
-id (jamais l'objet COM — sûr à travers la frontière rf-mcp).
+id (jamais l'objet COM : sûr à travers la frontière rf-mcp).
 """
 from sapfx_common.semantic import nearby_labels, resolve_semantic, scope_hint
 from sapfx_common.vocabulary import lookup_as_dict
@@ -22,7 +22,7 @@ _INPUT_TYPES = ("GuiTextField", "GuiCTextField", "GuiPasswordField", "GuiComboBo
 _READ_TYPES = ("GuiTextField", "GuiCTextField", "GuiComboBox",
                "GuiCheckBox", "GuiRadioButton")
 # Pas de GuiMenu : SAP duplique les boutons de toolbar dans les menus (même
-# texte) — l'inclure rendrait la plupart des boutons ambigus (constaté live sur
+# texte) : l'inclure rendrait la plupart des boutons ambigus (constaté live sur
 # A4H : « Number of Entries » = btn[31] ET menu[1]/menu[10]). Pour un menu :
 # `Find Element By Label ... control_types=GuiMenu` puis `Click Element`.
 _CLICK_TYPES = ("GuiButton", "GuiTab")
@@ -60,26 +60,26 @@ class SemanticKeywords:
         """Résout un localisateur **humain** en id SAP GUI (chaîne, collable partout).
 
         Grammaire du ``locator`` :
-        | ``Table``           | élément ancré au libellé (à droite ou dessous — les deux à la fois = ambiguïté remontée), sinon élément dont le texte/tooltip correspond |
+        | ``Table``           | élément ancré au libellé (à droite ou dessous ; les deux à la fois = ambiguïté remontée), sinon élément dont le texte/tooltip correspond |
         | ``@ Table``         | uniquement l'élément SOUS le libellé |
         | ``Gauche @ Haut``   | intersection : à droite de ``Gauche`` ET sous ``Haut`` (grilles de champs) |
         | ``= contenu``       | élément par son texte propre exact |
         | ``N @ Table``       | le N-ième champ (1-based) de la grille verticale sous ``Table`` |
         | ``Table @ N``       | le N-ième champ (1-based) de la grille horizontale à droite de ``Table`` |
-        | ``Ancre >> Reste``  | restreint la résolution de ``Reste`` (n'importe quelle forme ci-dessus) au voisinage du libellé ``Ancre`` (doit être unique sur l'écran) — désambiguïse un libellé répété ailleurs, ou identifie un champ sans libellé propre par son tooltip |
+        | ``Ancre >> Reste``  | restreint la résolution de ``Reste`` (n'importe quelle forme ci-dessus) au voisinage du libellé ``Ancre`` (doit être unique sur l'écran) : désambiguïse un libellé répété ailleurs, ou identifie un champ sans libellé propre par son tooltip |
 
-        ``exact=False`` (défaut) compare par **préfixe** insensible à la casse —
+        ``exact=False`` (défaut) compare par **préfixe** insensible à la casse,
         pensé pour les tooltips SAP qui finissent par le raccourci (``Exécuter (F8)``).
         ``control_types`` restreint les types cibles (liste ou ``"GuiButton, GuiTab"``).
         ``scope_radius`` (px) étend le voisinage de ``Ancre >> Reste`` au-delà
-        du défaut (100 px) quand la cible visée est plus loin de l'ancre —
+        du défaut (100 px) quand la cible visée est plus loin de l'ancre :
         c'est une intention de portée, pas une tolérance de rendu ; les
         tolérances d'alignement, elles, restent volontairement non exposées.
 
         Échoue si aucun élément ne correspond (avec les libellés réellement
-        visibles dans le message — et, pour un ``>>``, le diagnostic de la
+        visibles dans le message ; et, pour un ``>>``, le diagnostic de la
         portée : ancre absente/ambiguë ou rayon à élargir) ou si PLUSIEURS
-        correspondent (avec la liste des candidats — désambiguïser via
+        correspondent (avec la liste des candidats : désambiguïser via
         ``Gauche @ Haut``, ``exact=True`` ou ``control_types``). Jamais de
         premier-match silencieux. Usage type::
 
@@ -94,9 +94,9 @@ class SemanticKeywords:
     def fill_field_by_label(self, label, value, exact=False, scope_radius=None):
         """Saisit ``value`` dans le champ désigné par son **libellé** (même
         grammaire que `Find Element By Label`, cibles restreintes aux champs de
-        saisie **modifiables** — un champ en lecture seule, comme le « to » d'un
+        saisie **modifiables** ; un champ en lecture seule, comme le « to » d'un
         selection screen, n'est jamais une cible ni une position de grille).
-        Retourne l'id résolu — à journaliser dans ``resources/`` si le
+        Retourne l'id résolu, à journaliser dans ``resources/`` si le
         localisateur a vocation à être stabilisé."""
         eid = self._resolve_semantic_unique(label, _INPUT_TYPES,
                                             _as_bool(exact),
@@ -112,9 +112,9 @@ class SemanticKeywords:
 
         Résolution en **cascade** (même principe que la grammaire : la première
         étape qui produit des matches gagne) : d'abord les champs
-        **modifiables** — ainsi une position de grille compte les mêmes champs
+        **modifiables**, ainsi une position de grille compte les mêmes champs
         que `Find Element By Label` et `Fill Field By Label` (jamais le « to »
-        en lecture seule d'un selection screen) — puis, si aucun, les champs en
+        en lecture seule d'un selection screen) ; puis, si aucun, les champs en
         lecture seule : la façon dont un dynpro d'**affichage** montre ses
         valeurs. L'ambiguïté de l'étape gagnante reste remontée, jamais
         tranchée."""
@@ -130,7 +130,7 @@ class SemanticKeywords:
         ``exact=False`` ignore le suffixe raccourci clavier des tooltips SAP
         (``Enregistrer (Ctrl+S)`` matché par ``Enregistrer``). Les entrées de
         menu sont volontairement hors cible (elles dupliquent le texte des
-        boutons de toolbar) — passer par `Find Element By Label` avec
+        boutons de toolbar) : passer par `Find Element By Label` avec
         ``control_types=GuiMenu`` pour un menu. Retourne l'id résolu."""
         eid = self._resolve_semantic_unique(label, _CLICK_TYPES,
                                             _as_bool(exact),
@@ -146,7 +146,7 @@ class SemanticKeywords:
                                  prefer_changeable=False):
         """Résolution + exigence d'unicité, avec erreurs auto-corrigibles.
 
-        ``prefer_changeable`` : cascade en deux passes — cibles modifiables
+        ``prefer_changeable`` : cascade en deux passes, cibles modifiables
         d'abord (positions de grille alignées sur Find/Fill), repli sur toutes
         les cibles si la première passe ne produit rien (dynpro d'affichage).
         L'ambiguïté de la passe gagnante est remontée, jamais tranchée."""
@@ -175,7 +175,7 @@ class SemanticKeywords:
                 hint += "\nLibellés visibles à l'écran :\n%s" % "\n".join(
                     "  - %s" % text for text in labels)
             elif not any(el.left is not None for el in elements):
-                hint += ("\n(Aucune géométrie disponible sur cette session — "
+                hint += ("\n(Aucune géométrie disponible sur cette session, "
                          "GetObjectTree absent et coordonnées illisibles : seuls "
                          "le texte propre et le tooltip peuvent matcher.)")
             self.take_screenshot()
@@ -196,11 +196,11 @@ class SemanticKeywords:
 
         Le pont entre la langue d'un plan de test (« le fournisseur », « la
         compagnie aérienne ») et les champs techniques des écrans de sélection
-        (LIFNR, CARRID…) — utilisé tel quel par les agents sap-planner /
+        (LIFNR, CARRID…), utilisé tel quel par les agents sap-planner /
         sap-generator. Vocabulaire partagé ECC↔Fiori
-        (``sapfx_common.vocabulary`` — concept issu de playwright-praman,
+        (``sapfx_common.vocabulary``, concept issu de playwright-praman,
         Apache-2.0, NOTICE) : MM/SD/FI + modèle Flight de démo (nos suites
         SE16). Ambiguïté ou score sous ``threshold`` = échec listant les
-        candidats — jamais de premier-match silencieux. ``domain`` restreint
+        candidats, jamais de premier-match silencieux. ``domain`` restreint
         au module. Dict JSON-safe (rf-mcp)."""
         return lookup_as_dict(term, domain=domain, threshold=float(threshold))

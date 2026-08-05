@@ -1,10 +1,10 @@
 *** Settings ***
-Documentation       Live ECC *exploratory* smoke — captured interactively via rf-mcp
+Documentation       Live ECC *exploratory* smoke: captured interactively via rf-mcp
 ...                 (RobotMCP) against a real ABAP Platform A4H (ABAP Platform Trial
 ...                 in Docker) and hardened into a re-runnable suite. Drives SAP GUI
 ...                 through the Scripting API: login lands on SAP Easy Access, the
 ...                 client table T000 is read through the ALV grid and asserted on
-...                 technical columns (MANDT / LOGSYS — locale-independent), and an
+...                 technical columns (MANDT / LOGSYS, locale-independent), and an
 ...                 unknown transaction fails explicitly.
 ...
 ...                 Requires a reachable system + scripting enabled server-side
@@ -16,12 +16,12 @@ Documentation       Live ECC *exploratory* smoke — captured interactively via 
 ...                     -v "SAP_PASSWORD: Secret:***" -v SAP_CLIENT:001 -v SAP_LANGUAGE:EN ^
 ...                     tests/robot/ecc_explore_smoke.robot
 ...
-...                 FR — Smoke ECC *exploratoire*, capturé interactivement via rf-mcp
+...                 FR : Smoke ECC *exploratoire*, capturé interactivement via rf-mcp
 ...                 contre un vrai ABAP Platform A4H (ABAP Platform Trial sous Docker)
 ...                 puis figé en suite rejouable. Pilote SAP GUI via l'API Scripting :
 ...                 le login aboutit sur SAP Easy Access, la table des clients T000 est
 ...                 lue via la grille ALV et vérifiée sur des colonnes techniques
-...                 (MANDT / LOGSYS — indépendantes de la langue), et une transaction
+...                 (MANDT / LOGSYS, indépendantes de la langue), et une transaction
 ...                 inconnue échoue explicitement.
 
 Resource            ../../resources/ecc_keywords.resource
@@ -39,7 +39,7 @@ ${EXPECTED_LOGSYS}      A4HCLNT001    # Système logique du client 001 sur ce sy
 *** Test Cases ***
 Login Lands On SAP Easy Access
     [Documentation]    Le login aboutit sur le menu SAP Easy Access (transaction
-    ...                SESSION_MANAGER) — vérification par le code de transaction actif,
+    ...                SESSION_MANAGER) : vérification par le code de transaction actif,
     ...                indépendant de la langue.
     ${tx}=    Get Current Transaction
     Should Be Equal    ${tx}    SESSION_MANAGER

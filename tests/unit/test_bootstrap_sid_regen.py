@@ -198,8 +198,8 @@ def test_sid_should_be_visible_waits_on_visible_state():
     # L'état part en ENUM quand Browser est installé : l'appel Python direct
     # (get_library_instance) ne bénéficie pas de la conversion d'arguments de
     # Robot, et l'API interne de Browser rejette la chaîne "visible" (KeyError
-    # — attrapé live par fiori_hybrid_smoke). Sans Browser (CI unit), la
-    # chaîne reste le repli — d'où la comparaison sur le NOM.
+    # attrapé live par fiori_hybrid_smoke). Sans Browser (CI unit), la
+    # chaîne reste le repli, d'où la comparaison sur le NOM.
     assert getattr(state, "name", state) == "visible"
 
 

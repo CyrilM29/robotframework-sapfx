@@ -1,5 +1,5 @@
 """Tests hors-SAP de l'assembleur du pack de déploiement
-(``scripts/build_release_pack.py`` — convention #5 du CLAUDE.md, appliquée à un
+(``scripts/build_release_pack.py``, convention #5 du CLAUDE.md, appliquée à un
 script d'outillage). Aucun wheel n'est construit ici : on teste la logique pure
 (version, exclusions, manifeste, zip) sur des arborescences factices."""
 import importlib.util
@@ -155,7 +155,7 @@ def test_normalize_crlf_converts_and_is_idempotent():
 
 def test_assemble_forces_crlf_on_cmd_launchers(tmp_path):
     """cmd.exe exige du CRLF : un install.cmd livré en LF pur (checkout git eol=lf)
-    crache «'M' n'est pas reconnu…» au double-clic — vécu sur le pack 0.6.2."""
+    crache «'M' n'est pas reconnu…» au double-clic (vécu sur le pack 0.6.2)."""
     repo = _fake_repo(tmp_path / "repo")
     (repo / "packaging" / "install.cmd").write_bytes(b"@echo off\nREM x\n")
     (repo / "packaging" / "README.md").write_bytes(b"ligne1\nligne2\n")
@@ -163,7 +163,7 @@ def test_assemble_forces_crlf_on_cmd_launchers(tmp_path):
     stage.mkdir()
     mod.assemble(repo, stage)
     assert (stage / "install.cmd").read_bytes() == b"@echo off\r\nREM x\r\n"
-    # Seuls les .cmd sont normalisés — le reste du manifeste est copié tel quel.
+    # Seuls les .cmd sont normalisés : le reste du manifeste est copié tel quel.
     assert (stage / "README.md").read_bytes() == b"ligne1\nligne2\n"
 
 

@@ -1,10 +1,10 @@
-"""Registre de sessions SAP GUI nommées — multi-session par alias, en sécurité.
+"""Registre de sessions SAP GUI nommées : multi-session par alias, en sécurité.
 
 L'API SAP GUI Scripting est nativement multi-session : un moteur de scripting
 (``sapapp``) porte N connexions (systèmes/utilisateurs différents), chacune
 jusqu'à 6 sessions/fenêtres (limite serveur ``rdisp/max_alt_modes``). La
 bibliothèque n'en exposait qu'UNE (``self.session``). Ce mixin ajoute un
-**registre par alias** — le pattern `Open Api Session` du canal API, et
+**registre par alias**, le pattern `Open Api Session` du canal API, et
 `New Context`/`Switch` de la bibliothèque Browser::
 
     Open Sap Session      erp_qa    connection_string=/H/hosta/S/3200
@@ -16,7 +16,7 @@ bibliothèque n'en exposait qu'UNE (``self.session``). Ce mixin ajoute un
 Les deux cas « deux sessions live » sont couverts :
 
 * **même connexion** (poser un verrou dans l'une, vérifier dans l'autre) :
-  `Create Gui Session` — l'équivalent scripté de ``/o``, AUCUN nouveau login,
+  `Create Gui Session`, l'équivalent scripté de ``/o``, AUCUN nouveau login,
   donc jamais de popup multi-logon ;
 * **deux systèmes/utilisateurs** : `Open Sap Session` avec sa propre chaîne de
   connexion et, optionnellement, ses identifiants.
@@ -25,10 +25,10 @@ Rails de sûreté (le « en sécurité » du multi-session) :
 
 * **Affinité de thread (COM STA)** : les objets SAP GUI appartiennent au thread
   qui les a créés. Le registre mémorise ce thread ; un accès depuis un autre
-  thread initialise COM défensivement (marshaling — le mode dont dépendent les
+  thread initialise COM défensivement (marshaling, le mode dont dépendent les
   state providers rf-mcp), et ``SAPFX_STRICT_COM_THREAD=1`` transforme ce cas
   en erreur actionnable. Le multi-session est un **multiplexage** (une session
-  active à la fois, bascule explicite) — jamais du parallélisme de threads.
+  active à la fois, bascule explicite), jamais du parallélisme de threads.
 * **Identifiants** : ``password`` accepte le type ``Secret`` de Robot
   Framework 7.4 et n'est jamais journalisé.
 * **Teardown isolé** : `Close Sap Session` ne ferme QUE la session visée ; les
@@ -71,23 +71,23 @@ class SessionKeywords:
                          client=None, language=None):
         """Ouvre une **nouvelle connexion SAP** enregistrée sous ``alias`` et
         l'active. Le moteur de scripting doit déjà être joignable (`Connect To
-        Session` / `Open Sap Logon` une fois par process — le Logon Pad est
+        Session` / `Open Sap Logon` une fois par process : le Logon Pad est
         PARTAGÉ par toutes les sessions).
 
         Exactement une des deux formes : ``connection_string=/H/hôte/S/32NN``
-        (système sans entrée Logon préenregistrée — image Docker, serveur
+        (système sans entrée Logon préenregistrée : image Docker, serveur
         local) ou ``connection_name=`` (description d'une entrée SAP Logon).
 
         ``user=`` (avec ``password=``, ``client=``, ``language=`` optionnels)
         déroule aussi l'écran de connexion SAP standard (champs ``RSYST-*``).
-        ``password`` accepte le type ``Secret`` de Robot Framework 7.4 —
+        ``password`` accepte le type ``Secret`` de Robot Framework 7.4 ;
         créez la variable typée dès la ligne de commande
         (``-v "SAP_PASSWORD: Secret:<motdepasse>"``) : la valeur est alors
         masquée partout, même en TRACE ; ce keyword ne la journalise jamais,
         y compris pour une chaîne ordinaire. Un login qui ne se
         termine pas (mauvais identifiants, popup multi-logon ``wnd[1]``, mot
         de passe expiré) échoue en le nommant. Pour une 2e session du MÊME
-        utilisateur, préférer `Create Gui Session` — aucun re-login, donc
+        utilisateur, préférer `Create Gui Session` : aucun re-login, donc
         aucun popup multi-logon. ::
 
             Open Sap Session    erp_qa    connection_string=/H/vhcala4hci/S/3200
@@ -122,10 +122,10 @@ class SessionKeywords:
 
     def create_gui_session(self, alias, timeout=None):
         """Ouvre une **2e fenêtre/session** sur la connexion ACTIVE (même
-        système, même utilisateur — l'équivalent scripté de ``/o``) et
+        système, même utilisateur, l'équivalent scripté de ``/o``) et
         l'enregistre sous ``alias``, qui devient la session active.
 
-        AUCUN nouveau login : pas de popup multi-logon — c'est la voie
+        AUCUN nouveau login : pas de popup multi-logon, c'est la voie
         recommandée pour le scénario « poser une donnée dans une session,
         la vérifier dans l'autre ». La création étant asynchrone, on attend
         (jusqu'à ``timeout``, défaut ``default_timeout``) que la nouvelle
@@ -141,7 +141,7 @@ class SessionKeywords:
         base_session = self.session
         if self._is_unbound(connection) or self._is_unbound(base_session):
             raise AssertionError(
-                "No active SAP connection/session to branch from — open one "
+                "No active SAP connection/session to branch from: open one "
                 "first (Open Connection / Open Sap Session).")
         before = int(connection.Children.Count)
         base_session.createSession()
@@ -159,7 +159,7 @@ class SessionKeywords:
         created = poll_until(new_session, budget, step=0.5)
         if not created:
             raise AssertionError(
-                "createSession() produced no new session within %ss — the "
+                "createSession() produced no new session within %ss: the "
                 "per-connection session limit may be reached (server parameter "
                 "rdisp/max_alt_modes, 6 max), or the server refuses new modes."
                 % budget)
@@ -172,7 +172,7 @@ class SessionKeywords:
     def switch_sap_session(self, alias):
         """Bascule la **session active** vers ``alias`` : tous les keywords
         suivants (saisie, transaction, perception…) s'exécutent dessus. Le
-        multi-session est un multiplexage — une session active à la fois,
+        multi-session est un multiplexage : une session active à la fois,
         bascule explicite ; jamais deux threads sur deux sessions. Un alias
         inconnu échoue en listant les alias connectés."""
         alias = self._validate_session_alias(alias)
@@ -193,11 +193,11 @@ class SessionKeywords:
         return self._active_alias()
 
     def list_sap_sessions(self):
-        """Retourne la liste des sessions du registre — une entrée par alias :
+        """Retourne la liste des sessions du registre, une entrée par alias :
         ``alias``, ``active``, ``connected`` et, best-effort, ``system`` /
         ``client`` / ``user`` / ``transaction`` (depuis ``session.Info``).
 
-        Uniquement des chaînes/booléens — jamais d'objet COM (contrainte
+        Uniquement des chaînes/booléens, jamais d'objet COM (contrainte
         rf-mcp : un objet COM ne doit JAMAIS traverser la frontière MCP)."""
         entries = []
         for alias in sorted(self._session_registry()):
@@ -218,7 +218,7 @@ class SessionKeywords:
         return entries
 
     def close_sap_session(self, alias=None):
-        """Ferme la session ``alias`` (défaut : l'active) — et SEULEMENT
+        """Ferme la session ``alias`` (défaut : l'active), et SEULEMENT
         elle : teardown isolé, les autres alias et le Logon Pad restent
         debout. La connexion sous-jacente n'est fermée que si plus aucun
         alias ne la référence. La fermeture COM est best-effort (une session
@@ -256,7 +256,7 @@ class SessionKeywords:
 
     def close_all_sap_sessions(self):
         """Ferme toutes les sessions du registre (best-effort, chacune
-        isolément — une session morte n'empêche pas de fermer les autres) et
+        isolément : une session morte n'empêche pas de fermer les autres) et
         revient sur l'alias ``default``. Le keyword de Suite Teardown du
         multi-session. Retourne la liste des alias effectivement fermés."""
         registry = self._session_registry()
@@ -296,7 +296,7 @@ class SessionKeywords:
         """Déroule l'écran de login SAP standard (champs ``RSYST-*``) sur la
         session active. Le mot de passe (``Secret`` accepté) n'est jamais
         journalisé. Vérifie best-effort que le login a abouti
-        (``Info.User`` non vide) — un échec nomme les causes probables."""
+        (``Info.User`` non vide) ; un échec nomme les causes probables."""
         session = self.session
         if client:
             session.findById("wnd[0]/usr/txtRSYST-MANDT").text = str(client)
@@ -314,7 +314,7 @@ class SessionKeywords:
         if not logged_user:
             self.take_screenshot()
             raise AssertionError(
-                "Login as '%s' did not complete (Info.User still empty) — wrong "
+                "Login as '%s' did not complete (Info.User still empty): wrong "
                 "credentials, a pending dialog (multiple-logon popup wnd[1], "
                 "expired password), or a locked user. For a second session of "
                 "the SAME user, use Create Gui Session instead (no re-login, "

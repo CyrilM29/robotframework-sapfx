@@ -1,5 +1,5 @@
 """Tests de l'effecteur coordonnées (PointerKeywords) : géométrie écran pure,
-calcul du point relatif, validation des offsets/boutons — le geste win32 et la
+calcul du point relatif, validation des offsets/boutons ; le geste win32 et la
 mise au premier plan sont stubbés (aucune souris ne bouge en CI)."""
 import pytest
 

@@ -16,13 +16,13 @@ assertions).
 |---|---|---|
 | **sap-planner** | A business goal + a reachable system (ECC tcode or Fiori URL) | A Markdown test plan in `specs/`, grounded in live observations (perceive → act loop) |
 | **sap-generator** | A plan from `specs/` | A runnable suite in `tests/robot/`, every step executed live through rf-mcp before being written; missing business keywords added to the resources layer |
-| **sap-healer** | A failing suite/test | The failure reproduced, classified (locator drift / timing / data / functional change) and repaired **in the resources layer**, verified live, re-run to green — never silently |
+| **sap-healer** | A failing suite/test | The failure reproduced, classified (locator drift / timing / data / functional change) and repaired **in the resources layer**, verified live, re-run to green, never silently |
 
 The planner also has a **coverage-discovery mode** for the question that comes
-*before* any plan — « what should we test first? »: it reads the real usage of
+*before* any plan (« what should we test first? »): it reads the real usage of
 the system through **ST03N**'s transaction profile (perceive → act, grid
 keywords), ranks transactions by dialog steps × users, flags what the existing
-suites already cover, and writes a roadmap to `specs/couverture-proposee.md` —
+suites already cover, and writes a roadmap to `specs/couverture-proposee.md`:
 one entry per uncovered high-usage transaction, each then going through the
 normal exploration loop. On a fresh trial without collector history it says so
 honestly and falls back to asking for the critical-transaction list.
@@ -44,7 +44,7 @@ for Claude Code.
 
 Key structural difference with Playwright's agents: thanks to convention #1,
 the healer patches `resources/` (one line fixes every suite using that
-locator), not the tests — test bodies only change when the business flow
+locator), not the tests; test bodies only change when the business flow
 itself changed, which is a planner/generator round, not a heal. The healer
 also reads the cumulative healing telemetry (`SAPFX_HEALING_LOG`) to spot
 locators that drift recurrently and deserve a definitive fix.
@@ -52,15 +52,15 @@ locators that drift recurrently and deserve a definitive fix.
 That telemetry loop is also automated without any agent:
 `python scripts/healing_drift_report.py --log <journal>` aggregates the
 JSONL, separates **stable** drifts (same locator healed repeatedly to one
-target — the `resources/` patch is located and proposed; `--apply` executes
+target: the `resources/` patch is located and proposed; `--apply` executes
 it) from **unstable** ones (left to a human or to sap-healer), and exits
-non-zero when drifts exist — ready for a scheduled CI job that opens an
+non-zero when drifts exist, ready for a scheduled CI job that opens an
 issue/PR. Same house rule as the healer: it patches `resources/` only, never
 tests, never silently.
 
 ## The maintenance cycle (`/sap-maintain`)
 
-The three maintenance bricks — drift sentinel, healing telemetry, sap-healer —
+The three maintenance bricks (drift sentinel, healing telemetry, sap-healer)
 are chained by one orchestrating command, `/sap-maintain`
 (`.claude/commands/sap-maintain.md`): run the sentinel
 (`tests/robot/ecc_drift_sentinel.robot`), read its aggregated drift report,
@@ -71,7 +71,7 @@ sap-healer agent one failure at a time, and produce ONE French report
 house rules (patch `resources/` only, never silently, close every session even
 on failure) and becomes a scheduled assertion by re-running the sentinel with
 `-v FAIL_ON_DRIFT:True`. A fully unattended CI variant would need the SAP
-system reachable from the runner — on the A4H-in-Docker setup this is a local
+system reachable from the runner: on the A4H-in-Docker setup this is a local
 scheduled task, not a GitHub-hosted job.
 
 ## Evaluating the agents themselves (`/sap-eval-healer`)
@@ -79,41 +79,41 @@ scheduled task, not a GitHub-hosted job.
 Changing an agent definition or the rf-mcp guidance without a regression net
 is how agent behaviour silently rots. `scripts/agent_eval_harness.py` makes
 the 0.3.0 blind exercise replayable: `inject` applies a known simulated drift
-to the resources layer (byte-exact backup + hashes of the protected surface —
+to the resources layer (byte-exact backup + hashes of the protected surface:
 tests and the other resources), the sap-healer is then launched **blind**
 (« this suite is red », nothing more), and `verify` judges the outcome: drift
 repaired in the resource layer, zero changes to tests, state cleaned on PASS
 (`restore` rolls back an aborted run). The `/sap-eval-healer` command drives
 the full protocol, including the git-clean preflight and the red/green suite
 runs around the heal. A FAIL verdict comes with the diagnosis to feed back
-into `.claude/agents/sap-healer.md` or the hints — that is the point.
+into `.claude/agents/sap-healer.md` or the hints: that is the point.
 
 ## Instructed tracks (investigated 2026-07-23, not yet built)
 
 **MCP-native vision channel.** Verdict: the rf-mcp 0.31.2 plugin contract
-(`LibraryStateProvider`) has **no image channel** — state providers return
+(`LibraryStateProvider`) has **no image channel**: state providers return
 JSON dicts, so a screenshot crosses MCP as base64 *text* the model cannot see.
 The underlying stack could do it: rf-mcp runs on fastmcp (3.4.2 here), whose
-tools can return real MCP image content (`fastmcp.utilities.types.Image`) —
+tools can return real MCP image content (`fastmcp.utilities.types.Image`),
 but that is an **upstream rf-mcp evolution** (a `get_screenshot` tool or an
 image-capable provider hook), worth proposing, not something the plugins can
 add from outside. Practicable **today** without any change: the agents run
-inside Claude Code, whose `Read` tool renders PNG files — so `Take Screenshot`
+inside Claude Code, whose `Read` tool renders PNG files, so `Take Screenshot`
 (file) + `Read` gives the planner/healer real vision on opaque zones. The
 missing piece for the full Set-of-Mark loop is a file-writing variant of
 `Get Annotated Screenshot` (its dict returns the annotated PNG only as
-base64) — a small keyword (`path=` output) to add when the need is confirmed.
+base64); a small keyword (`path=` output) to add when the need is confirmed.
 
 **Read-only session guard for the planner.** The planner's display-only
 contract lives in its prompt only; a runtime `SAPFX_READONLY_SESSION=1`
-(refusing save-type vkeys — 11/Ctrl+S —, delete context menus, `Post Odata`,
+(refusing save-type vkeys (11/Ctrl+S), delete context menus, `Post Odata`,
 write RFCs) would be defence in depth, in the same spirit as
 `SAPFX_STRICT_COM_THREAD`. Honest difficulty, which is why it is not built
-yet: the read/write frontier is blurry — filling a selection screen *is* a UI
+yet: the read/write frontier is blurry, since filling a selection screen *is* a UI
 write and must stay allowed, transaction semantics decide whether F8 mutates
 anything, and a denylist that pretends to be a sandbox would be worse than
 the documented contract. If built, it should be sold as « blocks the known
-commit gestures », never as an authorization boundary — the SAP user's
+commit gestures », never as an authorization boundary: the SAP user's
 permissions remain the real one (see the security notes in
 [mcp-integration.md](mcp-integration.md)).
 
@@ -129,7 +129,7 @@ The same agents are available in both VS Code AI stacks:
 - **GitHub Copilot agent mode** reads the chat modes in `.github/chatmodes/`
   plus `.vscode/mcp.json`.
 
-`.github/chatmodes/*.chatmode.md` are **generated** — never edit them by hand:
+`.github/chatmodes/*.chatmode.md` are **generated**; never edit them by hand:
 
 ```bash
 python scripts/regen_agent_definitions.py           # regenerate after editing .claude/agents/
@@ -137,7 +137,7 @@ python scripts/regen_agent_definitions.py --check   # CI/pytest guard (drift det
 ```
 
 The body (the instructions) is copied verbatim; only the front matter changes
-dialect — Claude Code tool names become the qualified VS Code forms
+dialect: Claude Code tool names become the qualified VS Code forms
 (`search/readFile`, `edit/editFiles`…), and MCP tools keep their per-tool
 granularity as `rf-mcp-sap/<tool>`. This is the exact dialect emitted by
 Playwright's own reference generator
@@ -155,12 +155,12 @@ plus the reference example), and both MCP templates. On the target PC:
 
 1. `install.cmd -WithMcp` installs the plugins and renders **both** IDE
    configs in place: `.mcp.json` (Claude Code) and `.vscode/mcp.json`
-   (Copilot) — plus `mcp.generated.json` to copy if the agent runs in another
+   (Copilot), plus `mcp.generated.json` to copy if the agent runs in another
    project.
 2. Open the pack folder in VS Code: the agents are discovered immediately
    (approve the project MCP server on first use).
 3. Pack-specific rule (encoded in the agent definitions): the generator and
-   healer never modify the files shipped by the pack — new keywords and
+   healer never modify the files shipped by the pack: new keywords and
    locator overrides go to `resources/site_keywords.resource`, so a pack
    update never overwrites local work. In the source repo they enrich
    `resources/` normally (convention #1).
@@ -171,7 +171,7 @@ plus the reference example), and both MCP templates. On the target PC:
   (`Get Screen Signature` / `Get Ui5 Page Tree`, `mode=diff` in loops).
 - **Session isolation**: API/Fiori state is partitioned per rf-mcp session;
   ECC agents run one live session per process due to rf-mcp 0.31 nested-resource context limits.
-- **The agents hold the SAP user's authorizations** — nothing more, nothing
+- **The agents hold the SAP user's authorizations**, nothing more, nothing
   less (see the security notes in [mcp-integration.md](mcp-integration.md)).
   Point them at trial/test systems; the planner is display-only by contract.
 - **Never silent**: every healer repair is reported `before → after` with live
