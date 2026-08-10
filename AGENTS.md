@@ -233,7 +233,12 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   from the export, and `check_no_em_dash.py`, the mechanical guard for the
   em-dash rule: the character is refused in every tracked text file, with an
   `ALLOWED` map pinning an exact count for the few files that must quote it
-  (`_vendor/` out of scope), in `scripts/`. A `PostToolUse` hook
+  (`_vendor/` out of scope). Also `check_published_versions.py`: no published
+  instruction may cite a stale SAPFX version (pack filename, pip pin, wheel
+  names in READMEs / `docs/` / `packaging/`), and a STATIC version badge is
+  refused where the dynamic shields.io badge updates itself (what you see
+  right after a release is cache, not an error); third-party versions and
+  history files are out of scope on purpose. All in `scripts/`. A `PostToolUse` hook
   (`scripts/hook_guards.py`) runs the em-dash guard on every edited file, and
   the others after every edit of
   specs/tests/resources/variables.

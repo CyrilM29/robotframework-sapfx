@@ -47,6 +47,15 @@ def main() -> int:
             sys.stderr.write(em_dash.stdout + em_dash.stderr)
             return 2  # bloquant : l'assistant doit reformuler tout de suite
 
+        # Éditer un README/doc publié est LE moment où une version périmée (nom
+        # du pack, épinglage pip) ou un badge de version gravé se glisse : le
+        # garde tourne tout de suite plutôt qu'à la release suivante.
+        if normalized.endswith((".md", ".txt")):
+            versions = run("check_published_versions.py")
+            if versions.returncode != 0:
+                sys.stderr.write(versions.stdout + versions.stderr)
+                return 2  # bloquant : la version citée doit suivre pyproject
+
     if not any(segment in normalized for segment in WATCHED):
         return 0
 

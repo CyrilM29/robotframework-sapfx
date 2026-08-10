@@ -55,7 +55,7 @@ Tout ce qui précède est **réel** : écrans capturés sur un système live (A4
 pendant que la bibliothèque le pilote, localisateur périmé réparé en plein run
 (score 97 %), vrai comptage SE16, vrai rapport de dérive. Le point clé : le
 healing n'est jamais silencieux. Un WARNING devient une télémétrie cumulée,
-puis `scripts/healing_drift_report.py` localise le patch à faire dans
+puis `scripts/healing_drift_report.py` **(pack)** localise le patch à faire dans
 `resources/` sans modifier les tests métier.
 
 https://github.com/user-attachments/assets/0a471849-30a9-47f5-a48c-7071b16be8fb
@@ -69,13 +69,19 @@ Les bibliothèques sont le cœur d'exécution. Autour, chaque besoin d'un projet
 de test SAP a son outil dans la même boîte, avec partout le même vocabulaire
 métier, les mêmes moteurs de localisation, les mêmes conventions :
 
+> **Ce que livre chaque canal.** `pip install robotframework-sapfx` fournit les
+> trois bibliothèques et tous les keywords documentés ci-dessous. Les éléments
+> marqués **(pack)** ne sont pas des paquets Python : ils vivent dans ce dépôt
+> et dans le pack de déploiement Windows. Voir [Installation](#installation)
+> pour les deux canaux.
+
 | Besoin | L'outil dans la boîte |
 | --- | --- |
-| Écrire des tests lisibles | les trois bibliothèques + la couche de keywords métier `resources/` : aucun id SAP brut dans les tests (convention tenue par la CI) |
-| Capturer un déroulé existant | deux recorders : SAP GUI desktop (moteur d'événements natifs, lanceur graphique) et web Fiori/UI5 (extension Chrome MV3), avec exports resource-first, brouillons de spec et enregistrements rejouables |
-| Générer et réparer les tests avec l'IA, sous contrôle | l'intégration rf-mcp (MCP) et les agents `plan → generate → heal` : chaque étape générée est exécutée en direct avant d'être écrite, et le healer patche `resources/`, jamais les tests |
-| Surveiller des écrans sans écrire de scénario | la sentinelle de dérive : perception structurelle + visuelle contre des références committées |
-| Anticiper la dérive des localisateurs | la télémétrie de healing qui alimente `healing_drift_report.py`, lequel localise le correctif à faire dans `resources/` |
+| Écrire des tests lisibles | les trois bibliothèques + la couche de keywords métier `resources/` **(pack)** : aucun id SAP brut dans les tests (convention tenue par la CI) |
+| Capturer un déroulé existant | deux recorders **(pack)** : SAP GUI desktop (moteur d'événements natifs, lanceur graphique) et web Fiori/UI5 (extension Chrome MV3), avec exports resource-first, brouillons de spec et enregistrements rejouables |
+| Générer et réparer les tests avec l'IA, sous contrôle | l'intégration rf-mcp (MCP) et les agents `plan → generate → heal` **(pack)** : chaque étape générée est exécutée en direct avant d'être écrite, et le healer patche `resources/`, jamais les tests |
+| Surveiller des écrans sans écrire de scénario | la sentinelle de dérive : les keywords de perception et de baseline visuelle sont dans les bibliothèques, la suite de veille prête à l'emploi est **(pack)** |
+| Anticiper la dérive des localisateurs | la télémétrie de healing (dans les bibliothèques) qui alimente `healing_drift_report.py` **(pack)**, lequel localise le correctif à faire dans `resources/` |
 | Provisionner un poste de test | le pack de déploiement Windows : l'installation complète ([voir Installation](#installation)) |
 
 C'est la vue d'ensemble qui compte : enregistrement, génération, exécution,
@@ -105,7 +111,9 @@ Le détail dans [docs/fiori-architecture.fr.md](docs/fiori-architecture.fr.md)
 La bibliothèque originale constitue une base solide avec une bonne couverture de mots-clés
 (y compris les grilles ALV). Ce fork conserve **tout** cela et ajoute ce dont
 l'automatisation SAP en production a besoin (voir l'[audit](docs/audit-upstream.fr.md)
-complet) :
+complet). Tout ce qui suit est un keyword fourni par
+`pip install robotframework-sapfx`, sauf les éléments marqués **(pack)**, qui
+sont des outils livrés avec le dépôt et le pack de déploiement Windows :
 
 - **Synchronisation réelle** à la place des `sleep` fixes : `Wait Until Busy Done`,
   `Wait Until Element Present`, `Wait Until Element Value Is`.
@@ -145,7 +153,7 @@ complet) :
 - **Iframes de launchpad & Fiori Elements** : `Set Ui5 Frame` pour les applications
   Work Zone/cFLP embarquées dans une iframe (cross-origin) ; sélecteurs stables
   `idSuffix=fe::…`. UI5 multi-versions : 1.60 → 2.0 nightly, prouvé en live.
-- **Des enregistreurs**, pas de simples spies : bureau (`tools/recorder` :
+- **Des enregistreurs (pack)**, pas de simples spies : bureau (`tools/recorder` :
   surbrillance, capture au clic, survol, `--record` produisant une séquence de
   mots-clés rejouable avec un **moteur natif à événements** (boutons/grilles/arbres
   exacts via les événements `Change` de l'API de scripting, repli polling
@@ -153,7 +161,7 @@ complet) :
   (`tools/recorder_web` : snippet **et** extension Chrome MV3 qui exporte un corps
   `*** Test Cases ***`, avec assertions de valeur et support des iframes).
   Aucun traceur tiers.
-- **Intégration rf-mcp (RobotMCP)** (`integrations/robotmcp/`) : `SapEccPlugin` /
+- **Intégration rf-mcp (RobotMCP) (pack)** (`integrations/robotmcp/`) : `SapEccPlugin` /
   `SapFioriPlugin` se branchent sur le serveur
   [rf-mcp](https://github.com/manykarim/robotframework-mcp) : routage de mots-clés,
   guidance de sélecteurs SAP et perception d'écran en direct pour agents IA.
