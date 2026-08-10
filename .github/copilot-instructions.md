@@ -145,9 +145,13 @@ per file, update the index in the same operation, never secrets anywhere.
   PyPI README variant; itself excluded from the export) and the em-dash guard
   (`check_no_em_dash.py`: the character refused in every tracked text file, an
   `ALLOWED` map pinning an exact count for the few files that must quote it,
-  `_vendor/` out of scope) in `scripts/`.
+  `_vendor/` out of scope) in `scripts/`. `check_published_versions.py`
+  refuses a stale SAPFX version in published instructions (pack filename,
+  pip pin, wheel names) and a STATIC version badge where the dynamic
+  shields.io one updates itself.
   A `PostToolUse` hook (`scripts/hook_guards.py`) runs the em-dash guard on
-  every edited file and the others after each edit.
+  every edited file, the published-version guard on every edited `.md`/`.txt`,
+  and the others after each edit.
   The built pack (`dist/sapfx-pack-*.zip`) is generated: never edit it in place.
 - SAP test agents (plan → generate → heal, plus the offline `sap-istqb`
   designer: planner specs + recorder outputs → ISTQB test plan + test cases

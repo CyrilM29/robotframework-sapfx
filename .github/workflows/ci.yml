@@ -76,6 +76,13 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/check_no_em_dash.py
 
+      # Une instruction publiée qui cite une version périmée (nom du pack,
+      # épinglage pip, wheel) envoie l'utilisateur dans le mur ; et un badge de
+      # version GRAVÉ serait faux dès la release suivante. Né de la 0.6.6.
+      - name: No stale SAPFX version in published instructions
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_published_versions.py
+
       # 3.10 = plancher supporté, 3.14 = dernier Python vérifié : les deux
       # extrémités tournent en pytest nu ; la voie complète (lint, gardes,
       # couverture) reste sur 3.12.
