@@ -24,7 +24,10 @@ per file, update the index in the same operation, never secrets anywhere.
   session, the replay prerequisite of recorded suites), waits (incl. the
   dynamic `Set Default Timeout`/`Set Poll Interval`, previous value returned
   for a teardown restore), ALV grid (by column title, row addressing by
-  content, `Read Abap List`), perception (`Get Screen Signature`: `mode=diff` with the
+  content, `Read Abap List`, classic dynpro **table controls** by column
+  title with automatic scrolling (`Read Table Control` and friends: note
+  `RowCount` counts RESERVED rows, not filled ones) and `Pick F4 Value`
+  for search helps), perception (`Get Screen Signature`: `mode=diff` with the
   `pair_renames` smart diff pairing lookalike ids into `~ old -> new` lines,
   `mode=semantic` form view with verified human labels, `GetObjectTree`
   fast path with COM-walk fallback, in-memory screenshots `Get Screenshot As
@@ -97,6 +100,12 @@ per file, update the index in the same operation, never secrets anywhere.
   console/page errors + the ARIA snapshot of non-SAP regions into one
   JSON-safe dict with an actionable `issues` summary (`Log Fiori Diagnostics`
   renders the Markdown report);
+  `Wait For Ui5 Idle` waits for the real network/busy quiet point after an
+  action (a rendered view is not yet its data; it covers requests already
+  in flight, so a first render is still awaited by an application
+  condition); `Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`
+  assert by message TYPE, never localized text; `Upload File Via Ui5`
+  reaches the inner file input through open shadow roots;
   `Get Ui5 Perceptual Hash`/`Ui5 Screen Should Match Baseline` mirror the ECC
   visual snapshot cycle (shared `sapfx_common.visual_baseline`); `Open Fiori
   App` (stable intent-hash FLP navigation), `Log In Via Identity Provider`
@@ -235,6 +244,12 @@ per file, update the index in the same operation, never secrets anywhere.
    `gh issue list -R CyrilM29/robotframework-sapfx`): the public repo is
    detached from this one (export-per-release), so nothing else surfaces them.
    Surface any open PR/issue to the user before pushing.
+9. Docs and both memory layers are updated BEFORE the commit, in the same lot,
+   never "commit now, document later": `CLAUDE.md` + its mirrors (`AGENTS.md`,
+   this file), `llms.txt`, the bilingual `docs/*.md` pair and the `CHANGELOG`;
+   then `memory/` (project, public-safe, one file per durable fact + index) and
+   the private cross-project base (personal/machine/cross-repo facts + index).
+   Memory entries are dated observations: correct a wrong one in the same lot.
 
 ## License
 

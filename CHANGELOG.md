@@ -5,6 +5,33 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
+## [Unreleased]
+
+### Added
+- **`check_published_versions.py`**: no published instruction may cite a stale
+  SAPFX version. It scans the files a user reads to ACT (READMEs, `docs/`,
+  `packaging/`) for artifacts they will look for or type (pack filename,
+  `robotframework-sapfx==X.Y.Z`, wheel names) and refuses a **static** version
+  badge where the dynamic shields.io badge updates itself. Third-party
+  versions (rf-mcp, fastmcp, Docker, UI5) and history files (CHANGELOG,
+  CLAUDE.md, `memory/`, heal-journal) are out of scope on purpose: a guard
+  that cries wolf gets disabled. Wired into CI and the `PostToolUse` hook,
+  20 unit tests.
+- **`pypi-publish` accepts a `post` input** on manual dispatch: a published
+  PyPI version's files are immutable, so correcting the page means
+  republishing the same code as `X.Y.Z.postN`. The suffix is applied to
+  `pyproject.toml` for the build only, so the repository never carries a
+  divergent version (module `__version__` stays `X.Y.Z`).
+
+### Changed
+- **The READMEs now say what ships where.** `pip install robotframework-sapfx`
+  delivers the libraries and their keywords; the recorders, the rf-mcp
+  integration, the test agents and the business resources carry a **(pack)**
+  tag because they ship with the repository and the Windows deployment pack.
+  Previously the feature sections listed everything undifferentiated and the
+  Install section clarified it a hundred lines below, which was misleading on
+  the PyPI page. Published as `0.6.6.post1` (page only, identical code).
+
 ## [0.6.6] - 2026-08-10
 
 ### Added
