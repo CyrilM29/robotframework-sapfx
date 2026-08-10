@@ -12,6 +12,13 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      post:
+        description: >-
+          Numéro de POST-RELEASE (1, 2…) pour republier la MÊME version avec
+          une page PyPI corrigée. Laisser vide pour une publication normale.
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -46,6 +53,33 @@ jobs:
           if tag != version:
               sys.exit(f"tag {tag} != pyproject version {version}")
           print(f"version {version} OK")
+          EOF
+
+      # Les fichiers d'une version PyPI sont IMMUABLES : une page à corriger
+      # (README) impose de republier la même version en post-release. On patche
+      # donc pyproject le temps du build, sans jamais committer une version
+      # divergente (le dépôt reste sur X.Y.Z, et `__version__` des modules
+      # aussi : le code est identique, c'est la page qui change).
+      - name: Apply the post-release suffix (page-only fix)
+        if: github.event_name == 'workflow_dispatch' && inputs.post != ''
+        env:
+          POST: ${{ inputs.post }}
+        run: |
+          python - <<'EOF'
+          import os, pathlib, re, sys
+          post = os.environ["POST"].strip()
+          if not post.isdigit() or post == "0":
+              sys.exit(f"post doit être un entier >= 1 (reçu {post!r})")
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          current = re.search(r'^version = "([^"]+)"', text, re.M).group(1)
+          if ".post" in current or ".dev" in current or "rc" in current:
+              sys.exit(f"version déjà suffixée ({current}) : rien à faire ici")
+          target = f"{current}.post{post}"
+          path.write_text(
+              text.replace(f'version = "{current}"', f'version = "{target}"', 1),
+              encoding="utf-8")
+          print(f"post-release : {current} -> {target}")
           EOF
 
       - name: Render the PyPI README (no EN/FR banner, "library" medallion)
