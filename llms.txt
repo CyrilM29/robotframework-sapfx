@@ -13,8 +13,11 @@
 
 Non-negotiable conventions: tests contain no raw SAP ids or CSS/XPath
 (business keywords live in `resources/`); never `time.sleep`, always
-condition-based waits; assertions are locale-independent (message *types*,
-never localized texts); every keyword has an off-SAP unit test (fake COM /
+condition-based waits (`Wait Until Busy Done` on ECC, `Wait For Ui5 Idle`
+after an action that triggers OData on Fiori: a rendered view is not yet
+its data); assertions are locale-independent (message *types*, never
+localized texts, on the web too through
+`Ui5 Should Have No Messages Of Type`); every keyword has an off-SAP unit test (fake COM /
 fake Browser); ambiguity is always surfaced with candidates, never resolved
 by silent first match. Distribution: `pip install robotframework-sapfx`
 (PyPI: the four libraries only), the self-contained Windows deployment pack

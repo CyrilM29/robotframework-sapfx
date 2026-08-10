@@ -40,7 +40,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   waits (incl. the dynamic `Set Default Timeout`/`Set Poll Interval`,
   returning the previous value for a teardown restore), ALV
   grid (by column title, row addressing by content, `Read Abap List` for
-  classic list output), perception (`Get Screen Signature` with `mode=diff`
+  classic list output, plus classic dynpro **table controls** by column
+  title (`Read Table Control`, `Get/Set Table Control Cell`,
+  `Find Table Control Row`: automatic windowed scrolling; `RowCount`
+  counts RESERVED rows, so only the truly filled ones are returned) and
+  `Pick F4 Value` for search helps), perception (`Get Screen Signature` with `mode=diff`
   (`pair_renames=True` pairs lookalike ids into `~ old -> new` rename lines
   via the healing scoring) and `mode=semantic` (the form view: one line per
   actionable target with its VERIFIED human label), `GetObjectTree` fast path
@@ -125,7 +129,16 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   enterprise IDP login forms (SAP IAS / Azure AD presets, single-page and
   two-step), `Lookup Business Term` resolves FR/EN business terms to ABAP
   fields (shared vocabulary, ambiguity always surfaced, playwright-praman
-  concepts, Apache-2.0, NOTICE); `Get Ui5 Perceptual Hash` + `Ui5 Screen Should Match Baseline`
+  concepts, Apache-2.0, NOTICE); `Wait For Ui5 Idle` waits for the page's REAL quiet point (in-flight
+  XHR/fetch instrumented at bundle injection + visible busy indicators +
+  a continuous settle window): a rendered view is not yet its data, and
+  this is what removes flakiness after a Go, a sort or a navigation (it
+  waits for requests ALREADY in flight, so a FIRST render is still awaited
+  through an application condition); `Get Ui5 Messages` /
+  `Ui5 Should Have No Messages Of Type` read the MessageManager plus
+  recent MessageToasts and assert by message TYPE, never localized text
+  (convention #3 on the web); `Upload File Via Ui5` targets the control's
+  inner file input through open shadow roots; `Get Ui5 Perceptual Hash` + `Ui5 Screen Should Match Baseline`
   give the web side the same visual snapshot cycle as ECC (shared
   `sapfx_common.visual_baseline`). It does not drive the page itself: it
   reuses the Browser library's active page, so suites must import `Browser`
@@ -328,6 +341,19 @@ followed by `robot --dryrun` on windows, on every push/PR to `main`.
    `gh issue list -R CyrilM29/robotframework-sapfx`): the public repo has no
    technical link to this one, nothing else surfaces them. Report any open
    PR/issue to the user before pushing.
+10. **Docs and both memory layers are updated BEFORE the commit, in the same
+   lot.** Never "commit now, document later". Before every commit (and a
+   fortiori before a push or a release): `CLAUDE.md` + its mirrors (`AGENTS.md`,
+   `.github/copilot-instructions.md`), `llms.txt`, the bilingual `docs/*.md`
+   pair when the described behaviour moved, and the `CHANGELOG` entry; then
+   **project memory** (`memory/`, public-safe French, one file per durable
+   fact, index in the same operation: what cost something to learn, not what
+   the code or `git log` already says); then the **shared cross-project
+   memory** (private base: personal, machine-bound or beyond this repo), index
+   line included. A memory entry is a DATED observation: when your work proves
+   one wrong, fix it in the same lot instead of leaving a trap for the next
+   session. The existing guards only cover figures, published versions and
+   agent guidance: the rest is discipline, hence this rule.
 
 ## License
 

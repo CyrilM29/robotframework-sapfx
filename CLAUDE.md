@@ -445,6 +445,30 @@ cap-sflight target, see [docs/sap-test-data.md](docs/sap-test-data.md)).
    release, fresh history), so nothing else will surface them. An open PR/issue
    there may invalidate or duplicate local work in progress: report it to the
    user before pushing.
+10. **Documentation and both memory layers are updated BEFORE the commit, in
+    the same lot.** Never "commit now, document later": the later never comes,
+    and the next session then works from a guide that lies. Before every
+    `git commit` (and a fortiori before a push or a release), run through:
+    - **Docs**: `CLAUDE.md` (layout table, field notes, conventions, status
+      entry for a release) and its two condensed mirrors `AGENTS.md` +
+      `.github/copilot-instructions.md` (convention #7), plus `llms.txt`, the
+      bilingual `docs/*.md` pair when the behaviour they describe moved, and
+      the `CHANGELOG` section for the change.
+    - **Project memory** (`memory/`, public-safe, French): one file per
+      durable fact, index updated in the same operation. What belongs here is
+      what cost something to learn: a live-system trap, a decision with its
+      context. Not what the code or `git log` already says.
+    - **Shared cross-project memory** (the private base, layer 2): what is
+      personal, machine-bound, or true beyond this repo (release process,
+      distribution channels, environment specifics), index line updated with
+      the entry.
+    A memory entry is a **dated observation**: when the release you just cut
+    proves an entry wrong, correct that entry in the same lot rather than
+    leaving a booby trap for the next session (0.6.6 was slowed down twice by
+    exactly that). The mechanical net that exists (`check_comms_sync.py`,
+    `check_published_versions.py`, `check_guidance_sync.py`) only covers
+    figures, published versions and agent guidance: the rest of this rule is
+    discipline, so it is stated here rather than assumed.
 
 ## License
 
@@ -1033,3 +1057,39 @@ Apache 2.0. Vendored upstream attribution is in `NOTICE`; preserve it.
       `.cmd` en CRLF (`.gitattributes` + normalisation au build) ;
       `check_spec_sync` en rglob (suites ventilées) + date dans le marqueur
       de provenance. 921→963 tests (couverture canonique CI ubuntu : 93 %).
+- [x] **Releases 0.6.4 et 0.6.5** : détail dans le CHANGELOG (ouverture du
+      source sur `CyrilM29/robotframework-sapfx` + PyPI, outillage de posture
+      open source, garde du cadratin, recorder web durci). Cette liste avait
+      décroché : depuis la 0.6.6, le CHANGELOG fait foi pour l'historique et
+      cette section ne garde qu'un repère par release marquante.
+- [x] **Release 0.6.6, le canal API devient une plateforme de données
+      (2026-08-10, validée LIVE)** : CRUD OData complet (`Patch`/`Delete`, le
+      protocole CSRF généralisé à toute écriture, `If-Match`),
+      `Call Odata Function`, `Post Odata Batch` (multipart v2 ET v4, écritures
+      en UN changeset atomique), pagination server-driven (`follow_next`),
+      **fabrique de données de test** (`track=True`, `Ensure Odata Entity`,
+      `Delete Created Entities` en teardown), **perception du canal**
+      (`Get Odata Metadata` avec les libellés `sap:label`,
+      `Find Odata Property By Label`, `List Odata Services`), **préflight
+      Gateway** nommant sa remédiation (`Gateway Should Be Active`,
+      `Wait Until Api Available`), auth OAuth2 client credentials et mTLS,
+      télémétrie par alias, et le pattern **BAPI** au-dessus du RFC optionnel
+      (`Call Bapi` jugé par TYPE de BAPIRET2, `Commit/Rollback Bapi
+      Transaction`, `Wait For Background Job` via TBTCO). ECC : **table
+      controls** de dynpro par titre de colonne et `Pick F4 Value`. Fiori :
+      `Wait For Ui5 Idle` (le repos RÉEL : requêtes en vol + busy + calme
+      continu), `Get Ui5 Messages`/`Ui5 Should Have No Messages Of Type`
+      (assertion par TYPE, convention #3 côté web), `Upload File Via Ui5`.
+      Tout reste consommable par les agents (retours JSON-safe, cartes
+      d'intention rf-mcp, guidance, agents et skill à jour).
+      **Validation live** vs A4H (API 16/16, ECC 8/8) et cap-sflight (3/3),
+      qui a attrapé DEUX vrais bugs, désormais verrouillés en unitaire : la
+      scrollbar d'un table control plafonne à `total - visible`, et `RowCount`
+      compte les lignes RÉSERVÉES (47 annoncées, 26 remplies). FB60 n'existe
+      pas sur A4H (voir field notes) : la validation table control passe par
+      SE11. Suivi : garde `check_published_versions.py` (aucune version
+      périmée dans une instruction publiée, badge de version statique refusé),
+      marqueurs **(pack)** dans les README (ce que livre PyPI vs le pack), et
+      publication `0.6.6.post1` (page PyPI seule : les fichiers d'une version
+      publiée sont immuables). 963→1158 tests (couverture canonique CI
+      ubuntu : 93 %).
