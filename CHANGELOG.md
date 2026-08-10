@@ -24,6 +24,16 @@ name that was current at the time).
   divergent version (module `__version__` stays `X.Y.Z`).
 
 ### Changed
+- **Discovery metadata.** The PyPI distribution carried six keywords from the
+  SAP GUI era (`robotframework, sap, sapgui, ecc, s4hana, test-automation`),
+  naming neither the Fiori channel nor the API one nor the AI agents: 22
+  keywords now cover the three channels (fiori, sapui5, ui5, playwright,
+  odata, rfc, bapi, api-testing, self-healing, mcp, ai-agents), and the
+  classifiers gained the audience, the testing topics and the Python versions
+  the CI actually verifies (3.10 to 3.14). The OS classifier deliberately
+  stays Windows: that is the SAP GUI channel's real constraint, and only what
+  is validated gets declared. **PyPI metadata is frozen per release**, like
+  the README, so these appear on the page at the next release.
 - **The READMEs now say what ships where.** `pip install robotframework-sapfx`
   delivers the libraries and their keywords; the recorders, the rf-mcp
   integration, the test agents and the business resources carry a **(pack)**
