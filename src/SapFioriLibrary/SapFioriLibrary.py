@@ -51,6 +51,8 @@ from sapfx_common.vocabulary import lookup_as_dict
 from ._ui5_js import (
     BEST_XPATH_JS,
     DUMP_TREE_JS,
+    GET_MESSAGES_JS,
+    IDLE_STATE_JS,
     PAGE_COMPOSITION_JS,
     READ_TABLE_JS,
     RESOLVE_DOM_JS,
@@ -80,7 +82,7 @@ class SapFioriLibrary:
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 
-    __version__ = "0.6.5"
+    __version__ = "0.6.6"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -813,6 +815,133 @@ class SapFioriLibrary:
         dom_id = self._pick_id(ids, index, selector, noun="table")
         rows = self._evaluate(READ_TABLE_JS, arg=dom_id)
         return rows or []
+
+    def wait_for_ui5_idle(self, timeout=None, settle="300 ms"):
+        """Attend que la page soit **réellement au repos** : plus aucune
+        requête réseau en vol (XHR et fetch, instrumentés par le bundle à son
+        injection), aucun indicateur busy UI5 visible, et un calme continu
+        d'au moins ``settle``.
+
+        Le tueur de flakiness des apps Fiori : « rendu » ne veut pas dire
+        « données arrivées ». Après un Go de FilterBar, un tri ou une
+        navigation, la vue existe déjà pendant que l'OData voyage encore ;
+        asserter à ce moment lit l'AVANT. Ce keyword est l'équivalent de
+        l'autoWaiter d'OPA5, réimplémenté au niveau réseau/DOM : il ne dépend
+        PAS du runtime UI5, les pages Web Components et hybrides en profitent
+        aussi (dans la portée de frame courante). Ne compte que les requêtes
+        lancées APRÈS la première injection du bundle : exactement le besoin
+        (agir, puis attendre). ``timeout`` défaut = ``ui5_timeout``. Retourne
+        l'état final ``{"pending", "busy", "quiet_ms"}`` (JSON-safe). Jamais
+        une pause fixe : convention n°2. ::
+
+            Click Ui5 Control    controlType=Button    properties={'text': 'Go'}
+            Wait For Ui5 Idle
+            ${rows}=    Read Ui5 Table    controlType=Table
+
+        **Portée exacte** (vérifiée live sur cap-sflight) : ce keyword attend
+        le repos des requêtes DÉJÀ parties ; il ne devine pas qu'une requête
+        *va* partir. Au tout premier chargement d'une app, il peut donc
+        rendre la main avant que la vue n'ait lancé son ``initialLoad`` :
+        y enchaîner l'attente d'un contrôle (`Ui5 Control Should Be Visible`,
+        ou la résolution qui sonde déjà le rendu) reste la façon d'attendre
+        un PREMIER rendu. C'est APRÈS une action (Go, tri, navigation), là où
+        la vue est déjà là et où seules les données manquent, qu'il est
+        décisif."""
+        budget = timestr_to_secs(timeout if timeout is not None else self.ui5_timeout)
+        settle_ms = timestr_to_secs(settle) * 1000.0
+        state = {}
+
+        def _check():
+            try:
+                result = self._evaluate(IDLE_STATE_JS) or {}
+            except Exception:
+                return False
+            state.clear()
+            state.update(result)
+            return (not result.get("busy")
+                    and int(result.get("pending") or 0) == 0
+                    and float(result.get("quiet_ms") or 0) >= settle_ms)
+
+        if not poll_until(_check, budget, step=self.poll_interval):
+            raise AssertionError(
+                "La page n'est pas revenue au repos après %s (dernier état : "
+                "%s). Log Fiori Diagnostics donne le détail (console, erreurs, "
+                "composition)." % (secs_to_timestr(budget),
+                                   state or "illisible"))
+        return dict(state)
+
+    def get_ui5_messages(self, include_toasts=True):
+        """Lit les **messages UI5** de la page : le MessageManager (module
+        ``Messaging`` des UI5 récents, ``getMessageManager()`` sinon) plus les
+        ``MessageToast`` récents, captés par un hook posé à l'injection du
+        bundle (un toast est éphémère à l'écran, pas dans cette liste ; ceux
+        émis avant l'injection sont perdus, best-effort). Retourne un dict
+        JSON-safe ``{"messages": [{"type", "message", "target",
+        "description"}], "toasts": [{"text", "time"}]}``.
+
+        La perception des messages du canal web, miroir du type de message de
+        barre d'état ECC : ASSERTER sur le ``type`` (Error/Warning/Success),
+        jamais sur le texte localisé (convention n°3), via
+        `Ui5 Should Have No Messages Of Type`. Runtime UI5 absent sur la
+        portée courante = échec actionnable nommant `Get Page Composition`."""
+        result = self._evaluate(GET_MESSAGES_JS)
+        if result is None:
+            raise AssertionError(
+                "Pas de runtime UI5 sur la page/frame courante : Get Ui5 "
+                "Messages lit le MessageManager UI5. Vérifier la portée de "
+                "frame (Set/Push Ui5 Frame) ou sonder Get Page Composition.")
+        if not include_toasts:
+            result.pop("toasts", None)
+        return result
+
+    def ui5_should_have_no_messages_of_type(self, message_type="Error"):
+        """Échoue si le MessageManager UI5 porte AU MOINS un message du type
+        donné (``Error``, ``Warning``…) : l'assertion **locale-safe** du canal
+        web (convention n°3 : on juge le TYPE, le texte n'est joint au message
+        d'échec que pour le lecteur humain). Typiquement après une soumission
+        de formulaire : l'app peut afficher l'écran suivant ET porter une
+        erreur de validation dans sa MessagePopover. ::
+
+            Click Ui5 Control    controlType=Button    properties={'text': 'Save'}
+            Wait For Ui5 Idle
+            Ui5 Should Have No Messages Of Type    Error
+        """
+        wanted = str(message_type).strip().casefold()
+        result = self.get_ui5_messages()
+        offending = [m for m in result.get("messages", [])
+                     if str(m.get("type", "")).strip().casefold() == wanted]
+        if offending:
+            detail = "\n".join(
+                "  - %s : %s" % (m.get("type"), m.get("message"))
+                for m in offending[:5])
+            raise AssertionError(
+                "La page porte %d message(s) UI5 de type %s :\n%s"
+                % (len(offending), message_type, detail))
+
+    def upload_file_via_ui5(self, file_path, index=0, **selector_parts):
+        """Téléverse ``file_path`` dans un contrôle d'upload UI5
+        (``sap.ui.unified.FileUploader``, upload d'une table Fiori Elements…) :
+        résout le contrôle (mêmes sélecteurs que `Click Ui5 Control`), vise
+        son ``<input type=file>`` interne (le CSS de Playwright perce les
+        shadow roots ouverts au passage) et délègue à `Upload File By
+        Selector` de Browser. Re-résout et ré-essaie sur échec transitoire
+        (*stale element*). Sur une page UI5 Web Components sans runtime
+        (moteur *wc*), résoudre l'hôte avec `Resolve Wc Control` puis appeler
+        directement `Upload File By Selector` avec ``<chemin> input[type=file]``."""
+        def _upload():
+            selector = build_control_selector(**selector_parts)
+            ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector),
+                                str(selector))
+            if not ids:
+                raise AssertionError(
+                    "No UI5 control matched %s on the current page.%s"
+                    % (selector, self._relaxed_hint(selector_parts)))
+            dom_id = self._pick_id(ids, int(index), selector)
+            target = self._scoped_selector(
+                'css=[id="%s"] input[type="file"]' % dom_id)
+            self._browser().upload_file_by_selector(target, file_path)
+        self._act_with_retry(
+            _upload, "upload %s" % (selector_parts or "index %s" % index))
 
     def get_ui5_text(self, index=0, **selector_parts):
         """Résout un contrôle et retourne son texte visible via `Get Text` de Browser."""

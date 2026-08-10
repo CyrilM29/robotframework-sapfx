@@ -74,12 +74,23 @@ premier.
 dans le test**, convention n°1 du projet ; les steps UI5 deviennent des keywords
 **auto-réparables** via `Resolve Ui5 With Fallback` et leur xpath enregistré), un **plan
 Markdown au format `specs/`** (`recorded.spec.md`, l'entrée du cycle agents
-plan → generate → heal), un **rapport HTML de documentation auto-contenu**
+plan → generate → heal), un **plan de test + cas de test ISTQB**
+(`recorded.istqb.md` : sections ISTQB / ISO 29119-3, un cas de test par
+scénario avec tableau Action / Données / Résultat attendu et bloc `replay`
+YAML normalisé, actions neutres vis-à-vis du framework avec le localisateur
+relevé en `hint` : lisible par un humain ET rejouable par une IA avec
+n'importe quel framework de test ; l'agent `sap-istqb` rédige les rubriques
+de jugement), un **rapport HTML de documentation auto-contenu**
 (`recorded_report.html` : une phrase métier par step avec la ligne RF exacte en
 regard, un chapitre par scénario ; de la documentation pour humains, jamais un
 test ; concept observé chez le recorder de RoboSAPiens, voir `NOTICE`), ou
 l'**import d'un `.robot` exporté** dans le panneau (lignes de
 bootstrap ignorées, multi-tests restaurés en marqueurs : le cycle d'édition se referme).
+Chaque ligne de format porte aussi une **case à cocher** : cocher plusieurs
+formats (le choix survit à la navigation), puis « exporter la sélection » les
+télécharge tous, téléchargements espacés (Chrome affiche son invite
+multi-téléchargements au lieu de bloquer en silence) ; cliquer le libellé
+d'une ligne exporte toujours ce seul format immédiatement.
 **`pause`** arrête l'ajout ; **`clear`** vide la liste. Exemple de sortie :
 
 ```robotframework

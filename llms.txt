@@ -4,10 +4,12 @@
 > SAP paradigms end to end: SapEccLibrary (SAP GUI desktop client, ECC and
 > S/4HANA backend, via the SAP GUI Scripting COM API), SapFioriLibrary
 > (Fiori / SAPUI5 / UI5 Web Components on the web, alongside the Browser
-> library / Playwright), SapApiLibrary (OData v2/v4 + optional RFC), shared
-> pure engines (locator healing, screen perception, visual hashing, semantic
-> labels, business vocabulary), desktop and web recorders, and AI test agents
-> (plan → generate → heal) composed over the rf-mcp MCP server.
+> library / Playwright), SapApiLibrary (OData v2/v4 full CRUD + $batch +
+> metadata discovery + Gateway preflight + test-data factory + optional
+> RFC/BAPI), shared pure engines (locator healing, screen perception, visual
+> hashing, semantic labels, business vocabulary), desktop and web recorders,
+> and AI test agents (plan → generate → heal) composed over the rf-mcp MCP
+> server.
 
 Non-negotiable conventions: tests contain no raw SAP ids or CSS/XPath
 (business keywords live in `resources/`); never `time.sleep`, always
@@ -39,6 +41,9 @@ pinned dependencies from PyPI or an internal mirror), and the public source repo
 - [Test agents](docs/test-agents.md): sap-planner / sap-generator /
   sap-healer: live exploration through rf-mcp, plans in `specs/` as the
   source of truth, every generated step verified live before being written;
+  sap-istqb turns planner specs and recorder outputs into ISTQB test plans +
+  test cases under `specs/istqb/` (human-readable, replayable by an AI with
+  any framework via normalized replay blocks);
   `/sap-maintain` chains sentinel → healing telemetry → healer into one
   report, `/sap-eval-healer` evaluates the healer blind on a simulated drift
   (`scripts/agent_eval_harness.py`)

@@ -1,4 +1,4 @@
-# Versions qualifiées ensemble pour le pack Windows 0.6.5.
+# Versions qualifiées ensemble pour le pack Windows 0.6.6.
 # Mettre à jour volontairement, puis rejouer le job release-pack complet.
 robotframework==7.4.2
 robotframework-browser==20.0.0

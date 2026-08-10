@@ -17,7 +17,13 @@ Trois canaux, un vocabulaire métier commun (couche `resources/`) :
 - **SapFioriLibrary** : Fiori/UI5 web, au-dessus de la bibliothèque Browser
   (Playwright) ; une suite doit importer `Library    Browser` à côté.
 - **SapApiLibrary** : OData v2/v4 + RFC optionnel. Préparer/recouper les
-  données par l'API, ne piloter l'écran que pour ce qu'on teste.
+  données par l'API, ne piloter l'écran que pour ce qu'on teste : CRUD
+  complet (`Post/Patch/Delete Odata`, `Post Odata Batch` atomique), fabrique
+  de données (`track=True`, `Ensure Odata Entity`, `Delete Created Entities`
+  en teardown), préflight `Gateway Should Be Active` / `Wait Until Api
+  Available`, discovery `Get Odata Metadata` / `List Odata Services` /
+  `Find Odata Property By Label`, pattern BAPI (`Call Bapi` + `Commit/
+  Rollback Bapi Transaction`) et `Wait For Background Job` (TBTCO par RFC).
 
 ## La boucle perception → action (ECC)
 
@@ -40,7 +46,10 @@ courte. `Get Ui5 Page Map` numérote les contrôles actionnables,
 `Click Ui5 Ref` / `Fill Ui5 Ref` agissent par `@N` (fraîcheur re-vérifiée au
 registre rendu). `Get Page Composition` sur une page hybride (quels moteurs
 par région : role/xpath/sid/wc/dom), `Get Fiori Diagnostics` quand un écran
-se comporte mal (lire `issues` d'abord).
+se comporte mal (lire `issues` d'abord). Après une action qui déclenche de
+l'OData : `Wait For Ui5 Idle` (le repos réseau réel, « rendu » ne veut pas
+dire « données arrivées ») ; messages applicatifs par TYPE via
+`Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`.
 
 ## Les règles non négociables
 
@@ -67,13 +76,18 @@ se comporte mal (lire `issues` d'abord).
   journalisée, jamais silencieuse ; télémétrie `SAPFX_HEALING_LOG`.
 - Assertions visuelles : `Screen Should Match Baseline`
   (`mask_elements=auto`), déclinaison par élément et côté Fiori.
+- Écrans classiques ECC : `Read Table Control` et ses variantes (tables de
+  dynpro adressées par TITRE de colonne, défilement automatique),
+  `Pick F4 Value` (matchcode ouvert, entrée choisie, popup refermé).
 
 ## Le cycle agents
 
 `/sap-plan` (exploration live → plan `specs/`) → `/sap-generate` (plan →
 suite `.robot`, chaque étape vérifiée live) → `/sap-heal` (échec reproduit,
 patch de `resources/`, jamais des tests) ; `/sap-maintain` = sentinelle +
-télémétrie + réparations en un rapport.
+télémétrie + réparations en un rapport ; `/sap-istqb` = plans du planner +
+sorties recorder → plan de test + cas de test ISTQB sous `specs/istqb/`
+(bloc replay normalisé, rejouable par une IA quel que soit le framework).
 
 Repères : `llms.txt` (index du projet), `docs/test-agents.md`,
 `docs/architecture.md`.

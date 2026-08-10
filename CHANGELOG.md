@@ -5,6 +5,260 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
+## [0.6.6] - 2026-08-10
+
+### Added
+- **API channel completed into a data platform** (`SapApiLibrary`, still
+  stdlib-pure, 2026-08-10):
+  - Full OData CRUD: `Patch Odata` / `Delete Odata` (the CSRF protocol is
+    generalized to every write, with the one-shot replay on an expired-token
+    403; `If-Match` handled, `*` by default), `Call Odata Function` (v2
+    function imports, v4 actions) and `Post Odata Batch` (multipart `$batch`
+    for v2 AND v4, writes grouped in ONE atomic changeset by default,
+    responses flattened in order, partial failures fail loudly; pure core
+    `sapfx_common.odata_batch`).
+  - **Test-data factory**: `Post Odata track=True` registers each created
+    entity (v2 `__metadata.uri`, v4 `@odata.id` or `Location`, foreign
+    origins relativized), `Register Created Entity` / `Get Created Entities`,
+    `Delete Created Entities` (LIFO, best-effort, JSON-safe report,
+    `strict=` option) and `Ensure Odata Entity` (idempotent create); closing
+    a session with uncleaned tracked entities warns, never silently.
+  - Server-driven **pagination**: `Get Odata Entities follow_next=True`
+    follows `__next` / `@odata.nextLink`, `max_pages` cap with an announced
+    truncation warning (a silent partial read is a false-positive factory).
+  - **Channel perception and discovery**: `Get Odata Metadata` (v2+v4
+    `$metadata` parsed and cached per session: entity sets, keys, properties,
+    `sap:label` labels; pure core `sapfx_common.odata_metadata`),
+    `Find Odata Property By Label` (the API twin of the human locators, all
+    candidates surfaced) and `List Odata Services` (Gateway catalog).
+  - **Gateway preflight**: `Get Gateway Status` / `Gateway Should Be Active`
+    (classified probe, each state names its remediation; the recreated-A4H
+    HTTP 500 `/IWFND/CM_COS/003` case points to IMG `/IWFND/IWF_ACTIVATE`)
+    and `Wait Until Api Available` (boot polling, never `time.sleep`); pure
+    core `sapfx_common.gateway_status`.
+  - **Auth beyond Basic**: OAuth2 client credentials (`token_url` +
+    `client_id` + `client_secret`, Bearer cached and refreshed, one replay
+    on 401, secrets never logged) and mTLS client certificates
+    (`client_cert` / `client_key`) on `Open Api Session`.
+  - **Per-alias telemetry**: request/error counters, cumulated network time,
+    last status/URL/error (`Get Api Telemetry`; `List Api Sessions` rows
+    enriched, which feeds the rf-mcp state provider for free).
+  - **BAPI pattern** over the optional RFC: `Call Bapi` (BAPIRET2 checked by
+    TYPE `E`/`A`/`X`, locale-safe by construction, failure lists the blocking
+    messages and reminds the rollback; pure core `sapfx_common.bapi_return`),
+    `Commit Bapi Transaction` (`WAIT='X'`) / `Rollback Bapi Transaction`, and
+    `Wait For Background Job` (TBTCO polled through `RFC_READ_TABLE`, no
+    screen occupied, aborted job fails immediately; pure core
+    `sapfx_common.rfc_tables`). `Lookup Business Term` is now exposed on the
+    API channel too (third channel of the shared vocabulary).
+- **ECC classic-dynpro comfort** (`SapEccLibrary`):
+  - **GuiTableControl by column title**: `Read Table Control`,
+    `Get Table Control Cell` / `Set Table Control Cell` (absolute row,
+    automatic windowed scrolling, COM object re-acquired after each scroll)
+    and `Find Table Control Row`; untitled columns become `COL<n>`,
+    duplicated titles get a `(2)` suffix (nothing silently lost); pure core
+    `sapfx_common.table_control`; ALV objects are redirected to `Read Grid`
+    and vice versa.
+  - `Pick F4 Value`: opens the field's search help, picks the entry (result
+    grid double-clicked, or label list via F2) and closes the popup; value
+    not found = popup closed (F12) + failure listing a sample of visible
+    values; a multi-step F4 dialog fails naming `Get Screen Signature`.
+- **Fiori flakiness killers** (`SapFioriLibrary`):
+  - `Wait For Ui5 Idle`: waits for the REAL quiet point (in-flight XHR/fetch
+    counted by bundle instrumentation + visible busy indicators + a
+    continuous `settle` window); network-level, so it also works on WC and
+    hybrid pages ("rendered" does not mean "data arrived").
+  - `Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`: reads the
+    MessageManager (legacy core and the modern `Messaging` module) plus the
+    recent `MessageToast`s (hook installed at bundle injection); assertions
+    by message TYPE, never localized text (convention #3 on the web channel).
+  - `Upload File Via Ui5`: targets the control's inner `input[type=file]`
+    through open shadow roots and delegates to Browser's
+    `Upload File By Selector`.
+- **Live validation against A4H and cap-sflight (2026-08-10)**, which drove
+  three real fixes the unit tests could not have found:
+  - API channel **8/8 + 8/8 live** on A4H: Gateway preflight (`ok` on the live
+    catalog, `unreachable` on a closed port, `Wait Until Api Available`),
+    discovery (38 services listed, `SEPMRA_SHOP` `$metadata` parsed to 9 entity
+    sets, `$metadata` cache proven by zero extra request, `Find Odata Property
+    By Label` resolving the real label « Availability » to
+    `Products.StockQuantity`), then the full data cycle: `Post Odata
+    track=True` (server count 3 -> 4), re-read, `Patch Odata` (rating re-read
+    as 2 server-side), `Delete Created Entities` (count back to 3, zero
+    residue), idempotent `Ensure Odata Entity` and a real multipart `$batch`.
+  - **Table-control semantics corrected from the live system**: the scrollbar
+    caps at `total - visible` (the old plan asked for an out-of-range position
+    and raised), and `RowCount` counts RESERVED rows (47 announced, 26 filled)
+    whose cells are not materialized. `window_plan` replaces `scroll_positions`
+    (each row covered exactly once, last window shifted), `Read Table Control`
+    stops at the truly filled rows instead of returning phantom ones, and
+    `Get Table Control Cell` on a reserved row fails naming the trap. Live
+    result: 47-row screen read as its 26 real rows, row 25 reached through
+    automatic scrolling, `Find Table Control Row` returning 25.
+  - `Pick F4 Value` **validated on a real match code** (SE16/SCARR `CARRID`):
+    « LH » picked from the live result grid and landed in the field; an absent
+    value closes the popup and fails listing the real values (AA, AB, AC…).
+  - `Wait For Ui5 Idle` **validated on the live cap-sflight List Report**
+    (search + Go, then the filtered rows read after the wait are all the
+    filtered ones), and its exact scope documented: it waits for requests
+    ALREADY in flight, so a first render is still awaited through an
+    application condition. New offline-capable suite
+    `tests/robot/fiori_idle_messages_smoke.robot` (3/3) also covers
+    `Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`.
+- **Agent/rf-mcp consumability, kept in lockstep**: every new keyword returns
+  JSON-safe data; the three plugin intent cards route the new surface; the
+  guidance hints teach it (CRUD+factory, pagination, discovery, preflight,
+  BAPI, idle wait, messages by type, table controls, F4); the freshness guard
+  `check_guidance_sync.py` now enforces the new flagship keywords; the
+  planner/generator/healer definitions and the `sapfx` skill gained the
+  API-perception, idle-wait and data-factory guidance (VS Code chat modes
+  regenerated).
+
+### Security
+- **Code & security review pass (2026-08-10)**, every finding fixed and
+  unit-locked (1020 -> 1027 tests):
+  - `Close All Api Sessions` now also closes the namespace's **RFC
+    connections** (an orphaned RFC connection is a user session left open
+    server-side, the API-channel mirror of the "close every session you
+    opened" GUI lesson); new `Close All Rfc Connections` keyword,
+    best-effort (a dead connection does not block the others).
+  - `Open Api Session` **warns when Basic credentials travel over plain
+    `http://`** (mirror of the existing `verify_tls=False` warning); aliases
+    are validated non-empty like the GUI channel's.
+  - `Get Odata Count` requires the `$count` body to be **fully numeric**
+    instead of extracting digits from any response: an HTML login or error
+    page containing digits could fabricate a plausible count (silent false
+    positive).
+  - The WebGUI **sid engine decodes `lsdata` HTML entities with a pure
+    decoder** instead of the detached-`textarea.innerHTML` trick (theoretical
+    RCDATA breakout via `</textarea>`; no privilege gain, the bundle already
+    runs in page context, but the pattern is gone). Recorder artifacts
+    regenerated; offline smokes re-run green (hybrid 6/6, wc 7/7, web
+    recorder 4/4).
+  - `export_public_tree.py` extracts the HEAD archive with `tarfile`'s
+    `filter="data"` (belt-and-braces; also pins the Python 3.14 default).
+
+### Changed
+- **`Post Odata` retries once on an expired CSRF token (2026-08-10)**: a 403
+  whose body names the CSRF (Gateway security timeout, ~30 min) invalidates
+  the cached token, re-fetches and replays the POST once; any other error
+  still surfaces unchanged, and there is no blind retry. **Validated live vs
+  the real A4H Gateway** (instrumented transport, 7/7): nominal handshake
+  `GET Fetch -> POST token` accepted (the write-less probe POST reaches the
+  service layer: 405 business refusal, nothing written), then a corrupted
+  cached token draws the real Gateway CSRF 403 and the retry replays exactly
+  once with a fresh token, converging on the same business outcome.
+- **The injected JS becomes real JS files (2026-08-10)**: the `__SAPFX`
+  bundle and the Spy listener move out of `_ui5_js.py`'s Python strings into
+  `src/SapFioriLibrary/_ui5_bundle.js.tpl` /
+  `_ui5_spy_listener.js.tpl` (shipped in the wheel via package-data), loaded
+  and assembled by the module. Proven **byte-identical**: `BUNDLE`,
+  `spy_snippet()` and the regenerated recorder artifacts are unchanged;
+  `_ui5_js.py` drops from 2 707 to ~220 lines and the JS gets highlighting,
+  readable diffs and JS tooling.
+- **Desktop recorder split (2026-08-10)**: the pure text-to-text export
+  layer (suite, resource-first, spec, ISTQB, HTML report: 923 lines with
+  zero dependency on the COM half) moves to
+  `tools/recorder/recorder_exports.py`; `sapgui_recorder.py` re-exports
+  every name (explicit aliases), so path-loading consumers (Tkinter GUI,
+  unit tests, Robot suites importing the file as a Library) are untouched.
+  The deployment pack copies the whole `tools/recorder` directory, so the
+  new module ships automatically. **Re-validated live vs A4H the same day**:
+  `ecc_record_smoke` 1/1, then a full record -> exports -> dryrun -> replay
+  cycle 6/6 (poll engine transcribes a real SE16 flow, the four artifacts are
+  produced from the raw recording, the resource-first suite carries no raw id
+  and dry-runs green, and the replay against the open session lands on the
+  T000 selection screen; clean logoff in finally).
+- Stale `integrations/robotmcp/build/` output removed from the working tree
+  (regenerated by any build; it polluted greps with outdated copies).
+- **Two medallion variants, one per scope (2026-08-07)**: the project logo
+  splits in two engravings of the same medal. **ECC UI5 API TEST SUITE**
+  (robot face) speaks for the **whole project** (libraries + recorders + MCP
+  integration + test agents) and stays `assets/logo.png`: GitHub READMEs,
+  deck cover, web pages, extension icons 16/48/128, desktop recorder window
+  icon, and the 28 px data-URI embedded in the web recorder panel. **ECC UI5
+  API LIBRARY** (triskelion) speaks for the **three libraries alone**, which
+  is exactly what `pip install robotframework-sapfx` ships: it becomes
+  `assets/logo-library.png` and is used on the PyPI page only. The README is
+  a single file for both destinations, so the swap happens where the PyPI
+  variant is rendered: `pypi_readme()` in `scripts/export_public_tree.py` and
+  the `pypi-publish.yml` step, both **fail-closed** (pattern not found =
+  abort), unit-tested including a guard on the real `README.md`. Both
+  artworks are committed detoured (white background removed) as 1024 masters
+  `assets/logo_rf-sapfx_{suite,library}.png`, superseding the previous
+  `assets/logo_rf-sapfx.png` (LIBRARY RECORDER engraving, removed).
+  `gen_icons.py` now also rewrites the `_AICABRA_ICON` data-URI in place, so
+  one command regenerates every derivative.
+
+### Fixed
+- **Desktop recorder: a produced `.robot` now runs as-is (2026-08-05)** :
+  recordings (and VBS transpilations) are written as a COMPLETE suite by
+  default (Settings + `Library    SapEccLibrary` + `Suite Setup    Attach To
+  Open Session`); the historic body-only fragment lacked the Library import
+  and failed with "keyword not found" when launched directly (caught by the
+  ISTQB live test: user report). `--body-only` restores the fragment for
+  pasting into an existing suite; `--suite` stays accepted (now redundant);
+  the GUI "Suite .robot complète" checkbox is ticked by default and unticking
+  it emits `--body-only`. CLI default locked by a no-SAP unit test via the
+  transpile path; the repaired live recording was re-run AS-IS by robot
+  against A4H: 1/1 PASS (attach, SE16 flow, value assertion `2` re-verified
+  live, visual baseline created on first pass, clean logoff).
+
+### Added
+- **ISTQB export on both recorders + `sap-istqb` agent (2026-08-05)** : one
+  shared document template covering both ISTQB levels (test plan: objective
+  and scope, preconditions, entry/exit criteria, traceability, risks; test
+  cases: Action / Données / Résultat attendu table), each test case carrying
+  a normalized `replay` YAML block (framework-neutral actions
+  `run_transaction`/`fill`/`click`/`press_key`/`assert_*`…, human target
+  wording, recorded locator relegated to a `hint` with engine name and, on
+  the web, the recorded xpath as `fallback`): human-readable AND replayable
+  by an AI with any test framework. Desktop: `steps_to_istqb` +
+  `--export-istqb` + a GUI checkbox (passwords never carried, hot assertions
+  become real expected results, table cells pipe-escaped, YAML single-quote
+  safe); web: `buildIstqb` mirrors the template with one `TC-nn` per
+  scenario (`+test` markers), new « plan ISTQB (.istqb.md) » export-menu
+  entry, extension 0.9.2 → **0.10.0**, artifacts regenerated. New offline
+  agent **sap-istqb** (`/sap-istqb` command, chat mode regenerated,
+  `check_guidance_sync` markers carried): writes the judgment fields from
+  `specs/` plans and recorder outputs into `specs/istqb/<slug>.istqb.md`
+  (directory contract in `specs/istqb/README.md`), never inventing what no
+  source supports, never touching `tests/robot/` or `resources/`.
+  **Live-validated the same day against A4H Docker** (visible SAP GUI,
+  native record engine, scripted actions): SE16 → T000 → « Number of
+  Entries », hot value assertion reading the real count (2 clients) plus a
+  visual baseline, F12, clean logoff; 8 steps transcribed (merged
+  `Run Transaction`, exact `btn[31]` click) and the `.istqb.md` exported
+  from the raw recording. The live run caught a slug bug (accented test
+  names lost their letters: `TP-sc-nario-enregistr`), fixed by NFKD
+  transliteration on both channels and unit-locked. The **agent itself was
+  then exercised the same day** on both live recordings: it wrote the two
+  fully-redacted documents under `specs/istqb/` (T000/SE16 and
+  cap-sflight search), keeping the live-recorded replay blocks intact,
+  grounding every claim in real repo sources (verified: the spec, the
+  generated suite and its exact `Spec:` hash it cites all exist), justifying
+  priorities, naming real traceability gaps (T000 has no planner spec or
+  generated suite; the recording asserts no filtered count) and leaving
+  honest « à compléter » questions instead of inventing answers.
+- **Web recorder: multi-format export checkboxes (2026-08-05)** : every row
+  of the export menu now carries a checkbox (tick several formats, selection
+  persisted across navigation via sessionStorage) plus an « exporter la
+  sélection » entry that downloads them all with staggered downloads
+  (resource-first counts for its 2 files), so Chrome shows its
+  multiple-downloads prompt instead of silently blocking; an empty selection
+  reports honestly instead of no-oping. Clicking a row's label keeps the
+  historic immediate single-format export (offline smoke re-run 4/4 against
+  real Chromium). The desktop GUI already allowed combining its export
+  checkboxes freely. **Live-validated the same day against local cap-sflight**
+  (visible Chromium, real Fiori Elements List Report): recorder injected,
+  real gestures recorded (search « Aussie » + Go + Alt+click assertion,
+  `Travels (4,133)` → `(91)`), `.robot` + ISTQB checkboxes ticked then
+  « exporter la sélection » delivering both files (staggered downloads,
+  « Export de 2 formats » hint); the exported `.istqb.md` carries the stable
+  Fiori Elements ids as `ui5-role` hints with their recorded xpath as
+  `fallback`, and the transliterated identifier
+  (`TP-recherche-de-voyages-filtree`).
+
 ## [0.6.5] - 2026-08-05
 
 ### Added

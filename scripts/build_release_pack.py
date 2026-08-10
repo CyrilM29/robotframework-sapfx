@@ -106,6 +106,8 @@ PACK_FILES = [
     # référence seulement ; les plans locaux de l'équipe restent dans le dépôt.
     ("specs/README.md", "specs/README.md"),
     ("specs/sflight-consultation-se16.md", "specs/sflight-consultation-se16.md"),
+    # Contrat du sous-répertoire des plans ISTQB (sap-istqb + exports recorder).
+    ("specs/istqb/README.md", "specs/istqb/README.md"),
 ]
 
 # Projets dont on construit un wheel (chemin relatif dépôt).

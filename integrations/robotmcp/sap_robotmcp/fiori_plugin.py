@@ -181,6 +181,9 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # lecture / assertions
                 "Read Ui5 Table", "Get Ui5 Text", "Ui5 Control Should Be Visible",
                 "Ui5 Text Should Be", "Get Ui5 Match Count",
+                # repos réseau/busy + messages applicatifs + upload
+                "Wait For Ui5 Idle", "Get Ui5 Messages",
+                "Ui5 Should Have No Messages Of Type", "Upload File Via Ui5",
                 # moteur WebGUI sid (SAP GUI for HTML)
                 "Resolve Sid", "Click Sid", "Fill Sid Input", "Sid Should Be Visible",
                 # moteur Web Components (pages ui5-* hors registre UI5)

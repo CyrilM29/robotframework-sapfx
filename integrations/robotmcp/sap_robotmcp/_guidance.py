@@ -77,6 +77,20 @@ FIORI_HINTS = [
     "Assertion visuelle : Get Ui5 Perceptual Hash / Ui5 Screen Should Match "
     "Baseline : même cycle snapshot que l'ECC (baseline créée au 1er passage, "
     ".actual.png sauvé en cas de dérive).",
+    "Après une action qui déclenche un aller-retour OData (Go de FilterBar, "
+    "tri, navigation) : Wait For Ui5 Idle attend le VRAI repos (requêtes "
+    "XHR/fetch en vol + indicateurs busy + calme continu) : « rendu » ne "
+    "veut pas dire « données arrivées », asserter trop tôt lit l'écran "
+    "d'avant. Fonctionne aussi sur les pages WC/hybrides (compteurs "
+    "réseau/DOM, pas le runtime UI5).",
+    "Messages applicatifs : Get Ui5 Messages lit le MessageManager + les "
+    "MessageToast récents (hook posé à l'injection) ; asserter par TYPE "
+    "(Ui5 Should Have No Messages Of Type Error), jamais sur le texte "
+    "localisé : le miroir web du type de message de barre d'état ECC.",
+    "Tables : Read Ui5 Table lit une sap.m.Table / sap.ui.table.Table en "
+    "liste de dicts par en-têtes (le miroir de Read Grid ECC) ; Upload File "
+    "Via Ui5 téléverse dans un contrôle d'upload (l'input interne est visé à "
+    "travers les shadow roots ouverts).",
     "Terme métier FR/EN -> champ ABAP/table : Lookup Business Term (exposé par "
     "les DEUX bibliothèques ; ambiguïté toujours remontée avec les candidats, "
     "jamais de premier-match silencieux).",
@@ -90,6 +104,16 @@ ECC_HINTS = [
     "Grilles ALV : adresser par titre de colonne (cf. Read Grid), pas par index. "
     "Pour des assertions locale-indépendantes, comparer les ids TECHNIQUES de "
     "colonnes (Get Grid Column Ids), pas les titres affichés.",
+    "Tables de dynpro CLASSIQUES (GuiTableControl : FB60, VA01 ancienne "
+    "génération…) : Read Table Control / Get Table Control Cell / Set Table "
+    "Control Cell / Find Table Control Row adressent par TITRE de colonne et "
+    "défilent automatiquement (seules les lignes visibles existent côté COM ; "
+    "l'objet est ré-acquis après chaque scroll). L'ALV, elle, reste sur "
+    "Read Grid (l'erreur redirige dans les deux sens).",
+    "Aide à la recherche d'un champ : Pick F4 Value ouvre le matchcode, "
+    "choisit l'entrée (grille de résultats double-cliquée, ou liste par F2) "
+    "et referme ; valeur introuvable = popup refermé + échec listant un "
+    "échantillon des valeurs visibles.",
     "SE16 : la sortie par défaut est la liste ABAP classique, SANS objet grille "
     "scriptable : appeler d'abord `Use ALV Grid In Data Browser` (resource ECC, "
     "persistant par utilisateur) ; SE16N n'existe pas sur l'ABAP Platform Trial.",
@@ -169,7 +193,8 @@ ECC_HINTS = [
 API_HINTS = [
     "Le canal API n'a PAS d'écran : la perception EST la valeur de retour des "
     "keywords (listes/dicts JSON). List Api Sessions donne l'état du canal "
-    "(alias ouverts, base_url, sap-client, authentifié, jamais de credentials).",
+    "(alias ouverts, base_url, sap-client, authentifié, compteurs de "
+    "télémétrie, entités suivies ; jamais de credentials).",
     "Patron recommandé (suite flagship) : préparer et RECOUPER les données par "
     "l'API, ne piloter l'écran que pour ce qu'on teste : le même fait métier "
     "vérifié par deux canaux indépendants vaut plus que deux fois le même canal.",
@@ -183,16 +208,49 @@ API_HINTS = [
     "système passent en arguments nommés (top=5 -> $top=5).",
     "Post Odata applique le protocole CSRF SAP automatiquement (fetch du "
     "token + rejeu) ; ne jamais le réimplémenter à la main.",
+    "CRUD complet + fabrique de données : Post Odata track=True enregistre "
+    "l'entité créée, Patch Odata / Delete Odata (CSRF + If-Match gérés), "
+    "Delete Created Entities nettoie en teardown (ordre inverse, best-effort, "
+    "rapport JSON-safe), Ensure Odata Entity crée seulement si absent : le "
+    "cycle de données RÉVERSIBLE par l'API, sans passer par l'écran.",
+    "Listes paginées côté serveur (S/4 plafonne souvent à 100) : "
+    "Get Odata Entities follow_next=True suit __next/@odata.nextLink ; sans "
+    "lui la lecture peut être PARTIELLE en silence (faux positifs).",
+    "N opérations en UN aller-retour : Post Odata Batch (multipart, v2 ET "
+    "v4 ; écritures regroupées dans UN changeset atomique par défaut) ; "
+    "Call Odata Function pour les function imports (v2) et actions (v4).",
+    "PERCEPTION du canal : Get Odata Metadata parse le $metadata (entity "
+    "sets, clés, propriétés, libellés sap:label ; mis en cache par session) ; "
+    "Find Odata Property By Label = le localisateur « libellé humain » côté "
+    "API (ambiguïté remontée avec les candidats) ; List Odata Services "
+    "découvre les services actifs via le catalogue Gateway.",
+    "PRÉFLIGHT : Gateway Should Be Active échoue tôt en nommant la "
+    "remédiation (conteneur A4H re-créé -> HTTP 500 /IWFND/CM_COS/003 -> "
+    "activité IMG /IWFND/IWF_ACTIVATE) ; Wait Until Api Available attend un "
+    "système qui (re)démarre, jamais de time.sleep ; Get Api Telemetry "
+    "expose compteurs/latences par alias.",
+    "Auth au-delà du Basic : OAuth2 client credentials (token_url + "
+    "client_id + client_secret, S/4 Cloud / BTP) et certificat client mTLS "
+    "(client_cert/client_key) sur Open Api Session ; token demandé et "
+    "rafraîchi automatiquement, jamais journalisé.",
     "RFC optionnel via pyrfc (SAP NW RFC SDK requis) : Open Rfc Connection / "
-    "Call Rfc ; l'erreur donne la marche à suivre si pyrfc manque.",
+    "Call Rfc ; l'erreur donne la marche à suivre si pyrfc manque. Au-dessus, "
+    "le pattern BAPI : Call Bapi vérifie la table RETURN par TYPE (E/A/X = "
+    "échec listant les messages, jamais le texte localisé), puis Commit Bapi "
+    "Transaction (WAIT) ; Rollback Bapi Transaction après un échec. "
+    "Wait For Background Job suit un job de fond via RFC_READ_TABLE sur "
+    "TBTCO (statut A = échec immédiat), sans occuper aucun écran.",
 ]
 
 API_RECOMMENDATION = (
     "Canal API SAP (OData v2/v4, RFC) : SapApiLibrary, stdlib pure. Ouvrir "
-    "une session par alias (Open Api Session, password Secret), lire par "
-    "Get Odata Entities / Get Odata Count, écrire par Post Odata (CSRF "
-    "automatique). Le canal de PRÉPARATION et de RECOUPEMENT des données : "
-    "l'écran ne sert qu'à tester l'écran."
+    "une session par alias (Open Api Session, password Secret ; OAuth2/mTLS "
+    "possibles), vérifier la Gateway (Gateway Should Be Active), lire par "
+    "Get Odata Entities (follow_next=True pour tout lire) / Get Odata Count, "
+    "écrire par Post Odata / Patch Odata / Delete Odata (CSRF automatique, "
+    "track=True + Delete Created Entities = teardown garanti), explorer par "
+    "Get Odata Metadata / List Odata Services. Le canal de PRÉPARATION et de "
+    "RECOUPEMENT des données : l'écran ne sert qu'à tester l'écran."
 )
 
 FIORI_RECOMMENDATION = (

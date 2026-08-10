@@ -1,7 +1,7 @@
 > [🇬🇧 English](README.md) · **🇫🇷 Français**
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/assets/logo.png" alt="SAPFX : ECC UI5 API Library &amp; Recorder" width="240">
+  <img src="https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/assets/logo.png" alt="SAPFX : ECC UI5 API Test Suite" width="240">
 </p>
 
 # SAPFX

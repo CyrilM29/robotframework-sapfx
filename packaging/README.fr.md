@@ -15,7 +15,7 @@ cloner le dépôt source :
 | `tools/recorder_web/` | Recorder web : `recorder_snippet.js` (à coller dans DevTools) et `extension/` (extension Chrome MV3, à charger non empaquetée via `chrome://extensions`). |
 | `tests/robot/` | Six suites d'exemple : smokes ECC/Fiori plus `fiori_wc_smoke.robot` déterministe et hors ligne, campagne d'exploration autonome, sentinelle de dérive et flagship cross-paradigme. |
 | `scripts/` | Outillage de maintenance (stdlib pure, à lancer depuis la racine du pack) : `healing_drift_report.py` (relit la télémétrie de healing, propose, ou applique avec `--apply`, les patchs `resources/` des dérives stables de localisateurs) et `check_spec_sync.py` (échoue quand une suite générée est en retard sur son plan `specs/`). |
-| `.claude/` + `.github/chatmodes/` + `specs/` | **Agents de test SAP** (sap-planner / sap-generator / sap-healer) : définitions d'agents + commandes `/sap-*` pour Claude Code, chat modes générés pour VS Code / Copilot, et le répertoire des plans de test avec son exemple de référence. Voir « Agents de test » plus bas. |
+| `.claude/` + `.github/chatmodes/` + `specs/` | **Agents de test SAP** (sap-planner / sap-generator / sap-healer / sap-istqb) : définitions d'agents + commandes `/sap-*` pour Claude Code, chat modes générés pour VS Code / Copilot, et le répertoire des plans de test avec son exemple de référence (+ `specs/istqb/` pour les plans ISTQB). Voir « Agents de test » plus bas. |
 | `install.cmd` / `install.ps1` | Installateur : crée un `.venv` local, installe les wheels + dépendances épinglées, rend les configs MCP. |
 | `mcp.json.template` / `vscode-mcp.json.template` | Gabarits de déclaration du serveur rf-mcp ; `install.ps1 -WithMcp` les rend en place en `.mcp.json` (Claude Code) et `.vscode/mcp.json` (VS Code / Copilot), plus `mcp.generated.json` à copier dans un autre projet. |
 | `LICENSE` / `NOTICE` | Licence Apache-2.0 et attributions upstream, à conserver à côté des binaires. |
@@ -115,9 +115,15 @@ Le pack embarque les agents de test SAP (nécessite `-WithMcp`) :
 lisible métier dans `specs\` ; **sap-generator** transforme un plan en suite
 Robot Framework dans `tests\robot\`, chaque étape vérifiée live avant d'être
 écrite ; **sap-healer** répare une suite en échec en corrigeant la couche
-resources, preuves live à l'appui. Côté Claude Code : commandes `/sap-plan`,
-`/sap-generate` et `/sap-heal` ; côté VS Code / Copilot : chat modes du même
-nom (`sap-planner`, `sap-generator`, `sap-healer`).
+resources, preuves live à l'appui ; **sap-istqb** (hors ligne, sans MCP)
+transforme les plans du planner et les sorties des recorders en plan de test
++ cas de test ISTQB sous `specs\istqb\` (lisible par un humain, rejouable par
+une IA quel que soit le framework via ses blocs replay normalisés ; les deux
+recorders émettent le même gabarit en brouillon : `--export-istqb` côté
+desktop, entrée « plan ISTQB » du menu export côté web). Côté Claude Code :
+commandes `/sap-plan`, `/sap-generate`, `/sap-heal` et `/sap-istqb` ; côté
+VS Code / Copilot : chat modes du même nom (`sap-planner`, `sap-generator`,
+`sap-healer`, `sap-istqb`).
 
 Le pack embarque aussi la **skill `sapfx`** (`.claude\skills\sapfx\`) : un
 assistant Claude Code qui ouvre le dossier du pack apprend l'outillage en un

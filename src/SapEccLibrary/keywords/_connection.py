@@ -101,7 +101,9 @@ class ConnectionKeywords:
         """
         exe = self._resolve_saplogon_path(path)
         logger.info("Launching SAP Logon Pad: %s" % exe)
-        # DETACHED pour que le pad continue de fonctionner indépendamment du processus de test.
+        # Processus enfant ordinaire (Windows ne le tue pas avec le parent) ;
+        # close_fds évite seulement d'hériter nos descripteurs. `Close Sap
+        # Logon` en teardown reste la voie nominale pour l'arrêter.
         self._saplogon_proc = subprocess.Popen([exe], close_fds=True)
         self._wait_for_scripting_engine(timeout)
 
@@ -170,7 +172,7 @@ class ConnectionKeywords:
                     self.session = self.connection.Children(0)
                     return True
             except Exception:
-                pass
+                pass    # connexion en cours d'amorçage : COM peut refuser l'accès, on re-sonde
             return False
 
         # self.default_timeout est déjà en secondes (converti une fois dans

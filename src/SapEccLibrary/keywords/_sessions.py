@@ -153,7 +153,7 @@ class SessionKeywords:
                 if count > before:
                     return connection.Children(count - 1)
             except Exception:
-                pass
+                pass    # fenêtre en cours de création : Children peut être transitoirement illisible
             return None
 
         created = poll_until(new_session, budget, step=0.5)

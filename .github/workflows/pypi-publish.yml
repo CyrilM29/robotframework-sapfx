@@ -4,7 +4,8 @@
 # repository=robotframework-sapfx, workflow=pypi-publish.yml, environment=pypi.
 # Déclenchement : publication d'une GitHub Release (ou lancement manuel).
 # Le README poussé sur PyPI est la variante SANS le banner EN/FR (lien
-# relatif, cassé là-bas) : même règle que l'outillage d'export.
+# relatif, cassé là-bas) et AVEC le médaillon « library » (la distribution ne
+# livre que les bibliothèques) : même règle que l'outillage d'export.
 name: pypi-publish
 
 on:
@@ -17,6 +18,11 @@ permissions:
 
 jobs:
   publish:
+    # Le dépôt PRIVÉ embarque ce workflow (l'arbre public en est un export) :
+    # sans ce garde, publier la release privée y déclenche un job qui échoue à
+    # l'échange OIDC (le publisher PyPI n'autorise que le dépôt public), soit un
+    # run rouge sans conséquence mais trompeur (constaté en 0.6.5).
+    if: github.repository == 'CyrilM29/robotframework-sapfx'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -42,17 +48,34 @@ jobs:
           print(f"version {version} OK")
           EOF
 
-      - name: Strip the EN/FR banner from README (relative link, broken on PyPI)
+      - name: Render the PyPI README (no EN/FR banner, "library" medallion)
         run: |
           python - <<'EOF'
-          import pathlib, sys
+          import pathlib, re, sys
           p = pathlib.Path("README.md")
           text = p.read_text(encoding="utf-8")
           banner = "> **\U0001F1EC\U0001F1E7 English** · [\U0001F1EB\U0001F1F7 Français](README.fr.md)\n\n"
-          if banner not in text:
-              sys.exit("banner EN/FR introuvable dans README.md")
-          p.write_text(text.replace(banner, "", 1), encoding="utf-8")
-          print("README PyPI OK")
+          raw = "https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main"
+          blob = "https://github.com/CyrilM29/robotframework-sapfx/blob/main"
+          swaps = [
+              (banner, ""),
+              (raw + "/assets/logo.png", raw + "/assets/logo-library.png"),
+              ('alt="SAPFX: ECC UI5 API Test Suite"', 'alt="SAPFX: ECC UI5 API Library"'),
+          ]
+          for old, new in swaps:
+              if old not in text:
+                  sys.exit("motif introuvable dans README.md : %r" % old[:60])
+              text = text.replace(old, new, 1)
+          # Les liens relatifs vers des fichiers du dépôt (docs/…, *.md) sont
+          # MORTS sur la page PyPI, qui n'a aucune notion de dépôt : on les
+          # absolutise ici seulement (le README du dépôt garde ses relatifs).
+          text, linked = re.subn(
+              r"\]\((?!https?://|#|mailto:)([^)\s]+\.md)\)",
+              lambda m: "](%s/%s)" % (blob, m.group(1).lstrip("./")), text)
+          if not linked:
+              sys.exit("aucun lien relatif de dépôt trouvé : motif changé ?")
+          p.write_text(text, encoding="utf-8")
+          print("README PyPI OK (%d lien(s) absolutisé(s))" % linked)
           EOF
 
       - name: Build sdist and wheel
