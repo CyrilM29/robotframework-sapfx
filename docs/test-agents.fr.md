@@ -10,13 +10,14 @@ vocabulaire métier de `resources/` et respectent les conventions du dépôt
 (localisateurs dans la couche resources, pas d'attente fixe, assertions
 indépendantes de la locale).
 
-## Les trois agents
+## Les quatre agents
 
 | Agent | Entrée | Sortie |
 |---|---|---|
 | **sap-planner** | Un objectif métier + un système accessible (tcode ECC ou URL Fiori) | Un plan de test Markdown dans `specs/`, ancré dans l'observé live (boucle perception → action) |
 | **sap-generator** | Un plan de `specs/` | Une suite exécutable dans `tests/robot/`, chaque étape exécutée live via rf-mcp avant d'être écrite ; les keywords métier manquants ajoutés à la couche resources |
 | **sap-healer** | Une suite/un test en échec | L'échec reproduit, classifié (dérive de localisateur / timing / données / changement fonctionnel) et réparé **dans la couche resources**, vérifié live, relancé jusqu'au vert, jamais silencieusement |
+| **sap-istqb** | Des plans du planner et/ou des sorties recorder (enregistrements, brouillons `.spec.md`/`.istqb.md`) | Un document **plan de test + cas de test ISTQB** sous `specs/istqb/` (hors ligne, artefacts seulement) : sections ISO 29119-3, un cas de test par scénario avec tableau Action / Données / Résultat attendu et bloc `replay` YAML normalisé, lisible par un humain ET rejouable par une IA avec n'importe quel framework de test ; ce qu'aucune source n'appuie reste « à compléter » |
 
 Le planner a aussi un **mode découverte de couverture**, pour la question qui
 vient *avant* tout plan, « que faut-il tester en premier ? » : il lit l'usage
@@ -30,8 +31,16 @@ dit honnêtement et replie sur la liste des transactions critiques fournie par
 le métier.
 
 Les définitions canoniques vivent dans `.claude/agents/sap-*.md`. Les
-slash-commands `/sap-plan`, `/sap-generate` et `/sap-heal`
+slash-commands `/sap-plan`, `/sap-generate`, `/sap-heal` et `/sap-istqb`
 (`.claude/commands/`) les enrobent pour Claude Code.
+
+Les deux recorders émettent le même gabarit ISTQB en brouillon
+(`--export-istqb` côté desktop, l'entrée « plan ISTQB » du menu export côté
+web) : le rôle de sap-istqb est alors de RÉDIGER les rubriques de jugement
+(objectif, périmètre, priorités, risques, traçabilité vers les specs et les
+suites générées), jamais de dégrader l'observé. Ces documents sont de la
+documentation de conception de test : ils ne remplacent jamais les suites
+exécutables, et l'agent ne touche jamais `tests/robot/` ni `resources/`.
 
 ## Le cycle
 

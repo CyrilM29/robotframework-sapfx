@@ -139,7 +139,103 @@ class SemanticKeywords:
         self.click_element(eid)
         return eid
 
+    def pick_f4_value(self, field_id, value, column=None, timeout=None):
+        """Ouvre l'**aide à la recherche** (F4, matchcode) du champ
+        ``field_id``, choisit l'entrée ``value`` dans le popup de résultats et
+        referme le tout : le geste quotidien « F4 puis double-clic » en un
+        keyword. Retourne la valeur du champ après sélection.
+
+        Deux formes de popup couvertes : la **grille** de résultats
+        (GuiGridView : la ligne dont une colonne, ou la seule colonne
+        ``column`` si son titre est fourni, vaut ``value``, choisie par
+        double-clic) et la **liste à labels** (l'entrée au texte exact,
+        choisie par F2). Valeur introuvable = popup refermé (F12) puis échec
+        listant un échantillon des valeurs disponibles ; popup toujours
+        ouvert après le choix (aide F4 à étapes, onglet de restriction) =
+        échec nommant `Get Screen Signature` pour piloter ce dialogue par
+        ids. La comparaison est exacte, blancs de bordure ignorés."""
+        field = self.session.findById(field_id)
+        field.SetFocus()
+        self.send_vkey(4)
+        self.wait_until_busy_done()
+        self.wait_until_element_present("wnd[1]", timeout=timeout)
+        elements = self._screen_elements()
+        wanted = str(value).strip()
+        grid = next((el for el in elements if el.type == "GuiGridView"), None)
+        if grid is not None:
+            picked = self._pick_f4_from_grid(grid.id, wanted, column)
+        else:
+            picked = self._pick_f4_from_labels(elements, wanted)
+        if not picked:
+            sample = self._f4_available_values(grid, elements, column)
+            self.send_vkey(12, window=1)   # F12 : refermer proprement le popup
+            self.wait_until_busy_done()
+            self.take_screenshot()
+            raise AssertionError(
+                "Aucune entrée '%s' dans l'aide F4 de '%s'%s. Valeurs "
+                "visibles (extrait) : %s"
+                % (value, field_id,
+                   " (colonne '%s')" % column if column else "",
+                   sample or "aucune lisible"))
+        self.wait_until_busy_done()
+        if self.session.findById("wnd[1]", False) is not None:
+            self.take_screenshot()
+            raise AssertionError(
+                "L'aide F4 de '%s' est restée ouverte après la sélection de "
+                "'%s' (aide à étapes ou onglet de restriction) : piloter ce "
+                "dialogue par ids (Get Screen Signature sur la fenêtre "
+                "active)." % (field_id, value))
+        return self.get_value(field_id)
+
     # -- helpers (méthodes internes) ------------------------------------------
+
+    def _pick_f4_from_grid(self, grid_id, wanted, column):
+        """Cherche ``wanted`` dans la grille de résultats F4 et la choisit par
+        double-clic (le geste standard des aides à la recherche). ``column``
+        (titre visible) restreint la recherche à une colonne."""
+        grid = self.session.findById(grid_id)
+        column_ids = list(grid.ColumnOrder)
+        if column not in (None, "", "None"):
+            column_ids = [self.get_column_id_by_title(grid_id, column)]
+        for row in range(int(getattr(grid, "RowCount", 0) or 0)):
+            for col_id in column_ids:
+                if str(grid.GetCellValue(row, col_id)).strip() == wanted:
+                    grid.SetCurrentCell(row, col_id)
+                    grid.DoubleClickCurrentCell()
+                    return True
+        return False
+
+    def _pick_f4_from_labels(self, elements, wanted):
+        """Variante liste (aides F4 simples rendues en labels) : focalise
+        l'entrée au texte exact puis F2 (« choisir »)."""
+        for element in elements:
+            if element.type == "GuiLabel" and (element.text or "").strip() == wanted:
+                self.session.findById(element.id).SetFocus()
+                self.send_vkey(2, window=1)
+                return True
+        return False
+
+    def _f4_available_values(self, grid_element, elements, column):
+        """Échantillon (trié, dédoublonné) des valeurs visibles du popup F4,
+        pour rendre l'échec « valeur introuvable » actionnable."""
+        values = []
+        if grid_element is not None:
+            grid = self.session.findById(grid_element.id)
+            column_ids = list(grid.ColumnOrder)
+            if column not in (None, "", "None"):
+                try:
+                    column_ids = [self.get_column_id_by_title(grid_element.id,
+                                                              column)]
+                except ValueError:
+                    pass
+            for row in range(min(10, int(getattr(grid, "RowCount", 0) or 0))):
+                for col_id in column_ids[:1]:
+                    values.append(str(grid.GetCellValue(row, col_id)).strip())
+        else:
+            values = [(el.text or "").strip() for el in elements
+                      if el.type == "GuiLabel" and (el.text or "").strip()]
+        unique = sorted({value for value in values if value})
+        return ", ".join(unique[:10])
 
     def _resolve_semantic_unique(self, locator, types, exact,
                                  changeable_only=False, scope_radius=None,

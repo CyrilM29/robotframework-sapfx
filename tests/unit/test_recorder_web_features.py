@@ -99,12 +99,13 @@ def test_panel_warns_about_cross_origin_frames():
     assert "allFrames" in SNIPPET
 
 
-# --- exports : menu à 3 formats, resource-first, spec -------------------------
+# --- exports : menu multi-formats, resource-first, spec, istqb ----------------
 
-def test_export_menu_offers_four_formats():
+def test_export_menu_offers_five_formats():
     assert "'.robot complet'" in SNIPPET
     assert "resource-first (.resource + .robot)" in SNIPPET
     assert "plan specs/ (.spec.md)" in SNIPPET
+    assert "plan ISTQB (.istqb.md)" in SNIPPET
     assert "rapport HTML (.html)" in SNIPPET
 
 
@@ -124,6 +125,50 @@ def test_spec_export_follows_specs_contract():
     assert "function humanizeWebStep(line, fmt)" in SNIPPET
     assert "Points de vigilance" in SNIPPET
     assert "sap-generator" in SNIPPET
+
+
+def test_export_menu_multi_select_checkboxes():
+    # Cases à cocher du menu export : cocher plusieurs formats puis « exporter
+    # la sélection » (téléchargements espacés) ; le clic sur le LIBELLÉ reste
+    # l'export immédiat historique (les smokes cliquent `text=.robot complet`).
+    assert "var EXPORT_FORMATS = [" in SNIPPET
+    assert "function exportSelected()" in SNIPPET
+    assert "exporter la s\\u00e9lection" in SNIPPET
+    # la sélection survit à la navigation, comme les steps
+    assert "__ui5RecorderExportSel" in SNIPPET
+    assert "function saveExportSel()" in SNIPPET
+    # glyphes cochée/décochée + toggle sans fermer le menu
+    assert "\\u2611" in SNIPPET and "\\u2610" in SNIPPET
+    assert "it.checkbox.toggle(); paintBox();" in SNIPPET
+    # téléchargements espacés (resource-first compte pour 2 fichiers)
+    assert "delay += 400 * f.files;" in SNIPPET
+    assert "files: 2" in SNIPPET
+    # rien de coché = message honnête, pas un no-op silencieux
+    assert "Aucun format coch\\u00e9" in SNIPPET
+
+
+def test_istqb_export_mirrors_desktop_template():
+    # Miroir web de steps_to_istqb (recorder desktop) : même gabarit (plan +
+    # cas de test + bloc replay YAML normalisé), un TC par scénario (+test).
+    assert "function buildIstqb()" in SNIPPET
+    assert "function istqbStep(line)" in SNIPPET
+    assert "function istqbYaml(st)" in SNIPPET
+    assert "recorded.istqb.md" in SNIPPET
+    assert "Plan de test ISTQB : " in SNIPPET
+    # bloc replay : canal web, actions normalisées, moteur en hint
+    assert "channel: web" in SNIPPET
+    assert "'ui5-role'" in SNIPPET and "'sid'" in SNIPPET
+    assert "'wc'" in SNIPPET and "'dom'" in SNIPPET
+    # l'indice xpath posé à l'enregistrement devient un localisateur de repli
+    assert "yq('ui5-xpath')" in SNIPPET
+    # YAML sûr quel que soit le contenu : guillemets simples doublés
+    assert 'String(t).replace(/\'/g, "\'\'")' in SNIPPET
+    # accents translittérés dans l'identifiant (miroir du fix desktop)
+    assert "s.normalize('NFD')" in SNIPPET
+    # sections du plan (échappées \\u dans le JS généré)
+    assert "Objectif et p\\u00e9rim\\u00e8tre" in SNIPPET
+    assert "Tra\\u00e7abilit\\u00e9" in SNIPPET
+    assert "Risques et points de vigilance" in SNIPPET
 
 
 def test_report_export_is_a_self_contained_html_documentation():
@@ -247,7 +292,7 @@ def test_extension_manifest_bumped_for_recorder_features():
     with open(os.path.join(_RECORDER_WEB, "extension", "manifest.json"),
               encoding="utf-8") as fh:
         manifest = json.load(fh)
-    assert manifest["version"] == "0.9.2"
+    assert manifest["version"] == "0.10.0"
     # Le Chrome Web Store refuse une description > 132 caractères : bloquant
     # de soumission attrapé lors de la revue croisée avec rf-web-recorder.
     assert len(manifest["description"]) <= 132

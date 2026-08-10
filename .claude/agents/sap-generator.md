@@ -176,7 +176,9 @@ raw material and rewrite it to meet the rules below before saving.
    the `resources/` layer; tests speak business language (convention #1). On
    Fiori, address UI5 controls, never DOM ids.
 2. Never wait with `time.sleep`/`Sleep`: `Wait Until Busy Done` /
-   `Wait Until Element Present` (ECC), `Wait For UI5 Ready` (Fiori) (convention #2).
+   `Wait Until Element Present` (ECC), `Wait For UI5 Ready` at load time and
+   `Wait For Ui5 Idle` after an action that triggers an OData round-trip (a
+   rendered Fiori view is not yet its data) (convention #2).
 3. Locale-independent assertions: status-bar **message type** (`E`/`S`/…),
    technical column ids (`CARRID`), counts. Never localized texts (convention #3).
 4. MCP × COM: never let a keyword return a raw COM object across the MCP
@@ -191,6 +193,11 @@ raw material and rewrite it to meet the rules below before saving.
    What you write back into `specs/` (the « Écarts constatés à la génération »
    section) is published prose: **never use the em dash (« — »)** there. Use a
    colon, a comma, parentheses, or split the sentence.
+8. Prepare and clean test data through the **API channel** when the spec allows
+   it: `Gateway Should Be Active` in the Suite Setup of any OData-touching
+   suite, `Post Odata track=True` (or `Ensure Odata Entity`) for setup, and
+   `Delete Created Entities` in teardown so the system is left as found; the
+   screen is only driven for what the test actually proves.
 
 ## Final report
 

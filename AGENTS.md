@@ -132,8 +132,19 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   alongside it. Live-proven from UI5 1.60 to the 2.0 nightly.
 - **`SapApiLibrary`** (`src/SapApiLibrary/`): the **API channel** (stdlib-only,
   no new dependency): OData v2 (embedded Gateway) and v4 (CAP/S4) with one
-  keyword set (`Open Api Session` per alias, `Get Odata Entities`, `Get Odata
-  Count`, `Post Odata` with the SAP CSRF protocol), optional RFC via pyrfc.
+  keyword set: full CRUD (`Post/Patch/Delete Odata`, SAP CSRF protocol with
+  one-shot 403 replay, `If-Match` handled), `Call Odata Function`,
+  `Post Odata Batch` (multipart, atomic changeset), server-driven pagination
+  (`Get Odata Entities follow_next=True`), a **test-data factory**
+  (`track=True` + `Delete Created Entities` teardown, `Ensure Odata Entity`),
+  channel perception (`Get Odata Metadata` with `sap:label` labels,
+  `Find Odata Property By Label`, `List Odata Services`), Gateway preflight
+  (`Gateway Should Be Active` names the `/IWFND/IWF_ACTIVATE` remediation,
+  `Wait Until Api Available`), OAuth2 client-credentials + mTLS auth,
+  per-alias telemetry (`Get Api Telemetry`), and optional RFC via pyrfc with
+  the BAPI pattern (`Call Bapi` checked by RETURN type,
+  `Commit/Rollback Bapi Transaction`) plus `Wait For Background Job` (TBTCO
+  via RFC_READ_TABLE).
   Recommended pattern: prepare/cross-check data through the API, drive the
   screen only for what is actually under test, demonstrated by
   `tests/robot/flagship_cross_paradigm.robot` (SE16 count == OData `$count` on
@@ -167,9 +178,15 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   `Session.Record`+`Change` events, with automatic polling fallback;
   `--semantic` rewrites steps as human keywords when the label provably
   re-resolves, technical id kept as a comment; assertion hotkeys during record;
-  post-recording exports: `--suite`, `--export-resources` (resource-first
+  post-recording exports: `--suite` (complete runnable suite with the Library
+  import: the DEFAULT since 2026-08-05; `--body-only` keeps the historic
+  fragment), `--export-resources` (resource-first
   pair, no raw id left in the test, self-healing keywords for semantic lines),
-  `--export-spec` (a specs/-format plan) and `--export-report` (a
+  `--export-spec` (a specs/-format plan), `--export-istqb` (an ISTQB test
+  plan + test cases document: Action/Données/Résultat attendu table plus a
+  normalized `replay` YAML block per test case, framework-neutral actions
+  with recorded locators as hints, human-readable AND replayable by an AI
+  with any framework) and `--export-report` (a
   self-contained HTML documentation report (business phrase + exact RF line
   per step, ECC/Fiori/API keywords phrased, per-step data-URI screenshots,
   `password=` args masked; never a test)); `--replay` plays a recording
@@ -179,7 +196,8 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   records across all five engines incl. the generic dom engine, right-click
   assertion menu, in-page replay, multi-scenario markers, .robot re-import,
   exports: .robot / resource-first with self-healing UI5 keywords / specs
-  plan / self-contained HTML documentation report).
+  plan / ISTQB plan (same template as desktop, one test case per scenario) /
+  self-contained HTML documentation report).
   **rf-mcp plugins** in `integrations/robotmcp/`: perception is never a
   time-based cache, but consecutive identical calls get compacted
   (`_last_seen.py`) and `filtered`/`filtering_level` is really implemented
@@ -219,7 +237,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   (`scripts/hook_guards.py`) runs the em-dash guard on every edited file, and
   the others after every edit of
   specs/tests/resources/variables.
-  **SAP test agents** (plan → generate → heal, Playwright-Test-Agents style):
+  **SAP test agents** (plan → generate → heal, Playwright-Test-Agents style,
+  plus the offline `sap-istqb` test designer: planner specs + recorder
+  outputs → ISTQB test plan + test cases under `specs/istqb/`, normalized
+  replay blocks an AI can re-execute with any framework, never inventing
+  what no source supports):
   canonical definitions in `.claude/agents/` + `/sap-*` commands in
   `.claude/commands/` + the `sapfx` toolkit skill in `.claude/skills/`
   (shipped in the deployment pack), including the orchestrators `/sap-maintain`

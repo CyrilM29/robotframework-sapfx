@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SAP UI5 / WebGUI Locator Recorder",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "description": "Capture SapFioriLibrary locators and record Robot Framework steps on SAP Fiori, SAPUI5, WebGUI and hybrid pages.",
   "minimum_chrome_version": "111",
   "permissions": ["scripting", "activeTab"],

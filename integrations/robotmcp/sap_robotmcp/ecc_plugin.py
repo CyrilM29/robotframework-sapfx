@@ -263,6 +263,11 @@ class SapEccPlugin(StaticLibraryPlugin):
                 "Set Cell Value By Column Title", "Find Row By Column Value",
                 "Select Row By Column Value", "Get Cell Value By Row Content",
                 "Read Abap List",
+                # tables de dynpro classiques (GuiTableControl, par titre)
+                "Read Table Control", "Get Table Control Cell",
+                "Set Table Control Cell", "Find Table Control Row",
+                # aide à la recherche (matchcode)
+                "Pick F4 Value",
                 # essentiels upstream que l'agent utilise en permanence
                 "Input Text", "Send Vkey",
                 # diagnostic / préflight scripting + télémétrie

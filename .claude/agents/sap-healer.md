@@ -141,7 +141,10 @@ locator notes.
 
 1. Locators live in the `resources/` layer; tests keep speaking business
    language: no raw SAP element ids, no CSS/XPath in test bodies (convention #1).
-2. Never introduce `time.sleep`/`Sleep` to "fix" timing (convention #2).
+2. Never introduce `time.sleep`/`Sleep` to "fix" timing (convention #2): the
+   Fiori timing repair is `Wait For Ui5 Idle` (network + busy quiet) inside
+   the resource keyword; the ECC one is `Wait Until Busy Done` /
+   `Wait Until Element Present`.
 3. Never replace a locale-independent assertion (status-bar **message type**
    `E`/`S`, technical column ids) with a localized text match (convention #3).
 4. Never weaken an assertion, delete a failing step, or lower `--cov`-style

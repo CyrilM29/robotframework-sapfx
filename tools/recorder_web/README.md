@@ -80,12 +80,23 @@ bootstrap only in the first one.
 **no locator in the test**, project convention #1; UI5 steps become
 **self-healing** keywords via `Resolve Ui5 With Fallback` and their recorded
 xpath), a **`specs/`-format Markdown plan** (`recorded.spec.md`, the input of
-the plan → generate → heal agent cycle), a **self-contained HTML documentation
-report** (`recorded_report.html`: one business phrase per step with the exact
-RF line alongside, one chapter per scenario; documentation for humans, never
-a test; concept observed in RoboSAPiens' recorder, see `NOTICE`), or **import
+the plan → generate → heal agent cycle), an **ISTQB test plan + test cases**
+(`recorded.istqb.md`: ISTQB / ISO 29119-3 sections, one test case per scenario
+with an Action / Données / Résultat attendu table and a normalized `replay`
+YAML block, framework-neutral actions with the recorded locator as a `hint`:
+human-readable AND replayable by an AI with any test framework; the
+`sap-istqb` agent writes the judgment fields), a **self-contained HTML
+documentation report** (`recorded_report.html`: one business phrase per step
+with the exact RF line alongside, one chapter per scenario; documentation for
+humans, never a test; concept observed in RoboSAPiens' recorder, see
+`NOTICE`), or **import
 a previously exported `.robot`** back into the panel (bootstrap lines skipped,
-multi-tests restored as markers: the editing cycle closes). **`pause`** stops appending;
+multi-tests restored as markers: the editing cycle closes). Every format row
+also carries a **checkbox**: tick several formats (the choice survives
+navigation), then « exporter la sélection » downloads them all with staggered
+downloads (so Chrome shows its multiple-downloads prompt instead of silently
+blocking); clicking a row's label still exports that single format
+immediately. **`pause`** stops appending;
 **`clear`** empties it. Example output:
 
 ```robotframework

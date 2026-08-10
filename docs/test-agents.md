@@ -10,13 +10,14 @@ business vocabulary of `resources/`, and honour the repo's conventions
 (locators in the resources layer, no fixed waits, locale-independent
 assertions).
 
-## The three agents
+## The four agents
 
 | Agent | Input | Output |
 |---|---|---|
 | **sap-planner** | A business goal + a reachable system (ECC tcode or Fiori URL) | A Markdown test plan in `specs/`, grounded in live observations (perceive → act loop) |
 | **sap-generator** | A plan from `specs/` | A runnable suite in `tests/robot/`, every step executed live through rf-mcp before being written; missing business keywords added to the resources layer |
 | **sap-healer** | A failing suite/test | The failure reproduced, classified (locator drift / timing / data / functional change) and repaired **in the resources layer**, verified live, re-run to green, never silently |
+| **sap-istqb** | Planner specs and/or recorder outputs (recordings, `.spec.md`/`.istqb.md` drafts) | An **ISTQB test plan + test cases** document under `specs/istqb/` (offline, artifacts only): ISO 29119-3 sections, one test case per scenario with an Action / Données / Résultat attendu table and a normalized `replay` YAML block, human-readable AND replayable by an AI with any test framework; what no source supports stays marked « à compléter » |
 
 The planner also has a **coverage-discovery mode** for the question that comes
 *before* any plan (« what should we test first? »): it reads the real usage of
@@ -28,8 +29,16 @@ normal exploration loop. On a fresh trial without collector history it says so
 honestly and falls back to asking for the critical-transaction list.
 
 The canonical definitions live in `.claude/agents/sap-*.md`. Slash commands
-`/sap-plan`, `/sap-generate` and `/sap-heal` (`.claude/commands/`) wrap them
-for Claude Code.
+`/sap-plan`, `/sap-generate`, `/sap-heal` and `/sap-istqb`
+(`.claude/commands/`) wrap them for Claude Code.
+
+Both recorders emit the same ISTQB template as a draft (`--export-istqb` on
+the desktop, the « plan ISTQB » export-menu entry on the web): sap-istqb's
+job is then to WRITE the judgment fields (objective, scope, priorities,
+risks, traceability to specs and generated suites), never to degrade what was
+observed. These documents are test-design documentation: they never replace
+the executable suites, and the agent never edits `tests/robot/` or
+`resources/`.
 
 ## The cycle
 

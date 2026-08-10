@@ -114,16 +114,21 @@ _INTERACTIVE = {"capture", "hover", "record"}   # boucles à arrêter via « Arr
 
 
 def build_args(mode, filter_text="", out="", highlight_id="", no_highlight=False,
-               screenshots=False, engine="auto", semantic=False, suite=False,
-               export_resources=False, export_spec=False, export_report=False):
+               screenshots=False, engine="auto", semantic=False, suite=True,
+               export_resources=False, export_spec=False, export_report=False,
+               export_istqb=False):
     """Construit la liste d'arguments CLI de ``sapgui_recorder.py`` pour ``mode``.
 
     Reflète exactement l'interface de la CLI : ``--json`` prend le fichier en
     positionnel, ``--out`` sert capture/survol/record, ``--filter`` sert
-    dump/json/capture/survol, ``--screenshots``/``--semantic``/``--suite``/
-    ``--export-resources``/``--export-spec``/``--export-report`` ne s'appliquent
-    qu'au record, ``--engine`` à capture/record (omis quand il vaut ``auto``, le
-    défaut de la CLI). Lève si un id manque pour le surlignage."""
+    dump/json/capture/survol, ``--screenshots``/``--semantic``/
+    ``--export-resources``/``--export-spec``/``--export-report``/
+    ``--export-istqb`` ne s'appliquent qu'au record, ``--engine`` à
+    capture/record (omis quand il vaut ``auto``, le défaut de la CLI). La
+    suite complète est le DÉFAUT de la CLI depuis 2026-08-05 (aucun drapeau
+    émis) ; ``suite=False`` en mode record émet ``--body-only`` (l'ancien
+    fragment sans Library, qui ne se lance pas tel quel). Lève si un id manque
+    pour le surlignage."""
     filter_text = (filter_text or "").strip()
     out = (out or "").strip()
     highlight_id = (highlight_id or "").strip()
@@ -145,10 +150,11 @@ def build_args(mode, filter_text="", out="", highlight_id="", no_highlight=False
     elif mode == "record":
         args = (["--record"] + (["--screenshots"] if screenshots else [])
                 + (["--semantic"] if semantic else [])
-                + (["--suite"] if suite else [])
+                + ([] if suite else ["--body-only"])
                 + (["--export-resources"] if export_resources else [])
                 + (["--export-spec"] if export_spec else [])
-                + (["--export-report"] if export_report else []))
+                + (["--export-report"] if export_report else [])
+                + (["--export-istqb"] if export_istqb else []))
     else:
         raise ValueError("Mode inconnu : %r" % (mode,))
 
@@ -256,10 +262,11 @@ def main():
     shots_var = tk.BooleanVar(value=False)
     engine_var = tk.StringVar(value="auto")
     sem_var = tk.BooleanVar(value=False)
-    suite_var = tk.BooleanVar(value=False)
+    suite_var = tk.BooleanVar(value=True)   # défaut : .robot complet qui se lance tel quel
     expres_var = tk.BooleanVar(value=False)
     expspec_var = tk.BooleanVar(value=False)
     expreport_var = tk.BooleanVar(value=False)
+    expistqb_var = tk.BooleanVar(value=False)
 
     pad = {"padx": 8, "pady": 3}
 
@@ -295,7 +302,8 @@ def main():
         frm_opt, text="Keywords humains par libellé (record natif)", variable=sem_var)
     chk_sem.grid(row=6, column=1, sticky="w", padx=6, pady=2)
     chk_suite = ttk.Checkbutton(
-        frm_opt, text="Suite .robot complète (Settings + Setup)", variable=suite_var)
+        frm_opt, text="Suite .robot complète (Settings + Setup ; décoché = fragment)",
+        variable=suite_var)
     chk_suite.grid(row=7, column=1, sticky="w", padx=6, pady=2)
     chk_expres = ttk.Checkbutton(
         frm_opt, text="Export resource-first (.resource + suite)", variable=expres_var)
@@ -306,6 +314,9 @@ def main():
     chk_expreport = ttk.Checkbutton(
         frm_opt, text="Export rapport HTML (documentation)", variable=expreport_var)
     chk_expreport.grid(row=10, column=1, sticky="w", padx=6, pady=2)
+    chk_expistqb = ttk.Checkbutton(
+        frm_opt, text="Export plan ISTQB (.istqb.md)", variable=expistqb_var)
+    chk_expistqb.grid(row=11, column=1, sticky="w", padx=6, pady=2)
 
     desc_var = tk.StringVar()
     ttk.Label(root, textvariable=desc_var, wraplength=360, foreground="#555").grid(
@@ -329,6 +340,7 @@ def main():
         _set_state(chk_expres, mode in _USES_EXPORTS)
         _set_state(chk_expspec, mode in _USES_EXPORTS)
         _set_state(chk_expreport, mode in _USES_EXPORTS)
+        _set_state(chk_expistqb, mode in _USES_EXPORTS)
 
     def _set_state(widget, enabled, enabled_state="normal"):
         widget.configure(state=enabled_state if enabled else "disabled")
@@ -478,7 +490,7 @@ def main():
                               hid_var.get(), nohl_var.get(), shots_var.get(),
                               engine_var.get(), sem_var.get(), suite_var.get(),
                               expres_var.get(), expspec_var.get(),
-                              expreport_var.get())
+                              expreport_var.get(), expistqb_var.get())
         except ValueError as exc:
             messagebox.showerror("Option manquante", str(exc))
             return

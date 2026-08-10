@@ -93,6 +93,8 @@ _MAP_MARKERS = {
         "Click Element At Offset",
         # _semantic.py / _diagnostics.py
         "Lookup Business Term", "Client Security Should Be Hardened",
+        # _grid.py (GuiTableControl par titre) / _semantic.py (matchcode)
+        "Read Table Control", "Pick F4 Value",
     ],
     "fiori_plugin.py": [
         # pile de frames + moteur dom + diagnostic (sessions hybrides)
@@ -104,12 +106,21 @@ _MAP_MARKERS = {
         "Ui5 Screen Should Match Baseline", "Set Ui5 Timeout",
         # carte numérotée + action par référence @N
         "Get Ui5 Page Map", "Click Ui5 Ref",
+        # repos réseau/busy + messages par type + upload
+        "Wait For Ui5 Idle", "Get Ui5 Messages", "Upload File Via Ui5",
     ],
     "api_plugin.py": [
         # sessions par alias + introspection d'état (le canal sans écran)
         "Open Api Session", "Close All Api Sessions", "List Api Sessions",
         # OData v2/v4 + CSRF, RFC optionnel
         "Get Odata Count", "Post Odata", "Call Rfc",
+        # CRUD complet + fabrique de données (cycle réversible par l'API)
+        "Patch Odata", "Delete Odata", "Delete Created Entities",
+        # perception/découverte + préflight Gateway
+        "Get Odata Metadata", "List Odata Services", "Gateway Should Be Active",
+        "Wait Until Api Available",
+        # pattern BAPI + jobs de fond
+        "Call Bapi", "Wait For Background Job",
     ],
 }
 

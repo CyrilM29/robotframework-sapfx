@@ -40,10 +40,11 @@ python sapgui_recorder.py --record --out scenario.robot
 python sapgui_recorder.py --record --engine native   # force le moteur natif (événements)
 python sapgui_recorder.py --record --engine poll     # force le moteur polling
 python sapgui_recorder.py --record --screenshots     # + une capture d'écran par frontière (polling)
-python sapgui_recorder.py --record --suite           # .robot COMPLET rejouable (Settings + Setup)
+python sapgui_recorder.py --record --body-only       # fragment historique (sans Settings : ne se lance pas tel quel)
 python sapgui_recorder.py --record --export-resources  # + paire resource-first (aucun id brut)
 python sapgui_recorder.py --record --export-spec       # + plan Markdown format specs/ (brouillon)
 python sapgui_recorder.py --record --export-report     # + rapport HTML de documentation auto-contenu
+python sapgui_recorder.py --record --export-istqb      # + plan de test + cas de test ISTQB (.istqb.md)
 
 # Replay : rejoue un enregistrement contre la session SAP GUI OUVERTE (arrêt au 1er échec)
 python sapgui_recorder.py --replay captures/record_x.robot
@@ -70,14 +71,18 @@ vérifications sans quitter SAP GUI :
 
 ### Exports post-enregistrement
 
-Le déroulé brut (ids techniques) est un **brouillon**. Quatre exports en
+Le déroulé brut (ids techniques) est un **brouillon**. Cinq exports en
 dérivent ; l'enregistrement brut n'est jamais modifié :
 
-- `--suite` : le fichier de sortie est directement un `.robot` complet et
-  rejouable (Settings + `Suite Setup    Attach To Open Session`, le nouveau
+- **Suite complète par défaut** (depuis le 2026-08-05) : le fichier de sortie
+  est directement un `.robot` complet et rejouable (Settings +
+  `Library SapEccLibrary` + `Suite Setup    Attach To Open Session`, le
   keyword qui rattache la bibliothèque à la session SAP GUI déjà ouverte, par
   index ; `Connect To Session` seul n'obtient que le moteur de scripting,
-  jamais la session ; attrapé en rejouant un export en live).
+  jamais la session ; attrapé en rejouant un export en live). Un `.robot`
+  sans son import Library échoue en « keyword introuvable » lancé tel quel
+  (constaté live) ; `--body-only` restaure le fragment historique (corps nu à
+  coller dans une suite existante ; `--suite` reste accepté, redondant).
 - `--export-resources` : écrit `<out>_keywords.resource` (chaque id devient une
   variable `${LOC_…}` enveloppée dans un keyword métier : `Saisir
   DATABROWSE_TABLENAME`, `Cliquer Bouton 31`…) plus
@@ -98,6 +103,17 @@ dérivent ; l'enregistrement brut n'est jamais modifié :
   toujours masqués). De la documentation pour humains, jamais un test.
   Concept observé chez le recorder de RoboSAPiens (`saveHtmlReport`, voir
   `NOTICE`), réimplémenté par step.
+- `--export-istqb` : écrit `<out>.istqb.md`, un document **plan de test + cas
+  de test ISTQB** (sections ISTQB / ISO 29119-3 : objectif et périmètre,
+  préconditions, critères d'entrée/sortie, traçabilité, risques ; un cas de
+  test avec tableau Action / Données / Résultat attendu). Chaque cas de test
+  porte un bloc `replay` YAML normalisé (actions neutres vis-à-vis du
+  framework : `run_transaction`/`fill`/`click`/`assert_value`…, cible en
+  langage humain, localisateur relevé relégué en `hint`) : lisible par un
+  humain ET rejouable par une IA avec n'importe quel framework de test. Le
+  recorder n'invente rien : les rubriques de jugement restent « à compléter »
+  (l'agent `sap-istqb` les rédige depuis les plans `specs/`) ; les assertions
+  posées à chaud deviennent de vrais résultats attendus.
 
 Les lignes sémantiques de `--semantic` (un step `Fill Field By Label` /
 `Click Button By Label` portant son id technique en commentaire de fin de

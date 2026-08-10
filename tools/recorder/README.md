@@ -39,10 +39,11 @@ python sapgui_recorder.py --record --out scenario.robot
 python sapgui_recorder.py --record --engine native   # force the native event engine
 python sapgui_recorder.py --record --engine poll     # force the polling engine
 python sapgui_recorder.py --record --screenshots     # + a screenshot per boundary (polling)
-python sapgui_recorder.py --record --suite           # full replayable .robot (Settings + Setup)
+python sapgui_recorder.py --record --body-only       # historic fragment (no Settings: not runnable as-is)
 python sapgui_recorder.py --record --export-resources  # + resource-first pair (no raw id in tests)
 python sapgui_recorder.py --record --export-spec       # + specs/-style Markdown plan (draft)
 python sapgui_recorder.py --record --export-report     # + self-contained HTML documentation report
+python sapgui_recorder.py --record --export-istqb      # + ISTQB test plan + test cases (.istqb.md)
 
 # Replay: play a recording back against the OPEN SAP GUI session (stop on 1st failure)
 python sapgui_recorder.py --replay captures/record_x.robot
@@ -68,14 +69,18 @@ A recording without assertions is just a navigation script. During `--record`
 
 ### Post-recording exports
 
-The raw transcript (technical ids) is a **draft**. Four exports derive from it;
+The raw transcript (technical ids) is a **draft**. Five exports derive from it;
 the raw recording is never modified:
 
-- `--suite`: the output file itself is a complete, replayable `.robot`
-  (Settings + `Suite Setup    Attach To Open Session`, the new keyword that
-  binds the library to the already-open SAP GUI session by index;
-  `Connect To Session` alone only acquires the scripting engine, never the
-  session; caught by live-replaying an export).
+- **Complete suite by default** (since 2026-08-05): the output file itself is
+  a complete, replayable `.robot` (Settings + `Library SapEccLibrary` +
+  `Suite Setup    Attach To Open Session`, the keyword that binds the library
+  to the already-open SAP GUI session by index; `Connect To Session` alone
+  only acquires the scripting engine, never the session; caught by
+  live-replaying an export). A `.robot` file that lacks its Library import
+  fails with "keyword not found" when launched as-is (caught live);
+  `--body-only` restores the historic body-only fragment for pasting into an
+  existing suite (`--suite` is kept as a redundant compatibility flag).
 - `--export-resources`: writes `<out>_keywords.resource` (each id becomes a
   `${LOC_…}` variable wrapped in a business keyword: `Saisir
   DATABROWSE_TABLENAME`, `Cliquer Bouton 31`…) plus
@@ -95,6 +100,16 @@ the raw recording is never modified:
   named arguments are always masked). Documentation for humans, never a
   test. Concept observed in RoboSAPiens' recorder (`saveHtmlReport`, see
   `NOTICE`), re-implemented per step.
+- `--export-istqb`: writes `<out>.istqb.md`, an **ISTQB test plan + test
+  cases** document (ISTQB / ISO 29119-3 sections: objective and scope,
+  preconditions, entry/exit criteria, traceability, risks; one test case with
+  an Action / Données / Résultat attendu table). Each test case carries a
+  normalized `replay` YAML block (framework-neutral actions such as
+  `run_transaction`/`fill`/`click`/`assert_value`, human target wording, the
+  recorded locator relegated to a `hint`): human-readable AND replayable by an
+  AI with any test framework. The recorder invents nothing: judgment fields
+  stay marked « à compléter » (the `sap-istqb` agent writes them from
+  `specs/` plans); hot assertions become real expected results.
 
 Semantic lines from `--semantic` (a `Fill Field By Label` / `Click Button By
 Label` step carrying its technical id as an end-of-line comment) get a

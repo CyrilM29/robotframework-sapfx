@@ -106,8 +106,14 @@ per file, update the index in the same operation, never secrets anywhere.
   It reuses the Browser library's active page: suites import
   `Library    Browser` alongside it.
 - `src/SapApiLibrary/` is the **API channel** (stdlib-only): OData v2/v4 with
-  one keyword set (`Open Api Session`, `Get Odata Entities/Count`, `Post Odata`
-  with the SAP CSRF protocol), optional RFC via pyrfc. Prefer preparing and
+  one keyword set: full CRUD (`Post/Patch/Delete Odata`, SAP CSRF protocol,
+  `If-Match`), `Post Odata Batch` (atomic changeset), pagination
+  (`follow_next=True`), test-data factory (`track=True` +
+  `Delete Created Entities`, `Ensure Odata Entity`), discovery
+  (`Get Odata Metadata`, `List Odata Services`), Gateway preflight
+  (`Gateway Should Be Active`, `Wait Until Api Available`), OAuth2/mTLS auth,
+  telemetry, optional RFC via pyrfc with `Call Bapi` (RETURN checked by type)
+  and `Wait For Background Job`. Prefer preparing and
   cross-checking data through it; drive the screen only for what is under test
   (see `tests/robot/flagship_cross_paradigm.robot`, and
   `cross_paradigm_api_visual.robot` which adds a perceptual-hash screen baseline
@@ -143,7 +149,10 @@ per file, update the index in the same operation, never secrets anywhere.
   A `PostToolUse` hook (`scripts/hook_guards.py`) runs the em-dash guard on
   every edited file and the others after each edit.
   The built pack (`dist/sapfx-pack-*.zip`) is generated: never edit it in place.
-- SAP test agents (plan → generate → heal): canonical definitions in
+- SAP test agents (plan → generate → heal, plus the offline `sap-istqb`
+  designer: planner specs + recorder outputs → ISTQB test plan + test cases
+  under `specs/istqb/`, replayable by an AI with any framework): canonical
+  definitions in
   `.claude/agents/sap-*.md` (+ the `sapfx` toolkit skill in
   `.claude/skills/`, shipped in the pack), business test plans in `specs/`
   (French). The

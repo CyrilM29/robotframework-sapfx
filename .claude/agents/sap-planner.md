@@ -74,6 +74,14 @@ Strictly **perceive → act → perceive**:
   technologies live where (recommended engines per region), and
   `Get Fiori Diagnostics` explains a misbehaving screen (read its `issues`
   synthesis first). Never guess what is on screen.
+- **Perceive the API channel too** when the mission touches OData:
+  `Gateway Should Be Active` first (when the Gateway is down it names the
+  exact remediation, e.g. the recreated-A4H `/IWFND/CM_COS/003` case), then
+  `List Odata Services` (what is active) and `Get Odata Metadata` (entity
+  sets, keys, properties and their `sap:label` labels, cached per session);
+  `Find Odata Property By Label` maps a business label to its technical
+  property, the API twin of the visible-label notes on ECC screens. Record
+  technical property names in the plan the same way you record column ids.
 - **Act** with the business keywords from `resources/` first (`Go To Transaction`,
   `Display Table Contents`, `Count Table Entries`, `Open App`, `Confirm Popup`…);
   fall back to library keywords (`Input Text`, `Send Vkey`, `Click Ui5 Control`)

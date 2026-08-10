@@ -44,3 +44,11 @@ Gabarit d'un plan :
 
 `sflight-consultation-se16.md` est l'exemple de référence : il correspond au
 flux validé live par `tests/robot/ecc_data_smoke.robot`.
+
+Le sous-répertoire `istqb/` accueille les **plans de test + cas de test
+ISTQB** (`*.istqb.md`), produits par l'agent **sap-istqb** (et en brouillon
+par les deux recorders) : documentation de conception de test au gabarit
+ISTQB / ISO 29119-3, chaque cas de test portant un bloc `replay` YAML
+normalisé rejouable par une IA quel que soit le framework. Voir
+`specs/istqb/README.md` ; ces documents ne sont pas des plans à générer par
+sap-generator et restent hors du périmètre de `check_spec_sync.py`.

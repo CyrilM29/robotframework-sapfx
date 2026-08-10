@@ -96,8 +96,10 @@ class SapApiPlugin(StaticLibraryPlugin):
         )
         hints = LibraryHints(
             standard_keywords=[
-                "Open Api Session", "Get Odata Entities", "Get Odata Count",
-                "Post Odata", "Close All Api Sessions", STATE_KEYWORD,
+                "Open Api Session", "Gateway Should Be Active",
+                "Get Odata Entities", "Get Odata Count", "Post Odata",
+                "Delete Created Entities", "Get Odata Metadata",
+                "Close All Api Sessions", STATE_KEYWORD,
             ],
             error_hints=API_HINTS,
         )
@@ -116,13 +118,28 @@ class SapApiPlugin(StaticLibraryPlugin):
         return {
             kw.lower(): "SapApiLibrary"
             for kw in (
-                # sessions par alias
+                # sessions par alias + télémétrie
                 "Open Api Session", "Close Api Session",
                 "Close All Api Sessions", STATE_KEYWORD,
-                # OData v2/v4
+                "Get Api Telemetry",
+                # OData v2/v4 : lectures (pagination server-driven comprise)
                 "Get Odata", "Get Odata Entities", "Get Odata Count",
-                "Post Odata",
-                # RFC optionnel (pyrfc)
+                # OData v2/v4 : écritures (CRUD complet, CSRF/If-Match gérés)
+                "Post Odata", "Patch Odata", "Delete Odata",
+                "Call Odata Function", "Post Odata Batch",
+                # fabrique de données de test (cycle réversible par l'API)
+                "Ensure Odata Entity", "Register Created Entity",
+                "Get Created Entities", "Delete Created Entities",
+                # perception et découverte du canal (le canal sans écran)
+                "Get Odata Metadata", "Find Odata Property By Label",
+                "List Odata Services", "Lookup Business Term",
+                # préflight Gateway (le miroir API des préflights GUI)
+                "Get Gateway Status", "Gateway Should Be Active",
+                "Wait Until Api Available",
+                # RFC optionnel (pyrfc) + pattern BAPI + jobs de fond
                 "Open Rfc Connection", "Call Rfc", "Close Rfc Connection",
+                "Close All Rfc Connections", "Call Bapi",
+                "Commit Bapi Transaction", "Rollback Bapi Transaction",
+                "Wait For Background Job",
             )
         }

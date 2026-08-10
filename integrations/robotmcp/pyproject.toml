@@ -1,6 +1,6 @@
 [project]
 name = "sap-robotmcp"
-version = "0.6.5"
+version = "0.6.6"
 description = "SAP plugins for the rf-mcp (RobotMCP) server: real screen perception (never optimistic), keyword routing and selector guidance for SAP GUI (ECC/S4) and Fiori/UI5: MCP access to SAP for any agent."
 readme = "README.md"
 license = { text = "Apache-2.0" }

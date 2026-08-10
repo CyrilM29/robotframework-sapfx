@@ -19,8 +19,12 @@ playwright-log.txt
 *.png
 /results/
 # ...but the project logo + the extension's toolbar icons + store screenshot are committed assets.
+# Two medallion variants: `logo.png` (suite = the whole project) and
+# `logo-library.png` (the libraries alone, the PyPI page), each with its 1024 master.
 !assets/logo.png
-!assets/logo_rf-sapfx.png
+!assets/logo-library.png
+!assets/logo_rf-sapfx_suite.png
+!assets/logo_rf-sapfx_library.png
 !tools/recorder/assets/icon.png
 !tools/recorder_web/extension/icon16.png
 !tools/recorder_web/extension/icon48.png

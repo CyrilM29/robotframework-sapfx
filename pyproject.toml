@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robotframework-sapfx"
-version = "0.6.5"
+version = "0.6.6"
 description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -40,7 +40,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 SapEccLibrary = ["py.typed"]
-SapFioriLibrary = ["py.typed"]
+SapFioriLibrary = ["py.typed", "*.js.tpl"]
 SapApiLibrary = ["py.typed"]
 sapfx_common = ["py.typed"]
 

@@ -71,7 +71,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.6.5"
+    __version__ = "0.6.6"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 

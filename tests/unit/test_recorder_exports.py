@@ -149,6 +149,73 @@ def test_spec_export_unknown_step_stays_verbatim_as_raw():
     assert "Étape brute à traduire : `Mon Keyword Exotique    arg`" in md
 
 
+# --- export ISTQB (plan de test + cas de test) --------------------------------
+
+def test_istqb_export_covers_plan_sections_table_and_replay_block():
+    steps = ["Run Transaction    SE16",
+             "Input Text    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    T000",
+             "Send Vkey    0",
+             "Click Toolbar Button    wnd[0]    wnd[0]/tbar[1]/btn[31]",
+             "Element Value Should Be    wnd[1]/usr/txtG_DBCOUNT    1"]
+    md = spy.steps_to_istqb(steps, "Comptage T000", source="demo.robot")
+    for section in ("## 1. Objectif et périmètre",
+                    "## 2. Préconditions et données de test",
+                    "## 3. Critères d'entrée / de sortie",
+                    "## 4. Cas de test",
+                    "## 5. Traçabilité",
+                    "## 6. Risques et points de vigilance"):
+        assert section in md, section
+    assert "- **Identifiant** : TP-comptage-t000" in md
+    assert "### TC-01 : Comptage T000" in md
+    assert "| # | Action | Données | Résultat attendu |" in md
+    assert ("| 2 | Saisir `T000` dans le champ `DATABROWSE_TABLENAME` "
+            "| `T000` | La valeur est acceptée |") in md
+    # bloc replay : actions normalisées + localisateur relégué en hint
+    assert "channel: sap-gui" in md
+    assert "  - action: run_transaction" in md
+    assert "    value: 'T000'" in md
+    assert ("    hint: {engine: 'sapgui-id', "
+            "locator: 'wnd[0]/usr/ctxtDATABROWSE-TABLENAME'}") in md
+    assert "  - action: assert_value" in md
+    assert "    expected: '1'" in md
+    # le tableau humain ne porte AUCUN id brut (ils vivent dans les hints)
+    table = md.split("| # | Action")[1].split("Bloc rejouable")[0]
+    assert "wnd[" not in table
+    # la touche pressée est l'action, jamais une donnée
+    assert "| 3 | Envoyer la touche `Entrée` |  |" in md
+    # accents translittérés dans l'identifiant (attrapé au premier live)
+    assert "TP-scenario-enregistre" in spy.steps_to_istqb(
+        ["Run Transaction    SE16"], "Scénario enregistré")
+
+
+def test_istqb_export_semantic_visual_and_unknown_steps():
+    steps = ["Fill Field By Label    Table Name    T000"
+             "    # id: wnd[0]/usr/ctxtDATABROWSE-TABLENAME",
+             "Click Button By Label    Number of Entries",
+             "Screen Should Match Baseline    se16_t000",
+             "Mon Keyword Exotique    arg"]
+    md = spy.steps_to_istqb(steps)
+    # l'id relevé par --semantic prime sur l'ancre de libellé
+    assert ("hint: {engine: 'sapgui-id', "
+            "locator: 'wnd[0]/usr/ctxtDATABROWSE-TABLENAME'}") in md
+    assert "hint: {engine: 'sapgui-label', locator: 'Number of Entries'}" in md
+    assert "  - action: assert_visual" in md
+    # étape inconnue : action raw portant la ligne Robot Framework exacte
+    assert "  - action: raw" in md
+    assert "    line: 'Mon Keyword Exotique    arg'" in md
+
+
+def test_istqb_export_never_carries_a_password_and_quotes_yaml():
+    steps = ["Input Password    wnd[0]/usr/pwdRSYST-BCODE    secret123",
+             "Input Text    wnd[0]/usr/txtX    l'apostrophe"]
+    md = spy.steps_to_istqb(steps)
+    assert "  - action: fill_secret" in md
+    assert "secret123" not in md                     # jamais un mot de passe
+    assert "note: 'mot de passe à fournir au replay, jamais enregistré'" in md
+    # guillemets simples YAML doublés
+    assert "value: 'l''apostrophe'" in md
+
+
 # --- run_record_exports (E/S autour des fonctions pures) ----------------------
 
 def test_run_record_exports_writes_resource_pair_and_spec(tmp_path):
@@ -165,6 +232,20 @@ def test_run_record_exports_writes_resource_pair_and_spec(tmp_path):
     # l'enregistrement BRUT n'est jamais modifié
     assert "Input Text    wnd[0]/usr/txtX    1" in out.read_text(encoding="utf-8")
     assert any("resource-first" in m for m in messages)
+
+
+def test_run_record_exports_writes_istqb(tmp_path):
+    out = tmp_path / "demo.robot"
+    out.write_text(spy.build_record_header(str(out))
+                   + "    Input Text    wnd[0]/usr/txtX    1\n", encoding="utf-8")
+    messages = []
+    spy.run_record_exports(str(out), export_istqb=True, _writer=messages.append)
+    md = (tmp_path / "demo.istqb.md").read_text(encoding="utf-8")
+    assert "# Plan de test ISTQB :" in md and "channel: sap-gui" in md
+    assert "- **Références** : `demo.robot`" in md
+    # l'enregistrement BRUT n'est jamais modifié
+    assert "Input Text    wnd[0]/usr/txtX    1" in out.read_text(encoding="utf-8")
+    assert any("ISTQB" in m for m in messages)
 
 
 def test_run_record_exports_noop_without_flags(tmp_path):
@@ -598,17 +679,47 @@ def test_run_replay_fails_cleanly_on_missing_file_or_empty(tmp_path):
                           _writer=messages.append) == 1
 
 
+# --- défaut CLI : suite complète (un .robot produit se lance tel quel) --------
+
+def test_cli_default_writes_complete_suite_with_library(tmp_path):
+    # Attrapé au test live du 2026-08-05 : un enregistrement sans --suite
+    # produisait un corps nu SANS Library, qui échouait lancé tel quel.
+    # Verrouillé par la voie --transpile-vbs (aucune session SAP requise).
+    vbs = tmp_path / "rec.vbs"
+    vbs.write_text('session.findById("wnd[0]/usr/txtX").text = "1"\n',
+                   encoding="utf-8")
+    out = tmp_path / "defaut.robot"
+    assert spy.main(["--transpile-vbs", str(vbs), "--out", str(out)]) == 0
+    text = out.read_text(encoding="utf-8")
+    assert "*** Settings ***" in text
+    assert "Library             SapEccLibrary" in text
+    assert "Suite Setup         Attach To Open Session" in text
+    # --body-only = l'ancien fragment, sur demande explicite seulement
+    out2 = tmp_path / "fragment.robot"
+    assert spy.main(["--transpile-vbs", str(vbs), "--out", str(out2),
+                     "--body-only"]) == 0
+    text2 = out2.read_text(encoding="utf-8")
+    assert "*** Settings ***" not in text2
+    assert text2.lstrip("#").lstrip().startswith("Enregistré par SAP GUI Recorder")
+
+
 # --- GUI : nouvelles options + panneau de steps -------------------------------
 
 def test_build_args_record_new_flags():
-    assert gui.build_args("record", suite=True) == ["--record", "--suite"]
+    # suite complète = le DÉFAUT CLI depuis 2026-08-05 : aucun drapeau émis ;
+    # décocher la case = --body-only (l'ancien fragment sans Library).
+    assert gui.build_args("record") == ["--record"]
+    assert gui.build_args("record", suite=True) == ["--record"]
+    assert gui.build_args("record", suite=False) == ["--record", "--body-only"]
     assert gui.build_args("record", export_resources=True, export_spec=True) == \
         ["--record", "--export-resources", "--export-spec"]
     assert gui.build_args("record", export_report=True) == \
         ["--record", "--export-report"]
+    assert gui.build_args("record", export_istqb=True) == \
+        ["--record", "--export-istqb"]
     # hors record, sans effet
-    assert gui.build_args("capture", suite=True, export_resources=True,
-                          export_report=True) == ["--capture"]
+    assert gui.build_args("capture", suite=False, export_resources=True,
+                          export_report=True, export_istqb=True) == ["--capture"]
 
 
 def test_gui_default_record_name_and_path_resolution():

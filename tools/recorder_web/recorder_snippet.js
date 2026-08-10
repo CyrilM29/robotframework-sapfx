@@ -98,6 +98,106 @@
   }
   function shortType(full) { return full ? full.split('.').pop() : ''; }
 
+  // ---- Repos réseau/busy (Wait For Ui5 Idle) --------------------------------
+  // XHR et fetch instrumentés à l'INSTALLATION du bundle (la garde __SAPFX
+  // protège du double-wrap) : on ne compte que les requêtes lancées après
+  // l'injection, exactement le besoin du keyword (agir, puis attendre que la
+  // page ait fini de parler au serveur). Indépendant du runtime UI5 : les
+  // pages WC/hybrides en profitent aussi.
+  const NET = { pending: 0, last: Date.now() };
+  function netDone() { NET.pending = NET.pending > 0 ? NET.pending - 1 : 0; NET.last = Date.now(); }
+  try {
+    const xhrSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function () {
+      NET.pending += 1; NET.last = Date.now();
+      try { this.addEventListener('loadend', netDone); } catch (e) { netDone(); }
+      return xhrSend.apply(this, arguments);
+    };
+  } catch (e) {}
+  try {
+    if (window.fetch) {
+      const realFetch = window.fetch;
+      window.fetch = function () {
+        NET.pending += 1; NET.last = Date.now();
+        const p = realFetch.apply(this, arguments);
+        try { p.then(netDone, netDone); } catch (e) { netDone(); }
+        return p;
+      };
+    }
+  } catch (e) {}
+  function busyVisible() {
+    try {
+      const nodes = document.querySelectorAll(
+        '.sapUiLocalBusyIndicator, .sapUiBusy, .sapMBusyDialog, .sapMBusyIndicator');
+      for (let i = 0; i < nodes.length; i++) {
+        const r = nodes[i].getBoundingClientRect();
+        if (r.width || r.height) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+  function idleState() {
+    const busy = busyVisible();
+    if (busy || NET.pending > 0) NET.last = Date.now();
+    return { pending: NET.pending, busy: busy, quiet_ms: Date.now() - NET.last };
+  }
+
+  // ---- Messages UI5 (MessageManager/Messaging) et MessageToast ---------------
+  // Les toasts sont éphémères à l'écran : un hook posé sur sap.m.MessageToast à
+  // l'injection garde les 20 derniers (texte + horodatage). Best-effort : un
+  // toast émis AVANT l'injection est perdu, jamais une erreur.
+  const TOASTS = [];
+  try {
+    if (window.sap && sap.ui && sap.ui.require) {
+      sap.ui.require(['sap/m/MessageToast'], function (MT) {
+        try {
+          if (!MT || MT.__sapfxToastHook) return;
+          const realShow = MT.show;
+          MT.show = function (message) {
+            try {
+              TOASTS.push({ text: String(message), time: Date.now() });
+              if (TOASTS.length > 20) TOASTS.shift();
+            } catch (e) {}
+            return realShow.apply(this, arguments);
+          };
+          MT.__sapfxToastHook = true;
+        } catch (e) {}
+      });
+    }
+  } catch (e) {}
+  function messageModel() {
+    try {
+      const M = window.sap && sap.ui && sap.ui.require && sap.ui.require('sap/ui/core/Messaging');
+      if (M && typeof M.getMessageModel === 'function') return M.getMessageModel();
+    } catch (e) {}
+    try {
+      const c = core();
+      if (c && typeof c.getMessageManager === 'function') return c.getMessageManager().getMessageModel();
+    } catch (e) {}
+    return null;
+  }
+  function getMessages() {
+    if (!isUI5()) return null;
+    const out = { messages: [], toasts: TOASTS.slice() };
+    try {
+      const model = messageModel();
+      const data = (model && model.getData()) || [];
+      for (let i = 0; i < data.length; i++) {
+        const m = data[i];
+        try {
+          out.messages.push({
+            type: String((m.getType ? m.getType() : m.type) || ''),
+            message: String((m.getMessage ? m.getMessage() : m.message) || ''),
+            target: String((m.getTargets ? (m.getTargets()[0] || '')
+                            : (m.getTarget ? m.getTarget() : (m.target || ''))) || ''),
+            description: String((m.getDescription ? m.getDescription() : (m.description || '')) || '')
+          });
+        } catch (e) {}
+      }
+    } catch (e) {}
+    return out;
+  }
+
   // Littéral de chaîne XPath 1.0 correctement échappé. XPath 1.0 (document.evaluate)
   // n'offre AUCUN échappement de guillemet dans un littéral : on bascule de quote, et
   // si la valeur contient les deux types, on construit un concat(). Évite qu'un texte
@@ -393,12 +493,28 @@
   // encodages : JSON `"SID":"…"` (fixtures, anciens ITS) ou littéral JS `SID:'…'`
   // (clé non citée, guillemets simples : le WebGUI live S/4 1909, constaté 2026-07-18).
   // Porté depuis playwright-sap sidSelectorGenerator.ts (regex au lieu d'eval).
+  // Décodage d'entités HTML SANS innerHTML : même sur un <textarea> détaché,
+  // un lsdata hostile pourrait sortir du RCDATA par </textarea> et créer des
+  // nœuds à gestionnaire inline. Entités numériques + les nommées usuelles :
+  // largement assez pour un attribut lsdata.
+  const NAMED_ENTITIES = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+                          nbsp: '\u00a0'};
+  function decodeEntities(raw) {
+    return raw.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function (all, ent) {
+      if (ent.charAt(0) === '#') {
+        const cp = (ent.charAt(1) === 'x' || ent.charAt(1) === 'X')
+          ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+        return isNaN(cp) ? all : String.fromCodePoint(cp);
+      }
+      return Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, ent)
+        ? NAMED_ENTITIES[ent] : all;
+    });
+  }
   function sidFromElement(el) {
     if (!el || !el.getAttribute) return undefined;
     const raw = el.getAttribute('lsdata');
     if (!raw) return undefined;
-    const ta = document.createElement('textarea'); ta.innerHTML = raw;
-    const m = ta.value.match(/["']?SID["']?\s*:\s*["']([^"']+)["']/);
+    const m = decodeEntities(raw).match(/["']?SID["']?\s*:\s*["']([^"']+)["']/);
     return m ? m[1] : undefined;
   }
   function captureSid(node) {
@@ -832,6 +948,7 @@
                      resolveByDom: resolveByDom, pageComposition: pageComposition,
                      capture: capture, captureWc: captureWc, captureDom: captureDom,
                      bestXpath: bestXpath, readTable: readTable, dumpTree: dumpTree,
+                     idleState: idleState, getMessages: getMessages,
                      captureSid: captureSid, highlightInfo: highlightInfo };
 })();
 (function () {
@@ -1046,7 +1163,7 @@
   // « ce panneau se déplace » (constaté utile : le drag existait mais restait
   // invisible tant qu'on ne survolait pas l'en-tête).
   var logo = document.createElement('img');
-  logo.src = 'data:image/png;base64,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';
+  logo.src = 'data:image/png;base64,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';
   logo.alt = 'aicabra';
   logo.style.cssText = 'width:20px;height:20px;border-radius:50%;flex:0 0 auto;' +
     'cursor:move;background:#fff;';
@@ -1495,6 +1612,201 @@
       ? 'Localisateurs relev\u00e9s (notes factuelles pour le g\u00e9n\u00e9rateur) :\n\n' + vigilance.join('\n') + '\n'
       : '- (aucun localisateur relev\u00e9)\n';
     return md;
+  }
+  // --- export ISTQB : plan de test + cas de test, humain ET rejouable --------
+  // Miroir web de steps_to_istqb (recorder desktop) : UN document Markdown,
+  // sections plan (objectif, préconditions, critères), un cas de test PAR
+  // scénario (+test) avec tableau Action / Données / Résultat attendu, et un
+  // bloc replay YAML aux actions normalisées (fill/click/press_key/assert_*),
+  // indépendant du framework d'exécution : cible en langage humain d'abord, le
+  // localisateur relevé (et son repli xpath posé à l'enregistrement) en hint.
+  function yq(t) { return "'" + String(t).replace(/'/g, "''") + "'"; }
+  function mdCell(t) { return String(t).replace(/\|/g, '\\|'); }
+  function istqbSlug(t) {
+    // accents translittérés (NFD + diacritiques retirés) : « Scénario
+    // enregistré » -> scenario-enregistre, jamais sc-nario-enregistr.
+    var s = String(t);
+    try { s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+    s = s.replace(/[^0-9A-Za-z]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    return s || 'enregistrement';
+  }
+  var ISTQB_GENERIC_EXPECTED = 'L\u2019action s\u2019ex\u00e9cute sans erreur (\u00e0 pr\u00e9ciser)';
+  var ISTQB_EXPECTED = {
+    fill: 'La valeur est accept\u00e9e',
+    press_key: 'L\u2019\u00e9cran suivant s\u2019affiche (\u00e0 pr\u00e9ciser)',
+    wait: 'Le chargement se termine',
+    assert_text: 'Texte conforme (assertion ind\u00e9pendante de la locale)',
+    assert_present: 'L\u2019\u00e9l\u00e9ment est pr\u00e9sent',
+    raw: '\u00e0 pr\u00e9ciser'
+  };
+  function istqbStep(line) {
+    var cells = line.split('    ');
+    var ci = -1;
+    for (var i = 0; i < cells.length; i++) {
+      if (cells[i].charAt(0) === '#') { ci = i; break; }
+    }
+    var comment = ci >= 0 ? cells.slice(ci).join('    ') : '';
+    if (ci >= 0) cells = cells.slice(0, ci);
+    cells = cells.filter(function (c) { return c !== ''; });
+    var kw = cells[0] || '';
+    function target(from, to) {
+      return slugFromArgs(to ? cells.slice(from, to) : cells.slice(from), 'cible').toLowerCase();
+    }
+    function sel(from, to) {
+      return (to ? cells.slice(from, to) : cells.slice(from)).join('    ');
+    }
+    function hintFor(engine, loc) {
+      var h = { engine: engine, locator: loc };
+      var m = comment.match(/^#\s*xpath:\s*(.+)$/);
+      if (m) h.fallback = m[1];
+      return h;
+    }
+    if (kw === 'Click Ui5 Control') return { action: 'click', target: target(1), hint: hintFor('ui5-role', sel(1)) };
+    if (kw === 'Click Wc Control') return { action: 'click', target: target(1), hint: hintFor('wc', sel(1)) };
+    if (kw === 'Click Dom Element') return { action: 'click', target: target(1), hint: hintFor('dom', sel(1)) };
+    if (kw === 'Click Sid') return { action: 'click', target: target(1), hint: hintFor('sid', sel(1)) };
+    if (kw === 'Fill Ui5 Input' || kw === 'Fill Wc Input' || kw === 'Fill Dom Input')
+      return { action: 'fill', target: 'champ ' + target(2), value: rfUnescape(cells[1]),
+               hint: hintFor(kw === 'Fill Ui5 Input' ? 'ui5-role' : (kw === 'Fill Wc Input' ? 'wc' : 'dom'), sel(2)) };
+    if (kw === 'Fill Sid Input')
+      return { action: 'fill', target: 'champ ' + target(1, 2), value: rfUnescape(cells[2]),
+               hint: hintFor('sid', sel(1, 2)) };
+    if (kw === 'Ui5 Text Should Be')
+      return { action: 'assert_text', target: target(2), expected: rfUnescape(cells[1]),
+               hint: hintFor('ui5-role', sel(2)) };
+    if (/Should Be Visible$/.test(kw)) {
+      var eng = kw.indexOf('Ui5') === 0 ? 'ui5-role'
+        : (kw.indexOf('Wc') === 0 ? 'wc' : (kw.indexOf('Dom') === 0 ? 'dom' : 'sid'));
+      return { action: 'assert_present', target: target(1), hint: hintFor(eng, sel(1)) };
+    }
+    if (kw === 'Wait For UI5 Ready' || kw === 'Wait For Load State') return { action: 'wait' };
+    if (kw === 'Keyboard Key') return { action: 'press_key', value: cells[cells.length - 1] };
+    return null;
+  }
+  function istqbYaml(st) {
+    var out = ['  - action: ' + st.action];
+    ['target', 'value', 'expected', 'line', 'note'].forEach(function (k) {
+      if (st[k] !== undefined && st[k] !== null) out.push('    ' + k + ': ' + yq(st[k]));
+    });
+    if (st.hint) {
+      out.push('    hint: {engine: ' + yq(st.hint.engine) + ', locator: ' + yq(st.hint.locator) + '}');
+      if (st.hint.fallback)
+        out.push('    fallback: {engine: ' + yq('ui5-xpath') + ', locator: ' + yq(st.hint.fallback) + '}');
+    }
+    return out;
+  }
+  function buildIstqb() {
+    var groups = splitScenarios();
+    var values = [];
+    var parsed = groups.map(function (group) {
+      return group.steps.map(function (line) {
+        var st = istqbStep(line);
+        if (st === null) st = { action: 'raw', line: line,
+                                note: '\u00e9tape non traduite : ligne Robot Framework exacte' };
+        if (st.action === 'fill' && st.value) values.push(st.value);
+        return st;
+      });
+    });
+    var md = '# Plan de test ISTQB : ' + testName() + '\n\n';
+    md += '> G\u00e9n\u00e9r\u00e9 par le recorder web depuis ' + startUrl() + '.\n';
+    md += '> Document de conception de test (ISTQB / ISO 29119-3) : lisible par\n';
+    md += '> un humain, rejouable par une IA via le bloc `replay` de chaque cas\n';
+    md += '> de test, ind\u00e9pendant du framework d\u2019ex\u00e9cution. Les mentions\n';
+    md += '> \u00ab \u00e0 compl\u00e9ter / \u00e0 pr\u00e9ciser \u00bb sont \u00e0 renseigner avant usage\n';
+    md += '> formel (l\u2019agent sap-istqb peut r\u00e9diger ce document).\n\n';
+    md += '- **Identifiant** : TP-' + istqbSlug(testName()) + '\n';
+    md += '- **Canal** : Fiori (web)\n';
+    md += '- **Syst\u00e8me / URL** : ' + startUrl() + '\n\n';
+    md += '## 1. Objectif et p\u00e9rim\u00e8tre\n\n';
+    md += '- **Objectif** : \u00e0 compl\u00e9ter (constat\u00e9 : d\u00e9roul\u00e9 enregistr\u00e9 ci-dessous).\n';
+    md += '- **\u00c9l\u00e9ments \u00e0 tester** : \u00e0 compl\u00e9ter.\n';
+    md += '- **Hors p\u00e9rim\u00e8tre** : \u00e0 compl\u00e9ter.\n\n';
+    md += '## 2. Pr\u00e9conditions et donn\u00e9es de test\n\n';
+    md += '- Application accessible \u00e0 ' + startUrl() + '.\n';
+    md += '- Valeurs observ\u00e9es pendant l\u2019enregistrement : ' +
+      (values.length ? values.map(mdCode).join(', ') : 'aucune') + '.\n\n';
+    md += '## 3. Crit\u00e8res d\u2019entr\u00e9e / de sortie\n\n';
+    md += '- **Entr\u00e9e** : application accessible, pr\u00e9conditions satisfaites.\n';
+    md += '- **Sortie** : tous les cas de test ex\u00e9cut\u00e9s, r\u00e9sultats attendus confirm\u00e9s.\n\n';
+    md += '## 4. Cas de test\n\n';
+    var trace = [];
+    groups.forEach(function (group, gi) {
+      var tcId = 'TC-' + (gi + 1 < 10 ? '0' : '') + (gi + 1);
+      md += '### ' + tcId + ' : ' + group.name + '\n\n- **Priorit\u00e9** : \u00e0 compl\u00e9ter\n\n';
+      md += '| # | Action | Donn\u00e9es | R\u00e9sultat attendu |\n';
+      md += '|---|--------|---------|------------------|\n';
+      parsed[gi].forEach(function (st, i) {
+        var human = st.action === 'raw'
+          ? '\u00c9tape non traduite : ' + mdCode(st.line)
+          : (humanizeWebStep(group.steps[i]) || st.action);
+        var data = (st.action !== 'press_key' && st.value !== undefined) ? st.value
+          : (st.action.indexOf('assert') === 0 && st.expected !== undefined ? st.expected : '');
+        md += '| ' + (i + 1) + ' | ' + mdCell(human) + ' | ' +
+          mdCell(data ? mdCode(data) : '') + ' | ' +
+          mdCell(ISTQB_EXPECTED[st.action] || ISTQB_GENERIC_EXPECTED) + ' |\n';
+      });
+      md += '\n- **Postconditions** : \u00e0 compl\u00e9ter.\n\n';
+      md += 'Bloc rejouable (actions normalis\u00e9es ; les `hint` sont les\n';
+      md += 'localisateurs relev\u00e9s au moment de l\u2019enregistrement) :\n\n';
+      md += '```yaml\ntest_case: ' + tcId + '\ntitle: ' + yq(group.name) + '\nchannel: web\nsteps:\n';
+      parsed[gi].forEach(function (st) { md += istqbYaml(st).join('\n') + '\n'; });
+      md += '```\n\n';
+      trace.push('| ' + tcId + ' | sc\u00e9nario ' + (gi + 1) + ' de l\u2019enregistrement, \u00e9tapes 1 \u00e0 ' +
+        parsed[gi].length + ' | \u00e0 relier |');
+    });
+    md += '## 5. Tra\u00e7abilit\u00e9\n\n';
+    md += '| Cas de test | Source | Exigence / spec |\n|---|---|---|\n' + trace.join('\n') + '\n\n';
+    md += '## 6. Risques et points de vigilance\n\n';
+    md += '- Les localisateurs des `hint` datent de l\u2019enregistrement : les\n';
+    md += '  re-v\u00e9rifier en cas de d\u00e9rive de la page (cha\u00eene de fallback).\n';
+    md += '- Ne jamais rejouer avec des attentes fixes (time.sleep) : attendre la\n';
+    md += '  fin du chargement (Wait For UI5 Ready / Wait For Load State).\n';
+    return md;
+  }
+  function exportIstqb() {
+    var md = buildIstqb();
+    download(md, 'recorded.istqb.md');
+    copy(md, btnExport);
+  }
+  // --- sélection multi-formats du menu export --------------------------------
+  // Chaque ligne du menu porte une CASE À COCHER (cocher plusieurs formats,
+  // puis « exporter la sélection » : téléchargements espacés pour que Chrome
+  // affiche son invite multi-téléchargements au lieu de bloquer en silence) ;
+  // cliquer le LIBELLÉ exporte toujours ce seul format immédiatement (le
+  // comportement historique, sur lequel s'appuient les smokes). La sélection
+  // survit à la navigation (sessionStorage, comme les steps).
+  var EXPSEL_KEY = '__ui5RecorderExportSel';
+  var EXPORT_FORMATS = [
+    { key: 'robot', label: '.robot complet', run: exportScript, files: 1 },
+    { key: 'resource', label: 'resource-first (.resource + .robot)', run: exportResourceFirst, files: 2 },
+    { key: 'spec', label: 'plan specs/ (.spec.md)', run: exportSpec, files: 1 },
+    { key: 'istqb', label: 'plan ISTQB (.istqb.md)', run: exportIstqb, files: 1 },
+    { key: 'report', label: 'rapport HTML (.html)', run: exportReport, files: 1 }
+  ];
+  var exportSel = (function () {
+    try { return JSON.parse(sessionStorage.getItem(EXPSEL_KEY)) || {}; }
+    catch (e) { return {}; }
+  })();
+  function saveExportSel() {
+    try { sessionStorage.setItem(EXPSEL_KEY, JSON.stringify(exportSel)); }
+    catch (e) { warnStorage(e); }
+  }
+  function exportSelected() {
+    var chosen = EXPORT_FORMATS.filter(function (f) { return exportSel[f.key]; });
+    if (!chosen.length) {
+      hint.textContent = 'Aucun format coch\u00e9 : cocher des cases du menu export, ' +
+        'puis \u00ab exporter la s\u00e9lection \u00bb.';
+      return;
+    }
+    var delay = 0;
+    chosen.forEach(function (f) {
+      if (delay) setTimeout(f.run, delay); else f.run();
+      delay += 400 * f.files;
+    });
+    if (chosen.length > 1) {
+      hint.textContent = 'Export de ' + chosen.length + ' formats : autoriser les ' +
+        't\u00e9l\u00e9chargements multiples si le navigateur le demande.';
+    }
   }
   function exportScript() {
     var body = buildScript();
@@ -2002,8 +2314,26 @@
     menuEl.style.top = Math.max(0, Math.min(y, window.innerHeight - items.length * 26 - 10)) + 'px';
     items.forEach(function (it) {
       var b = document.createElement('div');
-      b.textContent = it.label;
-      b.style.cssText = 'padding:5px 10px;cursor:pointer;color:#0a6ed1;';
+      b.style.cssText = 'display:flex;align-items:center;cursor:pointer;color:#0a6ed1;';
+      if (it.checkbox) {
+        // zone case à cocher : toggle SANS fermer le menu (cocher plusieurs
+        // formats d'affilée) ; le libellé reste l'action immédiate.
+        var box = document.createElement('span');
+        box.style.cssText = 'padding:5px 2px 5px 10px;';
+        var paintBox = function () {
+          box.textContent = it.checkbox.checked() ? '\u2611' : '\u2610';
+        };
+        paintBox();
+        box.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation(); it.checkbox.toggle(); paintBox();
+        });
+        b.appendChild(box);
+      }
+      var lab = document.createElement('span');
+      lab.textContent = it.label;
+      lab.style.cssText = 'padding:5px 10px 5px ' + (it.checkbox ? '4px' : '10px') +
+        ';flex:1;';
+      b.appendChild(lab);
       b.addEventListener('mouseenter', function () { b.style.background = '#eaf3fb'; });
       b.addEventListener('mouseleave', function () { b.style.background = ''; });
       b.addEventListener('click', function (e) {
@@ -2243,7 +2573,7 @@
     dot.style.display = on ? 'inline-block' : 'none';
     dot.style.animation = on ? '__ui5RecBlink 1s infinite' : 'none';
     hint.textContent = on
-      ? 'Recording: click/typed value = step. Right-click = assertion menu. +test = next scenario. export = .robot / resource / spec / report / import.'
+      ? 'Recording: click/typed value = step. Right-click = assertion menu. +test = next scenario. export = .robot / resource / spec / istqb / report / import.'
       : 'Hover + click to capture. rec to record, play to replay in-page. Right-click / Alt+click = assert. Esc to stop.';
     updateFrameWarn();
     render();
@@ -2262,13 +2592,15 @@
   btnExport.addEventListener('click', function (e) {
     e.stopPropagation();
     var r = btnExport.getBoundingClientRect();
-    showMenu([
-      { label: '.robot complet', run: exportScript },
-      { label: 'resource-first (.resource + .robot)', run: exportResourceFirst },
-      { label: 'plan specs/ (.spec.md)', run: exportSpec },
-      { label: 'rapport HTML (.html)', run: exportReport },
-      { label: 'importer un .robot\u2026', run: importRobot }
-    ], r.left, r.bottom + 4);
+    var items = EXPORT_FORMATS.map(function (f) {
+      return { label: f.label, run: f.run, checkbox: {
+        checked: function () { return !!exportSel[f.key]; },
+        toggle: function () { exportSel[f.key] = !exportSel[f.key]; saveExportSel(); }
+      } };
+    });
+    items.push({ label: 'exporter la s\u00e9lection', run: exportSelected });
+    items.push({ label: 'importer un .robot\u2026', run: importRobot });
+    showMenu(items, r.left, r.bottom + 4);
   });
   btnClear.addEventListener('click', function () {
     captures = []; steps = [];
