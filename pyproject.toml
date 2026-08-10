@@ -10,10 +10,30 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
-keywords = ["robotframework", "sap", "sapgui", "ecc", "s4hana", "test-automation"]
+keywords = [
+    "robotframework", "robot-framework", "test-automation", "testing", "qa",
+    "sap", "sapgui", "sap-gui", "ecc", "s4hana", "abap",
+    "fiori", "sapui5", "ui5", "playwright",
+    "odata", "rfc", "bapi", "api-testing",
+    "self-healing", "mcp", "ai-agents",
+]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Framework :: Robot Framework",
     "Framework :: Robot Framework :: Library",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Acceptance",
+    "Topic :: Software Development :: Quality Assurance",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    # Le canal SAP GUI (COM/pywin32) est Windows ; les canaux Fiori et API,
+    # eux, n'ont pas cette contrainte. On ne déclare que ce qui est VALIDÉ.
     "Operating System :: Microsoft :: Windows",
     "License :: OSI Approved :: Apache Software License",
 ]
