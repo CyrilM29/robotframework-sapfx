@@ -26,6 +26,9 @@ playwright-log.txt
 !assets/logo_rf-sapfx_suite.png
 !assets/logo_rf-sapfx_library.png
 !tools/recorder/assets/icon.png
+# Images embarquées par les pages Libdoc publiées (docs/libdoc) :
+!docs/libdoc/logo-library.png
+!docs/libdoc/picto_light.png
 !tools/recorder_web/extension/icon16.png
 !tools/recorder_web/extension/icon48.png
 !tools/recorder_web/extension/icon128.png
