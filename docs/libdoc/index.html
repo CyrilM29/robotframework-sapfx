@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>robotframework-sapfx · Keyword documentation</title>
+<style>
+  /* Palette and layout mirror the SAPFX slide deck: navy cover, spaced
+     uppercase kickers, white cards with blue/purple icon badges. */
+  :root {
+    --navy: #0A2145;
+    --navy-card: #142B54;
+    --navy-card2: #1E3A69;
+    --blue: #0070F2;
+    --blue-light: #5AA6FF;
+    --purple: #A100FF;
+    --page: #F4F6FB;
+    --card: #FFFFFF;
+    --text: #16213B;
+    --muted: #66738C;
+    --ice: #C9D6EC;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, "Segoe UI", system-ui, sans-serif;
+    background: var(--page);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.21em;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--blue);
+  }
+
+  /* ---- cover ---- */
+  .cover {
+    position: relative;
+    background: var(--navy);
+    color: #fff;
+    overflow: hidden;
+  }
+  .cover-inner {
+    max-width: 66rem;
+    margin: 0 auto;
+    padding: 3.2rem 1.5rem 3rem;
+    display: flex;
+    align-items: center;
+    gap: 3rem;
+  }
+  .cover .kicker { color: var(--blue-light); }
+  .cover h1 {
+    margin: 0.9rem 0 0;
+    font-size: clamp(1.9rem, 4.2vw, 2.7rem);
+    line-height: 1.12;
+    font-weight: 700;
+  }
+  .cover h1 .accent { color: var(--purple); display: block; }
+  .cover .sub {
+    color: var(--ice);
+    margin-top: 1.1rem;
+    max-width: 30rem;
+    font-size: 1.02rem;
+  }
+  .chips { margin-top: 1.7rem; display: flex; flex-wrap: wrap; gap: 0.55rem; }
+  .chip {
+    background: var(--navy-card);
+    color: var(--ice);
+    border-radius: 999px;
+    padding: 0.34rem 0.95rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .medallion {
+    flex: 0 0 auto;
+    width: 17rem;
+    height: 17rem;
+    border-radius: 50%;
+    background: var(--navy-card);
+    border: 1px solid var(--navy-card2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .medallion img { width: 88%; height: 88%; object-fit: contain; }
+  .picto {
+    position: absolute;
+    top: 1.1rem;
+    right: 1.4rem;
+    width: 2.6rem;
+    opacity: 0.95;
+  }
+  @media (max-width: 46rem) {
+    .cover-inner { flex-direction: column-reverse; text-align: center; gap: 1.8rem; }
+    .cover .sub { margin-left: auto; margin-right: auto; }
+    .chips { justify-content: center; }
+    .medallion { width: 12rem; height: 12rem; }
+  }
+
+  /* ---- cards ---- */
+  main { max-width: 66rem; margin: 0 auto; padding: 2.8rem 1.5rem 2rem; }
+  main h2 { font-size: 1.65rem; margin: 0.45rem 0 1.6rem; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16.5rem, 1fr));
+    gap: 1.3rem;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 1.5rem 1.4rem 1.35rem;
+    box-shadow: 0 5px 10px rgba(10, 33, 69, 0.18);
+    display: flex;
+    flex-direction: column;
+  }
+  .badge {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 50%;
+    background: var(--blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+  }
+  .badge.purple { background: var(--purple); }
+  .badge svg { width: 1.75rem; height: 1.75rem; }
+  .card h3 { font-size: 1.1rem; margin-bottom: 0.15rem; }
+  .card .canal { color: var(--muted); font-size: 0.83rem; margin-bottom: 0.65rem; }
+  .card p { flex: 1; color: var(--muted); font-size: 0.92rem; }
+  .card a {
+    margin-top: 1.05rem;
+    color: var(--blue);
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-decoration: none;
+  }
+  .card a:hover { text-decoration: underline; }
+  .note {
+    margin-top: 2.2rem;
+    background: var(--card);
+    border-left: 4px solid var(--blue-light);
+    border-radius: 8px;
+    padding: 0.95rem 1.2rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 0.6rem 1.5rem 2.4rem;
+  }
+  footer a { color: var(--blue); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<header class="cover">
+  <img class="picto" src="picto_light.png" alt="">
+  <div class="cover-inner">
+    <div>
+      <div class="kicker">SAP test automation · Robot Framework</div>
+      <h1>Test SAP end to end,
+        <span class="accent">keyword by keyword</span></h1>
+      <p class="sub">One business vocabulary, three channels: SAP GUI,
+         Fiori/UI5 and OData API. These pages are the complete keyword
+         reference of the three libraries shipped on PyPI, generated with
+         Libdoc from the released code.</p>
+      <div class="chips">
+        <span class="chip">Apache 2.0</span>
+        <span class="chip">Robot Framework 7</span>
+        <span class="chip">pip install robotframework-sapfx</span>
+      </div>
+    </div>
+    <div class="medallion">
+      <img src="logo-library.png" alt="SAPFX: ECC UI5 API Library">
+    </div>
+  </div>
+</header>
+<main>
+  <div class="kicker">Keyword reference · three channels</div>
+  <h2>Three libraries, one vocabulary</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2.5" y="4" width="19" height="13" rx="2"/>
+          <path d="M9 21h6M12 17v4"/>
+        </svg>
+      </div>
+      <h3>SapEccLibrary</h3>
+      <div class="canal">Desktop channel · SAP GUI (ECC, S/4HANA)</div>
+      <p>Drives SAP GUI for Windows through the SAP GUI Scripting API.
+         Screen perception, label-based locators, self-healing locators,
+         multi-session, visual assertions.</p>
+      <a href="SapEccLibrary.html">Open the keyword reference &rarr;</a>
+    </div>
+    <div class="card">
+      <div class="badge purple">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9.5"/>
+          <path d="M2.5 12h19M12 2.5c2.7 2.6 4 6 4 9.5s-1.3 6.9-4 9.5c-2.7-2.6-4-6-4-9.5s1.3-6.9 4-9.5z"/>
+        </svg>
+      </div>
+      <h3>SapFioriLibrary</h3>
+      <div class="canal">Web channel · Fiori / SAPUI5</div>
+      <p>Fiori automation on top of the Browser library (Playwright).
+         Five resolution engines (UI5 controls, hierarchical XPath, WebGUI,
+         Web Components, generic DOM), launchpad iframes, aggregated
+         diagnostics.</p>
+      <a href="SapFioriLibrary.html">Open the keyword reference &rarr;</a>
+    </div>
+    <div class="card">
+      <div class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8.5 7 4 12l4.5 5M15.5 7 20 12l-4.5 5"/>
+        </svg>
+      </div>
+      <h3>SapApiLibrary</h3>
+      <div class="canal">API channel · OData v2/v4 and RFC</div>
+      <p>The screenless channel: OData reads and writes (CSRF, atomic
+         $batch, pagination), reversible test-data factory, Gateway
+         preflight, and the BAPI pattern on top of optional RFC.</p>
+      <a href="SapApiLibrary.html">Open the keyword reference &rarr;</a>
+    </div>
+  </div>
+  <div class="note">
+    These pages document the low-level keywords of the libraries. The
+    repository also ships a layer of ready-to-use business keywords
+    (the <code>resources/</code> directory): that is the layer test suites
+    call in practice, so tests contain no raw locators.
+  </div>
+</main>
+<footer>
+  <p><a href="https://pypi.org/project/robotframework-sapfx/">PyPI</a> ·
+     <a href="https://github.com/CyrilM29/robotframework-sapfx">GitHub</a> ·
+     Apache-2.0 license · Pages generated with
+     <a href="https://robotframework.org/robotframework/#built-in-tools">Robot Framework Libdoc</a></p>
+</footer>
+</body>
+</html>

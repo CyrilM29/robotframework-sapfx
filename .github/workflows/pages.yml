@@ -1,0 +1,59 @@
+# Publication des pages de documentation des keywords (Libdoc) sur GitHub Pages.
+# La source est `docs/libdoc/` : le dossier que l'export public alimente à
+# chaque release (les pages naissent dans le studio, elles voyagent avec le
+# code). Le déploiement passe par un ARTEFACT, pas par une branche `gh-pages` :
+# rien à recopier à la main, et l'historique neuf de `main` à chaque release ne
+# peut pas emporter le site.
+# Prérequis (une fois, côté dépôt public) : Settings -> Pages -> Source :
+# « GitHub Actions ». Une source « Deploy from a branch » désactiverait ce
+# workflow : Pages n'a qu'UNE source.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/libdoc/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un seul déploiement à la fois, et on ne coupe pas une publication en cours
+# (le site resterait à moitié posé).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Le dépôt PRIVÉ embarque ce workflow (l'arbre public en est un export),
+    # mais ses pages vivent ailleurs et Pages n'y est pas disponible : même
+    # garde que pypi-publish, pour éviter un run rouge trompeur.
+    if: github.repository == 'CyrilM29/robotframework-sapfx'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write # OIDC : c'est l'identité du workflow qui authentifie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Fail-closed : mieux vaut un run rouge qu'un site publié amputé d'une
+      # page (l'accueil relie les trois, un lien mort se voit chez le lecteur).
+      - name: Every documentation page is present
+        run: |
+          for page in index.html SapEccLibrary.html SapFioriLibrary.html SapApiLibrary.html; do
+            test -f "docs/libdoc/$page" || { echo "manquant : docs/libdoc/$page"; exit 1; }
+          done
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/libdoc
+
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
