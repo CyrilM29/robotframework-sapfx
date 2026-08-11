@@ -49,6 +49,10 @@ Un test se lit de la même façon quel que soit le canal utilisé. Voir
 [docs/architecture.fr.md](docs/architecture.fr.md) et
 [docs/fiori-architecture.fr.md](docs/fiori-architecture.fr.md).
 
+📖 **[Documentation des keywords](https://cyrilm29.github.io/robotframework-sapfx/)**
+(en anglais) : une page de référence par bibliothèque, chaque keyword avec ses
+arguments et ses exemples.
+
 ![Démo live : un localisateur périmé réparé sur un vrai système SAP, jusqu'au patch resources/](https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/docs/media/healing-live.gif)
 
 Tout ce qui précède est **réel** : écrans capturés sur un système live (A4H)
