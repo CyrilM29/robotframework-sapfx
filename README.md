@@ -48,6 +48,9 @@ A test reads the same whichever channel it drives. See
 [docs/architecture.md](docs/architecture.md) and
 [docs/fiori-architecture.md](docs/fiori-architecture.md).
 
+📖 **[Keyword documentation](https://cyrilm29.github.io/robotframework-sapfx/)**:
+one reference page per library, every keyword with its arguments and examples.
+
 ![Live demo: a stale locator healed against a real SAP system, down to the resources patch](https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main/docs/media/healing-live.gif)
 
 Everything above is **real**: screens captured on a live system (A4H) while the
