@@ -162,6 +162,11 @@ def test_les_licences_du_wheel_plugins_sont_des_copies_fideles(nom):
             % (nom, remede))
 
 
+@pytest.mark.skipif(
+    not os.path.exists(os.path.join(_ROOT, "scripts", "export_public_tree.py")),
+    reason="script d'export absent (arbre public exporté) : il est exclu de "
+           "l'export par construction, donc ce garde ne peut tourner que dans "
+           "le dépôt qui le porte. Même skip que test_export_public_tree.py.")
 def test_les_copies_de_licence_sont_connues_du_scan_anti_fuite():
     """Dupliquer un fichier de licence duplique son obligation d'allowlist.
 

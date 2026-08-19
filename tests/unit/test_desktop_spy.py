@@ -147,6 +147,13 @@ def test_safe_swallows_com_error_and_missing_attribute():
     assert spy._safe(FakeNode("x", "T"), "Id") == "x"
 
 
+@pytest.mark.skipif(
+    spy.pythoncom is None,
+    reason="Chemin COM réel : le recorder pose pythoncom=None quand l'import "
+           "global de pywin32 échoue (toute machine sans SAP GUI, dont la CI "
+           "Linux), et monkeypatch ne peut rien poser sur None. Le stub COM du "
+           "conftest ne suffit pas : c'est l'import de win32api/win32ui qui "
+           "manque, pas celui de pythoncom.")
 def test_get_scripting_engine_wraps_rot_com_error_as_runtime_error(monkeypatch):
     # Régression : une pythoncom.com_error en cours d'énumération de la Running
     # Object Table (COM non initialisé sur ce thread, RPC transitoire...)
