@@ -50,8 +50,13 @@ ${EPM_PRODUCTS_TABLE}    SNWD_PD
 
 # cap-sflight local : app Fiori Elements + service OData v4 du même process.
 ${SFLIGHT_URL}          http://localhost:4004/sap.fe.cap.travel/index.html
+${CAP_API_URL}          http://localhost:4004
 ${TRAVEL_ENTITY_PATH}    /processor/Travel
 ${TRAVEL_TABLE_ID}      sap.fe.cap.travel::TravelList--fe::table::Travel::LineItem-innerTable
+# Le mocked-auth de cds protège AUSSI le service OData : sans identifiants la
+# lecture part en HTTP 401. `alice` est l'utilisateur mock du projet, son mot
+# de passe est vide (ce n'est donc pas un secret, et rien n'est à masquer).
+${CAP_USER}             alice
 
 
 *** Test Cases ***
@@ -79,7 +84,7 @@ Travel Row Rendered By Fiori Exists Through OData
     ...                requête OData point : l'écran n'invente pas de données.
     [Tags]    capsflight
     [Setup]    Open Fiori Launchpad    ${SFLIGHT_URL}
-    Open Api Session    http://localhost:4004    alias=cap
+    Open Api Session    ${CAP_API_URL}    user=${CAP_USER}    password=${EMPTY}    alias=cap
     ${api_count}=    Get Odata Count    ${TRAVEL_ENTITY_PATH}    alias=cap
     Should Be True    ${api_count} > 0    msg=Aucun Travel côté OData : cds watch démarré ?
     Wait For UI5 Ready
@@ -96,13 +101,29 @@ Travel Row Rendered By Fiori Exists Through OData
 
 *** Keywords ***
 Extract First Travel Id
-    [Documentation]    Le Travel ID d'une ligne lue par ``Read Ui5 Table`` : la
-    ...                première valeur entièrement numérique de la ligne (les
-    ...                en-têtes affichés varient avec la locale, pas le format de
-    ...                l'identifiant).
+    [Documentation]    Le Travel ID d'une ligne lue par ``Read Ui5 Table``, lu
+    ...                dans la colonne d'identification (la première d'une List
+    ...                Report). Deux pièges de locale, tous deux rencontrés en
+    ...                live, et que la version « première valeur entièrement
+    ...                numérique » ne passait pas : cette colonne rend un
+    ...                *object identifier*, donc CONCATÈNE le libellé et
+    ...                l'identifiant (« ...New York4 133 »), et l'identifiant y
+    ...                est formaté avec un séparateur de milliers qui dépend de
+    ...                la langue (espace fine insécable en français). Contrairement
+    ...                à ce qu'affirmait la version précédente, le format de
+    ...                l'identifiant varie donc lui aussi avec la locale.
+    ...
+    ...                On prend ce qui suit la dernière lettre de la cellule et
+    ...                on n'en garde que les chiffres : le résultat est le même
+    ...                dans toutes les langues. Pas de regex : les backslashes
+    ...                d'une expression ``Evaluate`` sont mangés par l'échappement
+    ...                Robot (leçon déjà payée sur ``\\D``).
     [Arguments]    ${row}
-    FOR    ${value}    IN    @{row.values()}
-        ${digits}=    Evaluate    str($value).strip().isdigit()
-        IF    ${digits}    RETURN    ${value.strip()}
-    END
-    Fail    Aucune valeur numérique (Travel ID) dans la ligne : ${row}
+    Should Not Be Empty    ${row}    msg=Ligne vide : la table n'a rendu aucune cellule.
+    ${cellule}=    Evaluate    str(list($row.values())[0])
+    ${apres_libelle}=    Evaluate
+    ...    $cellule[max((i for i, c in enumerate($cellule) if c.isalpha()), default=-1) + 1:]
+    ${identifiant}=    Evaluate    ''.join(c for c in $apres_libelle if c.isdigit())
+    Should Not Be Empty    ${identifiant}
+    ...    msg=Aucun identifiant en fin de colonne d'identification : ${row}
+    RETURN    ${identifiant}

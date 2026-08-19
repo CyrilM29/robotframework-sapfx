@@ -39,6 +39,26 @@ def test_poll_until_returns_last_falsy_value_on_timeout():
     assert poll_until(lambda: [], timeout_secs=0.05, step=0.01) == []
 
 
+def test_poll_until_expire_meme_si_l_horloge_murale_est_figee(monkeypatch):
+    """L'échéance se mesure sur ``time.monotonic()``, jamais sur l'horloge
+    murale : une resynchronisation NTP (ici : horloge figée, le cas extrême)
+    ne doit ni allonger ni raccourcir le budget réel de l'attente. C'est la
+    primitive de TOUTES les attentes des deux canaux."""
+    monkeypatch.setattr(time, "time", lambda: 0.0)
+    calls = {"n": 0}
+
+    def check():
+        calls["n"] += 1
+        if calls["n"] > 500:   # borne de sûreté : sans elle, une régression
+            raise AssertionError(   # vers time.time() ferait boucler sans fin
+                "poll_until n'a pas expiré avec l'horloge murale figée : "
+                "l'échéance est-elle repassée sur time.time() ?")
+        return None
+
+    assert poll_until(check, timeout_secs=0.02, step=0.001) is None
+    assert calls["n"] >= 2
+
+
 # --- retry_call ---------------------------------------------------------------
 
 def test_retry_call_returns_first_success():
@@ -83,7 +103,7 @@ def test_retry_call_stops_early_when_deadline_passed():
 
     with pytest.raises(RuntimeError):
         retry_call(always_fail, attempts=100, interval=0.01,
-                   deadline=time.time() - 1)   # échéance déjà passée
+                   deadline=time.monotonic() - 1)   # échéance déjà passée
     assert calls["n"] == 1
 
 

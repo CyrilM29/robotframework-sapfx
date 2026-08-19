@@ -10,7 +10,6 @@ surcouche (voir ``sap_robotmcp.server``).
 """
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, Optional
 
 from robotmcp.plugins.base import StaticLibraryPlugin
@@ -23,8 +22,7 @@ from robotmcp.plugins.contracts import (
 )
 
 from ._guidance import API_HINTS, API_RECOMMENDATION
-from ._rf_context import run_keyword_in_context
-from ._staleness import staleness_warning
+from ._rf_context import finalize_state, structured_state
 
 STATE_KEYWORD = "List Api Sessions"
 
@@ -48,23 +46,41 @@ class ApiStateProvider(LibraryStateProvider):
         include_reduced_dom: bool = True,
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
-        return {"success": False, "error": _NO_SCREEN}
+        # Réponse explicite (et non une page vide) pour les appelants qui ne
+        # lisent PAS la capacité déclarée : rf-mcp lui-même appelle le provider
+        # sans la consulter. La surcouche, elle, refuse la section en amont et
+        # reprend ce même motif via `unsupported_reason`.
+        return {"success": False, "error": _NO_SCREEN, "supported": False}
+
+    @staticmethod
+    def unsupported_reason(section: str) -> Optional[str]:
+        """Motif LISIBLE d'une section que ce canal ne sert pas, pour que le
+        refus porté par la capacité déclarée reste actionnable."""
+        return _NO_SCREEN if section == "page_source" else None
 
     async def get_application_state(self, session: Any) -> Optional[Dict[str, Any]]:
+        """État réel du canal API (alias ouverts, base_url, authentifié),
+        même contrat que les canaux ECC et Fiori : ``connected`` dit si le
+        canal a répondu à sa lecture d'état de base, ``state_error`` porte la
+        cause sinon.
+
+        Le saut de thread et le contrat best-effort passent par le helper
+        partagé : une copie locale ici, et une évolution du contrat (timeout,
+        normalisation des erreurs) ne s'appliquerait qu'aux deux autres
+        canaux, sans que rien ne le signale."""
         state: Dict[str, Any] = {"active_library": "SapApiLibrary"}
-        try:
-            channel = await asyncio.to_thread(
-                run_keyword_in_context, session, STATE_KEYWORD,
-                allow_structured=True)
-        except Exception as exc:
-            state["state_error"] = str(exc)
-        else:
-            state.update(channel if isinstance(channel, dict)
-                         else {"channel_state": channel})
-        warning = staleness_warning()
-        if warning:
-            state["stale_code_warning"] = warning
-        return state
+        fatal: Dict[str, str] = {}
+        channel = await structured_state(session, STATE_KEYWORD, fatal,
+                                         needs_com=False)
+        if channel is None:
+            state["connected"] = False
+            state["state_error"] = fatal.get(
+                STATE_KEYWORD, "%s n'a rien retourné" % STATE_KEYWORD)
+            return finalize_state(state)
+        state["connected"] = True
+        state.update(channel if isinstance(channel, dict)
+                     else {"channel_state": channel})
+        return finalize_state(state)
 
 
 class SapApiPlugin(StaticLibraryPlugin):

@@ -7,6 +7,8 @@ et ajoute :
 * synchronisation réelle / attentes intelligentes -> ``keywords/_waits.py``
 * ergonomie de grille ALV (lecture par titre)     -> ``keywords/_grid.py``
 * un override de `Run Transaction` indépendant de la locale (ci-dessous)
+* des erreurs d'élément absent qui disent sur quel écran on se trouve
+  (ci-dessous, `Element Should Be Present` et `Get Element Type`)
 
 Il s'agit de la bibliothèque SAP GUI de *bas niveau*. Les keywords lisibles
 métier pour les tests se trouvent dans ``resources/ecc_keywords.resource``
@@ -26,6 +28,7 @@ from sapfx_common.session_context import current_execution_namespace
 from ._vendor.sapgui_base import SapGuiBase
 from .keywords import (
     ConnectionKeywords,
+    DdicKeywords,
     DiagnosticsKeywords,
     EmbeddedBrowserKeywords,
     GridKeywords,
@@ -41,7 +44,7 @@ from .keywords import (
 class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
                     PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
-                    SessionKeywords, SapGuiBase):
+                    SessionKeywords, DdicKeywords, SapGuiBase):
     """Bibliothèque Robot Framework pour automatiser le client bureau SAP GUI (ECC,
     backend S/4HANA GUI). Superset compatible de SapGuiLibrary.
 
@@ -71,7 +74,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.6.6"
+    __version__ = "0.6.7"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -283,6 +286,63 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
         comportement pour une chaîne ordinaire est inchangé.
         """
         return super().input_password(element_id, reveal_secret(password))
+
+    def element_should_be_present(self, element_id, message=None):
+        """Échoue si ``element_id`` est absent de l'écran courant.
+
+        Comportement upstream inchangé : seul le message d'échec est
+        enrichi de l'identité de l'écran réel (voir `_absence_message`).
+        Un ``message`` explicite fourni par l'appelant est respecté tel
+        quel : c'est sa phrase, pas la nôtre.
+        """
+        try:
+            return super().element_should_be_present(element_id, message)
+        except ValueError as absent:
+            if message is not None:
+                raise
+            raise ValueError(self._absence_message(str(absent))) from absent
+
+    def get_element_type(self, element_id):
+        """Retourne le type SAP de ``element_id`` (``GuiButton``, ``GuiTab``...).
+
+        Comportement upstream inchangé, message d'absence enrichi de
+        l'écran courant. C'est le chemin par lequel passe `Click Element`,
+        qui résout le type avant d'agir : sans cet enrichissement, un clic
+        sur un écran inattendu ne rapporte que l'id manquant.
+        """
+        try:
+            return super().get_element_type(element_id)
+        except ValueError as absent:
+            raise ValueError(self._absence_message(str(absent))) from absent
+
+    def _absence_message(self, message):
+        """Suffixe un message d'élément absent par l'IDENTITÉ de l'écran actif.
+
+        « Cannot find element with id 'wnd[0]/tbar[1]/btn[31]' » ne
+        distingue pas les trois causes possibles : localisateur périmé,
+        élément pas encore matérialisé, ou écran qui n'est pas celui
+        qu'on croit. La troisième est la plus fréquente en ECC (une
+        transaction qui refuse une saisie reste sur l'écran précédent) et
+        c'est la seule que l'id seul ne peut pas révéler. Une ligne
+        ``# screen <Programme>/<Transaction>/<Numéro>`` tranche
+        immédiatement, pour un humain comme pour un agent.
+
+        Mesuré le 2026-08-17 : le même `Click Element` avait réussi
+        vingt étapes plus tôt dans la session, puis échoué sur la table
+        suivante ; sans l'écran, le diagnostic généré a conclu à un
+        problème de synchronisation et a été rejeté par le juge.
+
+        Best-effort, comme `_closest_matches_hint` : le calcul ne masque
+        jamais l'erreur d'origine, et le mixin de perception peut être
+        absent (usage isolé en tests unitaires).
+        """
+        header = getattr(self, "_screen_header", None)
+        if header is None:
+            return message
+        try:
+            return "%s\n%s" % (message, header())
+        except Exception:                       # noqa: BLE001 (best-effort)
+            return message
 
     def get_current_transaction(self):
         """Retourne le **code de la transaction active** (``session.Info.Transaction``),

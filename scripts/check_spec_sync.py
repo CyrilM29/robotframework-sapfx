@@ -89,7 +89,10 @@ def check(repo_root: Path) -> int:
             problems.append("%s : marqueur cassé, %s n'existe plus"
                             % (suite.name, spec_rel))
             continue
-        linked_specs.add(spec_path.name)
+        # Le chemin RELATIF, pas le seul nom de fichier : deux plans homonymes
+        # dans des sous-dossiers différents ne doivent pas se couvrir l'un
+        # l'autre dans la liste des plans sans suite.
+        linked_specs.add(spec_rel.replace("\\", "/"))
         actual = spec_digest(spec_path)
         if actual != digest:
             problems.append(
@@ -112,7 +115,8 @@ def check(repo_root: Path) -> int:
             print("  - %s" % problem)
         return 1
     unlinked = [p.name for p in sorted(specs_dir.glob("*.md"))
-                if p.name not in linked_specs and p.name not in _UNLINKED_OK] \
+                if "specs/" + p.name not in linked_specs
+                and p.name not in _UNLINKED_OK] \
         if specs_dir.exists() else []
     print("[check_spec_sync] OK : %d suite(s) en phase avec leur spec."
           % len(markers))
@@ -159,8 +163,12 @@ def main(argv: list[str] | None = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors page
     # de code : UTF-8 best-effort plutôt qu'un plantage à l'affichage (même
     # leçon que healing_drift_report, apprise au premier essai CLI).
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # Ces quatre lignes sont la copie assumée de ``scripts/_common.py`` : ce
+    # script est EMBARQUÉ dans le pack Windows et doit y tourner seul, sans
+    # voisin (voir build_release_pack.py, section outillage de maintenance).
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--root", default=".",
                         help="racine du dépôt (défaut : répertoire courant)")

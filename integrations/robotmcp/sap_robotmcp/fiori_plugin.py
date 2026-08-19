@@ -14,7 +14,6 @@ RF-context.
 """
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, Optional
 
 from robotmcp.plugins.base import StaticLibraryPlugin
@@ -30,12 +29,17 @@ from sapfx_common.perception_diff import diff_perception
 from ._filtering import filter_ui5_tree, normalize_level
 from ._guidance import COMMON_HINTS, FIORI_HINTS, FIORI_RECOMMENDATION
 from ._last_seen import LastSeenCompactor
-from ._rf_context import run_keyword_in_context
-from ._staleness import staleness_warning
+from ._rf_context import finalize_state, perception_text, structured_state
+from ._staleness import attach_staleness
 
 # Keyword de perception de SapFioriLibrary : retourne l'arbre de contrôles UI5
 # sérialisé en XML (exécute le JS d'arbre de _ui5_js.py sur la page Browser active).
 PERCEPTION_KEYWORD = "Get Ui5 Page Tree"
+
+# Keyword d'état applicatif : tout l'état du canal web en UN aller-retour
+# (portée de frame, runtime UI5, messages). Assemblé côté bibliothèque parce
+# qu'à travers rf-mcp, c'est la traversée du contexte RF qui coûte, pas le JS.
+STATE_KEYWORD = "Get Ui5 Application State"
 
 _UNCHANGED_MARKER = "(unchanged since the previous perception call for this session)"
 
@@ -67,7 +71,8 @@ class FioriStateProvider(LibraryStateProvider):
             # Toujours interroger la page réelle (cf. EccStateProvider.get_page_source
             # pour le raisonnement) : jamais de cache qui risquerait de servir un
             # arbre périmé juste après une action.
-            tree = await asyncio.to_thread(run_keyword_in_context, session, PERCEPTION_KEYWORD)
+            tree = await perception_text(session, PERCEPTION_KEYWORD,
+                                         needs_com=False)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
         # Comparaison/diff sur l'arbre COMPLET (cf. EccStateProvider : un
@@ -101,10 +106,7 @@ class FioriStateProvider(LibraryStateProvider):
             "diff_since_last_call": served_diff,
             "filtered": bool(filtered) and not unchanged and not served_diff,
         }
-        warning = staleness_warning()
-        if warning:
-            result["stale_code_warning"] = warning
-        return result
+        return attach_staleness(result)
 
     @staticmethod
     def _full_view(tree: str, filtered: bool, filtering_level: str) -> str:
@@ -113,7 +115,62 @@ class FioriStateProvider(LibraryStateProvider):
         return tree
 
     async def get_application_state(self, session) -> Optional[Dict[str, Any]]:
-        return {"active_library": "SapFioriLibrary"}
+        """État applicatif RÉEL du canal Fiori (miroir de l'état enrichi ECC,
+        servi en direct par ``sapfx_state``), jamais un cache :
+
+        - ``connected`` : le canal a répondu à sa lecture d'état ; faux =
+          ``state_error`` porte la cause, comme sur les canaux ECC et API ;
+        - ``frame_stack`` : la portée iframe active (Work Zone/cFLP), le
+          contexte à connaître avant toute résolution ;
+        - ``ui5_runtime`` : y a-t-il un runtime UI5 dans cette portée ;
+        - ``ui5_messages`` : MessageManager + toasts récents (assertion par
+          TYPE, convention n°3 côté web), présents SEULEMENT si oui.
+
+        Le tout en **un** aller-retour de contexte RF (`Get Ui5 Application
+        State` assemble côté bibliothèque) : cette section est servie à chaque
+        tour d'agent, et c'est la traversée du contexte qui coûte, pas le JS.
+
+        Hors runtime UI5, la section messages est rangée en ``not_applicable``,
+        jamais en erreur : `Get Ui5 Messages` échoue durement dans ce cas, or
+        les pages UI5 Web Components (moteur ``wc``), le WebGUI classique
+        (``sid``) et les zones non-SAP d'une page hybride (``dom``) sont des
+        cibles LÉGITIMES de cette bibliothèque. Les lire sans condition faisait
+        porter à ces sessions une erreur de collecte permanente, à chaque tour.
+        Le keyword sonde donc le runtime d'abord, avec la seule expression web
+        du dépôt qui n'injecte PAS le bundle ``__SAPFX`` : une simple lecture
+        d'état ne doit pas instrumenter ``fetch``/``XMLHttpRequest`` dans
+        l'application sous test.
+        """
+        state: Dict[str, Any] = {"active_library": "SapFioriLibrary"}
+        fatal: Dict[str, str] = {}
+        live = await structured_state(session, STATE_KEYWORD, fatal,
+                                      needs_com=False)
+        if not isinstance(live, dict):
+            state["connected"] = False
+            state["state_error"] = fatal.get(
+                STATE_KEYWORD,
+                "%s a retourné une forme inattendue : %r"
+                % (STATE_KEYWORD, type(live).__name__))
+            return finalize_state(state)
+
+        state["connected"] = True
+        state["frame_stack"] = live.get("frame_stack", [])
+        runtime = bool(live.get("ui5_runtime"))
+        state["ui5_runtime"] = runtime
+        collection_errors: Dict[str, str] = {}
+        not_applicable: Dict[str, str] = {}
+        if not runtime:
+            not_applicable["ui5_messages"] = (
+                "pas de runtime UI5 dans la portée courante : page UI5 Web "
+                "Components, WebGUI (moteur sid), zone non-SAP (moteur dom) "
+                "ou page pas encore chargée. Section sans objet, pas une "
+                "erreur ; Get Page Composition en donne le détail.")
+        elif "messages" in live:
+            state["ui5_messages"] = live["messages"]
+        else:
+            collection_errors["ui5_messages"] = str(
+                live.get("messages_error") or "lecture des messages indisponible")
+        return finalize_state(state, collection_errors, not_applicable)
 
 
 class SapFioriPlugin(StaticLibraryPlugin):
@@ -140,7 +197,13 @@ class SapFioriPlugin(StaticLibraryPlugin):
                       "ui5-web-components"],
             technology=["ui5", "playwright"],
             supports_page_source=True,
-            supports_application_state=False,
+            # Le provider Fiori SERT un état applicatif (portée de frame
+            # active, messages UI5 récents) : la capacité doit le déclarer,
+            # comme les plugins miroirs ECC et API. La déclarer fausse ne se
+            # voyait pas (l'overlay appelle les providers en direct, sans lire
+            # le drapeau), mais tout consommateur qui, lui, respecte la
+            # capacité déclarée sauterait silencieusement cet état.
+            supports_application_state=True,
         )
         hints = LibraryHints(
             standard_keywords=[
@@ -184,6 +247,10 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # repos réseau/busy + messages applicatifs + upload
                 "Wait For Ui5 Idle", "Get Ui5 Messages",
                 "Ui5 Should Have No Messages Of Type", "Upload File Via Ui5",
+                # sonde de runtime : la question à poser AVANT tout keyword qui
+                # exige UI5 (pages wc/sid/dom = cibles légitimes, pas des pannes)
+                # + l'état du canal en un appel (ce que sert sapfx_state)
+                "Ui5 Runtime Is Present", STATE_KEYWORD,
                 # moteur WebGUI sid (SAP GUI for HTML)
                 "Resolve Sid", "Click Sid", "Fill Sid Input", "Sid Should Be Visible",
                 # moteur Web Components (pages ui5-* hors registre UI5)

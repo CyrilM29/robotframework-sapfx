@@ -97,6 +97,15 @@ jobs:
             --cov=src --cov=integrations/robotmcp/sap_robotmcp \
             --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
+      # Les recorders sont LIVRÉS dans le pack Windows : leur couverture est
+      # tenue elle aussi, avec un plancher PROPRE (le câblage Tkinter de la GUI
+      # n'est pas testable hors écran, il tire la moyenne vers le bas). Mesure
+      # séparée pour ne pas mélanger deux périmètres : le 85 % ci-dessus reste
+      # celui du produit (`src` + plugins), le chiffre publié aussi.
+      - name: Recorder tools coverage floor
+        if: matrix.python-version == '3.12'
+        run: pytest -q --cov=tools/recorder --cov-report=term --cov-fail-under=70
+
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always() && matrix.python-version == '3.12'
@@ -142,9 +151,48 @@ jobs:
   # Qualifie ce que l'utilisateur télécharge : build du ZIP, extraction hors du
   # checkout, installation par le vrai script, documentation des trois libs,
   # découverte du plugin, dry-run des exemples puis smoke Browser hors ligne.
-  release-pack:
+  # Le pack annonce « Python 3.10+ » dans ses deux READMEs, mais il n'était
+  # qualifié qu'en 3.12 : la promesse portait sur un plancher que rien
+  # n'exerçait, alors que les versions ÉPINGLÉES de constraints-deploy.txt
+  # (Pillow, robotframework-browser) ont chacune leur propre `Requires-Python`.
+  # Ce job installe le VRAI produit par son VRAI installateur sur le plancher,
+  # sans Chromium ni MCP : c'est la partie de release-pack qui répond à la
+  # question « le plancher tient-il », pour une fraction du temps.
+  pack-floor:
     runs-on: windows-latest
     needs: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      - name: Build the deployment ZIP on the floor interpreter
+        shell: pwsh
+        run: |
+          python scripts/build_release_pack.py --outdir "$env:RUNNER_TEMP\pack-floor"
+
+      - name: Install it with the shipped installer (pinned set, Python 3.10)
+        shell: pwsh
+        run: |
+          $Zip = Get-ChildItem "$env:RUNNER_TEMP\pack-floor\sapfx-pack-*-win.zip" -ErrorAction Stop
+          $ExtractRoot = "$env:RUNNER_TEMP\pack-floor-install"
+          Expand-Archive -Path $Zip.FullName -DestinationPath $ExtractRoot
+          $PackDir = Get-ChildItem $ExtractRoot -Directory -Filter "sapfx-pack-*-win" -ErrorAction Stop
+          & "$($PackDir.FullName)\install.ps1"
+          # Le smoke d'import de l'installateur couvre les trois bibliothèques ;
+          # on ajoute la résolution des keywords Robot, qui prouve que la version
+          # de Robot Framework épinglée charge vraiment les libs sur 3.10.
+          & "$($PackDir.FullName)\.venv\Scripts\robot.exe" --dryrun `
+            --outputdir "$env:RUNNER_TEMP\pack-floor-dry" "$($PackDir.FullName)\tests\robot"
+
+  release-pack:
+    runs-on: windows-latest
+    # `dryrun` ajouté : le ZIP ne doit pas être construit, publié et attesté
+    # alors que la suite unitaire contre le VRAI pywin32 est rouge.
+    needs: [test, dryrun]
     permissions:
       contents: read
       id-token: write

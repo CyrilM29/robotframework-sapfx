@@ -69,7 +69,7 @@ def test_pairing_ignores_single_language_trees():
 def test_drift_warns_when_only_the_english_side_changed(monkeypatch):
     files = ["docs/foo.md", "docs/foo.fr.md"]
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, **kwargs):
         assert cmd[:3] == ["git", "diff", "--name-only"]
         return subprocess.CompletedProcess(cmd, 0, stdout="docs/foo.md\n", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -82,7 +82,7 @@ def test_drift_warns_when_only_the_english_side_changed(monkeypatch):
 def test_drift_silent_when_both_sides_changed_together(monkeypatch):
     files = ["docs/foo.md", "docs/foo.fr.md"]
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, **kwargs):
         return subprocess.CompletedProcess(
             cmd, 0, stdout="docs/foo.md\ndocs/foo.fr.md\n", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -93,7 +93,7 @@ def test_drift_silent_when_both_sides_changed_together(monkeypatch):
 def test_drift_silent_when_unpaired_file_already_flagged_by_pairing(monkeypatch):
     files = ["docs/orphan.md"]   # pas de .fr.md du tout
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, **kwargs):
         return subprocess.CompletedProcess(cmd, 0, stdout="docs/orphan.md\n", stderr="")
     monkeypatch.setattr(subprocess, "run", fake_run)
 
@@ -103,7 +103,7 @@ def test_drift_silent_when_unpaired_file_already_flagged_by_pairing(monkeypatch)
 def test_drift_gracefully_ignored_when_git_diff_fails(monkeypatch, capsys):
     files = ["docs/foo.md", "docs/foo.fr.md"]
 
-    def fake_run(cmd, cwd, capture_output, text):
+    def fake_run(cmd, **kwargs):
         return subprocess.CompletedProcess(cmd, 128, stdout="", stderr="unknown revision")
     monkeypatch.setattr(subprocess, "run", fake_run)
 

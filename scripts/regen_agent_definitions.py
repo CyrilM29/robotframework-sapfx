@@ -27,6 +27,8 @@ import json
 import sys
 from pathlib import Path
 
+from _common import force_utf8_stdio
+
 _ROOT = Path(__file__).resolve().parent.parent
 
 # Outils Claude Code -> outils qualifiés VS Code / Copilot (agent mode), même
@@ -152,6 +154,7 @@ def iter_renders(root):
 
 
 def main(argv=None):
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--check", action="store_true",

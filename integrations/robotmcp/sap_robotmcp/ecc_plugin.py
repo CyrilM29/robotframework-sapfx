@@ -8,7 +8,6 @@ de SapEccLibrary ; validé e2e contre un A4H vivant).
 """
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, Optional
 
 from robotmcp.plugins.base import StaticLibraryPlugin
@@ -24,8 +23,8 @@ from sapfx_common.perception_diff import diff_perception
 from ._filtering import filter_ecc_signature, normalize_level
 from ._guidance import COMMON_HINTS, ECC_HINTS, ECC_RECOMMENDATION
 from ._last_seen import LastSeenCompactor
-from ._rf_context import run_keyword_in_context
-from ._staleness import staleness_warning
+from ._rf_context import finalize_state, perception_text, structured_state
+from ._staleness import attach_staleness
 
 # Keyword de perception de SapEccLibrary : retourne la signature texte de l'écran
 # actif (une ligne par contrôle, champs éditables préfixés `* `).
@@ -66,7 +65,7 @@ class EccStateProvider(LibraryStateProvider):
             # Toujours interroger l'écran réel : rien ne garantit qu'aucune action
             # n'a eu lieu depuis le dernier appel, et servir un état périmé juste
             # après une action casserait la boucle perception -> action.
-            sig = await asyncio.to_thread(run_keyword_in_context, session, PERCEPTION_KEYWORD)
+            sig = await perception_text(session, PERCEPTION_KEYWORD)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
         # La comparaison/le diff portent sur la signature COMPLÈTE (pas la vue
@@ -106,10 +105,7 @@ class EccStateProvider(LibraryStateProvider):
             "cross_session_sharing_detected": False,
             "session_isolation": "suite",
         }
-        warning = staleness_warning()
-        if warning:
-            result["stale_code_warning"] = warning
-        return result
+        return attach_staleness(result)
 
     @staticmethod
     def _full_view(sig: str, filtered: bool, filtering_level: str) -> str:
@@ -135,21 +131,23 @@ class EccStateProvider(LibraryStateProvider):
         - ``telemetry`` : compteurs ``session.Info`` du dernier aller-retour.
         """
         state: Dict[str, Any] = {"active_library": "SapEccLibrary"}
-        try:
-            transaction = await asyncio.to_thread(
-                run_keyword_in_context, session, "Get Current Transaction")
-        except Exception as exc:
+        collection_errors: Dict[str, str] = {}
+        # La transaction n'est PAS une section comme les autres : elle est la
+        # preuve de vie de la session. Son échec court-circuite (connected =
+        # False + state_error), il ne dégrade pas.
+        fatal: Dict[str, str] = {}
+        transaction = await structured_state(session, "Get Current Transaction",
+                                             fatal)
+        if transaction is None:
             state["connected"] = False
-            state["state_error"] = str(exc)
-            warning = staleness_warning()
-            if warning:
-                state["stale_code_warning"] = warning
-            return state
+            state["state_error"] = fatal.get(
+                "Get Current Transaction",
+                "Get Current Transaction n'a rien retourné")
+            return finalize_state(state)
         state["connected"] = True
         state["transaction"] = transaction
 
-        collection_errors: Dict[str, str] = {}
-        windows = await self._structured(session, "Get Open Windows",
+        windows = await structured_state(session, "Get Open Windows",
                                          collection_errors)
         if windows is not None:
             state["windows"] = windows
@@ -158,7 +156,7 @@ class EccStateProvider(LibraryStateProvider):
             state["modal_open"] = bool(modal)
             if modal:
                 state["modal_titles"] = [w.get("title", "") for w in modal]
-        status = await self._structured(session, "Get Status Message",
+        status = await structured_state(session, "Get Status Message",
                                         collection_errors)
         if status is not None:
             try:
@@ -168,28 +166,11 @@ class EccStateProvider(LibraryStateProvider):
                     "forme inattendue : %r" % (status,))
             else:
                 state["status_message"] = {"type": msg_type, "text": text}
-        telemetry = await self._structured(session, "Get Session Telemetry",
+        telemetry = await structured_state(session, "Get Session Telemetry",
                                            collection_errors)
         if telemetry is not None:
             state["telemetry"] = telemetry
-        if collection_errors:
-            state["collection_errors"] = collection_errors
-        warning = staleness_warning()
-        if warning:
-            state["stale_code_warning"] = warning
-        return state
-
-    @staticmethod
-    async def _structured(session, keyword: str,
-                          errors: Dict[str, str]) -> Any:
-        """Exécute un keyword d'état à sortie structurée, best-effort : ``None``
-        + trace dans ``errors`` en cas d'échec (jamais d'exception)."""
-        try:
-            return await asyncio.to_thread(
-                run_keyword_in_context, session, keyword, allow_structured=True)
-        except Exception as exc:
-            errors[keyword] = str(exc)
-            return None
+        return finalize_state(state, collection_errors)
 
 
 class SapEccPlugin(StaticLibraryPlugin):
@@ -268,6 +249,18 @@ class SapEccPlugin(StaticLibraryPlugin):
                 "Set Table Control Cell", "Find Table Control Row",
                 # aide à la recherche (matchcode)
                 "Pick F4 Value",
+                # inventaire DDIC (classification DD02L par lots, artefact).
+                # `Reach Se16 Selection Screen` ouvre l'écran de sélection en UN
+                # seul endroit (statut type E, popup de choix des champs,
+                # dialogue de génération) : hors de la carte, un agent
+                # ré-improvise ces trois branches, soit exactement les copies
+                # divergentes que ce keyword a supprimées.
+                "Reach Se16 Selection Screen", "Fill Multiple Selection",
+                "Classify Ddic Objects", "Get Ddic Classification Map",
+                "Validate Ddic Scope", "Record Ddic Probe",
+                "Sample Ddic Objects For Probe", "Merge Ddic Name Lists",
+                "Write Ddic Inventory Artifact",
+                "Compare Ddic Inventory Artifacts",
                 # essentiels upstream que l'agent utilise en permanence
                 "Input Text", "Send Vkey",
                 # diagnostic / préflight scripting + télémétrie
@@ -294,5 +287,8 @@ class SapEccPlugin(StaticLibraryPlugin):
                 "Get Screen Tile Hashes", "Check Screen Against Watch",
                 # effecteur coordonnées (zones hors API : GuiShell/GuiChart)
                 "Get Element Screen Region", "Click Element At Offset",
+                # pont navigateur embarqué (WebView2/CDP dans une fenêtre SAP)
+                "Enable Embedded Browser Debugging",
+                "Get Embedded Browser Page Id", "Switch To Embedded Browser Page",
             )
         }

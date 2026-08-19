@@ -34,6 +34,17 @@ def test_ensure_com_initialized_tolerates_already_initialized(monkeypatch):
     ensure_com_initialized()  # ne doit pas lever (com_error avalée)
 
 
+def test_ensure_com_initialized_tolerates_a_stub_without_com_error(monkeypatch):
+    # Un stub minimal n'a ni CoInitialize ni com_error : la clause `except`
+    # étant évaluée AU MOMENT de l'exception, lire pythoncom.com_error dedans
+    # ferait lever depuis la clause elle-même, alors que la fonction promet de
+    # ne jamais lever.
+    import pythoncom
+    monkeypatch.delattr(pythoncom, "CoInitialize", raising=False)
+    monkeypatch.delattr(pythoncom, "com_error", raising=False)
+    ensure_com_initialized()
+
+
 def test_ensure_com_initialized_propagates_unexpected_com_errors(monkeypatch):
     import pythoncom
 

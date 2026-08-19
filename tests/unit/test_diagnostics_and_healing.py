@@ -2,6 +2,7 @@
 télémétrie) et healing (réparation de localisateurs, closest matches), plus les
 primitives pures de ``sapfx_common.healing``. Fake COM, convention #5."""
 import pytest
+from pythoncom import com_error
 
 from sapfx_common.healing import (
     closest_gui_ids,
@@ -231,6 +232,60 @@ def test_get_closest_element_ids_returns_pairs():
         FakeNode("/app/con[0]/ses[0]/wnd[0]/usr/txtB", "GuiTextField")))
     pairs = _lib(session).get_closest_element_ids("wnd[0]/usr/txtA", limit=1)
     assert pairs == [["wnd[0]/usr/txtA", 1.0]]
+
+
+class FakeAbsentSession:
+    """Session dont ``findById`` se comporte comme SAP GUI : elle LÈVE.
+
+    Le ``FakeSession`` ci-dessus rend ``None``, ce qui convient aux
+    sondages ; ici on teste le chemin d'échec du vendor, qui n'existe que
+    si l'appel lève ``com_error`` comme le fait le vrai pont COM.
+    """
+
+    def __init__(self, info=None):
+        self.Info = info
+        self.ActiveWindow = None
+
+    def findById(self, element_id, raise_on_error=True):
+        raise com_error(element_id)
+
+
+def _absent_lib(program="SAPLSETB", transaction="SE16", screen="0100"):
+    return _lib(FakeAbsentSession(info=FakeInfo(
+        Program=program, Transaction=transaction, ScreenNumber=screen)))
+
+
+def test_element_should_be_present_error_names_the_current_screen():
+    with pytest.raises(ValueError) as err:
+        _absent_lib().element_should_be_present("wnd[1]/usr/radMULTI_LOGON_OPT1")
+    message = str(err.value)
+    assert "wnd[1]/usr/radMULTI_LOGON_OPT1" in message   # message upstream conservé
+    assert "# screen SAPLSETB/SE16/0100" in message      # et l'écran réel ajouté
+
+
+def test_get_element_type_error_names_the_current_screen():
+    """Le chemin de `Click Element`, qui résout le type avant d'agir."""
+    with pytest.raises(ValueError) as err:
+        _absent_lib().get_element_type("wnd[0]/tbar[1]/btn[31]")
+    message = str(err.value)
+    assert "wnd[0]/tbar[1]/btn[31]" in message
+    assert "# screen SAPLSETB/SE16/0100" in message
+
+
+def test_explicit_message_is_left_untouched():
+    """Une phrase fournie par l'appelant reste la sienne, sans suffixe."""
+    with pytest.raises(ValueError) as err:
+        _absent_lib().element_should_be_present("wnd[0]/usr/txtA",
+                                                message="popup attendue")
+    assert str(err.value) == "popup attendue"
+
+
+def test_unreadable_session_never_masks_the_original_error():
+    """Écran illisible : on perd le contexte, jamais le message d'origine."""
+    lib = _lib(FakeAbsentSession(info=None))
+    with pytest.raises(ValueError) as err:
+        lib.get_element_type("wnd[0]/usr/txtA")
+    assert "wnd[0]/usr/txtA" in str(err.value)
 
 
 def test_wait_until_element_present_error_includes_closest_ids():

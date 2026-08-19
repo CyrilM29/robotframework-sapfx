@@ -33,6 +33,56 @@ Format d'une entrée (append-only, la plus récente en haut) :
 
 ---
 
+## 2026-08-17 : exploratory_campaign_a4h.robot
+
+- **Classe** : data drift (dérive d'ENVIRONNEMENT : depuis la re-création du
+  conteneur A4H du 2026-08-01, SE16 régénère chaque écran de sélection au
+  premier accès ; sur SGEOCITY cette régénération émet un DIALOGUE modal
+  d'information au lieu d'un message de barre de statut). Ni localisateur ni
+  flux métier n'ont changé.
+- **Réparation** (suite AUTONOME : sa couche keywords locale est la couche
+  réparée, dérogation documentée dans son en-tête, `resources/` intouché) :
+  - `tests/robot/exploratory_campaign_a4h.robot` : nouveau keyword
+    `Dismiss Message Dialog If Present` (détection STRUCTURELLE : fenêtre
+    modale + champs `txtMESSTXT<n>`, texte relevé pour le journal, refermé par
+    Entrée) + variable `${SE16_DIALOG_TEXT_PREFIX}` = `wnd[1]/usr/txtMESSTXT`.
+  - `Open Table In SE16` : `contrôle type E seul` → `contrôle type E, puis
+    dialogue refermé et journalisé, puis attente de l'écran de sélection
+    (txtMAX_SEL)` ; écran jamais atteint après dialogue = échec explicite
+    citant le texte relevé.
+  - `Classify And Count Table` : `verdicts table | structure` → `verdicts
+    table | structure | dialog` (3e verdict : écran de sélection jamais
+    atteint après dialogue refermé, jamais mis en échec) ; la garde du jour
+    (attente txtMAX_SEL, cas SAPLANE) conservée telle quelle dans la branche
+    sans dialogue.
+  - `Deep Verify Package Catalog` : compteur `dialogs` + liste des rejets dans
+    le récap et le dictionnaire de stats.
+  - Test « Flight Data Tables Are Accessible And Populated » : SGEOCITY
+    CONSERVÉE dans la liste attendue (le dialogue est informatif, la table
+    reste consultable et peuplée : la retirer aurait réduit la couverture,
+    tolérer un verdict « rejeté » aurait affaibli l'assertion).
+- **Preuve** : perception rf-mcp live vs A4H (2026-08-17) : SE16 → SGEOCITY →
+  Entrée ouvre `wnd[1]` GuiModalWindow « Information » (écran SAPMSDYP/SE16/10)
+  au texte « ABAP Dictionary type FLTP is not allowed for dynpro element »
+  (SGEOCITY porte des champs FLTP, latitude/longitude) ; Entrée sur wnd[1]
+  referme le dialogue et « Data Browser: Table SGEOCITY: Selection Screen »
+  s'ouvre derrière ; « Number of Entries » répond 62. Re-run complet après
+  patch : 4/4, SGEOCITY comptée 62 (deux tests), 0 rejet par dialogue.
+
+**Leçon d'ancrage (pour sap-planner)** : après une re-création du conteneur,
+TOUS les écrans de sélection SE16 sont régénérés au premier accès. La plupart
+des tables l'annoncent dans la barre de statut (`Program /1BCDWB/DB<table>
+does not exist yet in library`, type non bloquant) ; une table à champs FLTP
+l'annonce par un dialogue MODAL que le contrôle du type de statut ne voit pas
+(type vide) et qui bloque le chargement de l'écran tant qu'il n'est pas
+refermé. Ancrage : après l'Entrée sur un nom de table, contrôler la PILE DE
+FENÊTRES (`Get Open Windows`, `modal=True`), pas seulement la barre de statut ;
+un dialogue de message se reconnaît structurellement (champs `MESSTXT`), jamais
+par son texte localisé. Corollaire : le dialogue disparaît une fois le dynpro
+généré ; un run qui ne le referme jamais le rencontre en boucle, un run sain ne
+le voit qu'une fois par génération (d'où une re-validation verte SANS dialogue
+juste après la session de perception qui l'a refermé).
+
 ## 2026-07-25 : travel_processor_consultation_liste.robot
 
 > **Provenance : dérive SIMULÉE**, injectée volontairement dans le page object

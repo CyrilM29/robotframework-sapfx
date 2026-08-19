@@ -3,6 +3,50 @@
   if (!window.__SAPFX) { console.error('[UI5 Recorder] __SAPFX bundle missing.'); return; }
   if (window.__ui5SpyStop) { console.info('[UI5 Recorder] already running.'); return; }
 
+  // Texte de sélecteur destiné à une cellule RF SIMPLE (text= wc, name= dom).
+  // Les blancs sont normalisés (une cellule ne porte ni saut de ligne ni run de
+  // 2+ espaces ; les moteurs normalisent leur cible de la même façon) et une
+  // amorce de variable RF est échappée (\${…}, littéral après relecture par
+  // Robot). Le backslash reste le SEUL caractère non transmissible (Robot le
+  // consomme à la relecture) : on garde alors le plus long segment sans
+  // backslash. L'apostrophe, elle, passe intacte : elle n'a jamais gêné une
+  // cellule RF, seulement le littéral Python des properties (voir pyQuoted).
+  function safeMatchText(value) {
+    var s = cleanCell(value);
+    if (!s) return null;
+    if (s.indexOf('\\') !== -1) {
+      var parts = s.split('\\');
+      var best = '';
+      for (var i = 0; i < parts.length; i++) {
+        var p = parts[i].trim();
+        if (p.length > best.length) best = p;
+      }
+      s = best;
+    }
+    s = s.replace(/([$@&%])\{/g, '\\$1{');
+    return s || null;
+  }
+  // Valeur d'un littéral Python (properties={'k': <ici>}), relu par
+  // ast.literal_eval APRÈS le déséchappement Robot. Le guillemet est choisi
+  // pour ne pas entrer en conflit avec le contenu (« Editor's Choice » part
+  // entre guillemets doubles) : aucune troncature sur l'apostrophe, qui était
+  // la cause n°1 de sélecteurs raccourcis donc ambigus. Retourne le littéral
+  // complet (guillemets compris), ou null si le contenu porte les DEUX sortes
+  // de guillemets (cas résiduel : l'appelant dégrade son sélecteur).
+  function pyQuoted(value) {
+    var s = safeMatchText(value);
+    if (s === null) return null;
+    if (s.indexOf("'") === -1) return "'" + s + "'";
+    if (s.indexOf('"') === -1) return '"' + s + '"';
+    return null;
+  }
+  // Un xpath part dans une cellule RF (ligne Resolve ou indice « # xpath: ») :
+  // saut de ligne, run de 2+ espaces, amorce de variable RF ou backslash
+  // (consommé par Robot à la relecture) le casseraient ; on l'omet plutôt que
+  // d'émettre une ligne corrompue, et l'omission est ANNONCÉE par l'appelant.
+  function rfSafeCell(text) {
+    return !/[\r\n\\]| {2,}|[$@&%]\{/.test(String(text));
+  }
   // Arguments de sélecteur (id ou controlType + properties), communs aux lignes
   // Resolve (inspecteur) et Click/Fill (recorder).
   function roleArgs(r) {
@@ -10,9 +54,16 @@
     if (r.idSuffix) return 'idSuffix=' + r.idSuffix;   // id stable Fiori Elements (fe::…)
     if (r.properties) {
       var k = Object.keys(r.properties)[0];
-      return "controlType=" + r.controlType + "    properties={'" + k + "': '" + r.properties[k] + "'}";
+      var v = pyQuoted(r.properties[k]);
+      if (v !== null) return "controlType=" + r.controlType + "    properties={'" + k + "': " + v + "}";
     }
-    return 'controlType=' + r.controlType;
+    // Dégradation en type SEUL : le replay prendra le PREMIER contrôle de ce
+    // type. On l'annonce dans la ligne plutôt que de laisser croire à un
+    // sélecteur discriminant (un clic rejoué ailleurs, en silence, est pire
+    // qu'un step visiblement à compléter).
+    return 'controlType=' + r.controlType
+      + '    # sélecteur non discriminant : la propriété enregistrée n\'est pas'
+      + ' transmissible telle quelle, préciser le contrôle avant de rejouer';
   }
   function roleLine(cap) { return 'Resolve Ui5 Control    ' + roleArgs(cap.role); }
   function clickLine(cap) { return 'Click Ui5 Control    ' + roleArgs(cap.role); }
@@ -23,15 +74,24 @@
   // le sélecteur primaire ne résout plus (esprit « fallback locators » de
   // Selenium IDE, sur nos moteurs sémantiques).
   function withXpathHint(line, cap) {
-    return (cap && cap.xpathShort) ? line + '    # xpath: ' + cap.xpathShort : line;
+    if (!cap || !cap.xpathShort) return line;
+    if (rfSafeCell(cap.xpathShort)) return line + '    # xpath: ' + cap.xpathShort;
+    // Repli xpath IMPOSSIBLE à transmettre en cellule RF : le step ne naîtra
+    // pas auto-réparable. On le DIT (l'omission muette laissait croire à un
+    // step qui se répare, jusqu'au jour où le sélecteur primaire dérive). Le
+    // préfixe diffère de « # xpath: » à dessein : l'export resource-first ne
+    // doit PAS prendre cette phrase pour un localisateur de repli.
+    return line + '    # xpath indisponible : non transmissible en cellule'
+      + ' Robot, ce step n\'a pas de repli auto-réparable';
   }
   function xpathLine(cap) {
     var x = cap.xpathShort || cap.xpath;
-    return x ? 'Resolve Ui5 By Xpath    ' + x : '';
+    return (x && rfSafeCell(x)) ? 'Resolve Ui5 By Xpath    ' + x : '';
   }
   // Web Component (page hors registre UI5) : arguments du moteur wc.
   function wcArgs(wc) {
-    return 'tag=' + wc.tag + (wc.text ? '    text=' + wc.text : '');
+    var t = wc.text ? safeMatchText(wc.text) : null;
+    return 'tag=' + wc.tag + (t ? '    text=' + t : '');
   }
   // Zone non-SAP : arguments du moteur dom (rôle + nom accessible de préférence,
   // chemin CSS light-DOM sinon). Espaces normalisés : un run de 4 espaces dans un
@@ -80,7 +140,8 @@
     return out;
   }
   function domArgs(d) {
-    if (d.role && d.name) return 'role=' + d.role + '    name=' + cleanCell(d.name);
+    var n = d.name ? safeMatchText(d.name) : null;
+    if (d.role && n) return 'role=' + d.role + '    name=' + n;
     if (d.role) return 'role=' + d.role + '    css=' + d.css;
     return 'css=' + d.css;
   }
@@ -348,7 +409,9 @@
   // Clé d'identité d'un step Fill (keyword + localisateur, valeur exclue) : une
   // re-saisie du même champ REMPLACE la précédente au lieu de s'empiler.
   function fillKey(line) {
-    var cells = line.split('    ');
+    // Cellules d'action seulement : un commentaire de fin de ligne (repli
+    // xpath, avertissement) ne fait pas partie de l'identité du localisateur.
+    var cells = splitStepCells(line).cells;
     if (cells[0] === 'Fill Ui5 Input' || cells[0] === 'Fill Wc Input' ||
         cells[0] === 'Fill Dom Input') return cells[0] + '|' + cells.slice(2).join('|');
     if (cells[0] === 'Fill Sid Input') return cells[0] + '|' + cells[1];
@@ -599,7 +662,10 @@
   }
   function humanizeWebStep(line, fmt) {
     fmt = fmt || mdCode;                 // spec = code span Markdown ; rapport = guillemets
-    var cells = line.split('    ');
+    // Le commentaire de fin de ligne (indice de repli xpath, avertissement de
+    // sélecteur non discriminant) n'est PAS un argument : sans ce retrait il
+    // entrait dans le libellé humain de la phrase générée.
+    var cells = splitStepCells(line).cells;
     var kw = cells[0];
     function target(from, to) {
       return fmt(slugFromArgs(to ? cells.slice(from, to) : cells.slice(from), 'cible').toLowerCase());

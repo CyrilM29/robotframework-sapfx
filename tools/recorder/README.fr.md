@@ -127,9 +127,15 @@ re-résolution par libellé sinon, jamais en silence.
 Le « play » de l'esprit Selenium IDE, côté client lourd : rejoue un
 enregistrement (corps nu ou suite complète) contre la session SAP GUI **déjà
 ouverte** (`Attach To Open Session`), step par step, arrêt au premier échec
-avec le step fautif nommé ; commentaires ignorés, keywords hors bibliothèque
-signalés mais non bloquants. La GUI l'expose par le bouton **Rejouer** du
-panneau de steps (sauvegarde d'abord les éditions en attente).
+avec le step fautif nommé ; commentaires ignorés. Un step dont le keyword
+n'existe **pas** dans `SapEccLibrary` est signalé ET fait échouer le replay
+(code de sortie 1) : un « Replay OK : 0 step(s) exécuté(s) » serait vert et
+faux. C'est exactement ce que produit une suite **resource-first**, dont tous
+les steps sont des keywords métier vivant dans le `.resource` importé : le
+message d'échec nomme le cas et renvoie vers `robot`. Un fichier portant
+plusieurs tests est annoncé comme tel, seul le premier étant rejoué. La GUI
+expose le replay par le bouton **Rejouer** du panneau de steps (sauvegarde
+d'abord les éditions en attente).
 
 ### Transpile VBS (`--transpile-vbs FICHIER`)
 
@@ -141,6 +147,17 @@ conservés en commentaires `# non mappé`). Ne requiert **aucune session SAP** ;
 `--suite` / `--export-resources` / `--export-spec` s'appliquent ensuite
 normalement. Validé de bout en bout : VBS format ALT+F12 → transpile →
 `--replay` contre un A4H live.
+
+### Arrêt propre depuis l'extérieur (`--stop-file FICHIER`)
+
+Les boucles interactives (capture / survol / record) s'arrêtent normalement par
+Ctrl+C dans leur console. Quand le recorder est piloté par un autre programme
+(le lanceur Tkinter ci-dessous, un script), il n'y a aucune console à qui
+envoyer ce signal : `--stop-file` nomme un fichier sentinelle, et la boucle
+sort dès qu'il apparaît, **par son teardown**. Tuer le processus, lui, saute ce
+teardown : l'OK-code en attente est perdu et `Session.Record` reste armé côté
+SAP GUI (F4 modal, drag & drop désactivé pour l'utilisateur). Le recorder
+efface la sentinelle lui-même en s'arrêtant.
 
 ### Lanceur visuel (sans ligne de commande)
 
@@ -155,7 +172,11 @@ python tools/recorder/recorder_gui.py
 Choisissez un mode (dump / JSON / capture / survol / record / surlignage), remplissez
 les champs optionnels filtre / sortie / id, puis **Lancer**. Les modes interactifs
 tournent dans une console séparée (sortie live + Ctrl+C) ; **Arrêter** les stoppe,
-**Dossier captures** ouvre le dossier de sortie. Les options du record (suite
+**Dossier captures** ouvre le dossier de sortie. **Arrêter** est un arrêt
+*propre* : le lanceur pose une sentinelle (`--stop-file`, voir ci-dessus) et le
+recorder quitte sa boucle par son propre teardown (`Session.Record` remis à
+False, événements désabonnés, dernières étapes écrites) ; il ne tue le
+processus que si cela reste sans réponse pendant cinq secondes. Les options du record (suite
 complète, export resource-first, export spec, export rapport HTML) sont des
 cases à cocher. En mode
 record, le **panneau « Étapes »** suit le fichier de sortie en direct (chaque

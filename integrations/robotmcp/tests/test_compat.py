@@ -50,6 +50,48 @@ def test_an_unimportable_anchor_module_is_reported(monkeypatch):
                for p in problems)
 
 
+# --- échappatoire d'environnement --------------------------------------------
+
+@pytest.mark.parametrize("valeur", ["1", "true", "TRUE", " yes ", "on"])
+def test_l_echappatoire_s_active_sur_une_valeur_affirmative(valeur):
+    assert _compat.env_flag_enabled(valeur) is True
+
+
+@pytest.mark.parametrize("valeur", [None, "", "0", "false", "no", "off", " "])
+def test_l_echappatoire_reste_fermee_sur_tout_le_reste(valeur):
+    """Un simple test de véracité acceptait « 0 » et « false », c'est-à-dire
+    exactement ce qu'un exploitant écrit pour dire « ne jamais contourner le
+    garde » : le refus de démarrer devenait alors un démarrage dégradé."""
+    assert _compat.env_flag_enabled(valeur) is False
+
+
+# --- voie entry point : avertissement de version, jamais bloquant ------------
+
+def test_la_voie_entry_point_avertit_une_seule_fois(monkeypatch, caplog):
+    """Les plugins se chargent aussi dans un serveur ``robotmcp`` standard, où
+    le refus au démarrage de la surcouche ne s'exécute jamais : cette voie-là
+    doit au moins AVERTIR sur la version, sans faire tomber un serveur qui n'a
+    rien demandé."""
+    monkeypatch.setattr(_compat, "robotmcp_version", lambda: "0.99.0")
+    monkeypatch.setattr(_compat, "_WARNED_ONCE", False)
+    with caplog.at_level("WARNING"):
+        premier = _compat.warn_version_once()
+    assert premier and "hors de la fenêtre validée" in premier
+    assert any("compatibilité rf-mcp" in r.message for r in caplog.records)
+    assert _compat.warn_version_once() is None    # une seule fois par process
+
+
+def test_la_voie_entry_point_ne_touche_aucun_module_rfmcp(monkeypatch):
+    """Elle ne peut PAS sonder les points d'ancrage : importer
+    ``robotmcp.server`` depuis un plugin chargé PAR ce serveur serait
+    circulaire. La version, elle, se lit dans les métadonnées."""
+    def interdit(name, *args, **kwargs):
+        raise AssertionError("import interdit sur cette voie : %s" % name)
+
+    monkeypatch.setattr(_compat.importlib, "import_module", interdit)
+    assert _compat.version_problem() is None
+
+
 # --- sonde get_session (proxy lazy rf-mcp >= 0.34) ---------------------------
 
 class _FakeModule:

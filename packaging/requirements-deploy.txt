@@ -4,7 +4,10 @@
 pywin32==311; platform_system == "Windows"
 # Côté Fiori / web. Après installation : `rfbrowser init chromium` (option
 # -WithBrowsers de install.ps1) ou utiliser le Chrome système (channel=chrome).
-robotframework-browser>=20.0
+# Borne haute alignée sur l'extra `web` du wheel : la bibliothèque Fiori vise
+# des chemins internes de Browser, une majeure se re-qualifie (le pack fige de
+# toute façon la version exacte dans constraints-deploy.txt).
+robotframework-browser>=20.0,<21
 # Assertions visuelles et empreinte de la sentinelle de dérive
 # (`Screen Should Match Baseline`, `Check Screen Against Watch`) : Pillow ne
 # sert qu'à décoder le PNG à la frontière (extra `visual` du wheel).

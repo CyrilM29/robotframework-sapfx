@@ -49,12 +49,29 @@ class FakeProvider:
         return self._app
 
 
+class FakeCapabilities:
+    def __init__(self, page_source=True, application_state=True):
+        self.supports_page_source = page_source
+        self.supports_application_state = application_state
+
+
 class FakeManager:
-    def __init__(self, providers=None):
+    def __init__(self, providers=None, capabilities=None):
         self._providers = providers or {}
+        self._capabilities = capabilities or {}
 
     def get_state_provider(self, name):
         return self._providers.get(name)
+
+    def get_capabilities(self, name):
+        return self._capabilities.get(name)
+
+
+class FakeLegacyManager(FakeManager):
+    """Manager sans accesseur de capacités (un rf-mcp qui aurait bougé) : dans
+    le doute, la surcouche doit servir l'état, jamais le refuser."""
+
+    get_capabilities = None
 
 
 # --- pick_library / resolve_session ------------------------------------------
@@ -131,6 +148,54 @@ def test_collect_state_a_failing_section_degrades_best_effort():
     assert out["success"] is True
     assert out["sections"]["page_source"]["success"] is False
     assert "COM parti" in out["sections"]["page_source"]["error"]
+    assert out["sections"]["application_state"]["connected"] is True
+
+
+def test_collect_state_refuse_une_section_declaree_non_servie():
+    """La capacité DÉCLARÉE fait foi.
+
+    Sans cette lecture, le drapeau restait décoratif (il a pu être faux tout un
+    temps côté Fiori sans que rien ne bronche) et chaque plugin devait
+    compenser à la main : le canal API portait une méthode dont le seul rôle
+    était de répondre « ce canal n'a pas d'écran »."""
+    provider = FakeProvider(page={"success": True, "page_source": "jamais"},
+                            app={"connected": True})
+    out = _collect(
+        execution_engine=FakeEngine({"s1": FakeSession()}),
+        plugin_manager=FakeManager(
+            {"SapEccLibrary": provider},
+            {"SapEccLibrary": FakeCapabilities(page_source=False)}),
+        session_id="s1")
+    page = out["sections"]["page_source"]
+    assert page["success"] is False and page["supported"] is False
+    assert "supports_page_source=False" in page["error"]
+    # la section déclarée servie, elle, l'est bel et bien
+    assert out["sections"]["application_state"]["connected"] is True
+
+
+def test_collect_state_reprend_le_motif_du_provider_quand_il_en_donne_un():
+    class _Explicite(FakeProvider):
+        @staticmethod
+        def unsupported_reason(section):
+            return "ce canal n'a pas d'écran : la perception EST le retour"
+
+    out = _collect(
+        execution_engine=FakeEngine({"s1": FakeSession()}),
+        plugin_manager=FakeManager(
+            {"SapEccLibrary": _Explicite()},
+            {"SapEccLibrary": FakeCapabilities(page_source=False)}),
+        session_id="s1")
+    assert (out["sections"]["page_source"]["error"]
+            == "ce canal n'a pas d'écran : la perception EST le retour")
+
+
+def test_collect_state_sert_l_etat_quand_les_capacites_sont_illisibles():
+    provider = FakeProvider(page={"success": True, "page_source": "# screen"},
+                            app={"connected": True})
+    out = _collect(execution_engine=FakeEngine({"s1": FakeSession()}),
+                   plugin_manager=FakeLegacyManager({"SapEccLibrary": provider}),
+                   session_id="s1")
+    assert out["sections"]["page_source"]["page_source"] == "# screen"
     assert out["sections"]["application_state"]["connected"] is True
 
 

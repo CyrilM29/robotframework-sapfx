@@ -76,42 +76,29 @@ def _run_snippet(tmp_path, lines):
                          log=None, output=None, console="NONE", exitonfailure=False)
 
 
-# --- Try Open Table Selection Screen : repérage dynamique de la case à cocher -
+# --- Try Open Table Selection Screen : une seule implémentation, dans la lib ---
 
-_CHECKBOX_MARKER = "l.startswith('* wnd[1]/usr/chk')"
+def test_selection_screen_opening_is_delegated_to_the_library_keyword():
+    """L'ouverture d'un écran de sélection SE16 (statut de type E, popup
+    « choix des champs » des tables larges, dialogue de message de génération,
+    attente de l'écran généré) a vécu en TROIS copies divergentes : cette
+    resource, le mixin DDIC et la campagne autonome. Elle vit désormais dans
+    l'unique keyword de bibliothèque `Reach Se16 Selection Screen`, couvert
+    par tests/unit/test_ddic_keywords.py (case cochée avec un id RELATIF,
+    dialogue absorbé, verdicts rejected/dialog/modal).
 
-
-def test_checkbox_picker_selects_first_popup_checkbox_in_signature_order(tmp_path):
-    expr = _extract_evaluate_expr(_CHECKBOX_MARKER)
-    # NB : pas de ligne d'en-tête "# screen ..." ici (non nécessaire à ce
-    # fragment, qui ne regarde que les lignes "* wnd[1]/usr/chk...") : un "#" en
-    # tout début de cellule Robot serait lu comme un commentaire et viderait
-    # ${sig} silencieusement.
-    sig = "\n".join([
-        "  wnd[0]/usr/lbl1\tGuiLabel\tSome label",
-        "* wnd[0]/usr/chkNOT_THE_POPUP\tGuiCheckBox\t",     # fenêtre 0 : ne doit pas matcher
-        "  wnd[1]/usr/lbl2\tGuiLabel\tChoisissez les champs",
-        "* wnd[1]/usr/chkRSDBFIELD-CHECK\tGuiCheckBox\t",
-        "* wnd[1]/usr/chkRSDBFIELD-CHECK2\tGuiCheckBox\t",  # 2e case -> ignorée, on prend la 1re
-        "  wnd[1]/tbar[0]/btn[0]\tGuiButton\tOK",
-    ])
-    rc = _run_snippet(tmp_path, [
-        "${sig}=    Set Variable    %s" % _robot_escaped(sig),
-        "${chk}=    Evaluate    %s" % expr,
-        "Should Be Equal    ${chk}    wnd[1]/usr/chkRSDBFIELD-CHECK",
-    ])
-    assert rc == 0
-
-
-def test_checkbox_picker_returns_empty_when_no_popup_checkbox(tmp_path):
-    expr = _extract_evaluate_expr(_CHECKBOX_MARKER)
-    sig = "  wnd[1]/usr/lbl\tGuiLabel\tNo checkbox here"
-    rc = _run_snippet(tmp_path, [
-        "${sig}=    Set Variable    %s" % _robot_escaped(sig),
-        "${chk}=    Evaluate    %s" % expr,
-        "Should Be Equal    ${chk}    ${EMPTY}",
-    ])
-    assert rc == 0
+    Ce test garde le dédoublonnage : il échoue si une copie de la logique
+    revient dans la resource (repérage de case à cocher par parsing de
+    signature, ou absorption de modale à la main)."""
+    text = _resource_text()
+    assert "Reach Se16 Selection Screen" in text, (
+        "Try Open Table Selection Screen doit déléguer au keyword de "
+        "bibliothèque, pas réimplémenter l'ouverture d'écran de sélection.")
+    for copy_marker in ("wnd[1]/usr/chk", "Select Checkbox"):
+        assert copy_marker not in text, (
+            "Une copie du pilotage de popup SE16 est revenue dans %s (%r) : "
+            "la logique appartient à Reach Se16 Selection Screen."
+            % (_RESOURCE, copy_marker))
 
 
 # --- Count Entries On Current Selection Screen : séparateurs de milliers ------

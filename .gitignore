@@ -37,6 +37,13 @@ playwright-log.txt
 # les diffs de dérive `*.actual.png` restent ignorés (artefacts transitoires).
 !tests/robot/visual_baselines/*.png
 tests/robot/visual_baselines/*.actual.png
+# Même règle pour la sentinelle de dérive : ses références (`*.signature.txt`,
+# `*.dhash.txt`, `*.tiles.txt`) sont committées, la perception COURANTE qu'elle
+# sauve quand un écran a dérivé est un artefact transitoire. Sans cette ligne,
+# tout passage de sentinelle ayant détecté une dérive salit l'arbre, et
+# `export_public_tree.py` (qui exige un arbre propre, il lit `git archive HEAD`)
+# refuse de tourner : constaté le 2026-08-19, en pleine préparation de release.
+screen_watch/*.actual.signature.txt
 # Images clés des démos vidéo (livrables comm, extraites des prises validées) :
 # régénérables par script, non committés ; les .webm sont les intermédiaires
 # Playwright des prises (le livrable est le MP4 composé).
@@ -74,3 +81,11 @@ tests/robot/visual_baselines/*.actual.png
 !.vscode/mcp.json
 *.swp
 Thumbs.db
+
+# .claude : les agents, commandes et skills sont versionnés ; les réglages
+# LOCAUX ne le sont jamais. `settings.local.json` lui-même est déjà couvert par
+# l'ignore global de Claude Code, mais pas ses sauvegardes (`.avant-<raison>`),
+# qui restaient visibles dans `git status` et faisaient ABANDONNER l'export
+# public (`export_public_tree.py` exige un arbre propre, fail-closed).
+.claude/settings.local.json*
+.claude/scheduled_tasks.lock

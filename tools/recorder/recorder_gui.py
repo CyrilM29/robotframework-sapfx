@@ -70,6 +70,46 @@ def resolve_record_out(current, previous_auto, now=None):
     fresh = default_record_name(now)
     return fresh, fresh
 
+def stop_file_path(out_name, now=None):
+    """Chemin de la sentinelle d'arrêt d'un lancement interactif.
+
+    Dérivé du fichier de sortie quand il y en a un (record), horodaté sinon
+    (capture et survol peuvent tourner sans fichier). Toujours sous
+    ``captures/`` : c'est un artefact de travail, et le recorder l'efface
+    lui-même en fin de boucle."""
+    base = os.path.basename((out_name or "").strip())
+    if not base:
+        base = (now or datetime.datetime.now()).strftime("%Y%m%d_%H%M%S")
+    return os.path.join(CAPTURES_DIR, base + ".stop")
+
+
+def request_stop(proc, stop_path, timeout=5.0):
+    """Arrête un recorder interactif SANS le tuer d'abord : pose la sentinelle
+    (le processus sort de sa boucle et déroule son teardown : ``Session.Record``
+    remis à False, événements désabonnés, dernières étapes écrites), et ne
+    recourt à ``terminate()`` que s'il ne rend pas la main.
+
+    ``terminate()`` seul sautait tout ce teardown, ce qui perdait l'OK-code en
+    attente et laissait le mode Record actif côté SAP GUI (F4 modal, drag & drop
+    désactivé pour l'utilisateur). Retourne ``'propre'``, ``'forcé'`` ou
+    ``'déjà arrêté'``."""
+    if proc is None or proc.poll() is not None:
+        return "déjà arrêté"
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(stop_path)), exist_ok=True)
+        with open(stop_path, "w", encoding="utf-8") as fh:
+            fh.write("stop\n")
+    except OSError:
+        proc.terminate()                  # sentinelle impossible : dernier recours
+        return "forcé"
+    try:
+        proc.wait(timeout=timeout)
+        return "propre"
+    except subprocess.TimeoutExpired:
+        proc.terminate()
+        return "forcé"
+
+
 def banner_drag_position(press_root, press_win, motion_root):
     """Nouvelle origine de la fenêtre pendant un glisser du bandeau.
 
@@ -251,6 +291,7 @@ def main():
         w.bind("<ButtonRelease-1>", _banner_release)
 
     proc = {"p": None}   # processus en cours (modes interactifs)
+    stop_state = {"path": None}          # sentinelle d'arrêt du lancement en cours
     # état du panneau de steps : fichier suivi, dernière mtime lue, édition en cours
     watch = {"path": None, "mtime": None, "dirty": False, "text": ""}
 
@@ -322,8 +363,12 @@ def main():
     ttk.Label(root, textvariable=desc_var, wraplength=360, foreground="#555").grid(
         row=3, column=0, sticky="w", **pad)
     status_var = tk.StringVar(value="Prêt. Ouvrez SAP Logon avec une session active.")
+    # Ligne 6 et non 5 : la rangée de boutons occupe la 5 (`frm_btn` ci-dessous).
+    # Deux widgets dans la MÊME cellule s'empilent sous Tk, et le frame créé en
+    # dernier passait devant : le seul canal de retour de la fenêtre (« En
+    # cours… », « Arrêté. », « Étapes enregistrées dans … ») était illisible.
     ttk.Label(root, textvariable=status_var, wraplength=360, foreground="#0a6ed1").grid(
-        row=5, column=0, sticky="w", **pad)
+        row=6, column=0, sticky="w", **pad)
 
     def _on_mode_change():
         mode = mode_var.get()
@@ -496,6 +541,13 @@ def main():
             return
         if proc["p"] is not None and proc["p"].poll() is None:
             on_stop()        # arrête une boucle précédente avant d'en lancer une autre
+        if mode in _INTERACTIVE:
+            # Sentinelle d'arrêt : la GUI est lancée par pythonw, elle n'a aucune
+            # console d'où envoyer un Ctrl+C au recorder (console SÉPARÉE).
+            stop_state["path"] = stop_file_path(out_var.get() or mode)
+            args = args + ["--stop-file", stop_state["path"]]
+        else:
+            stop_state["path"] = None
         try:
             p = launch(args)
         except Exception as exc:                       # pragma: no cover - dépend de l'OS
@@ -507,16 +559,24 @@ def main():
                          mtime=None, dirty=False, text="")
             steps_state["steps"] = []
             _refresh_steps_list()
-        shown = "sapgui_recorder.py " + " ".join(args)
+        # La sentinelle est un détail d'implémentation du bouton « Arrêter » :
+        # elle n'encombre pas la ligne d'état, déjà étroite.
+        shown = "sapgui_recorder.py " + " ".join(
+            args[:args.index("--stop-file")] if "--stop-file" in args else args)
         status_var.set(("En cours (Ctrl+C dans la console pour arrêter) : " if mode in _INTERACTIVE
                         else "Lancé : ") + shown)
 
     def on_stop():
         p = proc["p"]
-        if p is not None and p.poll() is None:
-            p.terminate()
-            status_var.set("Arrêté.")
+        path = stop_state["path"] or stop_file_path(out_var.get())
+        outcome = request_stop(p, path)
+        if outcome == "propre":
+            status_var.set("Arrêté (teardown du recorder déroulé).")
+        elif outcome == "forcé":
+            status_var.set("Arrêt FORCÉ : le recorder n'a pas rendu la main ; "
+                           "vérifiez le mode Record côté SAP GUI.")
         proc["p"] = None
+        stop_state["path"] = None
         _load_steps_from_file(force=True)   # dernier état du fichier après l'arrêt
 
     def on_open_captures():

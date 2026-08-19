@@ -127,6 +127,39 @@ def test_verify_fails_when_a_test_file_was_touched(fake_repo):
                and "ecc_scarr_spfli_liaisons.robot" in m for m in messages)
 
 
+def test_verify_fails_when_the_healer_added_a_protected_file(fake_repo):
+    # Régression : verify ne relisait que le manifeste, donc une CRÉATION
+    # passait. C'est pourtant le cas le plus probable en pack déployé, où les
+    # agents ont pour consigne d'écrire dans resources/site_keywords.resource.
+    mod.inject("se16-count-button", root=fake_repo)
+    path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(_RESOURCE)
+    added = os.path.join(fake_repo, "resources", "site_keywords.resource")
+    with open(added, "w", encoding="utf-8") as f:
+        f.write("*** Keywords ***\n")
+    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    assert ok is False
+    assert any("site_keywords.resource (ajouté)" in m for m in messages)
+
+
+def test_verify_ignore_les_artefacts_de_run(fake_repo):
+    # Le healer reproduit l'échec : il fait tourner pytest et robot. Leurs
+    # traces ne sont pas des sources, elles ne doivent pas faire échouer l'éval.
+    mod.inject("se16-count-button", root=fake_repo)
+    path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(_RESOURCE)
+    cache = os.path.join(fake_repo, "tests", "robot", "__pycache__")
+    os.makedirs(cache)
+    with open(os.path.join(cache, "x.pyc"), "wb") as f:
+        f.write(b"\x00")
+    with open(os.path.join(fake_repo, "tests", "robot", "e.actual.png"), "wb") as f:
+        f.write(b"\x89PNG")
+    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    assert ok is True, messages
+
+
 def test_verify_passes_with_a_note_when_repaired_differently(fake_repo):
     mod.inject("se16-count-button", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")

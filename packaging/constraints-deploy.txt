@@ -1,5 +1,8 @@
-# Versions qualifiées ensemble pour le pack Windows 0.6.6.
+# Versions qualifiées ensemble pour sapfx-pack-0.6.7-win.zip.
 # Mettre à jour volontairement, puis rejouer le job release-pack complet.
+# La version est écrite sous la forme du NOM DU PACK, et pas en prose : c'est
+# celle que check_published_versions.py sait reconnaître, donc la seule qui ne
+# puisse pas vieillir en silence dans ce commentaire.
 robotframework==7.4.2
 robotframework-browser==20.0.0
 Pillow==12.3.0

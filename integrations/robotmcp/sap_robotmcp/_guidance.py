@@ -87,6 +87,13 @@ FIORI_HINTS = [
     "MessageToast récents (hook posé à l'injection) ; asserter par TYPE "
     "(Ui5 Should Have No Messages Of Type Error), jamais sur le texte "
     "localisé : le miroir web du type de message de barre d'état ECC.",
+    "Page peut-être PAS UI5 (moteurs wc/sid/dom, frame poussée, page en cours "
+    "de chargement) ? Sonder Ui5 Runtime Is Present AVANT tout keyword qui "
+    "exige le runtime : il répond True/False sans jamais échouer, et c'est la "
+    "seule expression web qui n'injecte pas le bundle (donc n'instrumente pas "
+    "fetch/XHR de l'app). Absence de runtime = cible légitime, pas une panne. "
+    "Get Ui5 Application State fait les trois d'un coup (portée de frame + "
+    "runtime + messages) : le « où en suis-je » du canal web en un appel.",
     "Tables : Read Ui5 Table lit une sap.m.Table / sap.ui.table.Table en "
     "liste de dicts par en-têtes (le miroir de Read Grid ECC) ; Upload File "
     "Via Ui5 téléverse dans un contrôle d'upload (l'input interne est visé à "
@@ -117,6 +124,17 @@ ECC_HINTS = [
     "SE16 : la sortie par défaut est la liste ABAP classique, SANS objet grille "
     "scriptable : appeler d'abord `Use ALV Grid In Data Browser` (resource ECC, "
     "persistant par utilisateur) ; SE16N n'existe pas sur l'ABAP Platform Trial.",
+    "Classer un lot d'objets DDIC (table/vue/structure) : Classify Ddic Objects "
+    "lit DD02L par lots de sélection multiple (TABCLASS se lit en SORTIE de "
+    "grille, jamais en critère) avec le barème RELU sur la cible "
+    "(Get Ddic Classification Map sur le domaine TABCLASS) ; jamais un "
+    "balayage SE16 objet par objet. Fill Multiple Selection charge une liste "
+    "de valeurs dans tout critère d'écran de sélection (dialogue SAPLALDB).",
+    "Ouvrir un écran de sélection SE16 : TOUJOURS Reach Se16 Selection Screen, "
+    "jamais Run Transaction + Input Text + Send Vkey à la main. Il absorbe les "
+    "trois pièges en un endroit (statut type E = structure refusée, popup de "
+    "choix des champs des tables larges, dialogue de génération au premier "
+    "accès) et rend un verdict reached/rejected/dialog/modal.",
     "Écran inconnu ? Appeler Get Screen Signature pour voir les ids/types réels "
     "avant de deviner un localisateur. Après une action, préférer mode=diff : "
     "seul ce qui a changé est retourné (fraction des tokens).",

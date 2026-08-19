@@ -4,8 +4,10 @@ Seule la construction des arguments CLI (`build_args`) est testée ; le câblage
 ne l'est pas (il n'est importé que dans `main()`, donc importer le module ne requiert
 pas d'affichage). Le module vit sous ``tools/`` ; on le charge par chemin.
 """
+import datetime
 import importlib.util
 import os
+import subprocess
 import sys
 
 import pytest
@@ -171,3 +173,63 @@ def test_banner_drag_position_is_stable_without_motion():
 def test_banner_drag_position_supports_negative_screen_coordinates():
     # multi-ecrans : l'ecran secondaire a gauche donne des coordonnees negatives
     assert gui.banner_drag_position((0, 0), (-1920, 10), (-50, -8)) == (-1970, 2)
+
+
+# --- revue de code des tools (2026-08-19) : arret propre du bouton « Arreter » -
+
+class _FakeProc:
+    """Processus factice : ``poll`` rend None tant qu'il tourne ; ``wait`` sort
+    quand la sentinelle a ete vue, ou leve TimeoutExpired si on le lui demande."""
+
+    def __init__(self, honore_la_sentinelle=True, deja_fini=False):
+        self.honore = honore_la_sentinelle
+        self.fini = deja_fini
+        self.terminated = False
+
+    def poll(self):
+        return 0 if self.fini else None
+
+    def wait(self, timeout=None):
+        if not self.honore:
+            raise subprocess.TimeoutExpired("sapgui_recorder.py", timeout)
+        self.fini = True
+        return 0
+
+    def terminate(self):
+        self.terminated = True
+        self.fini = True
+
+
+def test_stop_file_path_reste_sous_captures(tmp_path):
+    chemin = gui.stop_file_path("record_20260819_101500.robot")
+    assert os.path.dirname(chemin) == gui.CAPTURES_DIR
+    assert chemin.endswith("record_20260819_101500.robot.stop")
+    # sans fichier de sortie (capture / survol) : horodate, jamais vide
+    auto = gui.stop_file_path("", now=datetime.datetime(2026, 8, 19, 10, 15, 0))
+    assert auto.endswith("20260819_101500.stop")
+    # un nom porteur de chemin ne fait pas sortir la sentinelle de captures/
+    assert os.path.dirname(gui.stop_file_path("../../evil")) == gui.CAPTURES_DIR
+
+
+def test_request_stop_pose_la_sentinelle_avant_de_tuer(tmp_path):
+    # Constat n°4 : terminate() sautait le teardown du recorder (OK-code en
+    # attente perdu, Session.Record laisse actif cote SAP GUI).
+    stop = tmp_path / "record.robot.stop"
+    proc = _FakeProc()
+    assert gui.request_stop(proc, str(stop), timeout=0.1) == "propre"
+    assert stop.exists()                       # le recorder l'efface lui-meme
+    assert proc.terminated is False
+
+
+def test_request_stop_force_si_le_recorder_ne_rend_pas_la_main(tmp_path):
+    stop = tmp_path / "record.robot.stop"
+    proc = _FakeProc(honore_la_sentinelle=False)
+    assert gui.request_stop(proc, str(stop), timeout=0.01) == "forcé"
+    assert proc.terminated is True
+
+
+def test_request_stop_ne_fait_rien_sur_un_processus_deja_arrete(tmp_path):
+    proc = _FakeProc(deja_fini=True)
+    assert gui.request_stop(proc, str(tmp_path / "x.stop")) == "déjà arrêté"
+    assert proc.terminated is False
+    assert gui.request_stop(None, str(tmp_path / "x.stop")) == "déjà arrêté"

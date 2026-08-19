@@ -10,7 +10,9 @@ rf-mcp 0.31 constatés live le 2026-07-23 (field notes CLAUDE.md) :
 
 - ``sapfx_state`` : appelle NOS state providers directement, avec ``page_source``
   avec la vraie sémantique ``full_source`` (le mode diff s'exerce par défaut),
-  ``application_state`` enrichi (``modal_open``…, jamais routé par rf-mcp) ;
+  et l'``application_state`` enrichi que rf-mcp ne route jamais (ECC :
+  ``modal_open``, statut, télémétrie ; Fiori : portée de frame, runtime UI5 et
+  messages ; API : alias ouverts), dans le respect des capacités déclarées ;
 - ``sapfx_screenshot`` : le canal VISION (le contrat plugin n'a pas de canal
   image ; fastmcp si) : écran brut ou annoté Set-of-Mark avec sa légende ;
 - ``sapfx_reload`` : le protocole de hot-reload de la couche plugin validé
@@ -25,7 +27,7 @@ import sys
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from ._rf_context import run_keyword_in_context
-from ._staleness import staleness_warning
+from ._staleness import attach_staleness
 
 # Bibliothèques SAPFX dont les providers sont servis par la surcouche.
 SAPFX_LIBRARIES = ("SapEccLibrary", "SapFioriLibrary", "SapApiLibrary")
@@ -115,23 +117,60 @@ async def collect_state(execution_engine: Any, plugin_manager: Any,
     }
     if unknown:
         result["unknown_sections"] = unknown
+    # La capacité DÉCLARÉE fait foi : une section qu'une bibliothèque annonce
+    # ne pas servir est refusée ici, pas appelée pour voir. Sans cette lecture,
+    # le drapeau restait décoratif (il a pu être faux tout un temps côté Fiori
+    # sans que rien ne bronche) et chaque plugin devait compenser à la main :
+    # le canal API portait une méthode dont le seul rôle était de répondre
+    # « ce canal n'a pas d'écran ».
+    capabilities = _capabilities_of(plugin_manager, picked)
     if "page_source" in wanted:
-        try:
-            result["sections"]["page_source"] = await provider.get_page_source(
+        result["sections"]["page_source"] = await _section(
+            provider, capabilities, "supports_page_source", picked,
+            "page_source",
+            lambda: provider.get_page_source(
                 session, full_source=full_source, filtered=filtered,
-                filtering_level=filtering_level)
-        except Exception as exc:
-            result["sections"]["page_source"] = _error(str(exc))
+                filtering_level=filtering_level))
     if "application_state" in wanted:
+        result["sections"]["application_state"] = await _section(
+            provider, capabilities, "supports_application_state", picked,
+            "application_state",
+            lambda: provider.get_application_state(session))
+    return attach_staleness(result)
+
+
+def _capabilities_of(plugin_manager: Any, library: str) -> Any:
+    """Capacités déclarées de la bibliothèque, ``None`` si illisibles (un
+    manager de doublure ou un rf-mcp qui aurait bougé ne doit pas priver
+    l'agent de son état : dans le doute, on appelle le provider)."""
+    try:
+        return plugin_manager.get_capabilities(library)
+    except Exception:
+        return None
+
+
+async def _section(provider: Any, capabilities: Any, flag: str, library: str,
+                   section: str, call: Callable[[], Any]) -> Dict[str, Any]:
+    """Sert une section en respectant la capacité déclarée.
+
+    Une section refusée l'est avec le motif du provider quand il en donne un
+    (``unsupported_reason``) : « ce canal n'a pas d'écran, la perception EST la
+    valeur de retour des keywords » vaut mieux que « capacité False », et cela
+    reste une réponse EXPLICITE, jamais confondue avec un échec de perception.
+    """
+    if capabilities is not None and getattr(capabilities, flag, True) is False:
         try:
-            result["sections"]["application_state"] = (
-                await provider.get_application_state(session))
-        except Exception as exc:
-            result["sections"]["application_state"] = _error(str(exc))
-    warning = staleness_warning()
-    if warning:
-        result["stale_code_warning"] = warning
-    return result
+            reason = provider.unsupported_reason(section)
+        except Exception:
+            reason = None
+        return _error(
+            reason or ("%s ne sert pas la section %s (capacité déclarée "
+                       "%s=False)." % (library, section, flag)),
+            supported=False)
+    try:
+        return await call()
+    except Exception as exc:
+        return _error(str(exc))
 
 
 # --- screenshot (canal vision) ------------------------------------------------

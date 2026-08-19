@@ -63,10 +63,10 @@ class WaitKeywords:
             self._timeout_secs(timeout), step=timestr_to_secs(interval))
         if element is None:
             self.take_screenshot()
-            raise AssertionError(
+            raise AssertionError(self._with_screen_identity(
                 "Element '%s' did not appear within %s seconds.%s"
                 % (element_id, self._timeout_secs(timeout),
-                   self._closest_matches_hint(element_id))
+                   self._closest_matches_hint(element_id)))
             )
         return element
 
@@ -163,11 +163,31 @@ class WaitKeywords:
             element = None
         if element is None and raise_on_missing:
             self.take_screenshot()
-            raise ValueError("Cannot find element with id '%s'." % element_id)
+            raise ValueError(self._with_screen_identity(
+                "Cannot find element with id '%s'." % element_id))
         return element
 
     def _timeout_secs(self, timeout):
         return self.default_timeout if timeout is None else timestr_to_secs(timeout)
+
+    def _with_screen_identity(self, message):
+        """Suffixe un message d'absence par l'IDENTITÉ de l'écran actif.
+
+        Même raisonnement (et même implémentation) que du côté des keywords
+        d'absence immédiate : « l'élément n'est pas apparu » ne distingue pas
+        un localisateur périmé, un rendu trop lent et un écran qui n'est pas
+        celui qu'on croit. C'est cette 3e cause que la ligne
+        ``# screen <Programme>/<Transaction>/<Numéro>`` tranche, et l'attente
+        est le chemin d'absence DOMINANT des suites (convention 2 : on attend,
+        on ne dort pas). Best-effort : le mixin peut être utilisé isolément
+        (tests unitaires) et le calcul ne masque jamais l'erreur d'origine."""
+        absence = getattr(self, "_absence_message", None)
+        if absence is None:
+            return message
+        try:
+            return absence(message)
+        except Exception:                       # noqa: BLE001 (best-effort)
+            return message
 
     def _closest_matches_hint(self, element_id):
         """Suffixe de message d'erreur listant les ids présents les plus proches

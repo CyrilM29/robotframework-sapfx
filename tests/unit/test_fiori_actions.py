@@ -248,6 +248,73 @@ def test_get_ui5_text_resolves_then_reads_via_browser_get_text():
     assert lib.get_ui5_text(controlType="sap.m.Text") == "Hello"
 
 
+# --- _page_png : repli fichier sans seconde capture ---------------------------
+
+class _ScreenshotBrowser:
+    """Doublure qui rend un CHEMIN quels que soient les arguments (le
+    comportement de Browser quand ``return_as=bytes`` n'aboutit pas) et
+    compte ses appels."""
+
+    def __init__(self, path):
+        self.path = path
+        self.calls = []
+
+    def take_screenshot(self, **kwargs):
+        self.calls.append(kwargs)
+        return str(self.path)
+
+
+def _force_browser_types(monkeypatch):
+    """Rend ``Browser.utils.data_types`` importable de façon déterministe,
+    que la vraie bibliothèque Browser soit installée ou non."""
+    import sys
+    import types as _types
+    pkg = _types.ModuleType("Browser")
+    pkg.__path__ = []
+    utils = _types.ModuleType("Browser.utils")
+    utils.__path__ = []
+    data_types = _types.ModuleType("Browser.utils.data_types")
+
+    class _ScreenshotReturnType:
+        bytes = "bytes"
+
+    class _ElementState:
+        visible = "visible"
+
+    data_types.ScreenshotReturnType = _ScreenshotReturnType
+    data_types.ElementState = _ElementState
+    monkeypatch.setitem(sys.modules, "Browser", pkg)
+    monkeypatch.setitem(sys.modules, "Browser.utils", utils)
+    monkeypatch.setitem(sys.modules, "Browser.utils.data_types", data_types)
+
+
+def test_page_png_lit_le_chemin_rendu_sans_reprendre_une_capture(monkeypatch,
+                                                                 tmp_path):
+    # Browser peut rendre un CHEMIN malgré return_as=bytes : il faut lire CE
+    # fichier. Reprendre une seconde capture montrerait un autre instant de la
+    # page (et la paierait deux fois).
+    _force_browser_types(monkeypatch)
+    png = tmp_path / "shot.png"
+    png.write_bytes(b"\x89PNG-page")
+    browser = _ScreenshotBrowser(png)
+    lib = _lib(browser)
+    assert lib._page_png() == b"\x89PNG-page"
+    assert len(browser.calls) == 1
+
+
+def test_page_png_utilise_les_octets_quand_browser_les_rend(monkeypatch):
+    _force_browser_types(monkeypatch)
+
+    class _BytesBrowser(_ScreenshotBrowser):
+        def take_screenshot(self, **kwargs):
+            self.calls.append(kwargs)
+            return b"\x89PNG-bytes"
+
+    browser = _BytesBrowser(None)
+    assert _lib(browser)._page_png() == b"\x89PNG-bytes"
+    assert browser.calls == [{"return_as": "bytes", "log_screenshot": False}]
+
+
 # --- _browser() : message d'erreur explicite hors suite Robot ----------------
 
 def test_browser_raises_helpful_runtime_error_outside_a_robot_run():

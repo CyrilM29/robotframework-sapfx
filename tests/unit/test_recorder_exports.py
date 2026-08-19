@@ -801,9 +801,145 @@ def test_spec_export_markdown_metacharacters_stay_literal():
     assert "Saisir `*LH*` dans le champ" in md
 
 
+def test_spec_et_istqb_masquent_les_arguments_secrets_des_lignes_brutes():
+    # Parité avec le rapport HTML : un password= ajouté à la main dans un
+    # déroulé mixte ne fuit ni dans le plan spec ni dans le plan ISTQB.
+    steps = ["Open Api Session    http://h    user=U    password=Secret:xyz",
+             "Mon Keyword Exotique    wnd[0]/usr/txtX    password=enclair"]
+    spec = spy.steps_to_spec(steps)
+    assert "Secret:xyz" not in spec and "enclair" not in spec
+    assert "password=***" in spec
+    istqb = spy.steps_to_istqb(steps)
+    assert "Secret:xyz" not in istqb and "enclair" not in istqb
+    assert "password=***" in istqb
+
+
 def test_md_code_survit_aux_backticks_du_contenu():
     # La parade CommonMark complète : un backtick DANS la donnée ne casse pas
     # le code span (clôture plus longue), un backtick en bord est isolé.
     assert spy.md_code("x") == "`x`"
     assert spy.md_code("a`b") == "``a`b``"
     assert spy.md_code("`debut") == "`` `debut ``"
+
+
+# --- revue de code des tools (2026-08-19) : correctifs verrouillés ------------
+#
+# Neuf constats de la revue ; les tests ci-dessous fixent le comportement des
+# six qui touchent le recorder bureau (les trois autres vivent dans le pack,
+# la GUI et la configuration mypy/couverture).
+
+def test_split_step_accepte_les_vrais_separateurs_robot():
+    # Constat n°2 : le découpage supposait EXACTEMENT quatre espaces. Robot
+    # sépare à partir de DEUX espaces, ou par tabulation, et un déroulé édité
+    # à la main (panneau de steps de la GUI) est du RF valide quelconque.
+    attendu = (["Input Text", "wnd[0]/usr/ctxtX", "T000"], "")
+    assert spy._split_step("Input Text    wnd[0]/usr/ctxtX    T000") == attendu
+    assert spy._split_step("Input Text  wnd[0]/usr/ctxtX  T000") == attendu
+    assert spy._split_step("Input Text\twnd[0]/usr/ctxtX\tT000") == attendu
+    # 5 espaces : le séparateur est gourmand, plus d'espace de tête parasite
+    # dans la cellule (une valeur silencieusement fausse au replay).
+    assert spy._split_step("Input Text     wnd[0]/usr/ctxtX     T000") == attendu
+    # Le commentaire de fin reste séparé, quel que soit le séparateur.
+    assert spy._split_step("Send Vkey\t0\t# F8") == (["Send Vkey", "0"], "# F8")
+
+
+def test_split_step_preserve_les_espaces_echappes_dune_valeur():
+    # Une valeur à espaces multiples ou à espace final est échappée `\ ` par
+    # rf_escape_value : le découpage ne doit pas la couper sur son PROPRE
+    # échappement, et le déséchappement doit rendre la valeur d'origine.
+    for brut in ("a  b", "fin ", "  début"):
+        cellule = spy.rf_escape_value(brut)
+        cells, _c = spy._split_step("Input Text    wnd[0]/usr/txtX    " + cellule)
+        assert len(cells) == 3, brut
+        assert spy.rf_unescape_value(cells[2]) == brut
+
+
+def test_count_test_cases_voit_les_scenarios_multiples():
+    # Constat n°1 (volet multi-tests) : parse_recorded_body ne rend que le
+    # PREMIER test ; le compte permet au replay de le dire.
+    texte = ("*** Test Cases ***\nPremier\n    Run Transaction    SE16\n"
+             "\nSecond\n    Run Transaction    SE38\n")
+    assert spy.count_test_cases(texte) == 2
+    assert spy.count_test_cases(spy.build_record_header("x", suite=True)) == 1
+    assert spy.count_test_cases("*** Settings ***\nLibrary    X\n") == 0
+
+
+class _LibSansKeywords:
+    """Bibliothèque qui ne porte AUCUN des keywords du déroulé (le cas de la
+    suite resource-first, dont les steps sont des keywords métier)."""
+
+
+def test_run_replay_echoue_quand_des_steps_nont_pas_ete_rejoues(tmp_path):
+    # Constat n°1 : « Replay OK : 0 step(s) exécuté(s) » en code 0 était vert
+    # ET faux. Un step sans keyword dans la bibliothèque fait désormais échouer.
+    out = tmp_path / "resource_first.robot"
+    out.write_text("*** Settings ***\nLibrary             SapEccLibrary\n"
+                   "Resource            rec_keywords.resource\n\n"
+                   "*** Test Cases ***\nScénario\n"
+                   "    Saisir DATABROWSE_TABLENAME    T000\n", encoding="utf-8")
+    messages = []
+    rc = spy.run_replay(str(out), _lib_factory=lambda: _LibSansKeywords(),
+                        _writer=messages.append)
+    assert rc == 1
+    texte = "\n".join(messages)
+    assert "ÉCHEC" in texte and "PAS été rejoués" in texte
+    # ... en nommant le cas resource-first et le bon outil pour la rejouer.
+    assert "resource-first" in texte and "robot" in texte
+    assert "Replay OK" not in texte
+
+
+def test_run_replay_signale_les_tests_non_rejoues(tmp_path):
+    out = tmp_path / "multi.robot"
+    out.write_text("*** Test Cases ***\nPremier\n    Run Transaction    SE16\n"
+                   "\nSecond\n    Run Transaction    SE38\n", encoding="utf-8")
+    lib = _FakeReplayLib()
+    messages = []
+    assert spy.run_replay(str(out), _lib_factory=lambda: lib,
+                          _writer=messages.append) == 0
+    texte = "\n".join(messages)
+    assert "seul le PREMIER est rejoué" in texte
+    assert lib.calls == [("run_transaction", "SE16")]
+
+
+def test_resolve_save_path_refuse_un_chemin_relatif_a_un_lecteur():
+    # Constat n°7 : ``E:fichier`` porte un lecteur sans être absolu ; le
+    # message parlait de traversée de chemin, il nomme maintenant la forme.
+    try:
+        spy.resolve_save_path("E:fichier.txt", spy.default_capture_path)
+    except ValueError as exc:
+        assert "relatif à un lecteur" in str(exc)
+    else:                                            # pragma: no cover
+        raise AssertionError("un chemin relatif à un lecteur doit être refusé")
+    # Le refus de traversée d'origine ne bouge pas.
+    try:
+        spy.resolve_save_path(os.path.join("..", "..", "evil.txt"),
+                              spy.default_capture_path)
+    except ValueError as exc:
+        assert "sort de" in str(exc)
+    else:                                            # pragma: no cover
+        raise AssertionError("la traversée hors de captures/ doit être refusée")
+
+
+def test_com_error_est_toujours_defini_meme_sans_pywin32():
+    # Constat n°6 : le repli d'import laissait `com_error` indéfini, alors que
+    # des dizaines de clauses ``except (AttributeError, com_error)`` le citent
+    # (une clause d'exception est évaluée AU MOMENT de l'erreur : NameError
+    # opaque à la place de l'erreur réelle).
+    assert isinstance(spy.com_error, type)
+    assert issubclass(spy.com_error, BaseException)
+
+
+def test_sentinelle_darret_arme_puis_declenche(tmp_path):
+    # Constat n°4 : l'arrêt EXTERNE (bouton « Arrêter » de la GUI) doit sortir
+    # des boucles par leur `finally`, pas par un processus tué.
+    stop = tmp_path / "record.robot.stop"
+    stop.write_text("périmé", encoding="utf-8")      # sentinelle d'un run passé
+    should_stop = spy.make_stop_checker(str(stop))
+    assert not stop.exists()                         # armement = nettoyage
+    assert should_stop() is False
+    stop.write_text("stop", encoding="utf-8")
+    assert should_stop() is True
+    spy.clear_stop_file(str(stop))
+    assert not stop.exists()
+    spy.clear_stop_file(str(stop))                   # idempotent
+    assert spy.make_stop_checker(None)() is False    # sonde inerte

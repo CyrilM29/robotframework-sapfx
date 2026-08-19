@@ -136,6 +136,21 @@ commit connus », jamais comme une frontière d'autorisation : les droits de
 l'utilisateur SAP restent la vraie (voir les notes de sécurité de
 [mcp-integration.fr.md](mcp-integration.fr.md)).
 
+**Score de confiance de release (au-delà du diagnostic déjà fait par
+sap-healer).** Piste identifiée en veille concurrentielle (2026-08-18,
+Testsigma : pipeline agentique qui génère, exécute, répare, diagnostique les
+tests puis score la confiance de la release). Le diagnostic existe déjà en
+bonne partie : sap-healer classe chaque échec (dérive de localisateur / timing
+/ données / changement fonctionnel) avant de réparer. Ce qui manque est
+ailleurs : un indicateur agrégé de confiance au niveau d'une release (pas d'un
+test), construit à partir de l'historique de healing (`SAPFX_HEALING_LOG`), de
+la télémétrie de dérive (`healing_drift_report.py`) et des suites
+rouges/vertes, pour répondre à « peut-on publier ». Cyril l'appelle le
+« 5ᵉ agent » (après planner, generator, healer, istqb). Pas encore instruite :
+pas d'analyse de faisabilité, pas de décision agent séparé vs extension de
+`/sap-maintain` ou du rapport de `healing_drift_report.py`, qui agrège déjà
+une partie de la matière brute.
+
 `specs/sflight-consultation-se16.md` est le plan d'exemple de référence ; il
 correspond au flux déjà validé live par `tests/robot/ecc_data_smoke.robot`.
 

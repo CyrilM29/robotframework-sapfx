@@ -46,11 +46,14 @@ Le panneau est **déplaçable** (glisser son en-tête) et **repliable** (▾), e
 | `bridge.js` | Relais monde ISOLATED : transmet l'état du recorder au badge. |
 | `recorder.js` | Programme Recorder **généré** (bundle + écouteur survol/panneau/clic/record). |
 | `icon16/48/128.png` | Icônes de la barre d'outils (**générées** par `gen_icons.py` depuis le logo du projet ; le 16 px recadre sur le visage du robot). |
-| `gen_icons.py` | Décline toutes les tailles d'icônes depuis `assets/logo.png` (racine du dépôt ; nécessite Pillow). Réservé au développement. |
-| `package.py` | Construit `dist/<name>-<version>.zip` pour la mise en ligne. Réservé au développement. |
-| `PRIVACY.md` / `PUBLISHING.md` | Politique de confidentialité + guide de soumission au store. |
+| `gen_icons.py` | Décline toutes les tailles d'icônes depuis `assets/logo.png` (racine du dépôt ; nécessite Pillow). Réservé au développement, **absent du pack Windows**. |
+| `package.py` | Construit `dist/<name>-<version>.zip` pour la mise en ligne. Réservé au développement, **absent du pack Windows**. |
+| `PRIVACY.md` | Politique de confidentialité : livrée partout, elle est due à qui installe l'extension. |
+| `PUBLISHING.md` | Guide de soumission au store. Réservé au mainteneur, **absent du pack Windows**. |
 
-Pour publier, voir [PUBLISHING.fr.md](PUBLISHING.fr.md) (`python package.py` → téléverser le zip).
+Pour publier, voir [PUBLISHING.fr.md](PUBLISHING.fr.md) (`python package.py` →
+téléverser le zip) dans le dépôt source : ce guide et les deux helpers ci-dessus
+restent hors du pack de déploiement, où rien ne pourrait les exécuter.
 
 > Techniques de localisation portées depuis [playwright-sap](https://github.com/ArpitSureka/playwright-sap)
 > (Apache-2.0) ; voir le fichier `NOTICE` du projet.

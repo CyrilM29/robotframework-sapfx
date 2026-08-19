@@ -5,6 +5,29 @@ sharing one business vocabulary. `CLAUDE.md` at the repo root is the canonical
 detailed guide; `AGENTS.md` is its condensed mirror. Keep all three files in sync
 when conventions or layout change.
 
+## Agent methodology is owned by rf-test-agents
+
+This repo owns SAP CAPABILITIES, not the agent method. The reference for
+agentic testing, for agents plus MCP on Robot Framework, and for the reasoning
+mindset of the four test agents (`sap-planner`, `sap-generator`, `sap-healer`,
+`sap-istqb` here; `rf-*` there) is the sibling repo `rf-test-agents`. Consult
+it before improvising a local answer about an agent's workflow, ground rules
+or division of labour; a methodology improvement found here is back-ported
+there, then propagated to the other verticals.
+
+## Observe, do not fix
+
+When a test run fails (red test, accessibility violation, baseline or snapshot
+drift, regression): report the finding (file, screen or page, rule, impact,
+useful output) and stop there. Do not fix the application under test, and do
+not fix the test itself either, without an explicit request.
+
+- No convenience baseline update, no `--update-snapshots` to turn a suite green.
+- Healer agents run only on request.
+- When unsure whether to observe or fix: observe, then ask.
+- Exception: a fix that was explicitly asked for, or the development work in
+  progress on this repo, is delivered in full, as usual.
+
 ## Memory
 
 Durable project facts live in `memory/` at the repo root (index
@@ -27,7 +50,16 @@ per file, update the index in the same operation, never secrets anywhere.
   content, `Read Abap List`, classic dynpro **table controls** by column
   title with automatic scrolling (`Read Table Control` and friends: note
   `RowCount` counts RESERVED rows, not filled ones) and `Pick F4 Value`
-  for search helps), perception (`Get Screen Signature`: `mode=diff` with the
+  for search helps), DDIC inventory (`Classify Ddic Objects` reads DD02L
+  through SE16 by batched multiple selection (the dialog is SCROLLED past its
+  visible window, scroll verified): `TABCLASS` is an OUTPUT column,
+  never a criterion; classification map read live from the TABCLASS domain;
+  an empty batch triggers a canary probe and a missing grid names
+  `Use ALV Grid In Data Browser`, so a campaign is never green and wrong;
+  every SE16 selection screen is reached through the one library keyword
+  `Reach Se16 Selection Screen`;
+  deterministic hashed JSON artifact; pure logic in
+  `sapfx_common/ddic_inventory.py`), perception (`Get Screen Signature`: `mode=diff` with the
   `pair_renames` smart diff pairing lookalike ids into `~ old -> new` lines,
   `mode=semantic` form view with verified human labels, `GetObjectTree`
   fast path with COM-walk fallback, in-memory screenshots `Get Screenshot As
@@ -45,7 +77,9 @@ per file, update the index in the same operation, never secrets anywhere.
   (`Scripting Should Be Fully Enabled`, `Client Security Should Be Hardened`:
   input-history CVE-2025-0055 posture, `Enable Test Tool Mode`, telemetry),
   locator healing (`Resolve Element With Healing`, incl. the `label=` anchor
-  path) and human locators (`Find/Fill/Read Field By Label`, `Click Button By
+  path; missing-element errors also append `# screen <Program>/<Transaction>/
+  <Number>`, the screen you are really on, which an id alone cannot reveal)
+  and human locators (`Find/Fill/Read Field By Label`, `Click Button By
   Label`: visible label + geometry, grid/position addressing (`N @ Label`/
   `Label @ N`) and the scoped-anchor operator (`Anchor >> Rest`); ambiguity
   always reported with the candidate list, never a silent first match). An
@@ -127,16 +161,31 @@ per file, update the index in the same operation, never secrets anywhere.
   (see `tests/robot/flagship_cross_paradigm.robot`, and
   `cross_paradigm_api_visual.robot` which adds a perceptual-hash screen baseline
   to that pattern; `exploratory_campaign_{a4h,fiori}.robot` are the matching
-  self-contained ECC/Fiori exploration campaigns).
-- Business keywords live in `resources/*.resource`; recorders in `tools/`;
+  self-contained ECC/Fiori exploration campaigns). The channel also has a suite
+  of its own, `tests/robot/api/canal_api_odata.robot`, exercising the same
+  business keywords against OData v2 (tag `a4h`) and OData v4 (tag
+  `capsflight`): a v4 target is not optional, it is what catches what a
+  forgiving SAP Gateway hides.
+- Business keywords live in `resources/*.resource`; recorders in `tools/`
+  (shipped in the pack, so they are in the mypy scope and have their own
+  coverage floor in CI; `--replay` fails on any step it could not run, and
+  `--stop-file` gives an external caller a clean stop);
   rf-mcp plugins in `integrations/robotmcp/` (state providers serve a smart
   perception diff on an already-seen screen plus a stale-code warning when
-  SAPFX code changed after server start; the `SapApiPlugin` serves the real
+  SAPFX code changed after server start, and an enriched application state
+  under one contract for the three channels (`connected`/`state_error`,
+  `collection_errors` for a failed section, `not_applicable` for one without
+  meaning here): window stack/modal trap/telemetry on ECC, iframe scope +
+  `ui5_runtime` probed before the UI5 messages on Fiori (a Web
+  Components/WebGUI/hybrid page is a supported target, not an error), all
+  three in one context crossing (`Get Ui5 Application State`); the
+  `SapApiPlugin` serves the real
   API-channel state via `List Api Sessions`, never credentials; the
   `sapfx-mcp` overlay (not a fork) mounts the rf-mcp server unchanged and
   adds `sapfx_state`/`sapfx_screenshot`/`sapfx_reload` behind a
-  version-window guard, deployment pin rf-mcp 0.35.0; API stores and Fiori
-  frame state
+  version-window guard (non-blocking warning on the entry-point path) and
+  honours the declared capabilities, deployment pin rf-mcp 0.35.0; API stores
+  and Fiori frame state
   are partitioned by rf-mcp session; ECC remains one live session per process);
   repo-wide consistency scripts
   (doc pairing, vendor drift, guidance sync) plus the Windows deployment-pack
@@ -158,7 +207,25 @@ per file, update the index in the same operation, never secrets anywhere.
   refuses a stale SAPFX version in published instructions (pack filename,
   pip pin, wheel names) and a STATIC version badge where the dynamic
   shields.io one updates itself.
-  A `PostToolUse` hook (`scripts/hook_guards.py`) runs the em-dash guard on
+  All of them sit on the shared `scripts/_common.py`: UTF-8 forced on **stdout
+  AND stderr** (Windows opens the standard streams in the machine's code page:
+  an arrow killed the process on stdout, mojibake on stderr) and a
+  section-aware read of the project version. The two first-generation packed
+  scripts (`healing_drift_report.py`, `check_spec_sync.py`) keep a deliberate
+  copy of that switch, so they stay usable even lifted out of the pack alone;
+  the pack also ships `check_conventions.py` (sap-generator's gate, previously
+  invoked by a path absent from the pack) and therefore `_common.py`. Unit
+  guards hold this: the internal import closure stays inside the pack, every
+  `scripts/<x>.py` a shipped file invokes is itself shipped or justified, and no
+  pack-manifest path may sit in `export_public_tree.py`'s `EXCLUDE_PREFIXES`
+  (copying `.claude/skills` wholesale had shipped the studio's PRIVATE comms
+  skill in the released 0.6.6 ZIP; skills now enter by whitelist, and such notes
+  stay unnamed because the leak scan forbids that name in public-bound files),
+  and the export's byte-level **content** scan runs over the pack manifest in CI
+  (5 hits on the shipped 0.6.6 ZIP, none on the fixed pack), since the export
+  itself only runs by hand once per release.
+  A `PostToolUse` hook (`scripts/hook_guards.py`, decision in a testable
+  `decide()`) runs the em-dash guard on
   every edited file, the published-version guard on every edited `.md`/`.txt`,
   and the others after each edit.
   The built pack (`dist/sapfx-pack-*.zip`) is generated: never edit it in place.
@@ -186,7 +253,8 @@ per file, update the index in the same operation, never secrets anywhere.
   never test bodies.
 - `src/sapfx_common/polling.py` holds the shared `poll_until`/`retry_call`/
   `retry_until` primitives: reuse them for any wait/retry logic instead of
-  writing new `while time.time() < deadline` loops. `sapfx_common/com_safety.py`
+  writing new `while time.time() < deadline` loops (their own deadlines run on
+  `time.monotonic()`, so a clock change mid-wait cannot alter the budget). `sapfx_common/com_safety.py`
   holds the shared defensive `CoInitialize` helper: reuse it for any code that
   might run off the main thread (rf-mcp) instead of a new inline try/except.
   `sapfx_common/healing.py` (locator-similarity scoring, shared ECC↔Fiori),

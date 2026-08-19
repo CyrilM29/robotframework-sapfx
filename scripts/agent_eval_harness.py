@@ -16,8 +16,8 @@ Trois actions (orchestrées par la slash-command ``/sap-eval-healer``) :
   état déjà injecté ou une cible ambiguë.
 - ``verify <scenario>``  : après le passage du healer, vérifie que la dérive a
   été réparée (l'ancien localisateur est revenu, l'injecté a disparu) et que
-  RIEN d'autre n'a bougé (tests intacts, autres resources intactes : le
-  contrat « patcher resources/, jamais les tests »). PASS supprime l'état.
+  RIEN d'autre n'a bougé : ni modifié, ni supprimé, ni AJOUTÉ (le contrat
+  « patcher resources/, jamais les tests »). PASS supprime l'état.
 - ``restore <scenario>`` : restaure la sauvegarde (éval interrompue).
 
 Ce script ne lance NI robot NI le healer : il prépare et juge. Logique pure
@@ -38,16 +38,25 @@ import os
 import sys
 from typing import Dict, List, Tuple
 
+from _common import force_utf8_stdio
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Répertoire d'état du harnais (sous results/ : jamais committé).
 STATE_DIR = os.path.join("results", "agent_eval")
 
-# Surface « interdite » au healer : toute modification y fait échouer verify
-# (hors le fichier cible du scénario). `variables/` fait partie de la
-# ventilation industrielle (locators.py, env_*.yaml) ; un répertoire absent
-# est simplement ignoré par le manifeste.
+# Surface « interdite » au healer : toute modification, DISPARITION ou AJOUT y
+# fait échouer verify (hors le fichier cible du scénario). `variables/` fait
+# partie de la ventilation industrielle (locators.py, env_*.yaml) ; un
+# répertoire absent est simplement ignoré par le manifeste.
 PROTECTED_DIRS = ("tests", "resources", "variables")
+
+# Artefacts de RUN, hors manifeste : le healer reproduit l'échec, donc il fait
+# tourner pytest et robot entre inject et verify. Leurs traces (bytecode,
+# capture de dérive visuelle) apparaîtraient sinon comme des « ajouts » et
+# feraient échouer l'éval sur du bruit. Ce ne sont pas des sources.
+IGNORED_DIR_NAMES = ("__pycache__", ".pytest_cache")
+IGNORED_SUFFIXES = (".pyc", ".pyo", ".actual.png")
 
 # Scénarios de dérive simulée. `old` doit apparaître EXACTEMENT une fois dans
 # `file` (sinon inject refuse : cible ambiguë). `suite` documente la suite à
@@ -90,12 +99,17 @@ def _sha256(data: bytes) -> str:
 
 def _protected_manifest(root: str, exclude_rel: str) -> Dict[str, str]:
     """Empreintes de tous les fichiers des répertoires protégés (chemins
-    relatifs, séparateur ``/``), hors le fichier cible du scénario."""
+    relatifs, séparateur ``/``), hors le fichier cible du scénario et hors
+    artefacts de run."""
     manifest: Dict[str, str] = {}
     for base in PROTECTED_DIRS:
         base_abs = os.path.join(root, base)
-        for dirpath, _dirnames, filenames in os.walk(base_abs):
+        for dirpath, dirnames, filenames in os.walk(base_abs):
+            dirnames[:] = [d for d in sorted(dirnames)
+                           if d not in IGNORED_DIR_NAMES]
             for filename in sorted(filenames):
+                if filename.endswith(IGNORED_SUFFIXES):
+                    continue
                 path = os.path.join(dirpath, filename)
                 rel = os.path.relpath(path, root).replace(os.sep, "/")
                 if rel == exclude_rel:
@@ -193,15 +207,20 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
                 "OK (avec note) : la dérive est réparée mais %s diffère de "
                 "l'original ; examiner le diff (commentaire ajouté ? "
                 "réparation par ancre de libellé ?)." % scenario["file"])
+    # Comparaison des DEUX sens : un fichier modifié ou disparu, mais aussi un
+    # fichier AJOUTÉ. Ne relire que le manifeste laissait passer le cas le plus
+    # probable en pack déployé, où les agents ont pour consigne d'écrire dans
+    # `resources/site_keywords.resource` : une création y serait sortie en PASS.
+    current = _protected_manifest(root, scenario["file"])
     drifted = []
     for rel, digest in sorted(state["protected"].items()):
-        path = os.path.join(root, rel.replace("/", os.sep))
-        try:
-            with open(path, "rb") as f:
-                if _sha256(f.read()) != digest:
-                    drifted.append(rel)
-        except OSError:
+        actual = current.get(rel)
+        if actual is None:
             drifted.append(rel + " (disparu)")
+        elif actual != digest:
+            drifted.append(rel)
+    drifted += ["%s (ajouté)" % rel
+                for rel in sorted(set(current) - set(state["protected"]))]
     if drifted:
         ok = False
         messages.append(
@@ -237,6 +256,7 @@ def restore(name: str, root: str | None = None) -> List[str]:
 
 
 def main(argv=None) -> int:
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(
         description="Harnais d'évaluation des agents (dérive simulée).")
     parser.add_argument("action", choices=["list", "inject", "verify", "restore"])

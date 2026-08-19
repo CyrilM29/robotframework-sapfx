@@ -15,6 +15,20 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}/src;${workspaceFolder}/integrations/robotmcp"
       }
+    },
+    // Mémoire QA locale fournie par CabrIA. Les variables machine sont posées
+    // hors du dépôt afin de garder cette configuration portable.
+    "qa-brain": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${env:QA_BRAIN_HOME}/rag/qa_brain/serveur.py"],
+      "env": {
+        "QA_BRAIN_QDRANT_URL": "http://127.0.0.1:6333",
+        "QA_BRAIN_COLLECTION": "cabria-qa",
+        "QA_BRAIN_EMBEDDINGS_URL": "${env:QA_BRAIN_EMBEDDINGS_URL}",
+        "QA_BRAIN_CHAT_URL": "${env:QA_BRAIN_CHAT_URL}",
+        "QA_BRAIN_CHAT_MODEL": "qwen/qwen3.6-35b-a3b"
+      }
     }
   }
 }

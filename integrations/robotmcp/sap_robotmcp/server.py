@@ -31,7 +31,7 @@ import os
 import sys
 from typing import Any, List, Optional
 
-from ._compat import check_compat
+from ._compat import check_compat, env_flag_enabled
 
 # Noms des outils ajoutés par la surcouche (contrat vérifié par test).
 OVERLAY_TOOL_NAMES = ("sapfx_state", "sapfx_screenshot", "sapfx_reload")
@@ -61,10 +61,16 @@ def build_overlay(mcp: Any, execution_engine: Any) -> List[str]:
         Sections (default: both): 'page_source', the screen perception with
         the REAL differential semantics (an already-seen screen that changed
         returns a compact smart diff unless full_source=true), and
-        'application_state', the live enriched state: transaction, window
+        'application_state', the live enriched state, whose content depends on
+        the channel. SAP GUI desktop (SapEccLibrary): transaction, window
         stack with modal_open (the leftover-error-modal trap), status-message
-        type, session telemetry. 'library' picks the provider explicitly
-        (SapEccLibrary/SapFioriLibrary) when the session imports both.
+        type, session telemetry. Fiori/UI5 (SapFioriLibrary): active iframe
+        scope (frame_stack), whether a UI5 runtime is in scope (ui5_runtime),
+        and the recent UI5 messages when there is one. API (SapApiLibrary):
+        the open aliases and their base_url, never credentials, and no screen.
+        Every state carries 'connected'; a section a library declares it does
+        not serve is refused explicitly, never faked. 'library' picks the
+        provider explicitly when the session imports several SAPFX libraries.
         """
         return await collect_state(
             execution_engine, get_library_plugin_manager(), session_id,
@@ -125,7 +131,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if problems:
         for problem in problems:
             print("[sapfx-mcp] COMPAT : %s" % problem, file=sys.stderr)
-        if not os.environ.get("SAPFX_MCP_FORCE"):
+        if not env_flag_enabled(os.environ.get("SAPFX_MCP_FORCE")):
             print("[sapfx-mcp] refus de démarrer (SAPFX_MCP_FORCE=1 pour "
                   "outrepasser en mode dégradé).", file=sys.stderr)
             return 1

@@ -19,8 +19,15 @@ de sortie, d'où ce script.
     couverture et le ratio live ; `positionnement.md` et toute citation de tests
     dans `comms/` doivent les reprendre exactement.
 4. Avec ``--verify-runtime``, le total est comparé à la collecte pytest réelle
-    et la couverture à `coverage.xml`. Le ratio live reste une preuve datée et
-    déclarative : son système cible et sa date sont obligatoires dans le manifeste.
+    et la couverture à `coverage.xml`. Le total de tests est un **plancher**,
+    pas une égalité : le manifeste porte le chiffre PUBLIÉ, figé à la release,
+    alors que la suite grossit à chaque lot. Collecter PLUS que le chiffre
+    publié n'est donc pas une dérive, c'est la comm qui sous-estime le produit
+    (la règle anti-overclaim du dossier) : le garde le signale
+    en information, sans échouer. Collecter MOINS échoue : le dossier
+    affirmerait des tests qui n'existent pas. Le ratio live reste une preuve
+    datée et déclarative : son système cible et sa date sont obligatoires dans
+    le manifeste.
 
 Usage ::
 
@@ -36,6 +43,8 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import _common
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -59,12 +68,13 @@ _SCANNED_SUFFIXES = (".md", ".py")
 
 
 def project_version(root=_ROOT):
-    """La version déclarée dans `pyproject.toml` : la source de vérité."""
-    text = (Path(root) / "pyproject.toml").read_text(encoding="utf-8")
-    match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
-    if not match:
-        raise RuntimeError("version introuvable dans pyproject.toml")
-    return match.group(1)
+    """La version déclarée dans `pyproject.toml` : la source de vérité.
+
+    Lecture mutualisée (``scripts/_common.py``) et consciente des sections :
+    la variante locale prenait la première ligne ``version = "…"`` du fichier,
+    donc celle d'un ``[tool.*]`` déclaré plus haut le jour où il y en aurait un.
+    """
+    return _common.project_version(root)
 
 
 def _comms_files(root=_ROOT):
@@ -88,7 +98,8 @@ def collect_pytest_tests(root=_ROOT):
     """Compte les tests par la collecte pytest réelle, sans scanner les sources."""
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q"],
-        cwd=root, capture_output=True, text=True, check=False)
+        cwd=root, capture_output=True, text=True, check=False,
+        encoding="utf-8", errors="replace")
     output = result.stdout + "\n" + result.stderr
     match = re.search(r"(\d+) tests collected", output)
     if result.returncode != 0 or not match:
@@ -102,8 +113,11 @@ def read_coverage_percent(path):
     return int(line_rate * 100 + 0.5)
 
 
-def check(root=_ROOT, verify_runtime=False, coverage_xml=None):
-    """Retourne la liste des messages d'erreur (vide si tout est aligné)."""
+def check(root=_ROOT, verify_runtime=False, coverage_xml=None, notes=None):
+    """Retourne la liste des messages d'erreur (vide si tout est aligné).
+
+    ``notes`` : liste optionnelle où sont déposées les remarques qui n'ont PAS
+    à faire échouer le garde (une comm en retard sur un produit qui a grossi)."""
     root = Path(root)
     problems = []
     version = project_version(root)
@@ -168,9 +182,19 @@ def check(root=_ROOT, verify_runtime=False, coverage_xml=None):
 
     if verify_runtime and proofs is not None:
         actual_tests = collect_pytest_tests(root)
-        if actual_tests != proofs["unit_tests"]:
-            problems.append(f"pytest collecte {actual_tests} tests, mais "
-                            f"{_PROOFS_FILE} en déclare {proofs['unit_tests']}.")
+        # PLANCHER, pas égalité (voir l'en-tête du module) : le manifeste porte
+        # le chiffre publié à la dernière release, et la suite grossit entre
+        # deux releases. Exiger l'égalité rendait la CI rouge au premier test
+        # ajouté, et un garde qui crie au loup finit désactivé.
+        if actual_tests < proofs["unit_tests"]:
+            problems.append(f"pytest ne collecte que {actual_tests} tests alors que "
+                            f"{_PROOFS_FILE} en déclare {proofs['unit_tests']} : "
+                            f"la comm affirme plus que ce que le dépôt exécute.")
+        elif actual_tests > proofs["unit_tests"] and notes is not None:
+            notes.append(f"pytest collecte {actual_tests} tests, {_PROOFS_FILE} en "
+                         f"publie {proofs['unit_tests']} (chiffre de la dernière "
+                         f"release) : sous-estimation volontaire, à rafraîchir à "
+                         f"la prochaine version.")
         if coverage_xml is None:
             problems.append("--coverage-xml est requis avec --verify-runtime.")
         else:
@@ -182,6 +206,7 @@ def check(root=_ROOT, verify_runtime=False, coverage_xml=None):
 
 
 def main(argv=None):
+    _common.force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--verify-runtime", action="store_true",
                         help="compare les preuves à pytest et coverage.xml")
@@ -189,8 +214,11 @@ def main(argv=None):
                         help="chemin de coverage.xml, relatif à la racine du dépôt")
     args = parser.parse_args(argv)
 
+    notes = []
     problems = check(verify_runtime=args.verify_runtime,
-                     coverage_xml=args.coverage_xml)
+                     coverage_xml=args.coverage_xml, notes=notes)
+    for note in notes:
+        print(f"[INFO] {note}")
     for problem in problems:
         print(f"[ERREUR] {problem}")
     if problems:

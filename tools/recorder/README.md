@@ -123,8 +123,13 @@ silent.
 The "play" of the Selenium-IDE spirit, thick-client side: replays a recording
 (bare body or full suite) against the **already-open** SAP GUI session
 (`Attach To Open Session`), step by step, stopping on the first failure with the
-offending step named; comments skipped, keywords outside the library reported
-but non-blocking. The GUI exposes it as the **Rejouer** button of the steps
+offending step named; comments are skipped. A step whose keyword does **not**
+exist in `SapEccLibrary` is reported AND fails the replay (exit code 1): a
+"Replay OK: 0 step(s) executed" would be green and false. That is exactly what a
+**resource-first** suite produces, since all of its steps are business keywords
+living in the imported `.resource`: the failure message names the case and points
+at `robot`. A file holding several tests is announced as such, only the first one
+being replayed. The GUI exposes replay as the **Rejouer** button of the steps
 panel (auto-saves pending edits first).
 
 ### VBS transpile (`--transpile-vbs FILE`)
@@ -136,6 +141,16 @@ context menus paired, grid cells tracked; unmapped calls kept as `# non mappé`
 comments). Requires **no SAP session**; `--suite` / `--export-resources` /
 `--export-spec` then apply normally. Validated end-to-end: ALT+F12-shaped VBS →
 transpile → `--replay` against a live A4H.
+
+### Clean external stop (`--stop-file FILE`)
+
+Interactive loops (capture / hover / record) normally end with Ctrl+C in their
+console. When the recorder is driven by another program (the Tkinter launcher
+below, a script), there is no console to signal: `--stop-file` names a sentinel
+file, and the loop exits as soon as it appears, **through its teardown**. Killing
+the process instead skips that teardown: the pending OK-code is lost and
+`Session.Record` stays armed on the SAP GUI side (modal F4, drag and drop
+disabled for the user). The recorder deletes the sentinel itself when it stops.
 
 ### Visual launcher (no command line)
 
@@ -150,7 +165,10 @@ python tools/recorder/recorder_gui.py
 Choose a mode (dump / JSON / capture / hover / record / highlight), fill the optional
 filter / output / id fields, **Lancer**. Interactive modes run in a separate console
 (live output + Ctrl+C); **Arrêter** stops them, **Dossier captures** opens the output
-folder. Record options (full suite, resource-first export, spec export, HTML
+folder. **Arrêter** is a *clean* stop: the launcher drops a stop sentinel
+(`--stop-file`, see below) and the recorder leaves its loop through its own
+teardown (`Session.Record` back to False, events unsubscribed, pending steps
+written); it only kills the process if that gets no answer within five seconds. Record options (full suite, resource-first export, spec export, HTML
 report export) are checkboxes. In record mode the **steps panel** follows the output file live
 (each emitted step appears as you work) and lets you reorder (↑/↓), delete (✕),
 **edit in place** (double-click a step), save (**Enregistrer**) and **replay**

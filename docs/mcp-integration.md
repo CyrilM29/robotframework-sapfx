@@ -52,8 +52,18 @@ express: each gap was established live on 2026-07-23 (see the field notes in
   whereas through rf-mcp's own `get_session_state` the diff only triggers with
   `page_source_filtered=true`), and `application_state` enriched with the
   live window stack (`modal_open`, the leftover-error-modal trap), the
-  status-message type and session telemetry, which rf-mcp never routes to
-  plugin providers.
+  status-message type and session telemetry on the ECC side, and with the
+  active iframe scope (`frame_stack`), whether a UI5 runtime is in scope
+  (`ui5_runtime`) and the recent UI5 messages on the Fiori side, which rf-mcp
+  never routes to plugin providers. That Fiori state costs **one** RF context
+  crossing, not three: `Get Ui5 Application State` assembles it library-side,
+  because the crossing is what costs on this per-turn path, not the JavaScript. All three channels share one state
+  contract: `connected` plus `state_error` when the channel does not answer,
+  `collection_errors` for a section that failed, and `not_applicable` for a
+  section that has no meaning here (no UI5 runtime on a Web Components,
+  WebGUI or hybrid page: a supported target, not a failure). A section a
+  library declares it does not serve is refused explicitly, with the
+  provider's own reason, never faked.
 - **`sapfx_screenshot`**: the vision channel, a real MCP image (the plugin
   contract has no image channel; fastmcp does), plain or Set-of-Mark
   annotated with its `number -> id` legend as a companion text block.
@@ -191,6 +201,9 @@ synthetic test by rf-mcp; use one live ECC session per rf-mcp process.
 pip install rf-mcp                      # the host MCP server
 pip install -e .                        # makes SapEcc/SapFioriLibrary importable
 pip install -e integrations/robotmcp    # registers the plugins (entry-points)
+# Keep that order: the plugin wheel depends on robotframework-sapfx, so run
+# from a checkout where the root is NOT installed editable, pip fetches the
+# PUBLISHED library into site-packages, next to the working tree.
 
 # verify rf-mcp discovers them:
 python -c "from robotmcp.config import library_registry as r; print([l for l in r.get_all_libraries() if 'Sap' in str(l)])"

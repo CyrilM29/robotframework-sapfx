@@ -55,11 +55,14 @@ recording without opening the popup; the icon shows a **`REC` badge** while reco
 | `bridge.js` | ISOLATED-world relay: forwards the recorder's state to the badge. |
 | `recorder.js` | **Generated** Recorder program (bundle + hover/panel/click/record listener). |
 | `icon16/48/128.png` | Toolbar icons (**generated** by `gen_icons.py` from the project logo; 16 px crops to the robot face). |
-| `gen_icons.py` | Derives all icon sizes from `assets/logo.png` (repo root; needs Pillow). Dev-only. |
-| `package.py` | Builds `dist/<name>-<version>.zip` for store upload. Dev-only. |
-| `PRIVACY.md` / `PUBLISHING.md` | Privacy policy + step-by-step store-submission guide. |
+| `gen_icons.py` | Derives all icon sizes from `assets/logo.png` (repo root; needs Pillow). Dev-only, **not shipped in the Windows pack**. |
+| `package.py` | Builds `dist/<name>-<version>.zip` for store upload. Dev-only, **not shipped in the Windows pack**. |
+| `PRIVACY.md` | Privacy policy: shipped everywhere, it is owed to whoever installs the extension. |
+| `PUBLISHING.md` | Step-by-step store-submission guide. Maintainer-only, **not shipped in the Windows pack**. |
 
-To publish, see [PUBLISHING.md](PUBLISHING.md) (`python package.py` → upload the zip).
+To publish, see [PUBLISHING.md](PUBLISHING.md) (`python package.py` → upload the
+zip) in the source repository: that guide and the two helpers above stay out of
+the deployment pack, where nothing could run them.
 
 > Locator techniques ported from [playwright-sap](https://github.com/ArpitSureka/playwright-sap)
 > (Apache-2.0); see the project `NOTICE`.

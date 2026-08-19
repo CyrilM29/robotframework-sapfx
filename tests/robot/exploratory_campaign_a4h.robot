@@ -59,6 +59,9 @@ ${SE16_MAX_HITS_FIELD}      wnd[0]/usr/txtMAX_SEL
 ${SE16_FIRST_SEL_FIELD}     wnd[0]/usr/ctxtI1-LOW      # 1er critère positionnel (= CARRID pour SCARR, DOMNAME pour DD07L)
 ${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]     # « Number of Entries » : fiable même quand le résultat est 0
 ${SE16_COUNT_POPUP}         wnd[1]/usr/txtG_DBCOUNT    # compteur affiché dans le popup « Number of Entries »
+# Objets tolérés en rejet par DIALOGUE de message au balayage profond : la référence
+# live (2026-08-17) en compte zéro. Au-delà, le balayage échoue en nommant les objets.
+${MAX_DIALOG_REJECTS}       ${0}
 # Bascule de sortie SE16 en grille ALV (Settings > User Parameters)
 ${SE16_SETTINGS_MENU}       wnd[0]/mbar/menu[3]/menu[0]
 ${SE16_ALV_GRID_RADIO}      wnd[1]/usr/tabsG_TABSTRIP/tabp0400/ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/radRSEUMOD-TBALV_GRID
@@ -144,6 +147,10 @@ Flight Data Tables Are Accessible And Populated
     SBOOK
     SCUSTOM
     SAIRPORT
+    # SGEOCITY reste attendue : son dialogue « ABAP Dictionary type FLTP is not allowed
+    # for dynpro element » (1er accès depuis la re-création du conteneur) est INFORMATIF ;
+    # une fois refermé par la couche keywords, la table se compte (62 entrées live
+    # 2026-08-17). La retirer aurait réduit la couverture sans raison.
     SGEOCITY
     STRAVELAG
     SBUSPART
@@ -156,10 +163,13 @@ Deep Catalog Sweep Of Flight And EPM Models
     ...                ``S_NWDEMO_MODEL_DDIC`` (modèle EPM / SNWD). Chaque objet reçoit un
     ...                verdict : soit une table réelle consultable (comptée via SE16, 0
     ...                admis), soit une structure / include rejetée par SE16 (message de
-    ...                type E ; TADIR ne distingue pas les deux). Le test échoue si un
+    ...                type E ; TADIR ne distingue pas les deux), soit un rejet par
+    ...                DIALOGUE de message (l'écran de sélection n'est jamais atteint :
+    ...                texte relevé et journalisé, dialogue refermé). Le test échoue si un
     ...                package ne livre aucune table réelle ou aucune donnée. Les tables
-    ...                vides et les structures sont journalisées, jamais mises en échec :
-    ...                une table démo légitimement vide reste « accessible ».
+    ...                vides, les structures et les rejets par dialogue sont journalisés,
+    ...                jamais mis en échec : une table démo légitimement vide reste
+    ...                « accessible ».
     [Tags]    verification    data    deep
     FOR    ${package}    IN    @{CATALOG_PACKAGES}
         ${stats}=    Deep Verify Package Catalog    ${package}
@@ -167,6 +177,14 @@ Deep Catalog Sweep Of Flight And EPM Models
         ...    msg=Le package ${package} n'expose aucune table réelle consultable.
         Should Be True    ${stats}[total_rows] > 0
         ...    msg=Le package ${package} ne contient aucune donnée (0 ligne au total).
+        # Un rejet par dialogue est une ANOMALIE, pas un genre d'objet : la référence
+        # live (2026-08-17) en compte zéro, SGEOCITY compris (son dialogue informatif
+        # se referme et la table se compte). Sans cette borne, une régression qui se
+        # manifeste en dialogue bloquant glisse du compte « tables » vers le seau
+        # « dialog » et le balayage reste vert. Relever ${MAX_DIALOG_REJECTS} est un
+        # choix explicite, jamais un effet de bord.
+        Should Be True    ${stats}[dialogs] <= ${MAX_DIALOG_REJECTS}
+        ...    msg=${package} : ${stats}[dialogs] objet(s) rejeté(s) par un dialogue de message (borne ${MAX_DIALOG_REJECTS}) : ${stats}[dialog_rejects]. Percevoir l'écran (Get Screen Signature) avant de relever la borne.
     END
 
 
@@ -241,18 +259,24 @@ Start Transaction
     Wait Until Busy Done
 
 Open Table In SE16
-    [Documentation]    Ouvre SE16 sur ``${table}`` et atteint son écran de sélection.
+    [Documentation]    Ouvre SE16 sur ``${table}`` et ATTEINT son écran de sélection.
     ...                Échoue explicitement si SE16 rejette le nom (message de statut de
     ...                type ``E`` : structure, include ou table inconnue). L'assertion
-    ...                porte sur le *type*, jamais sur le texte localisé.
+    ...                porte sur le *type*, jamais sur le texte localisé. SE16 peut aussi
+    ...                répondre par un DIALOGUE de message modal (vécu SGEOCITY après
+    ...                re-création du conteneur : « ABAP Dictionary type FLTP is not
+    ...                allowed for dynpro element », dialogue informatif émis à la
+    ...                génération de l'écran de sélection) : le texte est relevé pour le
+    ...                journal, le dialogue refermé, et on continue si l'écran de
+    ...                sélection s'ouvre quand même derrière (cas SGEOCITY : la table se
+    ...                compte normalement ensuite, 62 entrées live 2026-08-17).
     [Arguments]    ${table}
-    Start Transaction    SE16
-    Input Text    ${SE16_TABLE_FIELD}    ${table}
-    Send Vkey    0
-    Wait Until Busy Done
-    ${type}    ${message}=    Get Status Message
-    IF    '${type}' == 'E'
-        Fail    SE16 refuse la table '${table}' (message de type E) : ${message}
+    # Tout le pilotage (statut de type E, popup « choix des champs », dialogue de
+    # message de génération, attente de l'écran généré) vit dans le keyword de
+    # bibliothèque : une seule implémentation, ici comme dans la couche resources.
+    ${state}=    Reach Se16 Selection Screen    ${table}
+    IF    not $state["reached"]
+        Fail    SE16 n'ouvre pas la table '${table}' (verdict ${state}[verdict], message de type '${state}[message_type]') : ${state}[status_text] ${state}[dialog_text]
     END
 
 Count Table Entries
@@ -396,19 +420,24 @@ List Tables In Package
 Classify And Count Table
     [Documentation]    Donne un verdict à un objet TADIR ``TABL``. Ouvre SE16 sur
     ...                ``${table}`` : un message de statut de type ``E`` = structure /
-    ...                include (non consultable) ; sinon c'est une table réelle, comptée via
-    ...                « Number of Entries ». Renvoie DEUX valeurs : le genre
-    ...                (``table`` | ``structure``) et le nombre de lignes (``-1`` pour une
-    ...                structure). L'assertion porte sur le *type* du message, jamais sur son
-    ...                texte localisé.
+    ...                include (non consultable) ; un DIALOGUE de message modal qui
+    ...                empêche d'atteindre l'écran de sélection = rejet par dialogue
+    ...                (texte relevé et journalisé, dialogue refermé, jamais mis en
+    ...                échec) ; sinon c'est une table réelle, comptée via « Number of
+    ...                Entries ». Renvoie DEUX valeurs : le genre (``table`` |
+    ...                ``structure`` | ``dialog``) et le nombre de lignes (``-1`` hors
+    ...                ``table``). L'assertion porte sur le *type* du message et la
+    ...                STRUCTURE de l'écran, jamais sur un texte localisé.
     [Arguments]    ${table}
-    Start Transaction    SE16
-    Input Text    ${SE16_TABLE_FIELD}    ${table}
-    Send Vkey    0
-    Wait Until Busy Done
-    ${type}    ${message}=    Get Status Message
-    IF    '${type}' == 'E'
-        RETURN    structure    ${-1}
+    # Même keyword de bibliothèque que `Open Table In SE16` : le verdict structuré
+    # (reached | rejected | dialog | modal) remplace la détection recopiée. Les
+    # comparaisons sont en forme EXPRESSION ($state[...]), jamais une interpolation
+    # entre apostrophes : un texte SAP contenant une apostrophe casserait l'évaluation.
+    ${state}=    Reach Se16 Selection Screen    ${table}
+    IF    $state["verdict"] == "rejected"    RETURN    structure    ${-1}
+    IF    not $state["reached"]
+        Log    Table '${table}' rejetée par dialogue de message : ${state}[dialog_text]
+        RETURN    dialog    ${-1}
     END
     Click Element    ${SE16_COUNT_BUTTON}
     Wait Until Busy Done
@@ -419,23 +448,35 @@ Classify And Count Table
     ${count}=    Evaluate    int(''.join(c for c in $raw if c.isdigit()) or 0)
     RETURN    table    ${count}
 
+# La détection/absorption du DIALOGUE DE MESSAGE modal (programme SAPMSDYP, lignes
+# ``txtMESSTXT<n>``) vivait ici en deux copies ; elle est désormais DANS la
+# bibliothèque (`Reach Se16 Selection Screen`), qui la traite de façon structurelle,
+# relève le texte pour le seul journal et rend un verdict. Une copie, pas trois.
+
 Deep Verify Package Catalog
     [Documentation]    Découvre le catalogue TADIR de ``${package}`` puis balaie chaque
     ...                objet (classification + comptage). Journalise un verdict par objet et
     ...                un récapitulatif, et renvoie les statistiques agrégées (objets
-    ...                découverts, tables réelles, structures, total de lignes).
+    ...                découverts, tables réelles, structures, rejets par dialogue, total
+    ...                de lignes).
     [Arguments]    ${package}
     ${tables}=    List Tables In Package    ${package}
     ${discovered}=    Get Length    ${tables}
     ${n_tables}=    Set Variable    ${0}
     ${n_structures}=    Set Variable    ${0}
+    ${n_dialogs}=    Set Variable    ${0}
     ${total_rows}=    Set Variable    ${0}
     @{empty_tables}=    Create List
+    @{dialog_rejects}=    Create List
     FOR    ${obj}    IN    @{tables}
         ${kind}    ${count}=    Classify And Count Table    ${obj}
         IF    '${kind}' == 'structure'
             ${n_structures}=    Evaluate    ${n_structures} + 1
             Log    ${package} / ${obj} : structure (rejetée par SE16, type E)
+        ELSE IF    '${kind}' == 'dialog'
+            ${n_dialogs}=    Evaluate    ${n_dialogs} + 1
+            Append To List    ${dialog_rejects}    ${obj}
+            Log    ${package} / ${obj} : rejeté par un dialogue de message SE16 (texte relevé plus haut dans le log ; journalisé, jamais mis en échec)
         ELSE
             ${n_tables}=    Evaluate    ${n_tables} + 1
             ${total_rows}=    Evaluate    ${total_rows} + ${count}
@@ -443,7 +484,8 @@ Deep Verify Package Catalog
             IF    ${count} == 0    Append To List    ${empty_tables}    ${obj}
         END
     END
-    Log    RÉCAP ${package} : ${discovered} objets TABL = ${n_tables} tables réelles (${total_rows} lignes cumulées) + ${n_structures} structures. Tables vides : ${empty_tables}
+    Log    RÉCAP ${package} : ${discovered} objets TABL = ${n_tables} tables réelles (${total_rows} lignes cumulées) + ${n_structures} structures + ${n_dialogs} rejets par dialogue. Tables vides : ${empty_tables}. Rejets par dialogue : ${dialog_rejects}
     ${stats}=    Create Dictionary    package=${package}    discovered=${discovered}
-    ...    tables=${n_tables}    structures=${n_structures}    total_rows=${total_rows}
+    ...    tables=${n_tables}    structures=${n_structures}    dialogs=${n_dialogs}
+    ...    total_rows=${total_rows}    dialog_rejects=${dialog_rejects}
     RETURN    ${stats}

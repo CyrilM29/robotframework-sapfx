@@ -113,6 +113,36 @@ def test_verification_runtime_compare_pytest_et_coverage(tmp_path, monkeypatch):
     monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 617)
     assert mod.check(repo, verify_runtime=True, coverage_xml="coverage.xml") == []
 
-    monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 618)
+
+def test_le_total_de_tests_est_un_plancher_pas_une_egalite(tmp_path, monkeypatch):
+    # Le manifeste porte le chiffre PUBLIÉ, figé à la release ; la suite grossit
+    # entre deux releases. Exiger l'égalité rendait la CI rouge au premier test
+    # ajouté (constaté : 1254 collectés contre 1175 publiés), et un garde qui
+    # crie au loup finit désactivé.
+    repo = _repo(tmp_path)                       # publie 617 tests
+    coverage = repo / "coverage.xml"
+    coverage.write_text('<coverage line-rate="0.94"/>', encoding="utf-8")
+
+    # PLUS de tests que publié : la comm sous-estime le produit, c'est permis
+    # (règle anti-overclaim), et le garde le dit sans échouer.
+    monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 700)
+    notes = []
+    assert mod.check(repo, verify_runtime=True, coverage_xml="coverage.xml",
+                     notes=notes) == []
+    assert any("700" in note and "617" in note for note in notes)
+
+    # MOINS de tests que publié : la comm affirme ce qui n'existe pas.
+    monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 600)
     problems = mod.check(repo, verify_runtime=True, coverage_xml="coverage.xml")
-    assert any("pytest collecte 618" in problem for problem in problems)
+    assert any("600" in problem and "617" in problem for problem in problems)
+
+
+def test_verification_runtime_signale_une_couverture_divergente(tmp_path, monkeypatch):
+    # La couverture, elle, reste une ÉGALITÉ : elle est mesurée sur le même
+    # périmètre à chaque run (le job ubuntu de la CI fait foi), donc un écart
+    # est une vraie dérive, pas un décalage de calendrier.
+    repo = _repo(tmp_path)
+    (repo / "coverage.xml").write_text('<coverage line-rate="0.91"/>', encoding="utf-8")
+    monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 617)
+    problems = mod.check(repo, verify_runtime=True, coverage_xml="coverage.xml")
+    assert any("91 %" in problem for problem in problems)

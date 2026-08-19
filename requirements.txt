@@ -4,9 +4,21 @@ robotframework>=7.4
 pywin32==311; platform_system == "Windows"
 
 # Runtime : Fiori / web (phase 2). After install, run `rfbrowser init` once to
-# download the Playwright browser binaries.
-robotframework-browser>=20.0
+# download the Playwright browser binaries. Upper bound: SapFioriLibrary imports
+# internal Browser paths (`Browser.utils.data_types`), see the `web` extra in
+# pyproject.toml; a major bump has to be qualified, not resolved silently.
+robotframework-browser>=20.0,<21
 
-# Dev / test
+# Dev / test: same set as the `dev` extra of pyproject.toml, so the commands
+# documented in CLAUDE.md (`python -m mypy`, `pytest --cov ... --cov-fail-under=85`,
+# the pre-commit hooks) all run after a plain `pip install -r requirements.txt`.
 pytest>=7.0
+pytest-cov>=5.0
 ruff>=0.4
+mypy>=1.10
+pre-commit>=3.0
+
+# Visual assertions and drift-sentinel fingerprints (`Screen Should Match
+# Baseline`, `Check Screen Against Watch`): Pillow only decodes the PNG at the
+# boundary, the perceptual-hash core is stdlib-pure (`visual` extra).
+Pillow>=10.0

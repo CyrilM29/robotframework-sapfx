@@ -15,7 +15,12 @@ n'est pas décoratif : il dit de quoi on parle.
   bureau, picto 28 px embarqué dans le panneau du recorder web.
 - **`ECC UI5 API LIBRARY`** (triskèle) = les **trois bibliothèques seules**,
   c'est-à-dire exactement ce que livre `pip install robotframework-sapfx`.
-  C'est `assets/logo-library.png`, et il ne sert QUE sur la page PyPI.
+  C'est `assets/logo-library.png`. Deux surfaces au 2026-08-10 : la page PyPI
+  et les **pages Libdoc publiées** (`comms/libdoc/`, qui ne documentent que
+  les keywords des bibliothèques). Le critère est le SUJET, pas le support :
+  dès que recorders, agents ou MCP entrent dans le cadre, on repasse au
+  médaillon suite. (La fiche disait « QUE sur la page PyPI » : trop étroit
+  depuis la publication des pages Libdoc.)
 
 Le README est un seul fichier pour GitHub et PyPI : la bascule se fait donc là
 où la variante PyPI est rendue, et à **deux** endroits qu'il faut garder en

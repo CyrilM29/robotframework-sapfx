@@ -25,9 +25,19 @@ def ensure_com_initialized() -> None:
         import pythoncom
     except ImportError:
         return  # pywin32 absent : plateforme non-Windows, ou test hors-SAP
+    # Les clauses `except` sont évaluées AU MOMENT de l'exception : lire
+    # ``pythoncom.com_error`` directement dans le tuple ferait lever une
+    # AttributeError depuis la clause elle-même sur un stub qui n'a ni
+    # ``CoInitialize`` ni ``com_error``, alors que cette fonction promet de ne
+    # jamais lever. On résout le type d'abord, et on ne garde que s'il EST une
+    # classe d'exception.
+    com_error = getattr(pythoncom, "com_error", None)
+    benign: tuple = (AttributeError,)
+    if isinstance(com_error, type) and issubclass(com_error, BaseException):
+        benign += (com_error,)
     try:
         pythoncom.CoInitialize()
-    except (AttributeError, pythoncom.com_error):
+    except benign:
         # AttributeError : stub de test sans CoInitialize ; com_error : COM déjà
         # initialisé sur ce thread (S_FALSE), bénin dans les deux cas. Volontairement
         # PAS un `except Exception` large : une vraie panne COM doit remonter ici
