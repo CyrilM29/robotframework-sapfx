@@ -11,6 +11,8 @@ import codecs
 import importlib.util
 import os
 
+import pytest
+
 _SPY_PATH = os.path.normpath(os.path.join(
     os.path.dirname(__file__), "..", "..", "tools", "recorder", "sapgui_recorder.py"))
 _GUI_PATH = os.path.normpath(os.path.join(
@@ -901,6 +903,12 @@ def test_run_replay_signale_les_tests_non_rejoues(tmp_path):
     assert lib.calls == [("run_transaction", "SE16")]
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="Forme de chemin propre à Windows : `os.path.splitdrive` ne "
+           "reconnaît un lecteur que sous ntpath, donc `E:fichier` est un nom "
+           "relatif ordinaire ailleurs. La garde vise le vrai contexte du "
+           "recorder desktop, qui ne tourne que sous Windows.")
 def test_resolve_save_path_refuse_un_chemin_relatif_a_un_lecteur():
     # Constat n°7 : ``E:fichier`` porte un lecteur sans être absolu ; le
     # message parlait de traversée de chemin, il nomme maintenant la forme.
