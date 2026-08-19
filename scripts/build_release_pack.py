@@ -8,14 +8,17 @@ Produit dans ``dist/`` un dossier de staging puis un zip autonome
   et le wheel des plugins rf-mcp (`sap-robotmcp`), construits par
   ``pip wheel --no-deps`` ;
 - les recorders (``tools/recorder``, ``tools/recorder_web`` + extension MV3),
-    les keywords métier (``resources/``), six suites d'exemple (smokes,
+    les keywords métier (``resources/``), sept suites d'exemple (smokes,
   exploration autonome, sentinelle de dérive, flagship écran↔API) ;
 - les scripts de maintenance (``scripts/`` : bot télémétrie→patch
-  ``healing_drift_report.py``, garde spec↔suite ``check_spec_sync.py``, tous
-  deux stdlib pure, exécutables depuis la racine du pack) ;
+  ``healing_drift_report.py``, garde spec↔suite ``check_spec_sync.py``, garde
+  des conventions #1/#2 ``check_conventions.py`` + son socle ``_common.py``,
+  tous stdlib pure, exécutables depuis la racine du pack) ;
 - les agents de test (``.claude/agents`` + ``.claude/commands`` pour Claude Code,
-  ``.github/chatmodes`` généré pour VS Code/Copilot) et ``specs/`` (contrat +
-  plan d'exemple), le cycle plan → génération → réparation de docs/test-agents.md ;
+  ``.github/chatmodes`` généré pour VS Code/Copilot), la skill ``sapfx``
+  (liste blanche : ``.claude/skills/`` abrite aussi la skill privée de
+  communication) et ``specs/`` (contrat + plan d'exemple), le cycle
+  plan → génération → réparation de docs/test-agents.md ;
 - l'installateur (``install.cmd``/``install.ps1``), les gabarits MCP (Claude Code
   et VS Code) et les READMEs du pack, tous maintenus dans ``packaging/`` (le pack
   lui-même est un artefact, jamais édité à la main : voir packaging/README.fr.md).
@@ -33,19 +36,44 @@ Usage ::
 """
 import argparse
 import hashlib
-import re
 import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
+from _common import force_utf8_stdio, read_project_version
+
 _ROOT = Path(__file__).resolve().parent.parent
 
+#: Lecture de version mutualisée (``scripts/_common.py``) : trois copies
+#: cohabitaient dans les scripts, dont deux prenaient la première ligne
+#: ``version = "…"`` toutes sections confondues. Celle-ci suit les sections.
+read_version = read_project_version
+
 # Dossiers jamais embarqués, où qu'ils apparaissent (artefacts locaux/dev).
-EXCLUDED_DIR_NAMES = {"__pycache__", "captures", "dist", "store", ".pytest_cache"}
+# ``demo`` : les démos vidéo scénarisées des deux recorders sont des outils de
+# COMMUNICATION du studio (elles exigent ffmpeg, le clone cap-sflight, une prise
+# non parasitée) : rien qu'un poste de test puisse jouer.
+EXCLUDED_DIR_NAMES = {"__pycache__", "captures", "dist", "store", ".pytest_cache",
+                      "demo"}
 # Fichiers jamais embarqués (suffixe).
 EXCLUDED_FILE_SUFFIXES = (".pyc", ".pyo")
+# Fichiers jamais embarqués (nom exact) : les helpers de DÉVELOPPEMENT des
+# recorders, et la doc qui ne parle QUE d'eux. ``gen_icons.py`` ne peut de
+# toute façon pas tourner dans un pack (il exige Pillow ET ``assets/logo.png``,
+# qui n'y est pas), ``package.py`` construit le zip du Chrome Web Store, et
+# ``PUBLISHING.md`` est le pas-à-pas de mise en ligne sur le store : trois
+# gestes de mainteneur, hors sujet sur un poste de test. ``PRIVACY.md`` reste,
+# lui, embarqué : c'est une information due à l'UTILISATEUR de l'extension.
+# ``sap-eval-healer.md`` relève de la même catégorie : c'est l'éval en aveugle
+# du healer, un filet de régression du STUDIO. Elle pilote
+# ``scripts/agent_eval_harness.py`` sur ``resources/ecc_keywords.resource`` et
+# ``tests/robot/ecc_scarr_spfli_liaisons.robot``, deux cibles absentes du pack :
+# livrée, la commande ne pouvait qu'échouer chez l'utilisateur.
+EXCLUDED_FILE_NAMES = {"gen_icons.py", "package.py",
+                       "PUBLISHING.md", "PUBLISHING.fr.md",
+                       "sap-eval-healer.md"}
 
 # Arborescences copiées récursivement (relatif dépôt -> relatif pack).
 # Les définitions d'agents de test (planner/generator/healer) partent telles
@@ -59,7 +87,18 @@ PACK_TREES = [
     (".claude/commands", ".claude/commands"),
     # Skill « boîte à outils » (esprit install-as-a-skill de Vibium) : un agent
     # Claude Code qui la charge apprend l'outillage SAPFX en un appel.
-    (".claude/skills", ".claude/skills"),
+    #
+    # LISTE BLANCHE, jamais le dossier parent : ``.claude/skills/`` abrite aussi
+    # la skill PRIVÉE de communication du studio. Copier le parent l'a
+    # réellement expédiée dans le pack 0.6.6 livré, alors que
+    # ``export_public_tree.py`` l'exclut nommément depuis toujours : deux canaux
+    # de distribution existent, la frontière ne peut pas être tenue par un
+    # seul (et le scan anti-fuite de l'export interdit jusqu'à son NOM, raison
+    # de plus pour ne pas l'écrire ici). Ajouter
+    # une skill au pack = ajouter SA ligne ici (fail-closed), et le garde de
+    # symétrie de ``tests/unit/test_build_release_pack.py`` refuse désormais
+    # tout chemin que l'export public exclut.
+    (".claude/skills/sapfx", ".claude/skills/sapfx"),
     (".github/chatmodes", ".github/chatmodes"),
 ]
 
@@ -88,11 +127,29 @@ PACK_FILES = [
     # l'API (SapApiLibrary, embarquée dans le wheel des bibliothèques).
     ("tests/robot/flagship_cross_paradigm.robot",
      "tests/robot/flagship_cross_paradigm.robot"),
+    # Suite du canal API : la SEULE qui exerce `resources/api_keywords.resource`,
+    # livrée juste à côté. Sans elle, le pack embarquait une couche métier
+    # qu'aucun exemple ne montrait ni ne validait au dryrun. Ses deux lanes
+    # (`--include a4h` pour OData v2, `--include capsflight` pour v4) se
+    # lancent séparément selon ce que le poste a sous la main.
+    ("tests/robot/api/canal_api_odata.robot",
+     "tests/robot/api/canal_api_odata.robot"),
     # Outillage de maintenance, stdlib pure, exécutable depuis la racine du
     # pack : bot télémétrie de healing -> patch resources/ proposé, et garde
     # spec <-> suite générée (source de vérité) pour les suites des agents.
     ("scripts/healing_drift_report.py", "scripts/healing_drift_report.py"),
     ("scripts/check_spec_sync.py", "scripts/check_spec_sync.py"),
+    # Garde mécanique des conventions #1/#2, que sap-generator lance comme gate
+    # entre le dry run et le run live : sa définition l'appelle par ce chemin,
+    # donc il doit exister DANS le pack (il n'y était pas jusqu'ici, et l'agent
+    # déployé perdait son filet en silence). Il scanne ``tests/robot/`` et
+    # ``resources/``, tous deux présents à la racine du pack.
+    ("scripts/check_conventions.py", "scripts/check_conventions.py"),
+    # Le socle partagé dont dépend le garde ci-dessus (bascule UTF-8 de la
+    # console Windows). Les deux scripts de maintenance historiques gardent,
+    # eux, leur copie en ligne de ce bloc : ils restent exécutables même sortis
+    # seuls du pack.
+    ("scripts/_common.py", "scripts/_common.py"),
     ("packaging/README.md", "README.md"),
     ("packaging/README.fr.md", "README.fr.md"),
     ("packaging/install.ps1", "install.ps1"),
@@ -114,31 +171,14 @@ PACK_FILES = [
 WHEEL_PROJECTS = [".", "integrations/robotmcp"]
 
 
-def read_version(pyproject_text):
-    """Extrait ``version = "..."`` de la section [project] d'un pyproject.toml.
-
-    Regex volontairement (pas tomllib) : compatible avec le plancher
-    requires-python du dépôt et suffisant pour un champ que nous contrôlons.
-    """
-    in_project = False
-    for line in pyproject_text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("["):
-            in_project = stripped == "[project]"
-            continue
-        if in_project:
-            match = re.match(r'version\s*=\s*"([^"]+)"', stripped)
-            if match:
-                return match.group(1)
-    raise ValueError("version introuvable dans la section [project] du pyproject.toml")
-
-
 def is_excluded(rel_path):
     """Vrai si ce chemin relatif (POSIX ou natif) ne doit pas entrer dans le pack."""
     parts = Path(rel_path).parts
     if any(part in EXCLUDED_DIR_NAMES for part in parts):
         return True
-    return parts[-1].endswith(EXCLUDED_FILE_SUFFIXES) if parts else False
+    if not parts:
+        return False
+    return parts[-1] in EXCLUDED_FILE_NAMES or parts[-1].endswith(EXCLUDED_FILE_SUFFIXES)
 
 
 def build_manifest(root):
@@ -182,6 +222,20 @@ def build_wheels(root, wheels_dir):
              "-w", str(wheels_dir), str(project)],
             check=True,
         )
+
+
+def stale_wheels(wheels_dir, version):
+    """Wheels présents dont la version n'est PAS celle du pack, triés.
+
+    ``--skip-wheels`` réutilise le dossier ``wheels/`` du staging : un wheel
+    d'une release précédente y survivait et partait dans un ZIP nommé d'après
+    la version courante, sans un mot. Le nom d'un wheel porte sa version
+    (``robotframework_sapfx-<version>-py3-none-any.whl``) : la comparer coûte
+    une ligne, et c'est exactement ce que ``check_published_versions.py``
+    interdit dans le TEXTE des instructions.
+    """
+    return sorted(path.name for path in wheels_dir.glob("*.whl")
+                  if "-%s-" % version not in path.name)
 
 
 def normalize_crlf(data):
@@ -245,6 +299,7 @@ def write_checksum_file(path):
 
 
 def main(argv=None):
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--outdir", default=str(_ROOT / "dist"),
                         help="dossier de sortie (défaut : dist/)")
@@ -276,6 +331,12 @@ def main(argv=None):
     if wheel_count < len(WHEEL_PROJECTS):
         print(f"ERREUR : {wheel_count} wheel(s) dans {wheels_dir}, "
               f"{len(WHEEL_PROJECTS)} attendus.", file=sys.stderr)
+        return 1
+    stale = stale_wheels(wheels_dir, version)
+    if stale:
+        print(f"ERREUR : wheel(s) d'une autre version que le pack {version} : "
+              f"{', '.join(stale)}. Reconstruire sans --skip-wheels.",
+              file=sys.stderr)
         return 1
 
     assemble(_ROOT, stage_dir)

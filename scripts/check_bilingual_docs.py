@@ -28,6 +28,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from _common import force_utf8_stdio
+
 _ROOT = Path(__file__).resolve().parent.parent
 
 # Docs délibérément anglais-seul (cf. CLAUDE.md "## Language / Langue").
@@ -42,8 +44,13 @@ _EN_ONLY = {
 # continu par les agents dans la langue de travail de l'équipe (même logique
 # que specs/). Les traduire à chaque entrée n'aurait aucun sens : ce sont des
 # traces d'exécution, pas de la documentation destinée à être lue en anglais.
+# PERSONAS.md relève de la même catégorie : c'est un document de MÉTHODE de
+# travail interne (les casquettes que l'assistant endosse à la demande), adossé
+# à comms/ et à .claude/, deux arborescences déjà monolingues ; il s'adresse à
+# l'équipe, jamais à l'utilisateur de la bibliothèque.
 _FR_ONLY = {
     "docs/heal-journal.md",
+    "PERSONAS.md",
 }
 
 # Arborescences délibérément monolingues, hors du contrat bilingue : les
@@ -71,8 +78,11 @@ def _is_exempt(path):
 
 
 def _tracked_md_files():
+    # ``encoding`` explicite : sans lui, la sortie de git est décodée dans
+    # l'encodage du poste, et les autres gardes du dépôt le passent déjà.
     out = subprocess.run(["git", "ls-files", "*.md"], cwd=_ROOT, capture_output=True,
-                         text=True, check=True).stdout
+                         text=True, encoding="utf-8", errors="replace",
+                         check=True).stdout
     return [line for line in out.splitlines() if line]
 
 
@@ -98,7 +108,8 @@ def check_pairing(files):
 def check_drift(files, since):
     """Retourne la liste des messages d'avertissement de dérive depuis ``since``."""
     diff = subprocess.run(["git", "diff", "--name-only", f"{since}...HEAD"],
-                          cwd=_ROOT, capture_output=True, text=True)
+                          cwd=_ROOT, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
     if diff.returncode != 0:
         print(f"[check_bilingual_docs] impossible de diff contre {since!r} : "
              f"{diff.stderr.strip()} -- vérification de dérive ignorée.", file=sys.stderr)
@@ -122,6 +133,7 @@ def check_drift(files, since):
 
 
 def main(argv=None):
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--since", metavar="REF",
                         help="en plus de l'appariement, avertit si un .md a changé "

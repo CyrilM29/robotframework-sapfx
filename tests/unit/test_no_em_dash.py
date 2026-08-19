@@ -80,6 +80,31 @@ def test_check_ignore_le_code_vendorise(tmp_path):
     assert guard.check(tmp_path, [str(tmp_path / rel)]) == []
 
 
+def test_un_repertoire_cible_est_developpe_recursivement(tmp_path):
+    # Régression : un répertoire en argument était accepté puis ignoré en
+    # silence (``read_text`` lève dessus, erreur avalée comme celle d'un
+    # binaire), et le garde répondait « OK (ciblé) » sans avoir rien lu.
+    _write(tmp_path, "docs/sous/x.md", "titre — sous-titre\n")
+    problems = guard.check(tmp_path, [str(tmp_path / "docs")])
+    assert len(problems) == 1
+    assert "docs/sous/x.md:1" in problems[0]
+
+
+def test_un_repertoire_cible_respecte_les_exemptions(tmp_path):
+    _write(tmp_path, "src/SapEccLibrary/_vendor/x.py", "# amont — verbatim\n")
+    _write(tmp_path, "results/run.md", "rapport — de run\n")
+    assert guard.check(tmp_path, [str(tmp_path)]) == []
+
+
+def test_une_cible_hors_depot_est_ignoree(tmp_path):
+    # Le hook voit passer les fichiers d'autres arbres (base mémoire privée) :
+    # ils ont leurs propres règles.
+    autre = tmp_path.parent / (tmp_path.name + "_ailleurs")
+    autre.mkdir()
+    (autre / "x.md").write_text("titre — sous-titre\n", encoding="utf-8")
+    assert guard.check(tmp_path, [str(autre / "x.md")]) == []
+
+
 def test_le_depot_reel_passe_le_garde():
     """Le test qui tient la règle dans la durée : l'arbre suivi est conforme."""
     problems = guard.check(_ROOT)

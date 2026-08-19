@@ -136,6 +136,28 @@ def test_fichiers_d_histoire_hors_perimetre(tmp_path):
     assert "docs/heal-journal.md" not in mod.scanned_files(root)
 
 
+def test_un_sous_dossier_de_docs_est_balaye(tmp_path):
+    # Régression : le balayage s'arrêtait au premier niveau (os.listdir), donc
+    # une instruction rangée dans un sous-dossier sortait du garde en silence.
+    root = _repo(tmp_path)
+    guide = tmp_path / "docs" / "guides"
+    guide.mkdir(parents=True)
+    (guide / "install.md").write_text(
+        "Installer : `pip install robotframework-sapfx==0.5.0`\n", encoding="utf-8")
+    assert "docs/guides/install.md" in mod.scanned_files(root)
+    problems = mod.check(root)
+    assert len(problems) == 1
+    assert "docs/guides/install.md:1" in problems[0]
+
+
+def test_les_artefacts_de_run_restent_hors_perimetre(tmp_path):
+    root = _repo(tmp_path)
+    cache = tmp_path / "docs" / "__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "x.txt").write_text("sapfx-pack-0.1.0-win.zip\n", encoding="utf-8")
+    assert mod.check(root) == []
+
+
 # --- surface du garde --------------------------------------------------------
 
 def test_le_depot_reel_est_conforme():

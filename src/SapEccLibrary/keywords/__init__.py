@@ -1,5 +1,6 @@
 """Mixins de keywords composés dans :class:`SapEccLibrary.SapEccLibrary`."""
 from ._connection import ConnectionKeywords
+from ._ddic import DdicKeywords
 from ._diagnostics import DiagnosticsKeywords
 from ._embedded_browser import EmbeddedBrowserKeywords
 from ._grid import GridKeywords
@@ -10,7 +11,7 @@ from ._semantic import SemanticKeywords
 from ._sessions import SessionKeywords
 from ._waits import WaitKeywords
 
-__all__ = ["ConnectionKeywords", "DiagnosticsKeywords", "EmbeddedBrowserKeywords",
-           "GridKeywords", "HealingKeywords", "PerceptionKeywords",
-           "PointerKeywords", "SemanticKeywords", "SessionKeywords",
-           "WaitKeywords"]
+__all__ = ["ConnectionKeywords", "DdicKeywords", "DiagnosticsKeywords",
+           "EmbeddedBrowserKeywords", "GridKeywords", "HealingKeywords",
+           "PerceptionKeywords", "PointerKeywords", "SemanticKeywords",
+           "SessionKeywords", "WaitKeywords"]

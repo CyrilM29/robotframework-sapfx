@@ -53,9 +53,11 @@ pinned dependencies from PyPI or an internal mirror), and the public source repo
 - [MCP integration](docs/mcp-integration.md): plugins composed over rf-mcp
   (keyword routing, screen perception state providers (smart diffs on
   changed screens, live application state with modal detection, stale-code
-  warning), selector guidance), plus the `sapfx-mcp` overlay launcher (rf-mcp
-  unchanged + `sapfx_state`/`sapfx_screenshot`/`sapfx_reload` tools and a
-  startup compatibility guard, not a fork)
+  warning, one contract across the three channels: connected/state_error,
+  a section that failed vs one that has no meaning here), selector guidance),
+  plus the `sapfx-mcp` overlay launcher (rf-mcp unchanged +
+  `sapfx_state`/`sapfx_screenshot`/`sapfx_reload` tools, a startup
+  compatibility guard and respect for the declared capabilities, not a fork)
 - [Hardening the test environment](docs/hardening-test-environment.md):
   security checklist (RZ11 server posture, client patch level and input
   history, credentials, MV3/CDP surface, MCP containment) mapped to the
@@ -73,9 +75,11 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
 
 ## Key entry points
 
-- `resources/ecc_keywords.resource` and `resources/fiori_keywords.resource`:
-  the business-readable keyword layer tests should call (mirrored vocabulary
-  across ECC and Fiori)
+- `resources/ecc_keywords.resource`, `resources/fiori_keywords.resource` and
+  `resources/api_keywords.resource`: the business-readable keyword layer tests
+  should call (one mirrored vocabulary across the three channels, ECC, Fiori
+  and API; OData service paths live there under business names, never in a
+  suite)
 - `src/SapEccLibrary/`: vendored upstream base + mixins (connection, waits,
   grids, perception, diagnostics/preflights, healing, semantic labels,
   embedded browser, pointer fallback, multi-session registry: named session

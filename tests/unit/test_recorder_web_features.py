@@ -43,7 +43,8 @@ def test_listener_records_dom_clicks_fills_and_assertions():
 
 def test_dom_args_prefer_role_and_accessible_name():
     # le localisateur « intention utilisateur » d'abord, le chemin CSS en repli
-    assert "return 'role=' + d.role + '    name=' + cleanCell(d.name);" in SNIPPET
+    # (nom accessible assaini : voir test_selector_texts_are_sanitized...)
+    assert "return 'role=' + d.role + '    name=' + n;" in SNIPPET
     assert "return 'css=' + d.css;" in SNIPPET
 
 
@@ -212,6 +213,99 @@ def test_recorded_ui5_steps_carry_their_xpath_fallback():
     assert "function withXpathHint(line, cap)" in SNIPPET
     assert "withXpathHint(clickLine(cap), cap)" in SNIPPET
     assert "withXpathHint(fillLine(cap, value), cap)" in SNIPPET
+
+
+# --- textes de sélecteur assainis (apostrophe, ${...}, espaces doubles) -------
+
+def test_selector_texts_are_sanitized_before_entering_rf_cells():
+    # Un texte de page avec ${...} ou espaces multiples ne doit jamais casser la
+    # cellule RF ; le backslash, seul caractère que Robot consomme à la
+    # relecture, force la troncature au plus long segment sûr.
+    assert "function safeMatchText(value)" in SNIPPET
+    assert "safeMatchText(wc.text)" in SNIPPET
+    assert "safeMatchText(d.name)" in SNIPPET
+    # Une seule définition de la normalisation des blancs (cleanCell), appelée,
+    # jamais recopiée : deux copies dériveraient (traitement des NBSP…).
+    assert "var s = cleanCell(value);" in SNIPPET
+
+
+def test_apostrophes_no_longer_truncate_the_properties_selector():
+    """« Editor's Choice » partait tronqué en « s Choice », qui peut matcher un
+    AUTRE contrôle (la résolution role prend le premier match, en silence). Le
+    littéral Python choisit son guillemet au lieu de couper le texte."""
+    assert "function pyQuoted(value)" in SNIPPET
+    assert "pyQuoted(r.properties[k])" in SNIPPET
+    assert "if (s.indexOf(\"'\") === -1) return \"'\" + s + \"'\";" in SNIPPET
+    assert "if (s.indexOf('\"') === -1) return '\"' + s + '\"';" in SNIPPET
+
+
+def test_degraded_selectors_announce_themselves_instead_of_replaying_blindly():
+    """Sans propriété transmissible, la ligne tombe à `controlType=` seul : le
+    replay agirait sur le PREMIER contrôle du type. Le step le dit."""
+    assert "s\\u00e9lecteur non discriminant" in SNIPPET or \
+        "sélecteur non discriminant" in SNIPPET
+    # Perte du repli xpath : annoncée, et sous un préfixe que l'export
+    # resource-first ne peut pas confondre avec un vrai localisateur.
+    assert "# xpath indisponible" in SNIPPET
+
+
+def test_xpath_hints_are_dropped_when_they_would_break_the_rf_line():
+    # Un xpath porteur d'un saut de ligne, d'un run de 2+ espaces ou d'un
+    # BACKSLASH (consommé par Robot à la relecture : //Text[@text='C:\\temp']
+    # deviendrait « C:<TAB>emp ») casserait la ligne .robot : l'indice est omis
+    # plutôt qu'émis corrompu.
+    assert "function rfSafeCell(text)" in SNIPPET
+    assert "rfSafeCell(cap.xpathShort)" in SNIPPET
+    assert "(x && rfSafeCell(x))" in SNIPPET
+    assert "!/[\\r\\n\\\\]| {2,}|[$@&%]\\{/.test(String(text))" in SNIPPET
+
+
+def test_line_parsers_ignore_trailing_comments():
+    """Un commentaire de fin de ligne (repli xpath, avertissement) n'est ni un
+    argument de localisateur ni un mot du libellé humain."""
+    assert "var cells = splitStepCells(line).cells;" in SNIPPET
+
+
+def test_emitted_properties_literal_survives_robot_then_literal_eval(tmp_path):
+    """Le maillon que ni le grep JS ni le ``--dryrun`` ne voient : la ligne
+    ÉMISE par le recorder traverse DEUX déséchappements successifs (cellule
+    Robot, puis ``ast.literal_eval`` dans ``build_control_selector``). Une
+    apostrophe et une amorce de variable RF doivent en ressortir INTACTES,
+    sinon le sélecteur enregistré ne désigne plus le contrôle capturé.
+
+    On rejoue la vraie chaîne avec le vrai moteur Robot (même raison que
+    ``test_se16_exploration_logic``: l'échappement RF ne se simule pas)."""
+    import pytest
+    pytest.importorskip("robot", reason="robotframework requis pour ce test")
+    import robot as robot_pkg
+
+    helper = tmp_path / "chain_lib.py"
+    helper.write_text(
+        "from SapFioriLibrary._ui5_runtime import build_control_selector\n"
+        "def selector_text(control_type, properties):\n"
+        "    return build_control_selector(controlType=control_type,\n"
+        "                                  properties=properties)['properties']['text']\n",
+        encoding="utf-8")
+    # Lignes telles que roleArgs les émet (vérifiées contre le recorder généré) :
+    # apostrophe -> guillemets doubles, ${…} -> échappé au niveau Robot.
+    suite = tmp_path / "chain.robot"
+    suite.write_text(
+        "*** Settings ***\nLibrary    chain_lib.py\n\n"
+        "*** Test Cases ***\n"
+        "Apostrophe\n"
+        "    ${t}=    Selector Text    Button    properties={'text': \"Editor's Choice\"}\n"
+        "    Should Be Equal    ${t}    Editor's Choice\n"
+        "Variable RF litterale\n"
+        "    ${t}=    Selector Text    Text    properties={'text': 'Prix \\${x} EUR'}\n"
+        "    Should Be Equal    ${t}    Prix \\${x} EUR\n"
+        "Texte simple\n"
+        "    ${t}=    Selector Text    Button    properties={'text': 'Go'}\n"
+        "    Should Be Equal    ${t}    Go\n",
+        encoding="utf-8")
+    rc = robot_pkg.run(str(suite), outputdir=str(tmp_path), report=None,
+                       log=None, output=None, console="NONE",
+                       pythonpath=str(tmp_path), exitonfailure=False)
+    assert rc == 0
 
 
 def test_resource_first_converts_xpath_hint_into_fallback_resolution():

@@ -32,6 +32,7 @@ Usage::
 
     python scripts/check_no_em_dash.py                 # tout l'arbre suivi
     python scripts/check_no_em_dash.py docs/architecture.md   # ciblé (hook)
+    python scripts/check_no_em_dash.py docs/           # ciblé, récursif
 """
 from __future__ import annotations
 
@@ -40,6 +41,8 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+from _common import force_utf8_stdio
 
 EM_DASH = "—"
 
@@ -73,7 +76,7 @@ ALLOWED = {
     ".github/chatmodes/sap-generator.chatmode.md": (1, "généré depuis .claude/agents/"),
     ".github/chatmodes/sap-healer.chatmode.md": (1, "généré depuis .claude/agents/"),
     "scripts/check_no_em_dash.py": (2, "ce garde nomme le caractère qu'il refuse"),
-    "tests/unit/test_no_em_dash.py": (8, "teste le garde sur des cas portant le caractère"),
+    "tests/unit/test_no_em_dash.py": (12, "teste le garde sur des cas portant le caractère"),
 }
 
 
@@ -115,6 +118,42 @@ def read_text(path: Path) -> str | None:
         return None
 
 
+def relative_target(target: str, root: Path) -> str | None:
+    """Chemin relatif POSIX d'une cible, ou ``None`` si elle est hors dépôt."""
+    try:
+        rel = os.path.relpath(os.path.abspath(target), root)
+    except ValueError:
+        # Sous Windows, ``relpath`` lève quand la cible est sur un AUTRE
+        # disque (scratchpad en C:, dépôt en E:). C'est forcément hors
+        # dépôt : passer, plutôt que faire planter le hook post-édition.
+        return None
+    rel = rel.replace("\\", "/")
+    # Un chemin qui remonte hors du dépôt (``../``) n'est pas à nous :
+    # le hook post-édition voit passer des fichiers d'autres arbres (la
+    # base mémoire privée, par exemple), qui ont leurs propres règles.
+    return None if rel.startswith("../") else rel
+
+
+def expand_targets(root: Path, targets: list[str]) -> list[str]:
+    """Chemins relatifs scannables des cibles, RÉPERTOIRES DÉVELOPPÉS.
+
+    Un répertoire passé en argument était accepté puis ignoré en silence :
+    ``read_text`` lève dessus, et cette erreur est avalée comme celle d'un
+    binaire. Le garde répondait donc « OK (ciblé) » sans avoir rien lu, le
+    faux vert le plus coûteux qui soit puisqu'il vient d'un garde.
+    """
+    files: list[str] = []
+    for target in targets:
+        path = Path(target)
+        children = (sorted(p for p in path.rglob("*") if p.is_file())
+                    if path.is_dir() else [path])
+        for child in children:
+            rel = relative_target(str(child), root)
+            if rel is not None and is_scanned(rel):
+                files.append(rel)
+    return list(dict.fromkeys(files))
+
+
 def check(root: Path | str, targets: list[str] | None = None) -> list[str]:
     """Retourne la liste des problèmes (vide = conforme).
 
@@ -125,23 +164,7 @@ def check(root: Path | str, targets: list[str] | None = None) -> list[str]:
     root = Path(root)
     problems: list[str] = []
     if targets:
-        files = []
-        for target in targets:
-            try:
-                rel = os.path.relpath(os.path.abspath(target), root)
-            except ValueError:
-                # Sous Windows, ``relpath`` lève quand la cible est sur un AUTRE
-                # disque (scratchpad en C:, dépôt en E:). C'est forcément hors
-                # dépôt : passer, plutôt que faire planter le hook post-édition.
-                continue
-            rel = rel.replace("\\", "/")
-            # Un chemin qui remonte hors du dépôt (``../``) n'est pas à nous :
-            # le hook post-édition voit passer des fichiers d'autres arbres (la
-            # base mémoire privée, par exemple), qui ont leurs propres règles.
-            if rel.startswith("../"):
-                continue
-            if is_scanned(rel):
-                files.append(rel)
+        files = expand_targets(root, targets)
     else:
         files = [f for f in tracked_files(root) if is_scanned(f)]
 
@@ -186,12 +209,12 @@ def main(argv: list[str] | None = None) -> int:
     # sur une console Windows en cp1252, les imprimer brut ferait planter le
     # garde au lieu de rapporter la violation. Même parade que les autres
     # gardes du dépôt.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    force_utf8_stdio()
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="*",
-                        help="fichiers à vérifier (défaut : tout l'arbre suivi)")
+                        help="fichiers ou répertoires à vérifier "
+                             "(défaut : tout l'arbre suivi)")
     args = parser.parse_args(argv)
 
     problems = check(_ROOT, args.paths or None)

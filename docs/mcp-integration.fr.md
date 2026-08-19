@@ -56,8 +56,19 @@ plugin 0.31 ne sait pas exprimer ; chaque manque a été établi live le
   défaut ; via le `get_session_state` de rf-mcp, le diff ne s'exerce
   qu'avec `page_source_filtered=true`), et `application_state` enrichi de la
   pile de fenêtres live (`modal_open`, le piège du modal d'erreur
-  résiduel), du type de message de statut et de la télémétrie de session,
-  que rf-mcp ne route jamais vers les providers des plugins.
+  résiduel), du type de message de statut et de la télémétrie de session
+  côté ECC, et de la portée iframe active (`frame_stack`), de la présence
+  d'un runtime UI5 (`ui5_runtime`) et des messages UI5 récents côté Fiori,
+  que rf-mcp ne route jamais vers les providers des plugins. Cet état Fiori
+  coûte **un** passage par le contexte RF, pas trois : `Get Ui5 Application
+  State` l'assemble côté bibliothèque, parce que sur ce chemin servi à chaque
+  tour, c'est la traversée du contexte qui coûte, pas le JavaScript. Les trois canaux
+  partagent UN contrat d'état : `connected`, plus `state_error` quand le canal
+  ne répond pas, `collection_errors` pour une section qui a échoué, et
+  `not_applicable` pour une section qui n'a pas de sens ici (pas de runtime
+  UI5 sur une page Web Components, WebGUI ou hybride : une cible supportée,
+  pas une panne). Une section qu'une bibliothèque déclare ne pas servir est
+  refusée explicitement, avec le motif du provider, jamais simulée.
 - **`sapfx_screenshot`** : le canal vision, une vraie image MCP (le contrat
   plugin n'a pas de canal image ; fastmcp si), brute ou annotée Set-of-Mark
   avec sa légende `numéro -> id` en bloc texte compagnon.
@@ -202,6 +213,9 @@ resource au mauvais test synthétique : utiliser une session ECC live par proces
 pip install rf-mcp                      # le serveur MCP hôte
 pip install -e .                        # rend SapEcc/SapFioriLibrary importables
 pip install -e integrations/robotmcp    # enregistre les plugins (entry-points)
+# Garder cet ordre : le wheel des plugins dépend de robotframework-sapfx, donc
+# lancé depuis un clone où la racine n'est PAS installée en editable, pip pose
+# la bibliothèque PUBLIÉE dans site-packages, à côté de l'arbre de travail.
 
 # vérifier que rf-mcp les découvre :
 python -c "from robotmcp.config import library_registry as r; print([l for l in r.get_all_libraries() if 'Sap' in str(l)])"

@@ -60,11 +60,18 @@ class Drift:
 
 @dataclass
 class Patch:
-    """Un remplacement proposé dans un fichier .resource."""
+    """Un remplacement proposé dans un fichier .resource.
+
+    ``original`` porte le localisateur qui a motivé le patch : la dérive dont
+    il vient est ainsi connue sans la redéduire du texte de la ligne, ce que
+    faisait le rapport (par sous-chaîne) au risque d'attribuer un patch à la
+    mauvaise dérive quand deux ids se contiennent.
+    """
     path: Path
     line_no: int
     before: str
     after: str
+    original: str = ""
 
 
 def load_events(log_path: Path) -> list[dict]:
@@ -123,7 +130,10 @@ def find_in_resources(resources_dir: Path, locator: str) -> list[tuple[Path, int
 def propose_patches(drifts: Iterable[Drift], resources_dir: Path) -> list[Patch]:
     """Patches pour les dérives **stables** dont l'origine vit dans
     ``resources/`` (les instables et les localisateurs inline restent au
-    rapport, à traiter par un humain ou sap-healer)."""
+    rapport, à traiter par un humain ou sap-healer). TOUTES les occurrences
+    du localisateur sur la ligne sont remplacées, y compris un écho en
+    commentaire de fin de ligne : une ligne de resource ne porte qu'un
+    localisateur et ses échos, les laisser diverger serait pire."""
     patches = []
     for drift in drifts:
         if not drift.stable:
@@ -131,7 +141,8 @@ def propose_patches(drifts: Iterable[Drift], resources_dir: Path) -> list[Patch]
         healed = drift.healed or ""
         for path, line_no, line in find_in_resources(resources_dir, drift.original):
             patches.append(Patch(path=path, line_no=line_no, before=line,
-                                 after=line.replace(drift.original, healed)))
+                                 after=line.replace(drift.original, healed),
+                                 original=drift.original))
     return patches
 
 
@@ -177,8 +188,8 @@ def render_markdown(drifts: list[Drift], patches: list[Patch]) -> str:
                       "  - avant : `%s`" % patch.before.strip(),
                       "  - après : `%s`" % patch.after.strip()]
         lines.append("")
-    orphans = [d for d in stable
-               if not any(d.original in p.before for p in patches)]
+    patched_originals = {p.original for p in patches}
+    orphans = [d for d in stable if d.original not in patched_originals]
     if orphans:
         lines += ["### Stables mais hors resources/ (localisateur inline ?)", ""]
         lines += ["- `%s`" % d.original for d in orphans]
@@ -197,9 +208,12 @@ def render_markdown(drifts: list[Drift], patches: list[Patch]) -> str:
 def main(argv: Optional[list[str]] = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors
     # page de code (flèches) : on force UTF-8 en best-effort plutôt que de
-    # planter à l'affichage (constaté au premier essai CLI).
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    # planter à l'affichage (constaté au premier essai CLI). Ces quatre lignes
+    # sont la copie assumée de ``scripts/_common.py`` : ce script est EMBARQUÉ
+    # dans le pack Windows et doit y tourner seul, sans voisin.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--log", default=os.environ.get("SAPFX_HEALING_LOG", ""),
                         help="journal JSONL (défaut : $SAPFX_HEALING_LOG)")

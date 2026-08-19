@@ -90,6 +90,31 @@ def parse_recorded_body(text):
     return (name or DEFAULT_TEST_NAME), steps
 
 
+def count_test_cases(text):
+    """Nombre de tests d'un fichier d'enregistrement (lignes non indentées de la
+    section ``*** Test Cases ***``).
+
+    `parse_recorded_body` ne rend QUE le premier test (contrat du recorder) :
+    un fichier multi-scénarios (export ``+test`` du recorder web, suite écrite
+    à la main) serait rejoué à un tiers sans que rien ne le dise. Le compte
+    permet au replay de l'annoncer au lieu de laisser croire qu'il a tout
+    rejoué."""
+    count = 0
+    in_cases = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("*** test cases"):
+            in_cases = True
+            continue
+        if not in_cases or not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("***"):
+            break
+        if line[:1] not in (" ", "\t"):
+            count += 1
+    return count
+
+
 def replace_recorded_steps(text, steps):
     """Réécrit les étapes d'un fichier d'enregistrement en conservant tout
     l'en-tête (jusqu'à la ligne du nom de test incluse). Socle de l'édition de
@@ -126,10 +151,28 @@ def locator_slug(eid):
     return slug or "ELEMENT"
 
 
+# Séparateur de cellules Robot Framework : une tabulation, ou DEUX espaces au
+# moins. Les deux recorders écrivent quatre espaces, mais un déroulé ÉDITÉ
+# (panneau de steps de la GUI, retouche à la main, fichier venu d'ailleurs) est
+# du RF valide quelconque. Un `split("    ")` littéral rendait alors la ligne
+# entière en UNE cellule (séparation à 2, 3 espaces ou tabulation) : keyword
+# introuvable au replay ; ou des cellules à espace de tête (5 espaces et plus) :
+# valeur silencieusement fausse.
+_CELL_SEP = re.compile(r"\t+| {2,}")
+# Un espace VOLONTAIRE dans une valeur est échappé ``\ `` par `rf_escape_value` :
+# il est mis à l'abri du découpage (sentinelle) puis restitué, sans quoi une
+# valeur à espaces multiples ou à espace final serait coupée par son propre
+# échappement.
+_SPACE_SENTINEL = "\x00"
+
+
 def _split_step(step):
-    """Cellules RF d'une étape (séparateur 4 espaces), commentaire de fin mis à
-    part : ``('Send Vkey    0    # F8')`` -> ``(['Send Vkey', '0'], '# F8')``."""
-    cells = [c for c in step.split("    ") if c != ""]
+    """Cellules RF d'une étape (séparateur : tabulation, ou 2 espaces et plus),
+    commentaire de fin mis à part : ``('Send Vkey    0    # F8')`` ->
+    ``(['Send Vkey', '0'], '# F8')``."""
+    protected = (step or "").replace("\\ ", _SPACE_SENTINEL)
+    cells = [c.replace(_SPACE_SENTINEL, "\\ ")
+             for c in _CELL_SEP.split(protected) if c != ""]
     comment_at = next((i for i, c in enumerate(cells) if c.startswith("#")), None)
     if comment_at is None:
         return cells, ""
@@ -420,11 +463,12 @@ def steps_to_spec(steps, test_name=DEFAULT_TEST_NAME,
             # ne porte aucun id (contrat specs/ : pas d'id dans les étapes) ;
             # sinon elle vit en « Points de vigilance », intégralement.
             if any(c.startswith("wnd[") for c in cells[1:]):
-                raw_steps.append((step, len(etapes) + 1))
+                raw_steps.append((_mask_secret_args(step), len(etapes) + 1))
                 human = ("Étape technique à traduire "
                          "(ligne exacte en « Points de vigilance »)")
             else:
-                human = "Étape brute à traduire : %s" % md_code(step)
+                human = "Étape brute à traduire : %s" % md_code(
+                    _mask_secret_args(step))
         etapes.append(human)
     lines = ["# %s" % test_name,
              "",
@@ -630,9 +674,10 @@ def steps_to_istqb(steps, test_name=DEFAULT_TEST_NAME,
             continue
         struct = _istqb_step(cells, comment)
         if struct is None:
-            struct = {"action": "raw", "line": step,
+            masked = _mask_secret_args(step)
+            struct = {"action": "raw", "line": masked,
                       "note": "étape non traduite : ligne Robot Framework exacte"}
-            human = "Étape non traduite : %s" % md_code(step)
+            human = "Étape non traduite : %s" % md_code(masked)
         else:
             human = _humanize_step(cells, comment) or struct["action"]
         action = struct["action"]
@@ -841,10 +886,12 @@ def _humanize_channel_step(cells):
     return None
 
 
-# Un rapport ne montre JAMAIS un secret : les arguments nommés sensibles d'une
-# ligne (``password=…``/``passwd=…`` d'`Open Api Session`/`Open Rfc Connection`,
-# ajoutés à la main dans un déroulé mixte) sont masqués dans la ligne affichée.
-# Les recorders eux-mêmes n'émettent jamais de mot de passe (placeholder).
+# Un document généré (rapport HTML, lignes brutes des plans spec/ISTQB) ne
+# montre JAMAIS un secret : les arguments nommés sensibles d'une ligne
+# (``password=…``/``passwd=…`` d'`Open Api Session`/`Open Rfc Connection`,
+# ajoutés à la main dans un déroulé mixte) sont masqués dans la ligne
+# affichée. Les exports EXÉCUTABLES (.robot/.resource) restent fidèles : les
+# recorders eux-mêmes n'émettent jamais de mot de passe (placeholder).
 _SECRET_ARG = re.compile(r"\b(password|passwd)=\S+", re.IGNORECASE)
 
 

@@ -10,12 +10,28 @@ le même esprit que ``scripts/check_vendor_drift.py`` pour le code vendorisé.
 
 ``SAPFX_MCP_FORCE=1`` outrepasse le refus (démarrage en mode dégradé annoncé),
 pour ne jamais bloquer un poste où seul le numéro de version a bougé.
+
+Les plugins, eux, se chargent aussi par entry point dans un serveur ``robotmcp``
+STANDARD, où rien de tout cela ne s'exécute (l'installateur du pack retombe
+d'ailleurs sur ``robotmcp.exe`` quand ``sapfx-mcp.exe`` manque). Cette voie-là
+reçoit :func:`warn_version_once`, un avertissement de version NON bloquant :
+elle ne peut pas sonder les points d'ancrage, puisqu'importer
+``robotmcp.server`` depuis un plugin en cours de chargement PAR ce serveur
+serait circulaire ; la fenêtre de versions, elle, se lit dans les métadonnées.
 """
 from __future__ import annotations
 
 import importlib
 import importlib.metadata
+import logging
 from typing import List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+# Valeurs qui ACTIVENT une échappatoire d'environnement. Un simple test de
+# véracité accepterait « 0 », « false » ou « off », c'est-à-dire exactement ce
+# qu'un exploitant écrit pour dire l'inverse.
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
 
 # Fenêtre de versions rf-mcp validées : [minimum, borne exclue) sur
 # (major, minor). 0.31 est la série contre laquelle chaque point d'ancrage a
@@ -58,27 +74,64 @@ def _major_minor(version: str) -> Optional[Tuple[int, int]]:
         return None
 
 
+def env_flag_enabled(value: Optional[str]) -> bool:
+    """Une échappatoire d'environnement (``SAPFX_MCP_FORCE``) est-elle
+    ACTIVÉE ? Seules les valeurs affirmatives comptent : poser la variable à
+    « 0 » ou « false » pour documenter « ne jamais contourner » ne doit pas
+    produire l'effet exactement inverse."""
+    return (value or "").strip().lower() in _TRUE_VALUES
+
+
+def version_problem() -> Optional[str]:
+    """Écart de VERSION rf-mcp vis-à-vis de la fenêtre validée, ou ``None``.
+
+    Séparé de :func:`check_compat` parce qu'il se lit dans les métadonnées de
+    distribution, sans importer le moindre module rf-mcp : c'est la seule
+    partie du garde utilisable depuis un plugin chargé par entry point."""
+    version = robotmcp_version()
+    if version is None:
+        return ("rf-mcp introuvable (distributions cherchées : %s) ; "
+                "pip install rf-mcp." % ", ".join(_DIST_NAMES))
+    pair = _major_minor(version)
+    if pair is None:
+        return ("version rf-mcp illisible : %r ; fenêtre validée [%d.%d, %d.%d)."
+                % (version, *TESTED_MIN, *TESTED_UPPER))
+    if not (TESTED_MIN <= pair < TESTED_UPPER):
+        return ("rf-mcp %s hors de la fenêtre validée [%d.%d, %d.%d) : "
+                "re-valider les points d'ancrage de la surcouche (field notes "
+                "« Test live agent+MCP » de CLAUDE.md) puis élargir "
+                "sap_robotmcp/_compat.py." % (version, *TESTED_MIN, *TESTED_UPPER))
+    return None
+
+
+def warn_version_once() -> Optional[str]:
+    """Avertit UNE fois (log WARNING) si la version rf-mcp est hors fenêtre.
+
+    C'est le filet de la voie entry point : les plugins SAP se chargent dans
+    n'importe quel serveur rf-mcp, y compris le ``robotmcp`` standard, qui
+    n'exécute jamais le refus au démarrage de la surcouche. Non bloquant à
+    dessein : refuser ici ferait tomber un serveur qui, lui, n'a rien demandé.
+    Retourne le message émis (``None`` si tout va bien ou si déjà averti)."""
+    global _WARNED_ONCE
+    if _WARNED_ONCE:
+        return None
+    _WARNED_ONCE = True
+    problem = version_problem()
+    if problem:
+        logger.warning("[sapfx] compatibilité rf-mcp : %s", problem)
+    return problem
+
+
+_WARNED_ONCE = False
+
+
 def check_compat() -> List[str]:
     """Retourne la liste des problèmes de compatibilité (vide si tout est là)."""
     problems: List[str] = []
 
-    version = robotmcp_version()
-    if version is None:
-        problems.append(
-            "rf-mcp introuvable (distributions cherchées : %s) ; "
-            "pip install rf-mcp." % ", ".join(_DIST_NAMES))
-    else:
-        pair = _major_minor(version)
-        if pair is None:
-            problems.append(
-                "version rf-mcp illisible : %r ; fenêtre validée [%d.%d, %d.%d)."
-                % (version, *TESTED_MIN, *TESTED_UPPER))
-        elif not (TESTED_MIN <= pair < TESTED_UPPER):
-            problems.append(
-                "rf-mcp %s hors de la fenêtre validée [%d.%d, %d.%d) : "
-                "re-valider les points d'ancrage de la surcouche (field notes "
-                "« Test live agent+MCP » de CLAUDE.md) puis élargir "
-                "sap_robotmcp/_compat.py." % (version, *TESTED_MIN, *TESTED_UPPER))
+    problem = version_problem()
+    if problem:
+        problems.append(problem)
 
     for module_name, attrs in _ANCHORS:
         try:

@@ -114,15 +114,17 @@ class GridKeywords:
             )
         return self.get_cell_value_by_column_title(table_id, row, target_title)
 
-    def read_full_grid(self, table_id, page_step=None, max_rows=None):
+    def read_full_grid(self, table_id, page_step=None, max_rows=None,
+                       columns=None):
         """Comme `Read Grid` mais **fait défiler** la grille pour forcer le chargement
         différé de toutes les lignes avant de lire.
 
         SAP ne matérialise les lignes d'une ALV GridView qu'au fur et à mesure du
         défilement. On parcourt donc la grille par fenêtres de ``VisibleRowCount``
         (ou ``page_step`` si fourni) en repositionnant ``FirstVisibleRow``, puis on
-        lit l'ensemble. ``max_rows`` plafonne le total lu (journalisé). Restaure la
-        position de défilement initiale à la fin."""
+        lit l'ensemble. ``max_rows`` plafonne le total lu (journalisé) ;
+        ``columns`` restreint la lecture à des colonnes TECHNIQUES (voir
+        `Read Grid`). Restaure la position de défilement initiale à la fin."""
         grid = self._grid(table_id)
         total = grid.RowCount
         if max_rows is not None:
@@ -139,15 +141,24 @@ class GridKeywords:
             grid.FirstVisibleRow = original
         except com_error:
             pass
-        return self.read_grid(table_id, max_rows=max_rows)
+        return self.read_grid(table_id, max_rows=max_rows, columns=columns)
 
-    def read_grid(self, table_id, max_rows=None):
+    def read_grid(self, table_id, max_rows=None, columns=None):
         """Lit une grille ALV dans une liste de dicts ``[{column_title: value, ...}]``.
 
         Seules les lignes actuellement chargées sont lues ; SAP charge les grilles
         en différé, donc pour les grandes tables faites défiler/paginer d'abord
         (voir `Scroll`) ou passez un plafond ``max_rows``. Le plafond est journalisé
         pour qu'une lecture tronquée ne soit jamais confondue avec une lecture complète.
+
+        ``columns`` (liste d'ids TECHNIQUES, ``CARRID``… ; une valeur seule est
+        acceptée) restreint la lecture à ces colonnes et fait des ids techniques
+        les clés des dicts : indépendant de la locale ET du profil d'affichage
+        ALV de l'utilisateur (les titres affichés n'égalent les ids techniques
+        que quand le profil montre les noms de champs), et beaucoup moins
+        d'appels COM quand la grille est large. Colonne inconnue = échec
+        listant les colonnes disponibles. Sans ``columns``, les clés restent
+        les titres affichés (comportement historique).
         """
         grid = self._grid(table_id)
         row_count = grid.RowCount
@@ -157,10 +168,24 @@ class GridKeywords:
                 % (table_id, row_count, max_rows)
             )
             row_count = int(max_rows)
-        columns = [(cid, grid.GetDisplayedColumnTitle(cid)) for cid in grid.ColumnOrder]
+        if columns:
+            if isinstance(columns, str):
+                columns = [columns]
+            wanted = [str(c).strip() for c in columns if str(c).strip()]
+            available = [str(cid) for cid in grid.ColumnOrder]
+            missing = [c for c in wanted if c not in available]
+            if missing:
+                self.take_screenshot()
+                raise ValueError(
+                    "Grid '%s' has no technical column(s) %s. Available: %s"
+                    % (table_id, ", ".join(missing), ", ".join(available)))
+            pairs = [(cid, cid) for cid in wanted]
+        else:
+            pairs = [(cid, grid.GetDisplayedColumnTitle(cid))
+                     for cid in grid.ColumnOrder]
         rows = []
         for row in range(row_count):
-            rows.append({title: grid.GetCellValue(row, cid) for cid, title in columns})
+            rows.append({key: grid.GetCellValue(row, cid) for cid, key in pairs})
         return rows
 
     def read_abap_list(self):

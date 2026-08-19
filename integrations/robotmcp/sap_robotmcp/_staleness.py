@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import sys
 import time
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 # Préfixes de modules surveillés : les quatre paquets SAPFX + les plugins
 # eux-mêmes (une modification de sap_robotmcp exige tout autant un redémarrage).
@@ -63,3 +63,18 @@ def staleness_warning(prefixes: Iterable[str] = WATCHED_PREFIXES,
         "process : cette session utilise encore l'ANCIENNE version. "
         "Redémarrer le serveur rf-mcp avant de diagnostiquer quoi que ce soit."
         % ", ".join(names))
+
+
+def attach_staleness(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Joint l'avertissement à une réponse de state provider, s'il y a lieu.
+    Retourne ``payload`` (chaînable).
+
+    Le geste est le MÊME sur chaque sortie de chaque provider (page source,
+    état applicatif, et jusqu'à l'assemblage de la surcouche) : le factoriser
+    ici est ce qui garantit qu'un nouveau chemin de sortie ne l'oublie pas, et
+    qu'un changement de clé ou de condition d'émission n'ait qu'un seul point
+    d'application."""
+    warning = staleness_warning()
+    if warning:
+        payload["stale_code_warning"] = warning
+    return payload

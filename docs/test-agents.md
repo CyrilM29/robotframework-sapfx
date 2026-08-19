@@ -126,6 +126,20 @@ commit gestures », never as an authorization boundary: the SAP user's
 permissions remain the real one (see the security notes in
 [mcp-integration.md](mcp-integration.md)).
 
+**Release confidence score (beyond the diagnosis sap-healer already does).**
+Lead identified via competitive watch (2026-08-18, Testsigma: an agentic
+pipeline that generates, runs, heals and diagnoses tests, then scores release
+confidence). Diagnosis already exists in good part: sap-healer classifies
+every failure (locator drift / timing / data / functional change) before
+repairing it. What's missing sits elsewhere: an aggregated confidence
+indicator at the release level (not the test level), built from the healing
+history (`SAPFX_HEALING_LOG`), the drift telemetry
+(`healing_drift_report.py`) and red/green suite results, to answer "can we
+ship". Cyril calls it the "5th agent" (after planner, generator, healer,
+istqb). Not instructed yet: no feasibility analysis, no decision between a
+separate agent vs. extending `/sap-maintain` or the `healing_drift_report.py`
+report, which already aggregates part of the raw material.
+
 `specs/sflight-consultation-se16.md` is the reference plan example; it matches
 the flow already live-validated by `tests/robot/ecc_data_smoke.robot`.
 

@@ -6,6 +6,7 @@ Documentation       Mots-clés ECC lisibles métier, construits sur SapEccLibrar
 ...                 trouve dans `fiori_keywords.resource` (phase 2), afin qu'un test
 ...                 soit lisible de la même façon quelle que soit l'interface sous-jacente.
 
+Library             Collections
 Library             SapEccLibrary    screenshots_on_error=${True}    default_timeout=30s
 
 
@@ -252,33 +253,38 @@ Read Column Values From Displayed Grid
 
 Try Open Table Selection Screen
     [Documentation]    Ouvre SE16 sur ``${table}`` et tente d'atteindre l'écran de
-    ...                sélection. Retourne ``True`` si l'écran s'ouvre, ``False`` si
-    ...                SE16 rejette le nom : message de statut de type ``E``
-    ...                (structure, include ou table inconnue) ; l'assertion porte sur
-    ...                le *type*, jamais sur le texte localisé. Gère le dialogue
-    ...                « choix des champs de sélection » des tables larges
-    ...                (> 40 champs) : la première case est repérée dynamiquement
-    ...                via `Get Screen Signature` (sa position dépend de la table).
+    ...                sélection. Retourne ``True`` si l'écran s'ouvre, ``False``
+    ...                sinon : nom rejeté par un message de statut de type ``E``
+    ...                (structure, include ou table inconnue) OU par un dialogue de
+    ...                message modal. L'assertion porte sur le *type* et la
+    ...                STRUCTURE de l'écran, jamais sur un texte localisé.
+    ...                Le pilotage (popup « choix des champs de sélection » des
+    ...                tables larges, dialogue de message de génération d'écran,
+    ...                attente de l'écran généré) vit dans le keyword de
+    ...                bibliothèque `Reach Se16 Selection Screen` : UNE seule copie
+    ...                de cette logique, partagée avec le canal DDIC. Le verdict
+    ...                détaillé est journalisé et disponible via
+    ...                `Reach Table Selection Screen` pour qui doit distinguer
+    ...                ``rejected`` de ``dialog``.
     ...                Referme d'abord toute modale résiduelle d'une sonde
     ...                précédente : le keyword reste sûr en balayage de masse.
     [Arguments]    ${table}
+    ${state}=    Reach Table Selection Screen    ${table}
+    RETURN    ${state}[reached]
+
+Reach Table Selection Screen
+    [Documentation]    Comme `Try Open Table Selection Screen` mais retourne le
+    ...                VERDICT complet (dict) : ``reached``, ``verdict``
+    ...                (``reached`` | ``rejected`` | ``dialog`` | ``modal``),
+    ...                ``message_type``, ``status_text`` et ``dialog_text``. À
+    ...                utiliser quand un balayage doit distinguer « structure
+    ...                rejetée en type E » d'un « rejet par dialogue de message »
+    ...                (les textes ne servent qu'au journal, jamais aux assertions).
+    [Arguments]    ${table}
     Cancel Popup
-    Go To Transaction    SE16
-    Input Text    ${SE16_TABLE_FIELD}    ${table}
-    Send Vkey    0
-    Wait Until Busy Done
-    ${type}    ${text}=    Get Status Message
-    IF    '${type}' == 'E'    RETURN    ${False}
-    ${popup}=    Popup Is Present
-    IF    ${popup}
-        ${sig}=    Get Screen Signature
-        ${chk}=    Evaluate    next((l.split(chr(9))[0][2:] for l in $sig.splitlines() if l.startswith('* wnd[1]/usr/chk')), '')
-        IF    $chk    Select Checkbox    ${chk}
-        Send Vkey    0    window=1
-        Wait Until Busy Done
-    END
-    Wait Until Element Present    ${SE16_MAX_HITS_FIELD}
-    RETURN    ${True}
+    ${state}=    Reach Se16 Selection Screen    ${table}
+    Log    SE16 '${table}' : verdict=${state}[verdict] type=${state}[message_type]
+    RETURN    ${state}
 
 Open Table Selection Screen
     [Documentation]    Comme `Try Open Table Selection Screen` mais échoue si SE16
@@ -353,10 +359,12 @@ Read Domain Values
 
 List Repository Tables
     [Documentation]    Inventaire du référentiel (table ``TADIR``) : noms des objets
-    ...                ``R3TR TABL`` filtrés par package (``DEVCLASS``) et/ou motif
-    ...                de nom (joker ``*``). Retourne une liste triée, vide si aucun
-    ...                objet ne répond. NB : TADIR ne distingue pas tables
-    ...                transparentes et structures : combiner avec
+    ...                ``R3TR ${object_type}`` (``TABL`` par défaut, ``VIEW`` pour
+    ...                les vues : la découverte n'est plus aveugle aux vues) filtrés
+    ...                par package (``DEVCLASS``) et/ou motif de nom (joker ``*``).
+    ...                Retourne une liste triée, vide si aucun objet ne répond.
+    ...                NB : TADIR ne distingue pas tables transparentes et
+    ...                structures : joindre DD02L (`Classify Ddic Objects`) ou
     ...                `Try Open Table Selection Screen` pour écarter ces dernières.
     ...
     ...                Lève si le nombre de lignes lues atteint exactement ``max_hits``
@@ -367,9 +375,9 @@ List Repository Tables
     ...                ``max_hits``, ou passez ``allow_truncation=True`` pour accepter
     ...                explicitement un résultat potentiellement incomplet.
     [Arguments]    ${package}=${EMPTY}    ${name_pattern}=${EMPTY}    ${max_hits}=500
-    ...    ${allow_truncation}=False
+    ...    ${allow_truncation}=False    ${object_type}=TABL
     Open Table Selection Screen    TADIR
-    Input Text    ${TADIR_OBJECT_FIELD}    TABL
+    Input Text    ${TADIR_OBJECT_FIELD}    ${object_type}
     IF    $name_pattern    Input Text    ${TADIR_OBJ_NAME_FIELD}    ${name_pattern}
     IF    $package    Input Text    ${TADIR_DEVCLASS_FIELD}    ${package}
     Input Text    ${SE16_MAX_HITS_FIELD}    ${max_hits}
@@ -389,6 +397,34 @@ List Repository Tables
     END
     ${names}=    Evaluate    sorted({r["OBJ_NAME"] for r in $rows})
     RETURN    ${names}
+
+Discover DDIC Objects By Scope
+    [Documentation]    Découverte bornée des objets DDIC d'un périmètre validé
+    ...                (voir `Validate Ddic Scope`) : pour chaque package puis
+    ...                chaque préfixe, interroge TADIR pour chacun des types
+    ...                d'objets du périmètre (``scope[object_types]``, ``TABL``
+    ...                et ``VIEW`` par défaut : les vues sont découvertes ;
+    ...                surchargables par les arguments variables), fait l'union
+    ...                dédoublonnée et triée, applique ``max_objects``.
+    ...                Retourne ``[noms, truncated]`` : une borne atteinte est
+    ...                toujours visible, jamais un succès silencieux.
+    [Arguments]    ${scope}    @{object_types}
+    IF    not $object_types
+        ${object_types}=    Evaluate    $scope.get("object_types") or ["TABL", "VIEW"]
+    END
+    ${groups}=    Create List
+    FOR    ${object_type}    IN    @{object_types}
+        FOR    ${package}    IN    @{scope}[packages]
+            ${names}=    List Repository Tables    package=${package}    object_type=${object_type}
+            Append To List    ${groups}    ${names}
+        END
+        FOR    ${prefix}    IN    @{scope}[prefixes]
+            ${names}=    List Repository Tables    name_pattern=${prefix}*    object_type=${object_type}
+            Append To List    ${groups}    ${names}
+        END
+    END
+    ${names}    ${truncated}=    Merge Ddic Name Lists    ${groups}    ${scope}[max_objects]
+    RETURN    ${names}    ${truncated}
 
 Run Report
     [Documentation]    Ouvre SE38 et lance le programme ABAP ``${report}`` (F8) ;

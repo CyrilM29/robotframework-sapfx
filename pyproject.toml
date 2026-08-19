@@ -1,14 +1,25 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+# Plancher à 77 : la version qui comprend l'expression SPDX `license` et
+# `license-files` de PEP 639 (section [project]). Pas de borne haute, et c'est
+# justement pourquoi les deux formes DÉPRÉCIÉES (`license = { text = … }` et le
+# classifieur « License :: OSI Approved ») ont été retirées : elles nous
+# laissaient à la merci de la release de setuptools qui les supprimerait.
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "robotframework-sapfx"
-version = "0.6.6"
+version = "0.6.7"
 description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+# Expression SPDX + fichiers de licence (PEP 639), à la place de
+# `license = { text = … }` et du classifieur « License :: OSI Approved », tous
+# deux dépréciés depuis setuptools 77 (et mutuellement exclusifs avec une
+# expression). `NOTICE` porte l'attribution de l'upstream vendorisé : il est
+# nommé ici, pas seulement ramassé par le glob par défaut.
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
 keywords = [
     "robotframework", "robot-framework", "test-automation", "testing", "qa",
@@ -35,9 +46,19 @@ classifiers = [
     # Le canal SAP GUI (COM/pywin32) est Windows ; les canaux Fiori et API,
     # eux, n'ont pas cette contrainte. On ne déclare que ce qui est VALIDÉ.
     "Operating System :: Microsoft :: Windows",
-    "License :: OSI Approved :: Apache Software License",
 ]
 # Core needs Robot Framework; pywin32 (ECC/SAP GUI) only installs on Windows.
+#
+# Politique de bornes, explicite parce qu'elle est ASYMÉTRIQUE et que ça se
+# remarque : une borne haute n'est posée que là où une majeure casserait en
+# SILENCE (l'extra `web`, ci-dessous, où SapFioriLibrary vise des chemins
+# internes de Browser). Robot Framework, lui, casserait BRUYAMMENT, et une
+# borne haute sur un socle aussi central interdirait à nos consommateurs de
+# migrer avant nous : le plancher dit ce dont on a besoin (le type `Secret` de
+# 7.4), et la version RÉELLEMENT qualifiée ensemble vit dans
+# `packaging/constraints-deploy.txt`, pas ici. Même raisonnement que le
+# plancher `pywin32>=305` face au pin exact des fichiers d'environnement
+# (convention #6).
 dependencies = [
     "robotframework>=7.4",
     "pywin32>=305; platform_system=='Windows'",
@@ -45,7 +66,15 @@ dependencies = [
 
 [project.optional-dependencies]
 # Fiori / web side. Run `rfbrowser init` after install to fetch Playwright browsers.
-web = ["robotframework-browser>=20.0"]
+# Borne haute assumée : SapFioriLibrary importe des chemins INTERNES de Browser
+# (`Browser.utils.data_types` : ScreenshotReturnType, ElementState) parce que
+# l'appel Python direct via `get_library_instance` court-circuite la conversion
+# d'arguments de Robot. Le repli sur ImportError repasserait l'état en chaîne,
+# exactement le cas qui a produit le KeyError attrapé live sur le smoke hybride :
+# une majeure qui déplacerait ce module ne casserait donc pas à l'import, elle
+# réintroduirait le bug en silence. Relever la borne = re-qualifier ces deux
+# imports (et le pack épingle la version qualifiée dans constraints-deploy.txt).
+web = ["robotframework-browser>=20.0,<21"]
 # Visual assertions (Screen Should Match Baseline): Pillow decodes the PNG at
 # the boundary; the perceptual-hash core itself is stdlib-pure.
 visual = ["Pillow>=10.0"]
@@ -90,20 +119,24 @@ extend-exclude = ["src/SapEccLibrary/_vendor", "_upstream", "_pwsap", "_cap-sfli
 
 [tool.mypy]
 python_version = "3.10"
-# Base de code historique encore majoritairement non annotée (fork upstream) :
-# on n'exige pas des annotations partout d'un coup, on type progressivement
-# module par module (sapfx_common, _ui5_runtime en premier : voir CLAUDE.md
-# "Status / next steps") et mypy suit ce même périmètre.
-files = ["src/sapfx_common", "src/SapApiLibrary",
-        "src/SapEccLibrary/SapEccLibrary.py",
-        "src/SapFioriLibrary/SapFioriLibrary.py",
-        "src/SapFioriLibrary/_ui5_runtime.py",
-        "integrations/robotmcp/sap_robotmcp/_last_seen.py",
-        "integrations/robotmcp/sap_robotmcp/_rf_context.py",
-        "integrations/robotmcp/sap_robotmcp/_filtering.py",
-        "integrations/robotmcp/sap_robotmcp/_staleness.py",
-        "integrations/robotmcp/sap_robotmcp/_compat.py",
-        "integrations/robotmcp/sap_robotmcp/_overlay.py"]
+# Le typage progressif (module par module : sapfx_common et _ui5_runtime en
+# premier) a fini par couvrir tout l'arbre : le périmètre est donc TOUT ce qui
+# est livré, `_vendor/` excepté (convention 4 : upstream tel quel, on ne le
+# corrige pas). Ce n'est pas une exigence d'annotations partout (les réglages
+# restent non stricts), c'est la contrepartie du marqueur `py.typed` livré dans
+# les quatre paquets : ce qui est publié comme typé est vérifié.
+# `tools/recorder` et `tools/recorder_web` sont LIVRÉS dans le pack Windows :
+# du code livré est du code vérifié, au même titre que `src/`. Le périmètre
+# nomme les deux arbres plutôt que `tools`, qui peut abriter des copies
+# locales non suivies (elles échoueraient chez l'un et passeraient en CI).
+# Même règle pour `scripts/` : les DEUX scripts que le pack embarque
+# (maintenance préventive et garde spec/suite) sont du code livré, donc
+# vérifié. Le reste de `scripts/` est de l'outillage de dépôt, tenu par ruff
+# et par ses tests unitaires.
+files = ["src", "integrations/robotmcp/sap_robotmcp",
+         "tools/recorder", "tools/recorder_web",
+         "scripts/healing_drift_report.py", "scripts/check_spec_sync.py"]
+exclude = ["^src/SapEccLibrary/_vendor/"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]

@@ -8,6 +8,7 @@ import json
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 
 import pytest
 from robot.api.types import Secret
@@ -103,9 +104,42 @@ def test_url_composee_avec_options_systeme_et_sap_client():
     lib.get_odata("/sap/opu/odata/sap/SRV/Products", top="5", filter="Price gt 1")
     url = lib.requests_seen[0].full_url
     assert url.startswith("http://host:50000/sap/opu/odata/sap/SRV/Products?")
-    assert "%24top=5" in url and "%24filter=Price+gt+1" in url
+    assert "%24top=5" in url and "%24filter=Price%20gt%201" in url
     assert "sap-client=001" in url
     assert lib.requests_seen[0].get_header("Authorization", "").startswith("Basic ")
+
+
+def test_espaces_de_query_encodes_en_pourcent_20_jamais_en_plus():
+    """Un `$filter` contient toujours des espaces. Encodés « à la formulaire
+    HTML » (`+`), ils passent sur une Gateway SAP v2 mais font échouer un
+    service OData v4 en HTTP 400 : constaté live contre CAP, qui répond
+    « Expected "(", "/", or a whitespace but "+" found »."""
+    lib = _lib_with([_json_response({"value": []})])
+    lib.open_api_session("http://host:4004")
+    lib.get_odata("/processor/Travel", filter="TravelID eq 1 and BookingFee gt 0")
+    url = lib.requests_seen[0].full_url
+    assert "+" not in url, url
+    assert "%24filter=TravelID%20eq%201%20and%20BookingFee%20gt%200" in url
+
+
+def test_encodage_de_query_ne_change_que_l_espace():
+    """Corollaire du test précédent, et garde-fou de non-régression : le
+    correctif est délibérément limité au caractère fautif. Sur tout le reste
+    l'encodage doit rester IDENTIQUE à celui, éprouvé, qui était servi aux
+    Gateway en production. `urlencode` encode déjà un vrai `+` en `%2B`, donc
+    remplacer les `+` restants par `%20` décrit exactement l'écart attendu."""
+    params = {"filter": "Name eq 'A B' and Qty gt 1",
+              "select": "Id,Name", "expand": "to_Supplier/Address",
+              "search": "a+b & c=d"}
+    lib = _lib_with([_json_response({"value": []})])
+    lib.open_api_session("http://host:50000")
+    lib.get_odata("/SRV/Products", **params)
+    query = lib.requests_seen[0].full_url.split("?", 1)[1]
+    historique = urllib.parse.urlencode(
+        [("$" + k if k in SapApiLibrary._SYSTEM_QUERY else k, v)
+         for k, v in params.items()])
+    assert query == historique.replace("+", "%20")
+    assert "+" not in query
 
 
 def test_secret_est_deballe_uniquement_dans_l_entete_basic():
@@ -206,6 +240,21 @@ def test_post_odata_applique_le_protocole_csrf():
     assert fetch.get_header("X-csrf-token") == "Fetch"
     assert post.get_header("X-csrf-token") == "TOK123"
     assert post.data == json.dumps({"Name": "X"}).encode("utf-8")
+
+
+def test_post_odata_lit_le_token_csrf_quelle_que_soit_la_casse_de_l_en_tete():
+    # Les en-têtes HTTP sont insensibles à la casse et ``dict(response.headers)``
+    # conserve la casse ENVOYÉE : un relais qui répond ``X-Csrf-Token`` ne doit
+    # pas faire tomber le token à vide (l'écriture partirait sans token et le
+    # 403 qui suit se lirait comme une interdiction).
+    lib = _lib_with([
+        _json_response({}, headers={"X-Csrf-Token": "TOK123"}),   # fetch
+        _json_response({"d": {"Id": "NEW"}}, status=201),          # post
+    ])
+    lib.open_api_session("http://h")
+    lib.post_odata("/Products", {"Name": "X"})
+    _, post = lib.requests_seen
+    assert post.get_header("X-csrf-token") == "TOK123"
 
 
 def test_post_odata_204_retourne_dict_vide_et_token_reutilise():
@@ -393,6 +442,75 @@ def test_post_odata_403_sans_csrf_remonte_sans_rejeu():
     assert len(lib.requests_seen) == 2   # aucun rejeu aveugle
 
 
+def test_post_odata_rejoue_sur_403_avec_en_tete_csrf_required():
+    # Le juge fiable du protocole SAP : l'en-tête x-csrf-token: Required de la
+    # réponse, même quand le corps ne prononce jamais « csrf ».
+    expired = urllib.error.HTTPError(
+        "http://h/A", 403, "Forbidden",
+        {"x-csrf-token": "Required"}, io.BytesIO(b"Access denied"))
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "OLD"}),
+        expired,
+        _json_response({}, headers={"x-csrf-token": "NEW"}),
+        _json_response({"d": {"Id": "OK"}}, status=201),
+    ])
+    lib.open_api_session("http://h")
+    assert lib.post_odata("/A", {"k": 1})["d"]["Id"] == "OK"
+    assert lib.requests_seen[3].get_header("X-csrf-token") == "NEW"
+
+
+def test_post_odata_403_en_tete_non_required_remonte_meme_si_le_texte_dit_csrf():
+    # Un 403 dont l'en-tête x-csrf-token porte un token (pas « Required »)
+    # est une interdiction réelle : pas de rejeu, même si le corps dit csrf.
+    denied = urllib.error.HTTPError(
+        "http://h/A", 403, "Forbidden",
+        {"x-csrf-token": "abc123"}, io.BytesIO(b"CSRF protection: forbidden"))
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        denied,
+    ])
+    lib.open_api_session("http://h")
+    with pytest.raises(AssertionError, match="403"):
+        lib.post_odata("/A", {"k": 1})
+    assert len(lib.requests_seen) == 2
+
+
+def test_post_odata_rejoue_sur_403_dont_le_relais_a_vide_l_en_tete_csrf():
+    """Un relais peut transmettre ``x-csrf-token:`` SANS valeur. L'en-tête
+    présent mais vide n'est plus un signal : sans repli sur le texte, une
+    écriture qui se rétablissait seule après le timeout Gateway (~30 min)
+    échouerait désormais définitivement."""
+    expired = urllib.error.HTTPError(
+        "http://h/A", 403, "Forbidden",
+        {"x-csrf-token": "  "}, io.BytesIO(b"CSRF token validation failed"))
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "OLD"}),
+        expired,
+        _json_response({}, headers={"x-csrf-token": "NEW"}),
+        _json_response({"d": {"Id": "OK"}}, status=201),
+    ])
+    lib.open_api_session("http://h")
+    assert lib.post_odata("/A", {"k": 1})["d"]["Id"] == "OK"
+    assert lib.requests_seen[3].get_header("X-csrf-token") == "NEW"
+
+
+def test_post_odata_rejoue_sur_un_required_decore_par_un_relais():
+    """« Required; expired » reste un Required : la valeur est lue sur son
+    PREMIER mot, pas comparée à l'identique."""
+    expired = urllib.error.HTTPError(
+        "http://h/A", 403, "Forbidden",
+        {"x-csrf-token": "Required; expired"}, io.BytesIO(b"Access denied"))
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "OLD"}),
+        expired,
+        _json_response({}, headers={"x-csrf-token": "NEW"}),
+        _json_response({"d": {"Id": "OK"}}, status=201),
+    ])
+    lib.open_api_session("http://h")
+    assert lib.post_odata("/A", {"k": 1})["d"]["Id"] == "OK"
+    assert lib.requests_seen[3].get_header("X-csrf-token") == "NEW"
+
+
 # --- CRUD complet : PATCH / DELETE ---------------------------------------------------
 
 def test_patch_odata_applique_csrf_et_if_match():
@@ -474,6 +592,22 @@ def test_get_odata_entities_pagination_v4_relative_au_service():
     assert lib.requests_seen[1].full_url.startswith("http://h/svc/A?")
 
 
+def test_pagination_ne_double_pas_le_sap_client_deja_porte_par_le_lien():
+    # Le lien de page suivante est fabriqué par le SERVEUR et reconduit en
+    # général les options de la requête d'origine, sap-client compris : le
+    # réajouter donnerait sap-client=001&sap-client=001.
+    page1 = {"d": {"results": [{"Id": "1"}],
+                   "__next": "http://h/svc/A?$skiptoken=2&sap-client=001"}}
+    page2 = {"d": {"results": [{"Id": "2"}]}}
+    lib = _lib_with([_json_response(page1), _json_response(page2)])
+    lib.open_api_session("http://h", sap_client="001")
+    lib.get_odata_entities("/svc/A", follow_next=True)
+    next_url = lib.requests_seen[1].full_url
+    assert next_url.count("sap-client=") == 1
+    # ...et le paramètre reste ajouté quand le lien ne le porte PAS.
+    assert lib.requests_seen[0].full_url.count("sap-client=001") == 1
+
+
 def test_pagination_tronquee_est_annoncee(monkeypatch):
     warnings = []
     api_module = importlib.import_module("SapApiLibrary.SapApiLibrary")
@@ -518,6 +652,42 @@ def test_post_odata_track_relativise_une_origine_etrangere():
     lib.open_api_session("http://h")
     lib.post_odata("/svc/Products", {"Id": "9"}, track=True)
     assert lib.get_created_entities() == ["/svc/Products('9')"]
+
+
+def test_post_odata_track_resout_un_location_relatif_au_service():
+    """Un service OData v4 renvoie un `Location` relatif au SERVICE
+    (`Travel.drafts('…')`, constaté live sur CAP, sans `@odata.id`). Résolu
+    contre la base de session il perdait `/processor`, la suppression partait
+    sur la racine (404) et la donnée restait : `Delete Created Entities`
+    rendait un rapport en échec alors que le `$count` des entités actives,
+    lui, semblait restauré."""
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _json_response({"TravelUUID": "u1"}, status=201,
+                       headers={"Location": "Travel.drafts('u1')"}),
+    ])
+    lib.open_api_session("http://h:4004")
+    lib.post_odata("/processor/Travel", {}, track=True)
+    assert lib.get_created_entities() == [
+        "http://h:4004/processor/Travel.drafts('u1')"]
+
+
+def test_post_odata_track_puis_suppression_vise_bien_le_service():
+    """Bout en bout du cas précédent : l'URI suivie est celle que le DELETE
+    doit atteindre, préfixe de service compris."""
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _json_response({"TravelUUID": "u1"}, status=201,
+                       headers={"Location": "Travel.drafts('u1')"}),
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _FakeResponse(b"", status=204),
+    ])
+    lib.open_api_session("http://h:4004")
+    lib.post_odata("/processor/Travel", {}, track=True)
+    report = lib.delete_created_entities()
+    assert report["failed"] == []
+    assert lib.requests_seen[-1].full_url == (
+        "http://h:4004/processor/Travel.drafts('u1')")
 
 
 def test_delete_created_entities_lifo_et_rapport():

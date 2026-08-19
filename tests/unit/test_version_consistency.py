@@ -21,6 +21,7 @@ _PYPROJECTS = [
 _PACKAGE_INITS = [
     os.path.join("src", "SapEccLibrary", "__init__.py"),
     os.path.join("src", "SapFioriLibrary", "__init__.py"),
+    os.path.join("src", "SapApiLibrary", "__init__.py"),
     os.path.join("src", "sapfx_common", "__init__.py"),
     # attributs de CLASSE (version affichée par Robot pour la lib) : SapEccLibrary
     # resté à 0.2.5 pendant la 0.3.0, puis SapFioriLibrary resté à 0.2.5 pendant

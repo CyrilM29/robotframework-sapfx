@@ -58,17 +58,66 @@ def test_structured_contract_accepts_an_empty_list_as_a_real_value(monkeypatch):
 
 
 def test_structured_contract_falls_back_to_the_text_output(monkeypatch):
-    _patch_manager(monkeypatch, {"success": True, "result": None, "output": "SE16"})
+    # Réponse SANS clé ``result`` (forme défensive / rf-mcp ancien) : la sortie
+    # texte fait alors foi.
+    _patch_manager(monkeypatch, {"success": True, "output": "SE16"})
     out = run_keyword_in_context(_FakeSession(), "Get Current Transaction",
                                  allow_structured=True)
     assert out == "SE16"
 
 
 def test_structured_contract_flags_a_truly_empty_return(monkeypatch):
-    _patch_manager(monkeypatch, {"success": True, "result": None, "output": None})
+    """Forme RÉELLE d'un keyword qui ne retourne rien : rf-mcp met ``result``
+    à ``None`` et écrit la chaîne "OK" dans ``output`` (deux sites de retour de
+    son rf_native_context_manager).
+
+    Le garde doit voir un retour vide, PAS servir "OK" : une section d'état
+    indisponible arrivait sinon à l'agent sous la forme d'un franc « OK »,
+    indistinguable d'une vraie valeur."""
+    _patch_manager(monkeypatch, {"success": True, "result": None, "output": "OK"})
     with pytest.raises(RuntimeError, match="sortie vide"):
         run_keyword_in_context(_FakeSession(), "Get Open Windows",
                                allow_structured=True)
+
+
+def test_la_sentinelle_ok_ne_passe_pas_pour_une_valeur(monkeypatch):
+    # Même sans clé ``result`` (repli), la sentinelle "OK" reste un retour vide.
+    _patch_manager(monkeypatch, {"success": True, "output": "OK"})
+    with pytest.raises(RuntimeError, match="sortie vide"):
+        run_keyword_in_context(_FakeSession(), "Get Open Windows",
+                               allow_structured=True)
+
+
+def test_un_keyword_qui_retourne_vraiment_ok_est_servi(monkeypatch):
+    # Contre-épreuve : "OK" RETOURNÉ par le keyword arrive dans ``result``, et
+    # la sentinelle ne doit pas l'effacer.
+    _patch_manager(monkeypatch, {"success": True, "result": "OK", "output": "OK"})
+    assert run_keyword_in_context(_FakeSession(), "Get Status Message",
+                                  allow_structured=True) == "OK"
+
+
+def test_le_contrat_texte_refuse_aussi_la_sentinelle(monkeypatch):
+    _patch_manager(monkeypatch, {"success": True, "result": None, "output": "OK"})
+    with pytest.raises(RuntimeError, match="sortie vide"):
+        run_keyword_in_context(_FakeSession(), "Get Screen Signature")
+
+
+def test_le_saut_com_est_saute_sur_un_canal_sans_com(monkeypatch):
+    """Les canaux Fiori (CDP) et API (HTTP) n'ont aucun objet COM : y appeler
+    ``CoInitialize`` fait entrer durablement en appartement STA chaque worker
+    frais du pool de threads, sans jamais de ``CoUninitialize``, pour rien."""
+    import sap_robotmcp._rf_context as module
+
+    appels = []
+    monkeypatch.setattr(module, "ensure_com_initialized",
+                        lambda: appels.append("com"))
+    _patch_manager(monkeypatch, {"success": True, "result": "SE16"})
+    run_keyword_in_context(_FakeSession(), "Get Current Transaction",
+                           allow_structured=True)
+    assert appels == ["com"]
+    run_keyword_in_context(_FakeSession(), "Get Ui5 Frame Stack",
+                           allow_structured=True, needs_com=False)
+    assert appels == ["com"]
 
 
 def test_rf_failure_surfaces_the_real_reason(monkeypatch):

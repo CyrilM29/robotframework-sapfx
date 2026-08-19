@@ -16,22 +16,25 @@ Nous ne cherchons **pas** à unifier ces deux mondes en dessous. Nous les unifio
 Framework, où un keyword constitue l'abstraction :
 
 ```
-                ┌─────────────────────────────────────────────┐
-                │   Tests  (tests/robot/*.robot)               │
-                │   speak business language only               │
-                └───────────────────┬─────────────────────────┘
-                ┌───────────────────┴─────────────────────────┐
-                │  Business keywords (resources/*.resource)    │
-                │  ecc_keywords.resource  +  fiori_keywords*   │  ← unified vocabulary
-                └─────────┬───────────────────────┬───────────┘
-            ┌─────────────▼──────────┐   ┌─────────▼─────────────────┐
-            │  SapEccLibrary (this)  │   │  Browser lib + UI5 helpers │
-            │  COM / win32com        │   │  Playwright (phase 2)      │
-            └─────────┬──────────────┘   └─────────┬─────────────────┘
-       SAP GUI Scripting API                SAPUI5 runtime (sap.ui.*)
-
-  * fiori_keywords.resource is phase 2; the ECC side is implemented now.
+          ┌───────────────────────────────────────────────────────────────┐
+          │   Tests  (tests/robot/**/*.robot)                              │
+          │   speak business language only                                 │
+          └────────────────────────────┬──────────────────────────────────┘
+          ┌────────────────────────────┴──────────────────────────────────┐
+          │  Business keywords (resources/*.resource)                      │
+          │  ecc_keywords  +  fiori_keywords  +  api_keywords              │  ← one vocabulary
+          └───────┬─────────────────┬─────────────────────┬───────────────┘
+      ┌───────────▼────────┐ ┌──────▼─────────────┐ ┌─────▼──────────────┐
+      │  SapEccLibrary     │ │  SapFioriLibrary   │ │  SapApiLibrary     │
+      │  COM / win32com    │ │  + Browser library │ │  stdlib HTTP       │
+      └───────────┬────────┘ └──────┬─────────────┘ └─────┬──────────────┘
+   SAP GUI Scripting API      SAPUI5 runtime (sap.ui.*)   OData v2/v4, RFC
 ```
+
+Les trois canaux sont des pairs : même vocabulaire au-dessus, rien de partagé
+en dessous. Le canal API n'a aucun écran, et c'est bien pour cela qu'il compte :
+la façon la moins coûteuse de préparer ou de recouper des données n'est pas de
+piloter un écran.
 
 Un test se lit de la même façon quel que soit le canal :
 

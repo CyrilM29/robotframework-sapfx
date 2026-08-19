@@ -5,9 +5,553 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
-## [Unreleased]
+## [0.6.7] - 2026-08-19
 
 ### Added
+- **`Get Ui5 Application State` (SapFioriLibrary)**: the web channel's "where
+  am I" in a single call, frame scope plus UI5 runtime plus messages, probing
+  before it reads. It is assembled in the library because through rf-mcp the
+  cost is the Robot Framework context crossing, not the JavaScript: the MCP
+  state provider, which serves this section on every agent turn, now pays one
+  round trip instead of three.
+- **`Ui5 Runtime Is Present` (SapFioriLibrary)**: the probe to run before any
+  keyword that requires a UI5 runtime. It answers True/False and never fails,
+  and it is the only web expression in the repo that does **not** inject the
+  `__SAPFX` bundle, so it does not instrument the application's `fetch` /
+  `XMLHttpRequest` just to look at it. Pages driven by the `wc`, `sid` and
+  `dom` engines are supported targets, not failures, and this is how a caller
+  tells them apart cheaply.
+- **`resources/api_keywords.resource`**: the business-readable layer of the API
+  channel, third mirror of the ECC and Fiori resources (`Open Api Channel`,
+  `Count Business Entities`, `Read Business Entities`, `Create Test Entity`,
+  `Remove Created Test Data`, plus the preflight and perception keywords). It
+  carries the OData service paths under business names, so a suite never spells
+  one out, exactly as SAP ids live in `ecc_keywords.resource`.
+- **`tests/robot/api/canal_api_odata.robot`**: the API channel finally has a
+  suite of its own. It was only ever exercised indirectly, by the two
+  cross-paradigm suites and through a single read keyword each, while the
+  library exposes 33 public keywords: the two defects fixed below lived in
+  precisely that blind spot. The suite runs the same business keywords against
+  two protocols and two systems, OData v2 (tag `a4h`) and OData v4 (tag
+  `capsflight`), which is the property worth testing. Live: 12/12. It also
+  ships in the Windows pack, which now carries seven sample suites instead of
+  six: `resources/api_keywords.resource` was being delivered without a single
+  suite exercising it, so the pack held a business layer that nothing
+  demonstrated and that its own dry run never resolved. The pack dry run goes
+  from 27 to 39.
+
+### Fixed
+- **A `$filter` containing spaces no longer fails against an OData v4
+  service.** Query parameters were encoded the HTML-form way
+  (`application/x-www-form-urlencoded`), so a space became `+`. A SAP Gateway
+  tolerates it, a CAP v4 service rejects it outright with
+  `400 Expected "(", "/", or a whitespace but "+" found`, and a `$filter`
+  always contains spaces (`TravelID eq 1`), so all v4 filtering was inoperative.
+  Spaces are now percent-encoded; the fix is deliberately limited to that one
+  character, so everything already served to Gateways in production is
+  unchanged, and a unit test pins that exact equivalence. The old behaviour was
+  itself pinned by a unit test asserting `%24filter=Price+gt+1`, which is why
+  CI could not see it.
+- **The data factory now deletes what it tracked on an OData v4 service.** The
+  URI a server announces (`Location`, `@odata.id`, `__metadata.uri`) may be
+  relative to the **service**: CAP answers `Location: Travel.drafts('...')`.
+  Resolved against the session base URL it lost its service prefix, so the
+  delete hit the root, returned 404 and left the data behind, while the
+  `$count` of active entities looked restored. A relative URI is now resolved
+  against the request URL, as RFC 3986 requires and as the pagination path
+  already did. When a server announces a URI that is not addressable at all,
+  the warning names `Register Created Entity` as the way out instead of leaving
+  the caller to guess.
+- **The flagship suite's `capsflight` lane runs again.** It opened its OData
+  session with no credentials while the cds mocked-auth also guards the
+  service, so the lane died on HTTP 401 before reaching its assertion, which in
+  turn hid the two defects above. It also read the Travel ID as "the first
+  entirely numeric cell", an assumption the rendered page breaks twice over:
+  the identification column concatenates label and identifier, and the
+  identifier is formatted with a locale-dependent thousands separator. The
+  identifier is now read as the digits following the label, which is the same
+  in every language (convention 3).
+- **A missing state section no longer reaches the agent as a plain "OK".**
+  rf-mcp substitutes the literal string `"OK"` for a keyword that returns
+  `None`, so the "empty output" guard in the RF bridge was unreachable and the
+  section was served as if it held a value. The bridge now reads `result` as
+  authoritative and neutralises that sentinel; the unit test that covered it
+  asserted a response shape rf-mcp never emits.
+- **The Fiori application state stopped reporting supported pages as broken.**
+  It called `Get Ui5 Messages` unconditionally, and that keyword fails hard
+  outside a UI5 runtime, so every `sapfx_state` turn on a Web Components,
+  WebGUI or hybrid page carried a permanent collection error, plus a wasted
+  round trip. The runtime is probed first; the section is then reported as
+  `not_applicable`, a key kept distinct from `collection_errors` so the error
+  signal stays worth reading. As a side effect, a pure state read no longer
+  installs the network instrumentation into the application under test.
+- **One state contract across the three channels.** ECC, Fiori and API each
+  reported failure in their own vocabulary, so a consumer had to special-case
+  the payload per library to learn whether a section was missing or the channel
+  was down. All three now serve `connected`, plus `state_error` when the
+  channel does not answer, and share one epilogue (`finalize_state`) instead of
+  seven hand-copied ones, one of which was already forgotten on an early-return
+  path.
+- **The API channel really uses the shared best-effort helper.** The extraction
+  that was supposed to unify the three providers had left its copy inline, and
+  the guard could not see it: it grepped for the name of the removed helper
+  rather than checking the behaviour. The guard now drives each provider
+  through a failing RF context and checks the contract it claims to protect.
+- **The capability declaration is honoured, not decorative.** `sapfx_state`
+  called both provider methods regardless of `supports_page_source` /
+  `supports_application_state`, so the flags could be wrong for a whole release
+  without a symptom. A section a library declares it does not serve is now
+  refused explicitly, with that provider's own reason.
+- **`SAPFX_MCP_FORCE=0` no longer activates the escape hatch.** It was a bare
+  truthiness test, so the values an operator writes to mean "never bypass the
+  compatibility guard" started the server in degraded mode.
+- **The entry-point path is no longer unguarded.** The compatibility refusal
+  only runs under the `sapfx-mcp` overlay, while the plugins also load into a
+  stock `robotmcp` server (the pack installer falls back to it). That path now
+  emits a non-blocking version warning; it cannot probe the anchors, since
+  importing `robotmcp.server` from a plugin that server is loading would be
+  circular.
+- **The ECC intent map covers the DDIC keywords it advertises.** Six of ten
+  were routed, without `Reach Se16 Selection Screen`, the one that opens an
+  SE16 selection screen in a single place (status type E, wide-table field
+  popup, generation dialog). Unrouted, an agent re-improvises exactly the
+  divergent copies that keyword removed. A new guard checks the map in the
+  direction that was missing, library towards map, which is where omissions
+  live: the previous one could only catch a typo.
+- **`CoInitialize` is no longer called on the channels that have no COM.** The
+  shared helper applied the ECC guard to Fiori (CDP) and API (HTTP), entering
+  every fresh thread-pool worker into an STA apartment, never balanced by a
+  `CoUninitialize`.
+- **`integrations/robotmcp/NOTICE` no longer breaks the public export.** The
+  committed licence copy carries the author's name, which the leak scan allows
+  by exact path only, so the release-day export would have aborted on a leak
+  that is not one. Duplicating a licence file duplicates its allowlist
+  obligation: the copies are now declared in one place and a unit guard runs
+  the real scanner over them.
+- **The Windows pack no longer ships the studio's private comms skill.**
+  `build_release_pack.py` copied `.claude/skills` wholesale, so a skill that
+  `export_public_tree.py` had always excluded by name travelled inside the
+  released `sapfx-pack-0.6.6-win.zip`. Two distribution channels existed and
+  the private boundary was held by only one. Skills now enter the pack by
+  **whitelist** (`.claude/skills/sapfx`), and a unit guard makes the boundary
+  symmetric: no path in the pack manifest may sit in the public export's
+  `EXCLUDE_PREFIXES`. That skill's links point at `comms/`, which the pack does
+  not carry, so it was dead weight there as well.
+- **The pack's CONTENT is scanned for leaks too, in CI.** The guard above
+  reasons about paths and would miss a secret written INSIDE an otherwise
+  legitimate file. The public export does scan bytes, but only by hand, once per
+  release, over `git archive HEAD`: the ZIP could be built, tested and published
+  before the project's only content scan had ever run. It now runs over the pack
+  manifest on every push. Measured: 5 forbidden hits on the shipped 0.6.6 ZIP,
+  none on the fixed pack, so it would have stopped the leak at build time.
+- **Shipped agent definitions no longer invoke scripts the pack does not
+  carry.** sap-generator's definition runs `scripts/check_conventions.py` as its
+  convention #1 gate and `/sap-eval-healer` runs `scripts/agent_eval_harness.py`;
+  neither was in the manifest, so a deployed pack silently lost the gate and
+  offered a dead command. `check_conventions.py` (plus its `_common.py` base) is
+  now shipped and verified to run from the pack root; `/sap-eval-healer` is
+  excluded instead, being a studio regression net aimed at a resource and a
+  suite that the pack does not contain. A guard now checks both directions.
+- **The `sap_robotmcp` wheel ships its licence.** It declared Apache-2.0 while
+  carrying no licence text at all (verified on the wheel inside the 0.6.6 pack):
+  setuptools looks for licence files in the **project** directory, and
+  `integrations/robotmcp/` had none. It now holds committed copies of `LICENSE`
+  and `NOTICE`, kept byte-identical to the root ones by a unit guard, which is
+  what article 4 of the licence requires when redistributing.
+- **`install.ps1` fails with its own diagnosis again** when `wheels\` is
+  missing: under `$ErrorActionPreference = "Stop"`, `Get-ChildItem` aborted
+  before the explicit `Fail` message underneath it. The `robotmcp.exe` fallback
+  also stopped rendering an MCP config pointing at a non-existent executable.
+
+### Added
+- **The deployment pack verifies its own integrity and the host Python.**
+  `SHA256SUMS.txt` was shipped and checked by nobody: `install.ps1` now verifies
+  every listed file, treats a missing or altered `wheels/*.whl` as blocking and
+  a locally adapted example suite as informational (all three paths exercised
+  against a really extracted pack). It also refuses a host interpreter below
+  Python 3.10, the floor both pack READMEs promise and the one the pinned Pillow
+  and robotframework-browser require, instead of failing later inside pip. A
+  leftover `.mcp.json` from a previous `-WithMcp` run is now reported.
+- **CI qualifies the pack on the Python floor** (`pack-floor`: the real ZIP,
+  installed by the real installer on 3.10, without Chromium or MCP, then a
+  keyword-resolution dry run). The claim existed since the first pack and was
+  only ever exercised on 3.12. `release-pack` is now gated on `dryrun` too, so
+  no ZIP is built, published and attested over a red real-pywin32 suite.
+- **`tests/unit/test_dependency_pins.py`**, the dependency-side counterpart of
+  the version guard: the `pywin32` pin stays identical across its three
+  environment files and above the package floor (convention #6 was stated, not
+  enforced), the `robotframework-browser` bound stays identical across its three
+  declarations, and the `robotframework-sapfx` floor of the plugin wheel must
+  track the current version, since the plugins' keyword maps are versioned in
+  lock-step and pip must never pair a newer plugin with an older library.
+
+### Changed
+- **Both distributions declare their licence the PEP 639 way**
+  (`license = "Apache-2.0"` plus `license-files`, `setuptools>=77`), dropping
+  `license = { text = ... }` and the `License :: OSI Approved` classifier: both
+  are deprecated, mutually exclusive with an expression, and left the project
+  waiting on whichever setuptools release removes them. Wheels now carry
+  `Metadata-Version: 2.4` and `License-Expression: Apache-2.0`.
+- **`packaging/constraints-deploy.txt` names its pack the guarded way.** Its
+  header carried a hand-written `0.6.6`; the file is scanned by
+  `check_published_versions.py`, but no pattern matches free prose. Written as
+  the pack filename, the version can no longer go stale unnoticed.
+- **The upper-bound policy is written down** in `pyproject.toml`: a bound is
+  added only where a major would break SILENTLY (the `web` extra), which is why
+  `robotframework` keeps an open range while the qualified version lives in the
+  pack constraints.
+- **Every wait now measures its deadline on the monotonic clock.**
+  `sapfx_common.polling` (the shared primitive behind every `Wait Until ...`
+  of both channels) computed its deadlines with `time.time()`: an NTP
+  resynchronization or a clock change during a wait stretched or shortened the
+  real budget. `retry_call`'s optional `deadline` argument therefore moves from
+  an epoch reference to a `time.monotonic()` one (no caller in the repo passed
+  it).
+- **`robotframework-browser` is now bounded to `<21`** in the `web` extra and
+  both requirement files. `SapFioriLibrary` imports INTERNAL Browser paths
+  (`Browser.utils.data_types`: `ScreenshotReturnType`, `ElementState`) because
+  a direct Python call through `get_library_instance` bypasses Robot's argument
+  conversion; on `ImportError` the fallback passes the state back as a string,
+  exactly the case that produced the `KeyError` caught live on the hybrid
+  smoke. A major bump would therefore not break at import, it would silently
+  reintroduce the bug: it has to be qualified.
+- **`sap-robotmcp` declares its dependency on `robotframework-sapfx`.** The
+  plugins and the RF context import `sapfx_common` at module level, so the
+  dependency was real but only written in a comment; the Windows pack installs
+  both wheels, which hid the gap from every other installation route.
+- **mypy now covers everything that ships** (`files = ["src", ...]`, only
+  `_vendor/` excluded, convention 4) instead of a hand-picked list. The
+  progressive typing had in fact reached the whole tree, and the four packages
+  ship a `py.typed` marker: what is published as typed is now verified. The
+  scope was extended again on 2026-08-19 to `tools/recorder` and
+  `tools/recorder_web`: they ship in the Windows pack, and they passed as they
+  were (zero error). The recorders also get their own coverage floor in CI
+  (`--cov=tools/recorder --cov-fail-under=70`, measured 74 %), kept separate
+  from the product gate so the published coverage figure keeps its meaning.
+- **`requirements.txt` carries the documented toolchain** (`mypy`,
+  `pytest-cov`, `pre-commit`, `Pillow`), so the commands in CLAUDE.md all run
+  after a plain `pip install -r requirements.txt`.
+- **`Fill Multiple Selection` handles a scrollbar that caps.** Like every
+  GuiTableControl, the SAPLALDB dialog's scrollbar tops out
+  (`sapfx_common.table_control.window_plan`, learned live on SE11): the last
+  window then OVERLAPS the previous one. The reached position is read back and
+  the remaining values are written from the shifted local index instead of
+  failing, which is what the pure helper already knew how to compute. A scroll
+  that still leaves those values outside the visible window remains an
+  actionable failure: replaying the same visible rows would corrupt the
+  selection silently.
+- **ECC: a missing-element error now names the screen you are actually on.**
+  `Cannot find element with id 'wnd[0]/tbar[1]/btn[31]'` cannot tell a stale
+  locator from an element not yet materialized from the screen simply not
+  being the one you think, and that third cause is the frequent one in ECC (a
+  transaction refusing an entry stays on the previous screen). `Element Should
+  Be Present` and `Get Element Type` (the path `Click Element` takes to resolve
+  a type before acting) now append a `# screen <Program>/<Transaction>/<Number>`
+  line to the failure, **and so does the wait layer** (`Wait Until Element
+  Present`'s timeout, `_find`'s lookup error): waiting is the dominant absence
+  path in suites (convention 2 says wait, never sleep), so leaving it out kept
+  the founding case (a modal open, the selection screen never displayed)
+  reporting a bare timeout. Upstream behaviour is otherwise unchanged, an
+  explicit caller-supplied `message` is left untouched, and the enrichment is
+  best-effort: it never masks the original error.
+- **Fiori engine `role`: substring matching now normalizes whitespace on both
+  sides.** The `wc` and `dom` engines already collapsed whitespace in their
+  haystack; `matchProps` compared the RAW UI5 property value. Since a Robot
+  cell can carry neither a newline nor a run of 2+ spaces, every recorded
+  selector is normalized, so a control whose `text` is `Total:\n  42` could
+  never be matched by the selector the recorder had just emitted for it. The
+  regex form (`/…/`) still sees the raw value, so patterns over `\s` and `\n`
+  keep working.
+
+### Added
+- **DDIC inventory channel (ECC): classify a batch of dictionary objects in
+  one call.** New `DdicKeywords` mixin (`SapEccLibrary/keywords/_ddic.py`):
+  `Classify Ddic Objects` reads DD02L through SE16 with the multiple-selection
+  dialog batched to its visible window (`TABCLASS` is read from the OUTPUT
+  grid, it is not a selection criterion; an object unknown to DD02L is flagged,
+  never mistaken for an empty table), `Fill Multiple Selection` loads a list of
+  values into any selection-screen criterion (standard SAPLALDB dialog,
+  SCROLLED window by window beyond the visible rows, with the reached scroll
+  position read back: a capped scroll writes at the shifted local index, a
+  scroll that leaves values outside the window fails actionably, and no row is
+  ever silently rewritten),
+  `Get Ddic Classification Map` builds the normalization map from the TABCLASS
+  domain values read live on the target (APPEND stays `unknown` until a target
+  proves otherwise), `Validate Ddic Scope` refuses an unbounded campaign,
+  `Record Ddic Probe` stores locale-independent SE16 probe results and
+  `Write Ddic Inventory Artifact` emits a deterministic sorted JSON artifact
+  whose SHA-256 excludes the timestamp. Pure logic (scope validation, bounded
+  union, classification, artifact assembly, hash, two-target comparison with
+  scope-compatibility gate, Markdown report) lives in
+  `sapfx_common/ddic_inventory.py`, fully unit-tested off SAP, and reachable
+  from Robot through keyword wrappers rather than `Evaluate __import__(...)`
+  incantations (`Sample Ddic Objects For Probe`, `Merge Ddic Name Lists`,
+  `Compare Ddic Inventory Artifacts`).
+  Three safeguards keep a campaign from being green and wrong: the DD02L
+  result read distinguishes "no matching row" (selection screen kept) from
+  "no grid at all" (the Data Browser left in classic list mode, an error
+  naming `Use ALV Grid In Data Browser`) instead of reporting every object as
+  absent; a read that reaches its row cap fails rather than truncating
+  silently; and a batch that comes back EMPTY triggers a canary probe
+  (`TABNAME=DD02L`, the table describing itself) that tells a genuine absence
+  from positional criteria displaced by the per-user selection-field choice.
+  The grid read is also restricted to the four technical columns actually
+  consumed, which keys the rows by field name (independent of the user's ALV
+  heading preference, where displayed titles are not the technical ids) and
+  cuts roughly 90% of the COM calls per batch.
+  `List Repository Tables` (resource layer) gains an `object_type` parameter
+  (default `TABL`; `VIEW` makes views discoverable, they were silently
+  invisible before) and `Discover DDIC Objects By Scope` composes the bounded,
+  deduplicated union of a validated scope. Generated campaign suite
+  `tests/robot/ui/ecc/inventaire_tables_ddic.robot` (spec
+  `specs/inventaire-tables-ecc-s4hana.md`), validated live twice vs A4H
+  (7/7, identical summaries: 99 objects, 68 tables, 16 views, 15 structures,
+  0 unknown). Live finding recorded in the spec: projection views
+  (`EPM_V_BP_CUST`) are rejected by SE16 with a type `E` message exactly like
+  structures, so a type `E` rejection alone never classifies an object.
+
+### Fixed
+- **The post-edit hook no longer crashes on its own message.** Reported by a
+  code review of `scripts/` and its dependencies (2026-08-19). On Windows,
+  Python opens the standard streams in the machine's code page: the arrow in
+  `hook_guards.py`'s informational message (spec/suite drift) raised
+  `UnicodeEncodeError` on `stdout`, so the ONE branch designed to inform
+  without blocking was the one that died, and a relayed guard report reached
+  the assistant as mojibake on `stderr` (whose errors default to
+  `backslashreplace`, hence no crash but `→` in place of the character to
+  fix). Both streams are now switched to UTF-8, through the new shared
+  `scripts/_common.py`. Guards used to disagree on this: four forced their
+  `stdout`, ten did not, so CI logs and any programmatic consumer got a mix of
+  two encodings. `hook_guards.py`, the only script in `scripts/` without a
+  unit test, now has one: its decision moved to a `decide()` function
+  separated from I/O, which makes its four branches testable without a
+  throwaway repo or a genuinely red guard.
+- **`check_no_em_dash.py <directory>` no longer reports a false green.** A
+  directory passed as an argument was accepted, then silently ignored:
+  `read_text` raises on it and that error is swallowed like a binary's. The
+  guard answered `OK (ciblé)` without having read anything. Directories are
+  now expanded recursively, exemptions and out-of-repo paths included.
+- **`agent_eval_harness.py verify` now catches ADDED files.** It only re-read
+  the manifest recorded at injection time, so a modification or a deletion was
+  seen but a creation was not: a healer writing
+  `resources/site_keywords.resource`, which is exactly what the agent
+  definitions ask for on a deployed pack, would have scored PASS. Run
+  artifacts (`__pycache__`, `*.pyc`, `*.actual.png`) are excluded from the
+  manifest, since the healer reproduces the failure and therefore runs pytest
+  and robot between inject and verify.
+- **`build_release_pack.py` refuses wheels from another version.** The check
+  was a plain count, and `--skip-wheels` reuses `wheels/` as it stands: a wheel
+  from the previous release shipped inside a ZIP named after the current
+  version, silently. That is precisely what `check_published_versions.py`
+  forbids in the TEXT of published instructions.
+- **`export_public_tree.py check_top` is now symmetrical.** It only refused an
+  unknown top-level entry; a directory gone from HEAD produced an amputated
+  public tree, published without a word, in a script fail-closed everywhere
+  else. A unit test also pins `EXPECTED_TOP` against the real HEAD, so the
+  divergence surfaces in pytest rather than on release day. `git status` is
+  checked for its return code (without it, "clean" was an assumption, not a
+  fact), and an old interpreter without `tarfile`'s `filter` argument is
+  refused instead of extracting unfiltered.
+- **`check_published_versions.py` walks its folders recursively.** The scan
+  stopped at the first level, so an instruction filed in a subdirectory
+  (`docs/` is flat today, but the public export already creates `docs/libdoc/`)
+  left the guard's scope unnoticed.
+- Three readings of the project version cohabited, two of which took the first
+  `version = "…"` line regardless of section: they now share the section-aware
+  one in `_common.py`. `check_bilingual_docs.py` and `check_comms_sync.py` pass
+  an explicit `encoding` to their subprocesses like the other guards,
+  `check_spec_sync.py` indexes linked specs by relative path rather than by
+  file name, and `healing_drift_report.py` attributes a patch to its drift by
+  identity instead of by substring.
+- **mypy covers the two scripts the pack ships** (`healing_drift_report.py`,
+  `check_spec_sync.py`): shipped code is verified code, the very rule that
+  brought `tools/recorder*` into scope. They stay self-contained (no import
+  from `scripts/`), a property a unit test now enforces, since they must run
+  alone from the pack root.
+- **`check_comms_sync.py` treats the published test count as a FLOOR.** The
+  manifest carries the figure published at release time while the suite keeps
+  growing between releases, so requiring equality turned CI red on the first
+  test added (caught during the same review: 1254 collected against 1175
+  published, an underclaim). Collecting more than the published figure is now
+  an informational line, in line with the anti-overclaim rule; collecting less
+  still fails, since the comms base would then assert tests that do not exist.
+  Coverage stays a strict equality: it is measured on a fixed scope by the CI
+  Linux job, so a gap there is a real drift.
+- **Recorder: `--replay` no longer exits green after replaying nothing.** A step
+  whose keyword does not exist in `SapEccLibrary` was counted as "skipped" and
+  the run still ended with `Replay OK`, exit code 0. That is exactly what a
+  **resource-first** export produces (all of its steps are business keywords
+  living in the imported `.resource`): a green run that proved nothing. Such a
+  step now fails the replay, with a message naming the resource-first case and
+  pointing at `robot`. A file holding several tests is announced too, since
+  only the first one is replayed (`count_test_cases`). Found by code review of
+  `tools/`, 2026-08-19.
+- **Recorder: steps are split on the REAL Robot separator** (a tab, or two
+  spaces and more) instead of exactly four spaces. A hand-edited recording (the
+  GUI steps panel invites editing) separated by two spaces or a tab collapsed
+  into a single cell, so the replay called nothing; separated by five spaces it
+  produced arguments with a leading space, so the replay silently sent a wrong
+  value. Intentional spaces inside a value stay protected by their own
+  backslash escaping.
+- **Recorder GUI: « Arrêter » stops the recorder instead of killing it.** The
+  launcher runs the recorder in a SEPARATE console, so it has no Ctrl+C to
+  send and used `terminate()`, which skips the loop's `finally`: the pending
+  OK-code (`flush_native_state`) was lost, `Session.Record` stayed armed on the
+  SAP GUI side (modal F4, drag and drop disabled) and the events stayed
+  subscribed. New `--stop-file` sentinel, polled by every interactive loop:
+  the loop leaves through its teardown, and the process is only killed if it
+  does not answer within five seconds.
+- **Recorder GUI: the status line is readable again.** It shared row 5 of the
+  grid with the button frame, which Tk stacked on top of it: every message the
+  window has to give ("En cours…", "Arrêté.", "Étapes enregistrées dans …")
+  was hidden behind the buttons.
+- **Recorder: COM events that cannot be transcribed are counted and reported.**
+  The event sink swallows everything a handler raises (the bridge must not
+  break), but the handler also writes the step file: a lost event vanished
+  without a trace. Both native loops now report `N événement(s) NON transcrits`
+  with the last error when they stop.
+- **Recorder: the pywin32 import fallback defines `com_error`.** The
+  `except ImportError` branch reset the five `win32*` modules but left
+  `pythoncom` and `com_error` undefined, while dozens of
+  `except (AttributeError, com_error)` clauses name them: an exception clause
+  is evaluated when the error occurs, so the real error would have been
+  replaced by an opaque `NameError`.
+- **Recorder: a drive-relative output path is refused for what it is.** On
+  Windows `E:file` carries a drive without being absolute; `commonpath` then
+  raised a `ValueError` that the CLI displayed as a path-traversal message.
+- **Pack: development-only helpers stay out of the Windows pack.** The build
+  copied the recorder trees whole, so `gen_icons.py` (which needs Pillow AND
+  `assets/logo.png`, absent from the pack), `package.py` (the Chrome Web Store
+  zip), the extension's `PUBLISHING.md` store-submission guide (which documents
+  only those two) and both scripted video demos (ffmpeg, cap-sflight clone)
+  shipped to test machines that cannot run any of them. `PRIVACY.md` still
+  ships: it is owed to whoever installs the extension.
+- **API: the CSRF token is read case-insensitively.** `_send_with_csrf` looked
+  the fetch response header up with two hard-coded spellings
+  (`x-csrf-token`, `X-CSRF-Token`) while the module's own `_header()` helper,
+  used by the replay judge, is case-insensitive. HTTP headers are
+  case-insensitive and `dict(response.headers)` keeps the case the server
+  SENT: a relay answering `X-Csrf-Token` silently dropped the token to empty,
+  the write went out without it, and the 403 that followed read like a
+  permission problem. Found by review, not by a run: the thirteen CSRF tests
+  all used the lowercase spelling.
+- **API: `sap-client` is no longer appended twice when following pagination.**
+  Server-driven next links (`__next` v2, `@odata.nextLink` v4) are built by the
+  server and usually carry the original query options, `sap-client` included;
+  `_build_url` added it unconditionally, producing
+  `sap-client=001&sap-client=001` on every followed page.
+- **Fiori: `_page_png` no longer takes a second screenshot on the file
+  fallback.** The `except (ImportError, TypeError)` also covered the final
+  `bytes(raw)`, so a Browser version returning a PATH despite
+  `return_as=bytes` triggered a fresh capture: a different instant of the page
+  than the one being described, paid for twice. The returned path is now read
+  directly.
+- **`ensure_com_initialized` keeps its "never raises" promise.** `except`
+  clauses are evaluated when the exception happens, so reading
+  `pythoncom.com_error` inside the tuple raised an `AttributeError` from the
+  clause itself on a stub that has neither `CoInitialize` nor `com_error`.
+- **`SapApiLibrary` exposes `__version__` at package level** like the three
+  other packages (`import SapApiLibrary; SapApiLibrary.__version__` raised
+  `AttributeError`); the version guard now tracks that file too.
+- **Exploratory campaign (A4H): the table sweep survives selection screens
+  generated at first access.** After a container re-creation, SE16 GENERATES
+  each table's selection screen on first access (`/1BCDWB/DB<table>`, the
+  Enter takes ~1 s): "busy done" does not mean the screen is there, and on
+  SGEOCITY (FLTP fields) the generation pops a modal info dialog (SAPMSDYP,
+  "ABAP Dictionary type FLTP is not allowed for dynpro element") instead of a
+  status-bar message. Reaching a SE16 selection screen (status type `E`, the
+  wide-table "choose selection fields" popup, the generation message dialog,
+  waiting for the generated screen) now lives in ONE library keyword,
+  `Reach Se16 Selection Screen`, returning a structured verdict (`reached` /
+  `rejected` / `dialog` / `modal`) with the dialog text kept for the log only.
+  The resource layer (`Try Open Table Selection Screen`, plus the new
+  `Reach Table Selection Screen` for callers that need the full verdict) and
+  the autonomous campaign both delegate to it, replacing three divergent
+  copies. The sweep now also BOUNDS the `dialog` verdict
+  (`${MAX_DIALOG_REJECTS}`, 0 by the live reference): a regression showing up
+  as a blocking dialog used to slide from the "real tables" count into the
+  `dialog` bucket and leave the sweep green. Robot `IF` conditions on the
+  dialog use the expression form (`IF $state["verdict"] == …`) rather than
+  interpolating the localized text between quotes, where a single apostrophe
+  ("n'est pas autorisé") turned the condition into a SyntaxError. Live: 2/4 to
+  4/4; heal session in `docs/heal-journal.md`; lessons in the A4H field notes
+  and `memory/se16-ecran-selection-genere-premier-acces.md`.
+- **rf-mcp: the Fiori plugin declares the application state it actually
+  serves.** Its provider returns the active frame scope and recent UI5
+  messages, but `supports_application_state` still said `False` (the `sapfx`
+  overlay calls providers directly and never reads the flag, so nothing
+  surfaced it). Any consumer honouring the declared capability would have
+  skipped that state silently. The best-effort section helper
+  (`asyncio.to_thread` + error trace) moves to the shared `_rf_context`
+  module, where it was previously copied verbatim into each plugin.
+- **Web recorder: selector texts are sanitized before entering a Robot
+  Framework cell, without losing their discriminating power.** A page text
+  carrying an apostrophe, a backslash, a `${` sequence or a run of 2+ spaces
+  used to break the generated line (the `properties={'k': 'v'}` Python
+  literal, the `text=`/`name=` cells) or wake up an RF variable at replay.
+  Whitespace is now normalized (the engines normalize their target the same
+  way), `${` is escaped so it stays literal, and the properties literal picks
+  its quote character instead of cutting the text: `Editor's Choice` is
+  emitted whole as `properties={'text': "Editor's Choice"}` where truncating
+  it to `s Choice` could silently match a DIFFERENT control (role resolution
+  takes the first match). The backslash remains the only truncating character
+  (Robot consumes it when reading the cell back), and `rfSafeCell` now rejects
+  it in xpath cells too. When a selector must still degrade (both quote kinds
+  present) or an xpath fallback cannot be carried, the emitted step SAYS SO
+  instead of looking discriminating or self-healing: a wrong-target replay in
+  silence is worse than a step visibly marked to complete. Locked end to end
+  by a unit test that replays the real chain (Robot cell → RF unescape →
+  `ast.literal_eval`), the double unescaping that neither a JS grep nor a
+  `--dryrun` can see. Recorded VALUES were already escaped (`rfEscape`).
+- **API channel: the one-shot CSRF replay is now judged on the response
+  header.** Three cases, in order: a header starting with `Required` (a relay
+  may decorate it, `Required; expired`) is the SAP protocol's positive signal
+  and replays once; a header carrying a real token means the server issued
+  one, so the 403 is a genuine denial and is never replayed even when the body
+  mentions CSRF; a header that is absent OR blanked by a relay leaves no
+  reliable signal and falls back to the response text, because refusing there
+  would permanently break a write that used to recover by itself past the
+  Gateway CSRF timeout (~30 min). `_RequestError` carries status + headers
+  through the internal error path.
+- **Recorder documentation exports: secret masking extended.** The
+  `password=`/`passwd=` masking that protected the HTML report now also
+  covers the raw fall-through lines of the spec and ISTQB exports
+  (hand-added `Open Api Session` lines in a mixed recording). Executable
+  exports (.robot/.resource) stay faithful: the recorders never emit a real
+  password (placeholder by construction).
+
+### Changed
+- **`sapfx_state`: the Fiori `application_state` is no longer minimal.** It
+  now mirrors the ECC enrichment pattern: the active iframe scope
+  (`frame_stack`, the context to know before resolving anything) and the
+  recent UI5 messages (type-based, convention #3), each section best-effort
+  with `collection_errors`, plus the stale-code warning.
+- **`healing_drift_report.propose_patches` documents its whole-line
+  behavior**: every occurrence of a drifted locator on the resource line is
+  replaced, including an end-of-line comment echo (leaving echoes diverging
+  would be worse), locked by a unit test.
+
+### Added
+- **Keyword documentation pages (Libdoc), in the public tree.** One reference
+  page per published library (`SapEccLibrary`, `SapFioriLibrary`,
+  `SapApiLibrary`) plus a home page linking them, in **English** while the
+  docstrings stay French: the translation lives in an intermediate Libdoc JSON
+  spec, and the pages are rebuilt from it, so `src/` is never touched for the
+  published documentation. The four pages and the two images they embed ship
+  in the public repository under `docs/libdoc/` and feed the rendered
+  GitHub Pages site. Two guards: the pages must match the project version (a
+  release cannot ship documentation that lies about the product), and they
+  must carry **no machine path** (Libdoc engraves an absolute `source` per
+  keyword; it is relativized to `src/…` in the spec before the rebuild, which
+  the public export's leak scan would otherwise refuse).
+- **`pages` workflow**: the documentation pages are served on GitHub Pages from
+  `docs/libdoc/`, deployed as an artifact rather than through a `gh-pages`
+  branch. Nothing to copy by hand at each release, and the fresh `main` history
+  an export-per-release produces cannot carry the site away. A missing page
+  fails the run instead of publishing an amputated site. Both READMEs link the
+  site, and `[project.urls]` gained a `Documentation` entry, which PyPI shows
+  in the project sidebar (effective at the next release, like all PyPI
+  metadata).
 - **`check_published_versions.py`**: no published instruction may cite a stale
   SAPFX version. It scans the files a user reads to ACT (READMEs, `docs/`,
   `packaging/`) for artifacts they will look for or type (pack filename,

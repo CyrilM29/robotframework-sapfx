@@ -89,6 +89,8 @@ def _as_int(value: Any) -> Optional[int]:
 
 
 def _as_bool(value: Any) -> bool:
+    # "true" COM strict : sémantique distincte du _as_bool RF de
+    # SapApiLibrary (_TRUTHY) ; ne pas fusionner.
     if isinstance(value, bool):
         return value
     if isinstance(value, str):

@@ -79,6 +79,24 @@ def test_check_top_accepte_le_classe(mod):
     mod.check_top({"src", "docs"}, expected={"src", "docs"})  # ne lève pas
 
 
+def test_check_top_refuse_une_disparition(mod):
+    # Symétrie : un dossier sorti de HEAD produisait un arbre public amputé,
+    # publié sans un mot, dans un script fail-closed partout ailleurs.
+    with pytest.raises(mod.ExportError, match="docs"):
+        mod.check_top({"src"}, expected={"src", "docs"})
+
+
+def test_le_perimetre_attendu_correspond_au_depot_reel(mod):
+    """EXPECTED_TOP décrit le VRAI premier niveau : ni entrée fantôme, ni
+    dossier non classé (les deux feraient échouer l'export le jour de la
+    release, le pire moment pour le découvrir)."""
+    import subprocess
+    head = set(subprocess.run(
+        ["git", "ls-tree", "--name-only", "HEAD"], cwd=str(mod.SRC),
+        capture_output=True, text=True, encoding="utf-8", check=True).stdout.split())
+    assert head == mod.EXPECTED_TOP
+
+
 # ---------------------------------------------------------------- pypi_readme
 def _readme(mod, banner=True, logo=True, alt=True, links=True):
     """README minimal : banner EN/FR + le bloc médaillon que la variante PyPI
@@ -156,3 +174,36 @@ def test_les_transformations_visent_des_fichiers_publies(mod):
     exclus = tuple(p.rstrip("/") for p in mod.EXCLUDE_PREFIXES)
     for rel, *_ in mod.TRANSFORMS:
         assert not rel.startswith(exclus), rel
+
+
+def test_les_copies_sortent_du_perimetre_exclu(mod):
+    """Une copie n'a de sens que d'un dossier EXCLU vers un dossier PUBLIÉ."""
+    exclus = tuple(p.rstrip("/") for p in mod.EXCLUDE_PREFIXES)
+    for src, dst in mod.EXTRA_COPIES.items():
+        assert src.startswith(exclus), f"{src} est déjà publié : copie inutile"
+        assert not dst.startswith(exclus), f"{dst} retombe dans une exclusion"
+
+
+def test_les_pages_libdoc_et_leurs_images_sont_copiees(mod):
+    """Les pages de documentation des keywords sont un livrable UTILISATEUR :
+    produites dans le studio, elles doivent atterrir dans l'arbre public (les
+    specs JSON, matière de travail, restent privées)."""
+    copies = mod.EXTRA_COPIES
+    for page in ("index.html", "SapEccLibrary.html", "SapFioriLibrary.html",
+                 "SapApiLibrary.html", "logo-library.png", "picto_light.png"):
+        src = f"comms/libdoc/{page}"
+        assert copies.get(src) == f"docs/libdoc/{page}", (
+            f"{src} absent des copies publiques (page Libdoc non publiée ?)")
+    assert not any(s.startswith("comms/libdoc/spec/") for s in copies)
+
+
+def test_les_images_libdoc_gardent_une_exception_gitignore(mod):
+    """`*.png` est ignoré globalement : sans exception RÉÉCRITE vers la
+    destination publique, les images des pages publiées seraient absentes du
+    dépôt public (le filtre GITIGNORE_DROP retire les lignes citant comms)."""
+    rewrite = [t for t in mod.TRANSFORMS if t[0] == ".gitignore"]
+    assert rewrite, "aucune réécriture .gitignore : les PNG des pages seraient ignorés"
+    replacement = "".join(t[2] for t in rewrite)
+    for png in ("logo-library.png", "picto_light.png"):
+        assert f"!docs/libdoc/{png}" in replacement
+        assert mod.GITIGNORE_DROP_SUBSTRING not in f"!docs/libdoc/{png}"

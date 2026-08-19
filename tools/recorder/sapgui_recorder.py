@@ -68,6 +68,12 @@ except ImportError:  # autorise --help / l'import sur des machines de développe
     win32con = None
     win32gui = None
     win32ui = None
+    # `pythoncom` et `com_error` doivent exister EUX AUSSI : le module les cite
+    # dans des dizaines de clauses ``except (AttributeError, com_error)``, et
+    # une clause d'exception est évaluée au moment où l'erreur survient. Les
+    # laisser indéfinis remplacerait l'erreur réelle par un NameError opaque.
+    pythoncom = None
+    com_error = OSError
 
 # Dossier de sauvegarde par défaut des captures interactives.
 CAPTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "captures")
@@ -293,22 +299,74 @@ def resolve_save_path(path, default_factory):
         return default_factory()
     if os.path.isabs(path):
         return path
+    # Windows : ``E:fichier`` porte un lecteur SANS être absolu (il vise le
+    # répertoire courant DE ce lecteur). Un ``join`` sous captures/ le laisse
+    # tel quel et `commonpath` lève alors un ValueError « mix absolute and
+    # relative » que la CLI affichait en message de traversée de chemin,
+    # trompeur. On le refuse pour ce qu'il est.
+    if os.path.splitdrive(path)[0]:
+        raise ValueError(
+            "Le chemin %r est relatif à un lecteur (forme ``X:fichier``) : "
+            "donne un chemin absolu, ou un chemin relatif sous %s."
+            % (path, CAPTURES_DIR))
     captures_root = os.path.normpath(CAPTURES_DIR)
     candidate = os.path.normpath(os.path.join(captures_root, path))
-    if os.path.commonpath([captures_root, candidate]) != captures_root:
+    try:
+        inside = os.path.commonpath([captures_root, candidate]) == captures_root
+    except ValueError:                   # lecteurs différents, formes mixtes
+        inside = False
+    if not inside:
         raise ValueError(
             "Le chemin relatif %r sort de %s ; utilise un chemin absolu si "
             "c'est voulu." % (path, CAPTURES_DIR))
     return candidate
 
 
+# --- Arrêt propre demandé de l'extérieur (--stop-file) ------------------------
+#
+# Les boucles interactives s'arrêtent nominalement par Ctrl+C dans leur propre
+# console. La GUI, elle, n'a aucune console à laquelle envoyer ce signal (elle
+# lance le recorder dans une console SÉPARÉE) : elle ne pouvait que TUER le
+# processus, ce qui saute le ``finally`` des boucles, donc l'OK-code resté en
+# attente (`flush_native_state`), le ``session.Record = False`` et le
+# désabonnement des événements. Une sentinelle fichier, sondée au rythme de la
+# boucle, rend l'arrêt EXTERNE aussi propre que le Ctrl+C.
+
+def make_stop_checker(stop_file):
+    """Retourne ``should_stop()`` -> booléen, vrai dès que ``stop_file``
+    apparaît ; sonde inerte (toujours fausse) sans chemin.
+
+    Une sentinelle RESTÉE d'un run précédent est retirée à l'armement : sinon
+    elle arrêterait l'enregistrement suivant dès sa première itération."""
+    if not stop_file:
+        return lambda: False
+    try:
+        os.remove(stop_file)
+    except OSError:
+        pass
+    return lambda: os.path.exists(stop_file)
+
+
+def clear_stop_file(stop_file):
+    """Retire la sentinelle d'arrêt en fin de boucle (best-effort : son absence
+    n'est jamais une erreur, la boucle est déjà terminée)."""
+    if stop_file:
+        try:
+            os.remove(stop_file)
+        except OSError:
+            pass
+
+
 def capture_loop(engine, out_path, do_highlight=True, poll_seconds=0.3,
-                 filter_text=None, _max_iterations=None, _writer=print):
+                 filter_text=None, stop_file=None, _max_iterations=None,
+                 _writer=print):
     """Mode interactif : enregistre chaque nouvel élément focalisé jusqu'à Ctrl+C.
 
     ``filter_text`` (option ``--filter``) restreint aux éléments dont l'id ou le type
-    le contient. ``_max_iterations`` / ``_writer`` sont des points d'injection pour les
+    le contient. ``stop_file`` (option ``--stop-file``) est la sentinelle d'arrêt
+    externe. ``_max_iterations`` / ``_writer`` sont des points d'injection pour les
     tests : en production la boucle tourne indéfiniment et écrit sur stdout + fichier."""
+    should_stop = make_stop_checker(stop_file)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     fh = open(out_path, "w", encoding="utf-8")
     fh.write("# Captures SAP GUI Spy : %s\n\n" % out_path)
@@ -320,7 +378,8 @@ def capture_loop(engine, out_path, do_highlight=True, poll_seconds=0.3,
     count = 0
     iterations = 0
     try:
-        while _max_iterations is None or iterations < _max_iterations:
+        while (_max_iterations is None or iterations < _max_iterations) \
+                and not should_stop():
             iterations += 1
             element = current_focus(engine)
             if element is not None:
@@ -343,9 +402,13 @@ def capture_loop(engine, out_path, do_highlight=True, poll_seconds=0.3,
                                 pass
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        _writer("\nArrêt : %s élément(s) capturé(s) dans %s" % (count, out_path))
+        pass
     finally:
+        # Message d'arrêt dans le `finally` : la sortie par sentinelle
+        # (`stop_file`) doit rendre compte comme le Ctrl+C.
+        clear_stop_file(stop_file)
         fh.close()
+        _writer("\nArrêt : %s élément(s) capturé(s) dans %s" % (count, out_path))
     return count
 
 
@@ -475,14 +538,17 @@ def element_at(engine, x, y):
 
 
 def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
-               filter_text=None, _max_iterations=None, _writer=print):
+               filter_text=None, stop_file=None, _max_iterations=None,
+               _writer=print):
     """Mode survol : encadre en rouge le contrôle sous le curseur, en continu.
 
     ``filter_text`` (option ``--filter``) restreint aux contrôles dont l'id ou le type
     le contient : les autres sont ignorés (ni cadre ni capture). ``cursor_fn`` (défaut
     ``win32api.GetCursorPos``) et ``_max_iterations`` sont des points d'injection pour
-    les tests. Si ``out_path`` est fourni, chaque nouveau contrôle survolé est aussi
+    les tests. ``stop_file`` (option ``--stop-file``) est la sentinelle d'arrêt
+    externe. Si ``out_path`` est fourni, chaque nouveau contrôle survolé est aussi
     enregistré (sinon : inspecteur live, sans fichier)."""
+    should_stop = make_stop_checker(stop_file)
     if cursor_fn is None:
         if win32api is None:
             raise RuntimeError("win32api requis pour le mode survol (pywin32, Windows).")
@@ -500,7 +566,8 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
     count = 0
     iterations = 0
     try:
-        while _max_iterations is None or iterations < _max_iterations:
+        while (_max_iterations is None or iterations < _max_iterations) \
+                and not should_stop():
             iterations += 1
             x, y = cursor_fn()
             element = element_at(engine, x, y)
@@ -533,8 +600,9 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
                         count += 1
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        _writer("\nArrêt.")
+        pass
     finally:
+        clear_stop_file(stop_file)
         if current is not None:                  # ne pas laisser de cadre orphelin
             try:
                 current.Visualize(False)
@@ -542,6 +610,7 @@ def hover_loop(engine, cursor_fn=None, poll_seconds=0.15, out_path=None,
                 pass
         if fh is not None:
             fh.close()
+        _writer("\nArrêt.")
     return count
 
 
@@ -773,6 +842,7 @@ from recorder_exports import (  # noqa: E402
     _strip_md_code as _strip_md_code,
     _yq as _yq,
     build_record_header as build_record_header,
+    count_test_cases as count_test_cases,
     locator_slug as locator_slug,
     md_code as md_code,
     parse_recorded_body as parse_recorded_body,
@@ -959,9 +1029,25 @@ def _default_replay_lib():
     return lib
 
 
+def _resource_first_hint(text):
+    """Message d'aide quand le fichier soumis au replay est une suite
+    **resource-first** : ses steps sont des keywords métier qui vivent dans le
+    ``.resource`` importé, hors de portée de l'appel direct à la bibliothèque."""
+    if not re.search(r"^Resource\s", text, re.MULTILINE):
+        return ""
+    return ("  Ce fichier importe un Resource : c'est une suite resource-first, "
+            "dont les keywords métier ne sont pas ceux de SapEccLibrary. "
+            "Rejoue-la avec `robot`, ou rejoue l'enregistrement brut.")
+
+
 def run_replay(path, _lib_factory=None, _writer=print):
     """Point d'entrée de ``--replay`` : relit le fichier et rejoue. Retourne un
-    code de sortie CLI (0 = tout rejoué)."""
+    code de sortie CLI (0 = **tout** a été rejoué).
+
+    Un step dont le keyword n'existe pas dans SapEccLibrary est signalé ET
+    fait ÉCHOUER le replay : sortir en 0 avec des steps ignorés serait vert et
+    faux (cas vécu de la suite resource-first, dont 100 % des steps sont des
+    keywords métier : « Replay OK : 0 step(s) exécuté(s) »)."""
     try:
         with open(path, "r", encoding="utf-8") as fh:
             text = fh.read()
@@ -978,13 +1064,27 @@ def run_replay(path, _lib_factory=None, _writer=print):
     except Exception as exc:
         _writer("Erreur : impossible de rattacher SapEccLibrary (%s)" % exc)
         return 1
+    total_tests = count_test_cases(text)
+    if total_tests > 1:
+        # Le replay ne connaît que le premier test (contrat du recorder) : le
+        # dire, plutôt que laisser un « Replay OK » couvrir les autres.
+        _writer("Attention : %d tests dans %s, seul le PREMIER est rejoué."
+                % (total_tests, path))
     _writer("Replay de %d step(s) depuis %s :" % (len(steps), path))
     executed, skipped, failed, message = replay_recorded_steps(steps, lib, writer=_writer)
     if failed is not None:
         _writer("ÉCHEC au step %d : %s" % (failed + 1, message))
         _writer("  %s" % steps[failed])
         return 1
-    _writer("Replay OK : %d step(s) exécuté(s), %d ignoré(s)." % (executed, skipped))
+    if skipped:
+        _writer("ÉCHEC : %d step(s) sur %d n'ont aucun keyword dans "
+                "SapEccLibrary et n'ont donc PAS été rejoués."
+                % (skipped, len(steps)))
+        hint = _resource_first_hint(text)
+        if hint:
+            _writer(hint)
+        return 1
+    _writer("Replay OK : %d step(s) exécuté(s)." % executed)
     return 0
 
 
@@ -1566,9 +1666,9 @@ def advise_session_events(session, on_change=None, on_hit=None,
 
 
 def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
-                       suite=False, _writer=print, _max_iterations=None,
-                       _advise=None, _pump=None, _sleep=time.sleep,
-                       _elements_fn=None, _key_state_fn=None):
+                       suite=False, stop_file=None, _writer=print,
+                       _max_iterations=None, _advise=None, _pump=None,
+                       _sleep=time.sleep, _elements_fn=None, _key_state_fn=None):
     """Mode enregistreur NATIF : transcrit les événements Change en keywords.
 
     ``semantic=True`` (``--semantic``) : chaque ligne est réécrite en keyword
@@ -1581,8 +1681,11 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     Retourne le nombre d'étapes écrites, ou ``None`` si le mode natif est
     indisponible (événements interdits par le profil serveur, liaison COM aux
     événements impossible) : l'appelant replie alors sur `record_loop` (polling).
+    ``stop_file`` (option ``--stop-file``) arrête la boucle proprement depuis
+    l'extérieur (bouton « Arrêter » de la GUI), teardown compris.
     ``_advise``/``_pump``/``_max_iterations``/``_sleep``/``_elements_fn`` sont
     des points d'injection pour les tests hors SAP."""
+    should_stop = make_stop_checker(stop_file)
     session = first_session(engine)
     if session is None:
         _writer("Aucune session SAP ouverte.")
@@ -1598,7 +1701,7 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     if _pump is None:
         _pump = pythoncom.PumpWaitingMessages
 
-    counters = {"steps": 0, "visual": 0}
+    counters = {"steps": 0, "visual": 0, "lost": 0, "last_error": ""}
     state = {"st": initial_native_state()}
     fh = open_record_file(out_path, suite=suite)
 
@@ -1612,16 +1715,24 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     elements_fn = _elements_fn or screen_elements
 
     def on_change(component, command):
-        eid = relative_id(_safe(component, "Id"))
-        etype = _safe(component, "Type")
-        state["st"], lines = process_change(state["st"], eid, etype, command)
-        if lines and semantic:
-            # l'écran d'origine est encore affiché au moment de l'événement :
-            # c'est LE moment où le libellé de l'élément est calculable.
-            elements = elements_fn(session)
-            lines = [semanticize_step(line, elements) for line in lines]
-        for line in lines:
-            emit(line)
+        # Le sink COM étouffe TOUT ce qui remonte d'un handler (le pont ne doit
+        # pas casser) : un événement perdu ici (disque plein, écran disparu
+        # pendant le calcul sémantique) disparaîtrait donc sans une trace. On
+        # le compte pour le dire à l'arrêt : rien d'actionnable en silence.
+        try:
+            eid = relative_id(_safe(component, "Id"))
+            etype = _safe(component, "Type")
+            state["st"], lines = process_change(state["st"], eid, etype, command)
+            if lines and semantic:
+                # l'écran d'origine est encore affiché au moment de l'événement :
+                # c'est LE moment où le libellé de l'élément est calculable.
+                elements = elements_fn(session)
+                lines = [semanticize_step(line, elements) for line in lines]
+            for line in lines:
+                emit(line)
+        except Exception as exc:
+            counters["lost"] += 1
+            counters["last_error"] = "%s: %s" % (type(exc).__name__, exc)
 
     try:
         connection = _advise(session, on_change=on_change)
@@ -1651,7 +1762,8 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
     assert_base = os.path.splitext(os.path.basename(out_path))[0]
     iterations = 0
     try:
-        while _max_iterations is None or iterations < _max_iterations:
+        while (_max_iterations is None or iterations < _max_iterations) \
+                and not should_stop():
             iterations += 1
             _pump()                     # boucle STA : livre les événements en attente
             action = hotkeys()
@@ -1673,8 +1785,12 @@ def record_loop_native(engine, out_path, poll_seconds=0.1, semantic=False,
             pass
         connection.close()
         fh.close()
+        clear_stop_file(stop_file)
         _writer("\nArrêt : %s étape(s) enregistrée(s) dans %s"
                 % (counters["steps"], out_path))
+        if counters["lost"]:
+            _writer("Attention : %d événement(s) NON transcrits (dernière "
+                    "erreur : %s)" % (counters["lost"], counters["last_error"]))
     return counters["steps"]
 
 
@@ -1699,14 +1815,18 @@ def open_record_file(out_path, suite=False):
 # On écoute aussi ``FocusChanged`` en complément (navigation clavier).
 
 def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
-                        _writer=print, _max_iterations=None,
+                        stop_file=None, _writer=print, _max_iterations=None,
                         _advise=None, _pump=None, _sleep=time.sleep,
                         _cursor_fn=None):
     """Mode capture NATIF : enregistre chaque élément cliqué (Hit) ou focalisé
     (FocusChanged) via les événements de l'API, sans polling.
 
+    ``stop_file`` (option ``--stop-file``) arrête la boucle proprement depuis
+    l'extérieur, teardown compris (hit-test désarmé, désabonnement).
+
     Retourne le nombre de captures, ou ``None`` si le mode natif est indisponible
     (l'appelant replie sur `capture_loop`)."""
+    should_stop = make_stop_checker(stop_file)
     session = first_session(engine)
     if session is None:
         _writer("Aucune session SAP ouverte.")
@@ -1721,7 +1841,7 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
     if _pump is None:
         _pump = pythoncom.PumpWaitingMessages
 
-    seen = {"last": None, "count": 0}
+    seen = {"last": None, "count": 0, "lost": 0, "last_error": ""}
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     fh = open(out_path, "w", encoding="utf-8")
     fh.write("# Captures SAP GUI Spy (hit-test natif) : %s\n\n" % out_path)
@@ -1732,29 +1852,36 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
         cursor_fn = win32api.GetCursorPos
 
     def on_component(component):
-        eid = relative_id(_safe(component, "Id"))
-        if not eid or eid == seen["last"]:
-            return
-        seen["last"] = eid
-        etype = _safe(component, "Type")
-        if not _matches_filter(filter_text, eid, etype):
-            return
-        record = {"id": eid, "type": etype, "text": _safe(component, "Text")}
-        block = format_capture_block(record)
-        if cursor_fn is not None:
-            # Zone opaque cliquée (Hit) : propose aussi le repli coordonnées ;
-            # la position du curseur AU CLIC donne l'offset relatif exact.
-            try:
-                x, y = cursor_fn()
-                offset = offset_suggestion(etype, eid, element_rect(component), x, y)
-            except Exception:
-                offset = None
-            if offset:
-                block += "\n    " + offset
-        seen["count"] += 1
-        _writer(block)
-        fh.write(block + "\n\n")
-        fh.flush()
+        # Même règle que le record natif : le sink COM étouffe ce qui remonte
+        # d'un handler, donc une capture perdue est COMPTÉE et annoncée à
+        # l'arrêt plutôt que de disparaître sans trace.
+        try:
+            eid = relative_id(_safe(component, "Id"))
+            if not eid or eid == seen["last"]:
+                return
+            seen["last"] = eid
+            etype = _safe(component, "Type")
+            if not _matches_filter(filter_text, eid, etype):
+                return
+            record = {"id": eid, "type": etype, "text": _safe(component, "Text")}
+            block = format_capture_block(record)
+            if cursor_fn is not None:
+                # Zone opaque cliquée (Hit) : propose aussi le repli coordonnées ;
+                # la position du curseur AU CLIC donne l'offset relatif exact.
+                try:
+                    x, y = cursor_fn()
+                    offset = offset_suggestion(etype, eid, element_rect(component), x, y)
+                except Exception:
+                    offset = None
+                if offset:
+                    block += "\n    " + offset
+            seen["count"] += 1
+            _writer(block)
+            fh.write(block + "\n\n")
+            fh.flush()
+        except Exception as exc:
+            seen["lost"] += 1
+            seen["last_error"] = "%s: %s" % (type(exc).__name__, exc)
 
     try:
         connection = _advise(session, on_hit=on_component,
@@ -1776,7 +1903,8 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
     _writer("Chaque élément est enregistré -> %s   (Ctrl+C pour arrêter)\n" % out_path)
     iterations = 0
     try:
-        while _max_iterations is None or iterations < _max_iterations:
+        while (_max_iterations is None or iterations < _max_iterations) \
+                and not should_stop():
             iterations += 1
             _pump()
             _sleep(poll_seconds)
@@ -1790,12 +1918,16 @@ def capture_loop_native(engine, out_path, poll_seconds=0.1, filter_text=None,
                 pass
         connection.close()
         fh.close()
+        clear_stop_file(stop_file)
         _writer("\nArrêt : %s élément(s) capturé(s) dans %s" % (seen["count"], out_path))
+        if seen["lost"]:
+            _writer("Attention : %d capture(s) perdue(s) (dernière erreur : %s)"
+                    % (seen["lost"], seen["last_error"]))
     return seen["count"]
 
 
 def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
-                suite=False, _max_iterations=None, _writer=print,
+                suite=False, stop_file=None, _max_iterations=None, _writer=print,
                 _screenshot_fn=None, _key_state_fn=None):
     """Mode enregistreur : transcrit les manipulations en séquence de keywords.
 
@@ -1811,8 +1943,13 @@ def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
     capture échouée (API/version SAP GUI, bureau verrouillé...) est
     silencieusement ignorée : n'interrompt jamais l'enregistrement.
 
+    ``stop_file`` (option ``--stop-file``) arrête la boucle proprement depuis
+    l'extérieur (bouton « Arrêter » de la GUI) : le fichier est refermé et les
+    dernières étapes écrites, ce qu'un processus tué ne permet pas.
+
     ``_max_iterations``/``_writer``/``_screenshot_fn`` sont des points
     d'injection pour les tests."""
+    should_stop = make_stop_checker(stop_file)
     session = first_session(engine)
     if session is None:
         _writer("Aucune session SAP ouverte.")
@@ -1833,7 +1970,8 @@ def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
     shot_count = 0
     iterations = 0
     try:
-        while _max_iterations is None or iterations < _max_iterations:
+        while (_max_iterations is None or iterations < _max_iterations) \
+                and not should_stop():
             iterations += 1
             sig, fields = scan_active_window(session)
             state, steps = process_poll(state, sig, fields, okcode_value(session))
@@ -1867,9 +2005,13 @@ def record_loop(engine, out_path, poll_seconds=0.4, screenshot_dir=None,
                 count += 1
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        _writer("\nArrêt : %s étape(s) enregistrée(s) dans %s" % (count, out_path))
+        pass
     finally:
+        # Message d'arrêt dans le `finally` : le Ctrl+C n'est plus le SEUL
+        # chemin de sortie depuis l'arrêt par sentinelle (`stop_file`).
+        clear_stop_file(stop_file)
         fh.close()
+        _writer("\nArrêt : %s étape(s) enregistrée(s) dans %s" % (count, out_path))
     return count
 
 
@@ -1961,6 +2103,13 @@ def main(argv=None):
                              "(Session.Record + Change ; hit-test pour --capture), capte boutons, "
                              "grilles, arbres ; 'poll' = sondage (diff d'écran / focus) ; "
                              "'auto' (défaut) essaie native puis replie sur poll")
+    parser.add_argument("--stop-file", metavar="FILE",
+                        help="chemin d'une sentinelle d'arrêt : dès que ce fichier "
+                             "apparaît, la boucle interactive (capture/survol/record) "
+                             "s'arrête PROPREMENT, teardown compris (Session.Record "
+                             "remis à False, événements désabonnés, dernières étapes "
+                             "écrites) ; utilisé par le bouton « Arrêter » de la GUI, "
+                             "qui n'a pas de console où envoyer un Ctrl+C")
     parser.add_argument("--no-highlight", action="store_true",
                         help="en mode capture, ne pas surligner les éléments enregistrés")
     parser.add_argument("--screenshots", action="store_true",
@@ -2067,7 +2216,8 @@ def main(argv=None):
         captured = None
         if args.engine in ("auto", "native"):
             try:
-                captured = capture_loop_native(engine, out_path, filter_text=args.filter)
+                captured = capture_loop_native(engine, out_path, filter_text=args.filter,
+                                               stop_file=args.stop_file)
             except KeyboardInterrupt:
                 raise
             except Exception as exc:      # défaillance COM imprévue -> repli, jamais un crash
@@ -2080,14 +2230,15 @@ def main(argv=None):
                 return 1
         if captured is None:
             capture_loop(engine, out_path, do_highlight=not args.no_highlight,
-                         filter_text=args.filter)
+                         filter_text=args.filter, stop_file=args.stop_file)
         return 0
 
     if args.hover:
         out_path = _resolved(args.out, default_capture_path) if args.out else None
         if args.out and out_path is None:
             return 1
-        hover_loop(engine, out_path=out_path, filter_text=args.filter)
+        hover_loop(engine, out_path=out_path, filter_text=args.filter,
+                   stop_file=args.stop_file)
         return 0
 
     if args.record:
@@ -2107,7 +2258,8 @@ def main(argv=None):
         if use_native:
             try:
                 recorded = record_loop_native(engine, out_path, semantic=args.semantic,
-                                              suite=suite_mode)
+                                              suite=suite_mode,
+                                              stop_file=args.stop_file)
             except KeyboardInterrupt:
                 raise
             except Exception as exc:      # défaillance COM imprévue -> repli, jamais un crash
@@ -2122,7 +2274,8 @@ def main(argv=None):
             if args.semantic:
                 print("--semantic requiert le moteur natif : déroulé en ids techniques.",
                       file=sys.stderr)
-            record_loop(engine, out_path, screenshot_dir=screenshot_dir, suite=suite_mode)
+            record_loop(engine, out_path, screenshot_dir=screenshot_dir,
+                        suite=suite_mode, stop_file=args.stop_file)
         run_record_exports(out_path, export_resources=args.export_resources,
                            export_spec=args.export_spec,
                            export_report=args.export_report,

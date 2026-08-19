@@ -1,22 +1,57 @@
 [project]
 name = "sap-robotmcp"
-version = "0.6.6"
+version = "0.6.7"
 description = "SAP plugins for the rf-mcp (RobotMCP) server: real screen perception (never optimistic), keyword routing and selector guidance for SAP GUI (ECC/S4) and Fiori/UI5: MCP access to SAP for any agent."
 readme = "README.md"
-license = { text = "Apache-2.0" }
+# Expression SPDX + fichiers de licence (PEP 639 ; le pourquoi vit dans la
+# section « License » de CLAUDE.md et dans le CHANGELOG).
+license = "Apache-2.0"
+# Le glob de setuptools cherche dans le dossier du PROJET : d'où les copies
+# committées de LICENSE et NOTICE ici, tenues identiques à celles de la racine
+# par `tests/unit/test_dependency_pins.py` (qui nomme la commande de recopie).
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
 keywords = ["mcp", "model-context-protocol", "sap", "sapgui", "fiori", "ui5",
             "robotframework", "test-automation", "ai-agent"]
 classifiers = [
     "Framework :: Robot Framework",
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
     "Topic :: Software Development :: Testing",
 ]
 requires-python = ">=3.10"
-# rf-mcp est la dépendance hôte ; SapEcc/SapFioriLibrary doivent être importables
-# dans le même environnement (pip install -e . à la racine du dépôt).
-dependencies = ["rf-mcp>=0.31"]
+# rf-mcp est la dépendance hôte. `robotframework-sapfx` en est une VRAIE aussi :
+# les plugins et le contexte RF importent `sapfx_common` au niveau module
+# (_rf_context, ecc_plugin, fiori_plugin), donc une installation sans lui casse
+# `sapfx-mcp` au démarrage. Un commentaire ne suffisait pas : le pack Windows
+# installe les deux wheels, ce qui masquait le trou pour toute autre voie
+# d'installation.
+#
+# Le plancher est en LOCK-STEP avec la bibliothèque : les cartes d'intention
+# des plugins routent des keywords qui doivent exister dans la version
+# installée. Conséquence à tenir au moment du bump : ajouter un keyword à une
+# carte OBLIGE à monter la version du dépôt dans le même lot, sinon pip peut
+# satisfaire ce plancher avec une version PUBLIÉE qui ne contient pas encore le
+# keyword, et l'agent reçoit un KeywordNotFound dans une bibliothèque que le
+# plugin déclare pourtant satisfaisante. Le garde de `tests/unit/
+# test_dependency_pins.py` vérifie plancher == version courante, il ne peut pas
+# deviner qu'une version courante non bumpée est déjà publiée.
+#
+# EN DÉVELOPPEMENT, installer d'ABORD la racine en editable
+# (`pip install -e .` puis `pip install -e integrations/robotmcp`) : sans quoi
+# pip satisfait cette ligne depuis PyPI et pose la bibliothèque PUBLIÉE dans
+# site-packages, à côté de l'arbre de travail que `PYTHONPATH=src` est censé
+# servir. Tout process lancé depuis un autre répertoire importerait alors du
+# code qui n'est pas celui qu'on édite, la variante silencieuse du piège de
+# code figé que `_staleness.py` signale.
+#
+# Pas de borne haute sur rf-mcp : la fenêtre qualifiée vit dans `_compat.py`.
+# Portée exacte du garde, à ne pas surestimer : la surcouche `sapfx-mcp` sonde
+# les points d'ancrage et REFUSE de démarrer hors fenêtre
+# (`SAPFX_MCP_FORCE=1` pour outrepasser) ; sur la voie entry point, où les
+# plugins se chargent dans un `robotmcp` standard, seule la version est
+# vérifiée, et en simple avertissement. Le pack, lui, épingle la version
+# qualifiée dans `packaging/constraints-deploy.txt`.
+dependencies = ["rf-mcp>=0.31", "robotframework-sapfx>=0.6.7"]
 
 [project.urls]
 Homepage = "https://github.com/CyrilM29/robotframework-sapfx"
@@ -41,5 +76,9 @@ sapfx-mcp = "sap_robotmcp.server:main"
 include = ["sap_robotmcp*"]
 
 [build-system]
-requires = ["setuptools>=61"]
+# Plancher relevé à 77 : c'est la version qui comprend l'expression SPDX
+# `license` et `license-files` de PEP 639 (plus haut). Une borne haute serait
+# inutile ici, l'ancienne forme partait justement pour ne pas dépendre d'une
+# dépréciation qu'un backend plus récent finira par supprimer.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"

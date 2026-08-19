@@ -204,8 +204,14 @@
     if (rx && rx[1].length <= MATCH_PROPS_MAX_PATTERN_LENGTH) {
       try { re = new RegExp(rx[1], rx[2]); } catch (e) { re = null; }
     }
-    if (re) return re.test(h);
-    return h.toLowerCase().includes(w.toLowerCase());
+    if (re) return re.test(h);        // regex : la valeur BRUTE, \s et \n compris
+    // Sous-chaîne : les DEUX côtés sont normalisés en espaces. Une cellule Robot
+    // ne peut pas porter 2+ espaces ni un saut de ligne, donc un sélecteur
+    // enregistré est toujours normalisé ; sans cette normalisation côté
+    // résolution, une propriété contenant « Total:\n  42 » ne pourrait JAMAIS
+    // être matchée par le sélecteur que le recorder vient d'émettre (les
+    // moteurs wc et dom normalisent déjà leur cible, le moteur role non).
+    return wsCollapse(h).toLowerCase().includes(wsCollapse(w).toLowerCase());
   }
 
   // Normalisation des espaces (runs -> un espace). Les textes et noms

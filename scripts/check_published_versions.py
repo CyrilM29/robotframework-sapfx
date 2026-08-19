@@ -34,6 +34,8 @@ import os
 import re
 import sys
 
+import _common
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 #: Fichiers d'INSTRUCTIONS balayés (ce qu'un utilisateur lit pour agir).
@@ -46,6 +48,9 @@ SCANNED_GLOBS = (
 )
 SCANNED_SUFFIXES = (".md", ".txt", ".ps1", ".cmd", ".template")
 EXCLUDED_NAMES = frozenset({"heal-journal.md"})
+#: Sous-dossiers hors périmètre lors de la descente récursive : artefacts de
+#: run et environnements, jamais des instructions publiées.
+EXCLUDED_DIRS = frozenset({"__pycache__", ".venv", "node_modules"})
 
 #: Motifs (nom, regex à UN groupe capturant la version, remède affiché).
 #: Chaque motif vise un artefact que le lecteur va chercher ou taper.
@@ -76,17 +81,21 @@ ALLOWED: frozenset[tuple[str, str]] = frozenset()
 
 def current_version(root: str = _ROOT) -> str:
     """Version du projet, lue dans le ``pyproject.toml`` racine (la source de
-    vérité que ``test_version_consistency`` fait déjà régner partout)."""
-    path = os.path.join(root, "pyproject.toml")
-    with open(path, "r", encoding="utf-8") as handle:
-        match = re.search(r'^version = "([^"]+)"', handle.read(), re.MULTILINE)
-    if not match:
-        raise SystemExit("version introuvable dans pyproject.toml")
-    return match.group(1)
+    vérité que ``test_version_consistency`` fait déjà régner partout).
+
+    Lecture mutualisée (``scripts/_common.py``) et consciente des sections.
+    """
+    return _common.project_version(root)
 
 
 def scanned_files(root: str = _ROOT) -> list[str]:
-    """Chemins relatifs (POSIX) des fichiers d'instructions à balayer."""
+    """Chemins relatifs (POSIX) des fichiers d'instructions à balayer.
+
+    Descente RÉCURSIVE dans les dossiers surveillés : ``docs/`` est plat
+    aujourd'hui, mais l'export public y crée déjà ``docs/libdoc/``, et un
+    fichier d'instructions rangé dans un sous-dossier sortirait sinon du garde
+    sans que personne le remarque.
+    """
     found: list[str] = []
     for folder, names in SCANNED_GLOBS:
         base = os.path.join(root, folder) if folder else root
@@ -97,11 +106,13 @@ def scanned_files(root: str = _ROOT) -> list[str]:
             continue
         if not os.path.isdir(base):
             continue
-        for name in sorted(os.listdir(base)):
-            if name in EXCLUDED_NAMES or not name.endswith(SCANNED_SUFFIXES):
-                continue
-            if os.path.isfile(os.path.join(base, name)):
-                found.append("%s/%s" % (folder, name) if folder else name)
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = sorted(d for d in dirnames if d not in EXCLUDED_DIRS)
+            for name in sorted(filenames):
+                if name in EXCLUDED_NAMES or not name.endswith(SCANNED_SUFFIXES):
+                    continue
+                rel = os.path.relpath(os.path.join(dirpath, name), root)
+                found.append(rel.replace(os.sep, "/"))
     return found
 
 
@@ -140,6 +151,7 @@ def check(root: str = _ROOT, version: str | None = None) -> list[str]:
 
 
 def main(argv=None) -> int:
+    _common.force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", help="version attendue (défaut : pyproject.toml)")
     args = parser.parse_args(argv)

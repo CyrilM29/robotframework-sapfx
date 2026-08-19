@@ -136,6 +136,21 @@ DUMP_TREE_JS = build_call("dumpTree")
 IDLE_STATE_JS = build_call("idleState")
 GET_MESSAGES_JS = build_call("getMessages")
 
+# Sonde de runtime UI5 AUTONOME : la seule expression du module qui n'embarque
+# PAS le bundle. Toute fonction bâtie par `build_call` (ré)installe `__SAPFX`,
+# donc instrumente `fetch`/`XMLHttpRequest` et accroche `MessageToast` : c'est
+# voulu quand on pilote, jamais quand on se contente de REGARDER (state provider
+# rf-mcp appelé après chaque étape). Cette sonde est une lecture pure, et le
+# prix à payer est qu'elle duplique la logique de `isUI5()` du bundle : garder
+# les deux en phase (une classe `Element` chargée via AMD, sinon le Core hérité).
+UI5_RUNTIME_PROBE_JS = (
+    "() => { try { const E = window.sap && sap.ui && sap.ui.require && "
+    "sap.ui.require('sap/ui/core/Element'); "
+    "if (E && (typeof E.getElementById === 'function' || E.registry)) return true; } "
+    "catch (e) {} "
+    "const c = (window.sap && sap.ui && sap.ui.getCore) ? sap.ui.getCore() : null; "
+    "return !!(c && typeof c.byId === 'function'); }")
+
 
 def sid_xpath(sid):
     """Sélecteur navigateur pour un élément SAP WebGUI par son ``SID`` stable.

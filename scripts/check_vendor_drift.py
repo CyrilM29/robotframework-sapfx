@@ -23,6 +23,8 @@ import argparse
 import os
 import sys
 
+from _common import force_utf8_stdio
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DEFAULT_UPSTREAM = os.path.join(_ROOT, "_upstream", "SapGuiLibrary", "SapGuiLibrary.py")
 _DEFAULT_VENDOR = os.path.join(_ROOT, "src", "SapEccLibrary", "_vendor", "sapgui_base.py")
@@ -79,6 +81,7 @@ def check(upstream_path, vendor_path):
 
 
 def main(argv=None):
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream-file", default=_DEFAULT_UPSTREAM)
     parser.add_argument("--vendor-file", default=_DEFAULT_VENDOR)

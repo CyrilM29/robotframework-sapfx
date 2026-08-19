@@ -39,6 +39,8 @@ import importlib.util
 import os
 import sys
 
+from _common import force_utf8_stdio
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _CLAUDE_MD = os.path.join(_ROOT, "CLAUDE.md")
 _GUIDANCE_PY = os.path.join(_ROOT, "integrations", "robotmcp", "sap_robotmcp", "_guidance.py")
@@ -95,6 +97,12 @@ _MAP_MARKERS = {
         "Lookup Business Term", "Client Security Should Be Hardened",
         # _grid.py (GuiTableControl par titre) / _semantic.py (matchcode)
         "Read Table Control", "Pick F4 Value",
+        # _ddic.py (classification DD02L par lots, artefact d'inventaire) et
+        # l'ouverture d'écran de sélection SE16, en UN seul endroit
+        "Classify Ddic Objects", "Fill Multiple Selection",
+        "Write Ddic Inventory Artifact", "Reach Se16 Selection Screen",
+        # _embedded_browser.py (pont WebView2/CDP)
+        "Switch To Embedded Browser Page",
     ],
     "fiori_plugin.py": [
         # pile de frames + moteur dom + diagnostic (sessions hybrides)
@@ -108,6 +116,9 @@ _MAP_MARKERS = {
         "Get Ui5 Page Map", "Click Ui5 Ref",
         # repos réseau/busy + messages par type + upload
         "Wait For Ui5 Idle", "Get Ui5 Messages", "Upload File Via Ui5",
+        # sonde de runtime (pages wc/sid/dom : cibles légitimes, pas des
+        # pannes) + état du canal en UN aller-retour de contexte RF
+        "Ui5 Runtime Is Present", "Get Ui5 Application State",
     ],
     "api_plugin.py": [
         # sessions par alias + introspection d'état (le canal sans écran)
@@ -203,6 +214,7 @@ def check():
 
 
 def main(argv=None):
+    force_utf8_stdio()
     problems = check()
     if not problems:
         print("[check_guidance_sync] OK -- hints rf-mcp alignés sur CLAUDE.md.")

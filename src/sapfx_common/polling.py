@@ -5,6 +5,11 @@ Avant ce module, chaque bibliothèque portait sa propre boucle « sonder jusqu'�
 `_waits.py`, `_connection.py`, `SapFioriLibrary._act_with_retry`). Les trois
 formes canoniques vivent désormais ici ; les mixins/keywords ne gardent que leurs
 messages d'erreur métier.
+
+Toutes les échéances se mesurent sur ``time.monotonic()``, jamais sur l'horloge
+murale : une resynchronisation NTP ou un changement d'heure pendant une attente
+allongerait ou raccourcirait le budget réel d'un `Wait Until Element Present`,
+et c'est ici que TOUTES les attentes des deux canaux passent.
 """
 from __future__ import annotations
 
@@ -23,12 +28,12 @@ def poll_until(check: Callable[[], T], timeout_secs: float, step: float = 0.2) -
 
     Sonde au moins une fois, même avec un délai nul ou négatif.
     """
-    deadline = time.time() + float(timeout_secs)
+    deadline = time.monotonic() + float(timeout_secs)
     while True:
         result = check()
         if result:
             return result
-        if time.time() >= deadline:
+        if time.monotonic() >= deadline:
             return result
         time.sleep(step)
 
@@ -40,10 +45,10 @@ def retry_call(action: Callable[[], T], attempts: int = 3, interval: float = 0.2
     espacées de ``interval`` secondes. Retourne le résultat de la première
     tentative réussie ; relève la **dernière** exception quand toutes échouent.
 
-    ``deadline`` (epoch, optionnel) borne les relances dans le temps en plus du
-    compte : plus aucune tentative n'est lancée une fois l'échéance passée.
-    ``on_error(attempt, err)`` (optionnel) est appelé après chaque échec, pour
-    journaliser sans dupliquer la boucle chez l'appelant.
+    ``deadline`` (repère ``time.monotonic()``, optionnel) borne les relances dans
+    le temps en plus du compte : plus aucune tentative n'est lancée une fois
+    l'échéance passée. ``on_error(attempt, err)`` (optionnel) est appelé après
+    chaque échec, pour journaliser sans dupliquer la boucle chez l'appelant.
     """
     attempts = int(attempts)
     last: Optional[Exception] = None
@@ -54,7 +59,7 @@ def retry_call(action: Callable[[], T], attempts: int = 3, interval: float = 0.2
             last = err
             if on_error is not None:
                 on_error(attempt, err)
-            if deadline is not None and time.time() >= deadline:
+            if deadline is not None and time.monotonic() >= deadline:
                 break
             if attempt < attempts:
                 time.sleep(interval)
@@ -67,11 +72,11 @@ def retry_until(action: Callable[[], T], timeout_secs: float, step: float = 0.5)
     ``timeout_secs`` soit écoulé ; relève alors la dernière exception. Variante
     bornée par le temps (et non par un compte d'essais) de `retry_call` : le
     rythme d'attente est ``step`` secondes entre deux tentatives."""
-    deadline = time.time() + float(timeout_secs)
+    deadline = time.monotonic() + float(timeout_secs)
     while True:
         try:
             return action()
         except Exception:
-            if time.time() >= deadline:
+            if time.monotonic() >= deadline:
                 raise
             time.sleep(step)

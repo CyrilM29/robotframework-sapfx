@@ -49,7 +49,12 @@ par région : role/xpath/sid/wc/dom), `Get Fiori Diagnostics` quand un écran
 se comporte mal (lire `issues` d'abord). Après une action qui déclenche de
 l'OData : `Wait For Ui5 Idle` (le repos réseau réel, « rendu » ne veut pas
 dire « données arrivées ») ; messages applicatifs par TYPE via
-`Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`.
+`Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`, précédés de
+`Ui5 Runtime Is Present` quand la page peut ne pas être UI5 (moteurs wc/sid/dom
+: des cibles légitimes, pas des pannes ; cette sonde répond sans jamais échouer
+et sans rien injecter dans la page). `Get Ui5 Application State` donne les trois
+d'un coup (portée de frame, runtime, messages) : le « où en suis-je » du canal
+web, à joindre au diagnostic d'un échec.
 
 ## Les règles non négociables
 

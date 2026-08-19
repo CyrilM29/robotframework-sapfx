@@ -18,6 +18,29 @@ before the colon, English does not). Enforced by `scripts/check_no_em_dash.py`
 (CI + `PostToolUse` hook + unit test); its `ALLOWED` map pins an exact count per
 file allowed to quote the character, and only `_vendor/` is out of scope.
 
+## Agent methodology is owned by rf-test-agents
+
+This repo owns SAP CAPABILITIES, not the agent method. The reference for
+agentic testing, for agents plus MCP on Robot Framework, and for the reasoning
+mindset of the four test agents (`sap-planner`, `sap-generator`, `sap-healer`,
+`sap-istqb` here; `rf-*` there) is the sibling repo `rf-test-agents`. Consult
+it before improvising a local answer about an agent's workflow, ground rules
+or division of labour; a methodology improvement found here is back-ported
+there, then propagated to the other verticals.
+
+## Observe, do not fix
+
+When a test run fails (red test, accessibility violation, baseline or snapshot
+drift, regression): report the finding (file, screen or page, rule, impact,
+useful output) and stop there. Do not fix the application under test, and do
+not fix the test itself either, without an explicit request.
+
+- No convenience baseline update, no `--update-snapshots` to turn a suite green.
+- Healer agents run only on request.
+- When unsure whether to observe or fix: observe, then ask.
+- Exception: a fix that was explicitly asked for, or the development work in
+  progress on this repo, is delivered in full, as usual.
+
 ## Memory
 
 Durable project facts live in `memory/` at the repo root (index
@@ -44,7 +67,24 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   title (`Read Table Control`, `Get/Set Table Control Cell`,
   `Find Table Control Row`: automatic windowed scrolling; `RowCount`
   counts RESERVED rows, so only the truly filled ones are returned) and
-  `Pick F4 Value` for search helps), perception (`Get Screen Signature` with `mode=diff`
+  `Pick F4 Value` for search helps), DDIC inventory (`Classify Ddic Objects`:
+  DD02L read through SE16, `TABCLASS` is an OUTPUT column, never a selection
+  criterion; `Fill Multiple Selection` for arbitrary name lists, SCROLLING the
+  standard dialog window by window with the reached position READ BACK (a
+  capped scrollbar writes at the shifted local index, values left outside the
+  window fail actionably, no row is ever silently rewritten);
+  a batch coming back EMPTY triggers a canary probe that tells a genuine
+  absence from positional criteria displaced by the per-user field choice,
+  and a missing grid outside a selection screen names
+  `Use ALV Grid In Data Browser` instead of flagging every object absent;
+  reaching any SE16 selection screen goes through the single library keyword
+  `Reach Se16 Selection Screen` (verdict `reached`/`rejected`/`dialog`/`modal`),
+  which the resource layer and the campaigns delegate to;
+  classification map read live from the TABCLASS domain, `APPEND` stays
+  `unknown` without proof; deterministic JSON artifact whose SHA-256 excludes
+  the timestamp; pure logic in `sapfx_common/ddic_inventory.py`; a projection
+  view can be rejected by SE16 with a type `E` message exactly like a
+  structure, only DD02L classifies), perception (`Get Screen Signature` with `mode=diff`
   (`pair_renames=True` pairs lookalike ids into `~ old -> new` rename lines
   via the healing scoring) and `mode=semantic` (the form view: one line per
   actionable target with its VERIFIED human label), `GetObjectTree` fast path
@@ -64,7 +104,12 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   preflight `Client Security Should Be Hardened` (input-history CVE-2025-0055,
   see docs/hardening-test-environment.md), `Enable Test Tool
   Mode`, telemetry), healing (`Resolve Element With Healing` incl. the
-  `label=` anchor path, scored closest-match errors), **human locators**
+  `label=` anchor path, scored closest-match errors; a missing-element error
+  also names the screen you are REALLY on, `# screen <Program>/<Transaction>/
+  <Number>` appended by `Element Should Be Present` and `Get Element Type`,
+  best-effort and never at the expense of the original error: an id alone
+  cannot tell a stale locator from a screen that is not the one you think),
+  **human locators**
   (`Find/Fill/Read Field By Label`, `Click Button By Label`: visible label +
   geometric proximity, grid/position addressing (`N @ Label`/`Label @ N`) and
   the scoped-anchor operator (`Anchor >> Rest`, narrows to a unique label's
@@ -183,10 +228,17 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   dHash + crop/mask/tile primitives behind the visual assertions) and
   `visual_baseline` (the shared snapshot-baseline semantics + Pillow decode
   boundary used by BOTH channels' visual keywords, optional extra `visual`).
-  New wait/retry loops go here, never inline. Typed (`mypy`).
+  New wait/retry loops go here, never inline; their deadlines run on
+  `time.monotonic()`, never on the wall clock. Typed (`mypy`).
 - **Business keywords** live in `resources/` (`ecc_keywords.resource`,
-  `fiori_keywords.resource`, mirrored vocabulary + same-name aliases;
-  `a4h_demo_data.resource` for demo-data guards). **Recorders** in `tools/recorder`
+  `fiori_keywords.resource`, `api_keywords.resource`: one mirrored vocabulary
+  across the three channels, same-name aliases, and the OData service paths
+  carried under business names so no suite spells one out;
+  `a4h_demo_data.resource` for demo-data guards). The API channel has its own
+  suite, `tests/robot/api/canal_api_odata.robot`, running the same business
+  keywords against OData v2 (tag `a4h`) and OData v4 (tag `capsflight`): it
+  was previously exercised only through the two cross-paradigm suites, and
+  that blind spot is where two real defects had been sitting. **Recorders** in `tools/recorder`
   (desktop, COM, `--engine auto|native|poll`: native uses the API's own
   `Session.Record`+`Change` events, with automatic polling fallback;
   `--semantic` rewrites steps as human keywords when the label provably
@@ -203,8 +255,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   self-contained HTML documentation report (business phrase + exact RF line
   per step, ECC/Fiori/API keywords phrased, per-step data-URI screenshots,
   `password=` args masked; never a test)); `--replay` plays a recording
-  against the open session; `--transpile-vbs` converts SAP GUI's built-in
-  ALT+F12 VBS recordings) and
+  against the open session (a step whose keyword is NOT in the library now
+  FAILS the replay: a resource-first suite used to exit 0 with 0 step run);
+  `--stop-file` stops an interactive loop from outside through its teardown
+  (what killing the process skipped); `--transpile-vbs` converts SAP GUI's
+  built-in ALT+F12 VBS recordings) and
   `tools/recorder_web` (snippet + Chrome MV3 extension, injected in all frames;
   records across all five engines incl. the generic dom engine, right-click
   assertion menu, in-page replay, multi-scenario markers, .robot re-import,
@@ -216,12 +271,23 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   (`_last_seen.py`) and `filtered`/`filtering_level` is really implemented
    (`_filtering.py`); state providers serve the smart perception diff on an
    already-seen screen and a stale-code warning when SAPFX code changed on
-   disk after server start (`_staleness.py`); the API channel has its
-   `SapApiPlugin` (honest no-screen page source; real channel state via
-   `List Api Sessions`, never credentials); the **`sapfx-mcp` overlay**
+   disk after server start (`_staleness.py`), plus an **enriched application
+   state** under one contract shared by the three channels (`connected` /
+   `state_error`, `collection_errors` for a section that failed and
+   `not_applicable` for one that has no meaning here): window stack with the
+   modal trap, status type and telemetry on ECC; iframe scope, `ui5_runtime`
+   (probed before reading UI5 messages, so a Web Components/WebGUI/hybrid page
+   is a supported target rather than a permanent error) and the messages on
+   Fiori, in ONE context crossing (`Get Ui5 Application State`); the API
+   channel has its `SapApiPlugin` (honest no-screen page source; real channel
+   state via `List Api Sessions`, never credentials); the **`sapfx-mcp` overlay**
    (console entry point, NOT a fork) mounts the rf-mcp server unchanged and
    adds `sapfx_state`/`sapfx_screenshot`/`sapfx_reload` behind a startup
-   compatibility guard (rf-mcp window [0.31, 0.36), deployment pin 0.35.0);
+   compatibility guard (rf-mcp window [0.31, 0.36), deployment pin 0.35.0;
+   the entry-point path, where the plugins load in a stock `robotmcp`, gets a
+   non-blocking version warning instead), and it honours the declared
+   capabilities: a section a library does not serve is refused with that
+   provider's own reason, never faked;
    API/Fiori state is partitioned by rf-mcp synthetic-test
    namespace; ECC supports one live session per rf-mcp process.
   **Repo-wide scripts** (doc pairing, vendor drift, guidance
@@ -251,9 +317,33 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   names in READMEs / `docs/` / `packaging/`), and a STATIC version badge is
   refused where the dynamic shields.io badge updates itself (what you see
   right after a release is cache, not an error); third-party versions and
-  history files are out of scope on purpose. All in `scripts/`. A `PostToolUse` hook
-  (`scripts/hook_guards.py`) runs the em-dash guard on every edited file, and
-  the others after every edit of
+  history files are out of scope on purpose. All in `scripts/`, over the shared
+  `_common.py`: it forces UTF-8 on **stdout AND stderr** (on Windows the
+  standard streams open in the machine's code page, where an arrow killed the
+  process on stdout and produced mojibake on stderr) and reads the project
+  version **section-aware** (three copies used to disagree). The two
+  first-generation packed scripts (`healing_drift_report.py`,
+  `check_spec_sync.py`) keep a deliberate copy of that switch, so they stay
+  usable even lifted out of the pack alone; the pack also ships
+  `check_conventions.py` (sap-generator's own gate, previously invoked by a path
+  ABSENT from the pack) and therefore `_common.py`. Two unit guards hold the
+  pack honest: the internal import closure must be entirely inside the pack, and
+  every `scripts/<x>.py` a shipped file invokes must itself be shipped or
+  justified in the test's allowlist. That second guard is what moved
+  `/sap-eval-healer` out of the pack (a studio regression net, aimed at a
+  resource and a suite the pack does not carry). A third one enforces the
+  distribution boundary in both channels: no path in the pack manifest may sit
+  in `export_public_tree.py`'s `EXCLUDE_PREFIXES`, after `PACK_TREES` copied
+  `.claude/skills` wholesale and shipped the studio's PRIVATE comms skill inside
+  the released 0.6.6 ZIP. Skills now enter the pack by whitelist. That guard
+  reasons about PATHS, so a fourth one runs the export's byte-level **content**
+  scan over the pack manifest, in CI on every push: it reports 5 forbidden hits
+  on the shipped 0.6.6 ZIP and none on the fixed pack, whereas the export itself
+  runs by hand once per release, on `git archive HEAD`. When writing such a
+  note, keep it unnamed: the leak scan forbids that skill's very name in files
+  that go public, this one included. A `PostToolUse` hook
+  (`scripts/hook_guards.py`, its decision in a testable `decide()`) runs the
+  em-dash guard on every edited file, and the others after every edit of
   specs/tests/resources/variables.
   **SAP test agents** (plan → generate → heal, Playwright-Test-Agents style,
   plus the offline `sap-istqb` test designer: planner specs + recorder
@@ -297,7 +387,7 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
 ```bash
 python -m pytest -q                 # all logic tests: no SAP, no browser needed
 python -m ruff check src tools tests integrations scripts   # lint (_vendor excluded)
-python -m mypy                      # progressive type check (scope in pyproject.toml)
+python -m mypy                      # type check: all shipped code (the 2 packed scripts included), only `_vendor/` excluded
 pip install -r requirements.txt     # robotframework + pywin32 (pinned) + browser
 robot --pythonpath src --dryrun --outputdir results/dry tests/robot/   # keyword check, no SAP
 robot tests/robot/fiori_smoke.robot # live vs public OpenUI5 Demo Kit

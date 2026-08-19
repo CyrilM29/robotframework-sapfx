@@ -59,6 +59,7 @@ from ._ui5_js import (
     RESOLVE_ROLE_JS,
     RESOLVE_WC_JS,
     RESOLVE_XPATH_JS,
+    UI5_RUNTIME_PROBE_JS,
     sid_xpath,
 )
 from ._ui5_runtime import (
@@ -82,7 +83,7 @@ class SapFioriLibrary:
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 
-    __version__ = "0.6.6"
+    __version__ = "0.6.7"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -870,6 +871,64 @@ class SapFioriLibrary:
                                    state or "illisible"))
         return dict(state)
 
+    def ui5_runtime_is_present(self):
+        """Y a-t-il un **runtime UI5** dans la portée courante (page, ou frame
+        ciblée par `Set Ui5 Frame` / `Push Ui5 Frame`) ? Retourne ``True`` ou
+        ``False``, jamais d'échec : une page injoignable répond ``False``.
+
+        C'est la sonde à poser AVANT un keyword qui exige le runtime
+        (`Get Ui5 Messages`, `Get Ui5 Page Tree`) quand on ne sait pas encore
+        sur quoi on est tombé : pages UI5 Web Components sans runtime, WebGUI
+        classique (moteur ``sid``), zones non-SAP d'une page hybride (moteur
+        ``dom``) sont des cibles LÉGITIMES de cette bibliothèque, et y voir un
+        échec est un faux signal. `Get Page Composition` répond à la même
+        question en plus détaillé, au prix d'une analyse complète de la page.
+
+        Contrairement à tous les autres keywords web, cette sonde n'injecte
+        PAS le bundle ``__SAPFX`` : elle ne modifie donc rien (pas
+        d'instrumentation ``fetch`` ni ``XMLHttpRequest``, pas de hook
+        ``MessageToast``), ce qui la rend utilisable par une pure
+        observation, l'état applicatif servi aux agents notamment. ::
+
+            ${ui5}=    Ui5 Runtime Is Present
+            IF    ${ui5}    Ui5 Should Have No Messages Of Type    Error
+        """
+        try:
+            return bool(self._evaluate(UI5_RUNTIME_PROBE_JS))
+        except Exception:      # noqa: BLE001 (sonde : jamais d'échec)
+            return False
+
+    def get_ui5_application_state(self):
+        """L'état du canal web en **UN seul appel** : portée de frame active,
+        présence d'un runtime UI5, et messages UI5 quand il y en a un.
+        Retourne un dict JSON-safe ``{"frame_stack": [...], "ui5_runtime":
+        bool, "messages": {...}}`` (``messages`` absent hors runtime UI5,
+        remplacé par ``messages_error`` si leur lecture a échoué).
+
+        Le « où en suis-je » de la page, à joindre au diagnostic d'un échec ou
+        à servir à un agent. Il existe parce qu'un état assemblé keyword par
+        keyword coûte un aller-retour par section : à travers rf-mcp, chacun
+        traverse le contexte Robot Framework, ce qui domine largement le coût
+        du JS. Le state provider MCP l'appelle donc une fois plutôt que trois.
+
+        L'ordre compte et n'est pas négociable : le runtime est sondé par
+        `Ui5 Runtime Is Present` (aucune injection) AVANT de lire les
+        messages, qui exigent le runtime et installent le bundle. Une page
+        sans UI5 (moteurs wc/sid/dom) est donc décrite honnêtement, sans
+        échec et sans être instrumentée pour rien. ::
+
+            ${etat}=    Get Ui5 Application State
+            Log         Portée : ${etat}[frame_stack]
+        """
+        state = {"frame_stack": self.get_ui5_frame_stack(),
+                 "ui5_runtime": self.ui5_runtime_is_present()}
+        if state["ui5_runtime"]:
+            try:
+                state["messages"] = self.get_ui5_messages()
+            except Exception as exc:      # noqa: BLE001 (état best-effort)
+                state["messages_error"] = str(exc)
+        return state
+
     def get_ui5_messages(self, include_toasts=True):
         """Lit les **messages UI5** de la page : le MessageManager (module
         ``Messaging`` des UI5 récents, ``getMessageManager()`` sinon) plus les
@@ -883,13 +942,15 @@ class SapFioriLibrary:
         barre d'état ECC : ASSERTER sur le ``type`` (Error/Warning/Success),
         jamais sur le texte localisé (convention n°3), via
         `Ui5 Should Have No Messages Of Type`. Runtime UI5 absent sur la
-        portée courante = échec actionnable nommant `Get Page Composition`."""
+        portée courante = échec actionnable nommant `Ui5 Runtime Is Present`
+        (la sonde à poser d'abord quand la page peut ne pas être UI5)."""
         result = self._evaluate(GET_MESSAGES_JS)
         if result is None:
             raise AssertionError(
                 "Pas de runtime UI5 sur la page/frame courante : Get Ui5 "
                 "Messages lit le MessageManager UI5. Vérifier la portée de "
-                "frame (Set/Push Ui5 Frame) ou sonder Get Page Composition.")
+                "frame (Set/Push Ui5 Frame), sonder Ui5 Runtime Is Present "
+                "avant l'appel, ou Get Page Composition pour le détail.")
         if not include_toasts:
             result.pop("toasts", None)
         return result
@@ -1274,20 +1335,33 @@ class SapFioriLibrary:
     def _page_png(self):
         """Capture PNG de la page active via la bibliothèque Browser :
         ``return_as=bytes`` quand disponible (Browser récents), sinon repli
-        sur le fichier retourné par `Take Screenshot`. Stubbable en test."""
+        sur le fichier retourné par `Take Screenshot`. Stubbable en test.
+
+        Le repli fichier LIT le chemin déjà rendu quand Browser en a rendu un
+        malgré ``return_as=bytes`` : il ne reprend jamais une seconde capture,
+        qui montrerait un autre instant de la page que celle qu'on croit
+        décrire (et paierait deux fois le coût)."""
         browser = self._browser()
+        raw = None
         try:
             from Browser.utils.data_types import ScreenshotReturnType
+        except ImportError:                 # Browser absent (fakes de test) ou
+            pass                            # arborescence interne déplacée
+        else:
             try:
                 raw = browser.take_screenshot(
                     return_as=ScreenshotReturnType.bytes, log_screenshot=False)
-            except TypeError:   # Browser sans log_screenshot
-                raw = browser.take_screenshot(return_as=ScreenshotReturnType.bytes)
+            except TypeError:               # Browser sans log_screenshot...
+                try:
+                    raw = browser.take_screenshot(
+                        return_as=ScreenshotReturnType.bytes)
+                except TypeError:           # ...ou sans return_as du tout
+                    raw = None
+        if isinstance(raw, (bytes, bytearray)):
             return bytes(raw)
-        except (ImportError, TypeError):
-            path = browser.take_screenshot()
-            with open(path, "rb") as fh:
-                return fh.read()
+        path = raw if isinstance(raw, str) else browser.take_screenshot()
+        with open(path, "rb") as fh:
+            return fh.read()
 
     @staticmethod
     def _decode_image_to_gray(image_bytes):

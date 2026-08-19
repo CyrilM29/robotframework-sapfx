@@ -91,6 +91,25 @@ def test_propose_et_applique_les_patches_stables_seulement(tmp_path):
     assert "wnd[0]/usr/txtA" in content   # l'instable est intact
 
 
+def test_apply_patches_remplace_aussi_l_echo_en_commentaire(tmp_path):
+    # Comportement voulu : une ligne de resource peut répéter le localisateur
+    # (écho en commentaire de fin de ligne) ; le patch met à jour la ligne
+    # ENTIÈRE, échos compris, plutôt que de les laisser diverger.
+    resources = tmp_path / "resources"
+    resources.mkdir()
+    resource = resources / "kw.resource"
+    resource.write_text(
+        "${BTN}    wnd[0]/tbar[1]/btn[31]    # id relevé : wnd[0]/tbar[1]/btn[31]\n",
+        encoding="utf-8")
+    events = [_event("wnd[0]/tbar[1]/btn[31]", "wnd[0]/tbar[1]/btn[13]")] * 2
+    drifts = drift_mod.aggregate(events)
+    patches = drift_mod.propose_patches(drifts, resources)
+    assert drift_mod.apply_patches(patches) == 1
+    content = resource.read_text(encoding="utf-8")
+    assert content.count("wnd[0]/tbar[1]/btn[13]") == 2
+    assert "btn[31]" not in content
+
+
 def test_render_markdown_liste_stables_patches_et_instables(tmp_path):
     resources = tmp_path / "r"
     resources.mkdir()

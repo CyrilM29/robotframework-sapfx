@@ -67,6 +67,8 @@ import re
 import sys
 from pathlib import Path
 
+from _common import force_utf8_stdio
+
 # Stratégies de localisation explicites (SeleniumLibrary, Browser, UI5) en tête
 # de cellule. `timeout=`, `text=`… la liste est fermée pour éviter les faux
 # positifs sur les arguments nommés courants.
@@ -229,8 +231,7 @@ def check(repo_root: Path, targets: list[str] | None = None,
 def main(argv: list[str] | None = None) -> int:
     # Console Windows en cp1252 : le rapport contient des caractères hors page
     # de code : UTF-8 best-effort plutôt qu'un plantage à l'affichage.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    force_utf8_stdio()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("targets", nargs="*",
                         help="fichiers/répertoires à contrôler (défaut : "

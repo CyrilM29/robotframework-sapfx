@@ -500,3 +500,66 @@ def test_hardcopy_screenshot_none_si_api_absente_ou_buffer_vide(tmp_path):
     assert spy.hardcopy_screenshot(sans_api, base) is None
     vide = _ShotSession(_ShotWindow(b""))
     assert spy.hardcopy_screenshot(vide, base) is None
+
+
+# --- revue de code des tools (2026-08-19) : arrêt propre et pertes comptées ---
+
+def test_record_loop_native_sarrete_sur_la_sentinelle_avec_son_teardown(tmp_path):
+    # Constat n°4 : la GUI ne peut pas envoyer de Ctrl+C (console séparée) ;
+    # elle pose une sentinelle, et la boucle sort par son `finally` : Record
+    # désarmé, événements désabonnés, OK-code en attente écrit.
+    session = FakeSession()
+    engine = _engine_with(session)
+    out = str(tmp_path / "stop.robot")
+    stop = tmp_path / "stop.flag"
+    handlers = {}
+    connection = FakeConnection()
+    pumps = {"n": 0}
+
+    def fake_pump():
+        pumps["n"] += 1
+        if pumps["n"] == 1:
+            handlers["change"](FakeComponent("wnd[0]/tbar[0]/okcd", "GuiOkCodeField"),
+                               (("SP", "text", "SE16"),))
+        if pumps["n"] == 2:
+            stop.write_text("stop", encoding="utf-8")      # « Arrêter » de la GUI
+
+    count = spy.record_loop_native(
+        engine, out, stop_file=str(stop), _writer=lambda *_a: None,
+        _max_iterations=50, _advise=_fake_advise(handlers, connection),
+        _pump=fake_pump, _sleep=lambda s: None)
+
+    assert pumps["n"] < 50                       # sortie AVANT la borne d'itérations
+    assert session.Record is False               # teardown déroulé
+    assert connection.closed is True
+    assert not stop.exists()                     # sentinelle consommée
+    # L'OK-code resté en attente est bien écrit (ce qu'un processus tué perdait).
+    assert count == 1
+    assert "Run Transaction    SE16" in open(out, encoding="utf-8").read()
+
+
+def test_record_loop_native_compte_les_evenements_perdus(tmp_path):
+    # Constat n°5 : le sink COM étouffe tout ce qui remonte d'un handler ; un
+    # événement non transcrit doit être COMPTÉ et annoncé, jamais silencieux.
+    session = FakeSession()
+    out = str(tmp_path / "perdu.robot")
+    handlers = {}
+
+    class _Explose:
+        @property
+        def Id(self):
+            raise RuntimeError("COM parti pendant la lecture")
+
+    def fake_pump():
+        handlers["change"](_Explose(), (("SP", "text", "SE16"),))
+
+    written = []
+    count = spy.record_loop_native(
+        engine=_engine_with(session), out_path=out, _writer=written.append,
+        _max_iterations=2, _advise=_fake_advise(handlers, FakeConnection()),
+        _pump=fake_pump, _sleep=lambda s: None)
+
+    assert count == 0
+    texte = "\n".join(written)
+    assert "2 événement(s) NON transcrits" in texte
+    assert "COM parti pendant la lecture" in texte

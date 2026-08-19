@@ -72,8 +72,20 @@ _BODY_EXCERPT = 400
 # pour déduire l'entity set d'un chemin d'entité.
 _KEY_SUFFIX = re.compile(r"\([^()]*\)\s*$")
 
+# Encodage des paramètres de query. Le défaut d'``urlencode`` est celui des
+# formulaires HTML (``application/x-www-form-urlencoded``), qui rend l'espace
+# par ``+`` : une Gateway SAP v2 le tolère, un service OData v4 (CAP) le
+# REFUSE en HTTP 400 (« Expected "(", "/", or a whitespace but "+" found »),
+# et un ``$filter`` contient toujours des espaces (``TravelID eq 1``).
+# ``quote`` rend l'espace par ``%20`` et se comporte comme ``quote_plus`` sur
+# TOUT le reste : le correctif est donc strictement limité au caractère
+# fautif, et l'encodage déjà servi aux Gateway en production ne bouge pas.
+_QUERY_QUOTE = urllib.parse.quote
+
 
 def _as_bool(value: Any) -> bool:
+    # Booléens « à la Robot Framework » (_TRUTHY) : sémantique distincte du
+    # _as_bool COM strict d'object_tree ("true" seul) ; ne pas fusionner.
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in _TRUTHY
@@ -86,6 +98,21 @@ def _url_origin(url: str) -> tuple[str, str, Optional[int]]:
             parsed.port or default_port)
 
 
+def _has_query_param(url: str, name: str) -> bool:
+    """Vrai si ``url`` porte DÉJÀ ce paramètre de requête.
+
+    Sert au ``sap-client`` : les liens de pagination server-driven
+    (``__next`` v2, ``@odata.nextLink`` v4) sont fabriqués par le serveur et
+    reconduisent en général les options de la requête d'origine, ``sap-client``
+    compris. Le réajouter produirait ``sap-client=001&sap-client=001``, que
+    tous les serveurs ne tolèrent pas de la même façon."""
+    query = urllib.parse.urlsplit(url).query
+    if not query:
+        return False
+    return any(key == name for key, _ in
+               urllib.parse.parse_qsl(query, keep_blank_values=True))
+
+
 def _header(headers: Optional[dict], name: str) -> Optional[str]:
     """Lecture insensible à la casse d'un en-tête HTTP."""
     wanted = name.lower()
@@ -93,6 +120,47 @@ def _header(headers: Optional[dict], name: str) -> Optional[str]:
         if str(key).lower() == wanted:
             return value
     return None
+
+
+class _RequestError(AssertionError):
+    """Échec HTTP auto-corrigible porteur du statut et des en-têtes de la
+    réponse : le protocole CSRF juge sur l'en-tête ``x-csrf-token`` (la voie
+    fiable), pas sur le texte du message."""
+
+    def __init__(self, message: str, status: int, headers: dict):
+        super().__init__(message)
+        self.status = status
+        self.headers = dict(headers)
+
+
+def _csrf_rejected(err: AssertionError) -> bool:
+    """Vrai pour le 403 « token CSRF requis/expiré » à rejouer UNE fois.
+
+    Trois cas, dans cet ordre :
+
+    - en-tête ``x-csrf-token`` commençant par ``Required`` : le signal POSITIF
+      du protocole SAP, rejeu (la valeur peut être décorée par un relais,
+      ``Required; expired``, d'où la lecture du premier mot) ;
+    - en-tête portant un VRAI token : le serveur en a fourni un, la requête
+      n'a donc pas été refusée faute de token : interdiction réelle, aucun
+      rejeu (le rejouer serait un faux espoir) ;
+    - en-tête absent OU vidé par un relais : plus aucun signal fiable, on
+      retombe sur le texte de la réponse. Refuser ici casserait
+      DÉFINITIVEMENT une écriture qui se rétablissait seule au-delà du
+      timeout Gateway (~30 min), alors qu'un rejeu inutile ne coûte qu'un
+      aller-retour avant que l'erreur d'origine ne revienne à l'identique.
+
+    Seuls les échecs HTTP passent par ici (``_request`` lève toujours un
+    ``_RequestError``) : une AssertionError d'une autre origine (URL
+    injoignable, auth OAuth) n'est jamais un rejet CSRF."""
+    if not isinstance(err, _RequestError) or err.status != 403:
+        return False
+    marker = _header(err.headers, "x-csrf-token")
+    raw = "" if marker is None else str(marker).strip()
+    if raw:
+        first = raw.replace(";", " ").replace(",", " ").split()[0].lower()
+        return first == "required"
+    return "csrf" in str(err).lower()
 
 
 class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -216,7 +284,7 @@ class SapApiLibrary:
     côté serveur) ; `Close All Rfc Connections` existe seul au besoin.
     """
 
-    __version__ = "0.6.6"
+    __version__ = "0.6.7"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -483,7 +551,8 @@ class SapApiLibrary:
             result = self._decode_json(raw, status, path)
         if _as_bool(track):
             session = self._session(alias)
-            uri = self._entity_uri(session, result, headers)
+            uri = self._entity_uri(session, result, headers,
+                                   self._build_url(session, path, None))
             if uri:
                 session.created_entities.append(uri)
                 logger.info("Entité créée suivie pour nettoyage : %s" % uri)
@@ -658,7 +727,15 @@ class SapApiLibrary:
         if report["failed"]:
             logger.warn(
                 "Delete Created Entities : %d suppression(s) en échec sur %d "
-                "(détail dans le rapport retourné)."
+                "(détail dans le rapport retourné). Une URI suivie est celle "
+                "que le SERVEUR a annoncée (Location / @odata.id / "
+                "__metadata.uri) et elle n'est pas toujours adressable : un "
+                "service OData v4 draft-enabled répond par exemple "
+                "\"Travel.drafts('...')\" alors que seule la clé composite "
+                "\"Travel(TravelUUID=...,IsActiveEntity=false)\" existe. Sur "
+                "un 404, enregistrer le chemin qui répond avec Register "
+                "Created Entity plutôt que de compter sur Post Odata "
+                "track=True."
                 % (len(report["failed"]),
                    len(report["failed"]) + len(report["deleted"])))
         else:
@@ -672,10 +749,18 @@ class SapApiLibrary:
         return report
 
     def _entity_uri(self, session: _ApiSession, payload: Any,
-                    headers: Optional[dict]) -> Optional[str]:
+                    headers: Optional[dict],
+                    request_url: Optional[str] = None) -> Optional[str]:
         """URI de l'entité créée : ``__metadata.uri`` (v2), ``@odata.id``
         (v4) ou en-tête ``Location`` ; ramenée en chemin relatif quand son
-        origine diffère de la session (reverse-proxy)."""
+        origine diffère de la session (reverse-proxy).
+
+        Une URI **relative** se résout contre l'URL de la REQUÊTE (RFC 3986),
+        jamais contre la base de session : un service OData v4 répond
+        ``Location: Travel.drafts('…')``, relatif au service. Recollée à la
+        base, elle perdait son préfixe de service et la suppression partait
+        sur la racine (404), laissant la donnée derrière elle alors que le
+        ``$count`` des entités actives, lui, semblait restauré."""
         uri: Optional[str] = None
         if isinstance(payload, dict):
             envelope = payload.get("d", payload)
@@ -690,6 +775,8 @@ class SapApiLibrary:
         if not uri:
             return None
         uri = str(uri)
+        if request_url and not uri.startswith(("http://", "https://")):
+            uri = urllib.parse.urljoin(request_url, uri)
         if uri.startswith(("http://", "https://")) and (
                 _url_origin(uri) != _url_origin(session.base_url)):
             parsed = urllib.parse.urlsplit(uri)
@@ -1005,11 +1092,12 @@ class SapApiLibrary:
         for key, value in (query or {}).items():
             name = "$" + key if key in self._SYSTEM_QUERY else key
             params.append((name, value))
-        if session.sap_client:
+        if session.sap_client and not _has_query_param(url, "sap-client"):
             params.append(("sap-client", session.sap_client))
         if params:
             separator = "&" if "?" in url else "?"
-            url += separator + urllib.parse.urlencode(params)
+            url += separator + urllib.parse.urlencode(
+                params, quote_via=_QUERY_QUOTE)
         return url
 
     def _request(self, alias: str, method: str, path: str,
@@ -1053,9 +1141,10 @@ class SapApiLibrary:
                         excerpt.encode("utf-8"))
             telemetry["errors"] += 1
             telemetry["last_error"] = "HTTP %d %s" % (err.code, err.reason)
-            raise AssertionError(
+            raise _RequestError(
                 "%s %s -> HTTP %d %s.\nDébut de la réponse : %s"
-                % (method.upper(), url, err.code, err.reason, excerpt))
+                % (method.upper(), url, err.code, err.reason, excerpt),
+                err.code, dict(err.headers or {}))
         except urllib.error.URLError as err:
             telemetry["seconds"] += time.monotonic() - started
             telemetry["errors"] += 1
@@ -1104,14 +1193,15 @@ class SapApiLibrary:
                        ) -> tuple[int, dict, bytes]:
         """Écriture OData avec le protocole CSRF, générique à POST / PATCH /
         DELETE / $batch : token obtenu au besoin, re-fetch et rejeu UNE fois
-        sur 403 nommant le CSRF (timeout de sécurité Gateway, ~30 min).
+        sur le 403 CSRF, jugé sur l'en-tête ``x-csrf-token: Required`` de la
+        réponse avec repli texte (timeout de sécurité Gateway, ~30 min).
         Toute autre erreur remonte telle quelle."""
         session = self._session(alias)
         try:
             return self._send_with_csrf(session, alias, method, path, query,
                                         body, extra_headers, csrf_fetch_path)
         except AssertionError as err:
-            if "HTTP 403" not in str(err) or "csrf" not in str(err).lower():
+            if not _csrf_rejected(err):
                 raise
             session.csrf_token = None
             return self._send_with_csrf(session, alias, method, path, query,
@@ -1124,13 +1214,19 @@ class SapApiLibrary:
                         ) -> tuple[int, dict, bytes]:
         """Une écriture avec token CSRF, obtenu d'abord si la session n'en a
         pas (GET sur ``csrf_fetch_path``, défaut le chemin visé ; $batch
-        fetche sur la racine du service : GET sur $batch n'existe pas)."""
+        fetche sur la racine du service : GET sur $batch n'existe pas).
+
+        L'en-tête du token est lu par ``_header`` (insensible à la casse,
+        comme du côté du juge de rejeu) : les en-têtes HTTP sont
+        insensibles à la casse et ``dict(response.headers)`` conserve la
+        casse ENVOYÉE. Un relais qui répond ``X-Csrf-Token`` faisait
+        auparavant tomber le token à vide sans un mot, et l'écriture sans
+        token revenait en 403 présenté comme une interdiction."""
         if session.csrf_token is None:
             _, headers, _ = self._request(
                 alias, "GET", csrf_fetch_path or path, None,
                 headers={"X-CSRF-Token": "Fetch"})
-            session.csrf_token = headers.get("x-csrf-token") or headers.get(
-                "X-CSRF-Token") or ""
+            session.csrf_token = _header(headers, "x-csrf-token") or ""
         extra = {"Content-Type": "application/json"}
         if extra_headers:
             extra.update(extra_headers)

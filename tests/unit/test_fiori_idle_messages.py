@@ -93,11 +93,109 @@ def test_get_ui5_messages_json_safe_et_toasts_optionnels():
     assert "toasts" not in sans_toasts
 
 
-def test_get_ui5_messages_sans_runtime_nomme_la_composition():
+def test_get_ui5_messages_sans_runtime_nomme_la_sonde():
     lib = SapFioriLibrary()
     lib._evaluate = lambda js, arg=None: None
-    with pytest.raises(AssertionError, match="Get Page Composition"):
+    with pytest.raises(AssertionError) as err:
         lib.get_ui5_messages()
+    message = str(err.value)
+    assert "Ui5 Runtime Is Present" in message
+    assert "Get Page Composition" in message
+
+
+# --- Ui5 Runtime Is Present : la sonde qui n'injecte rien --------------------
+
+def test_la_sonde_de_runtime_repond_par_un_booleen():
+    lib = SapFioriLibrary()
+    lib._evaluate = lambda js, arg=None: True
+    assert lib.ui5_runtime_is_present() is True
+    lib._evaluate = lambda js, arg=None: False
+    assert lib.ui5_runtime_is_present() is False
+
+
+def test_la_sonde_de_runtime_n_echoue_jamais():
+    """C'est une SONDE : une page injoignable (navigation en cours, pas de page
+    du tout) répond « pas de runtime », elle ne lève pas. Sans cela, elle ne
+    pourrait pas servir à décider si l'on ose appeler un keyword UI5."""
+    lib = SapFioriLibrary()
+
+    def boom(js, arg=None):
+        raise RuntimeError("aucune page ouverte")
+
+    lib._evaluate = boom
+    assert lib.ui5_runtime_is_present() is False
+
+
+def test_l_etat_agrege_tient_en_un_appel_et_sonde_avant_de_lire():
+    """L'état du canal web est assemblé côté bibliothèque : un consommateur
+    (le state provider rf-mcp) paierait sinon un aller-retour de contexte
+    Robot Framework PAR section, ce qui domine largement le coût du JS.
+
+    L'ordre est la moitié du contrat : le runtime est sondé AVANT la lecture
+    des messages, qui l'exige et installe le bundle."""
+    lib = SapFioriLibrary()
+    lib._ui5_frame = "iframe#app"
+    vus = []
+
+    def evaluate(js, arg=None):
+        vus.append("probe" if BUNDLE not in js else "bundle")
+        return True if BUNDLE not in js else dict(_MESSAGES)
+
+    lib._evaluate = evaluate
+    state = lib.get_ui5_application_state()
+    assert state["frame_stack"] == ["iframe#app"]
+    assert state["ui5_runtime"] is True
+    assert state["messages"]["messages"][0]["type"] == "Error"
+    assert vus == ["probe", "bundle"]
+
+
+def test_l_etat_agrege_ne_lit_pas_les_messages_hors_runtime_ui5():
+    lib = SapFioriLibrary()
+    vus = []
+
+    def evaluate(js, arg=None):
+        vus.append("probe" if BUNDLE not in js else "bundle")
+        return False
+
+    lib._evaluate = evaluate
+    state = lib.get_ui5_application_state()
+    assert state == {"frame_stack": [], "ui5_runtime": False}
+    # rien d'autre n'a été évalué : pas d'échec inutile, pas d'injection
+    assert vus == ["probe"]
+
+
+def test_l_etat_agrege_consigne_une_lecture_de_messages_en_echec():
+    lib = SapFioriLibrary()
+
+    def evaluate(js, arg=None):
+        if BUNDLE not in js:
+            return True
+        raise RuntimeError("Pas de page ouverte")
+
+    lib._evaluate = evaluate
+    state = lib.get_ui5_application_state()
+    assert state["ui5_runtime"] is True
+    assert "messages" not in state
+    assert "Pas de page ouverte" in state["messages_error"]
+
+
+def test_la_sonde_de_runtime_n_injecte_pas_le_bundle():
+    """La propriété qui justifie son existence : toute autre expression web du
+    dépôt (ré)installe ``__SAPFX``, donc instrumente ``fetch`` et
+    ``XMLHttpRequest`` dans l'application sous test. Une simple lecture d'état
+    (celle que sert le state provider rf-mcp après chaque étape) ne doit rien
+    modifier."""
+    from SapFioriLibrary._ui5_js import GET_MESSAGES_JS, UI5_RUNTIME_PROBE_JS
+
+    assert BUNDLE not in UI5_RUNTIME_PROBE_JS
+    assert "window.__SAPFX" not in UI5_RUNTIME_PROBE_JS
+    assert BUNDLE in GET_MESSAGES_JS          # contre-épreuve
+    # Playwright ne lance pas un littéral de fonction qui commence par un blanc.
+    assert UI5_RUNTIME_PROBE_JS.startswith("(")
+    # Même logique que `isUI5()` du bundle : classe Element par AMD, sinon Core.
+    for marqueur in ("sap/ui/core/Element", "getElementById", "registry",
+                     "getCore", "byId"):
+        assert marqueur in UI5_RUNTIME_PROBE_JS, marqueur
 
 
 def test_ui5_should_have_no_messages_of_type():

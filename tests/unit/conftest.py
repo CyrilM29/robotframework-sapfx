@@ -17,6 +17,13 @@ _SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
+# Les scripts d'outillage partagent ``scripts/_common.py`` (sortie console,
+# lecture de version). Lancés en ligne de commande, ils le trouvent seuls
+# (``sys.path[0]`` = leur répertoire) ; chargés par chemin dans les tests, non.
+_SCRIPTS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "scripts"))
+if _SCRIPTS not in sys.path:
+    sys.path.insert(0, _SCRIPTS)
+
 
 def _ensure(name, factory):
     if name not in sys.modules:
