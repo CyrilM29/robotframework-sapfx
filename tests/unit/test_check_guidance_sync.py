@@ -62,6 +62,58 @@ def test_check_flags_an_agent_definition_that_dropped_a_marker(monkeypatch, tmp_
     assert not any("resources/" in p for p in problems)
 
 
+def _agent_complet(marqueurs_communs=True, convention_12=True):
+    """Texte d'agent portant tous les marqueurs, sauf ce qu'on retire à dessein."""
+    texte = []
+    if marqueurs_communs:
+        texte.append("Locators live in resources/. Never time.sleep. "
+                     "Assert the message type. Never use an em dash.")
+    if convention_12:
+        texte.append("Convention #12: fix or create the keyword in src/.")
+    return " ".join(texte)
+
+
+def test_check_flags_a_coding_agent_that_dropped_convention_12(monkeypatch, tmp_path):
+    """La règle « une lacune se comble dans la bibliothèque » ne vaut que pour
+    les agents qui écrivent du code : le garde doit la réclamer là, et nulle
+    part ailleurs. Contre-épreuve dans les deux sens, sans quoi il pourrait
+    passer sans jamais rien vérifier."""
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    (agents / "sap-healer.md").write_text(
+        _agent_complet(convention_12=False), encoding="utf-8")
+    (agents / "sap-planner.md").write_text(
+        _agent_complet(convention_12=False), encoding="utf-8")
+    monkeypatch.setattr(mod, "_AGENTS_DIR", str(agents))
+    problems = mod.check()
+    # Le healer produit du code : la convention lui est réclamée.
+    assert any("convention #12" in p and "sap-healer.md" in p for p in problems)
+    # Le planner explore : on ne la lui impose pas.
+    assert not any("convention #12" in p and "sap-planner.md" in p for p in problems)
+
+
+def test_check_accepts_a_coding_agent_that_states_convention_12(monkeypatch, tmp_path):
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    for nom in ("sap-generator.md", "sap-healer.md"):
+        (agents / nom).write_text(_agent_complet(), encoding="utf-8")
+    monkeypatch.setattr(mod, "_AGENTS_DIR", str(agents))
+    assert not [p for p in mod.check() if "convention #12" in p]
+
+
+def test_check_flags_convention_12_removed_from_claude_md(monkeypatch, tmp_path):
+    """Le pendant amont : si le passage disparaît du guide canonique, les
+    définitions d'agents citeraient une convention qui n'existe plus."""
+    claude_md = tmp_path / "CLAUDE.md"
+    with open(mod._CLAUDE_MD, encoding="utf-8") as source:
+        contenu = source.read()
+    ancre = mod._CLAUDE_ONLY[0][1]
+    claude_md.write_text(contenu.replace(ancre, "Une autre règle"), encoding="utf-8")
+    monkeypatch.setattr(mod, "_CLAUDE_MD", str(claude_md))
+    problems = mod.check()
+    assert any("convention #12" in p and "CLAUDE.md" in p for p in problems)
+
+
 def test_check_flags_missing_agent_definitions(monkeypatch, tmp_path):
     empty = tmp_path / "agents"
     empty.mkdir()

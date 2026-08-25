@@ -5,6 +5,488 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
+## [Unreleased]
+
+## [0.7.0] - 2026-08-25
+
+### Added
+- **`containedIn`, the DOM-containment selector part** of the Fiori role engine
+  (`Resolve Ui5 Control`, `Get Ui5 Ids`, `Get Ui5 Properties`, `Get Ui5 Match
+  Count`…): restricts the match to controls whose DOM node descends from the DOM
+  node of the designated control (exact id, then id suffix, then the DOM node
+  carrying that id, which is what `Get Ui5 Ids` returns). It is **not** a
+  duplicate of `viewId`: that one follows the property (owning view, factory
+  ids), this one follows the rendering, and the second reaches what the first
+  cannot see. It exists because a launchpad tile on SAPUI5 1.120 is rendered by
+  a **separate component**: its title and counter are neither in its view, nor
+  in its aggregations, nor in its binding context, and reading them had been
+  improvised as page-object JavaScript. The capability now lives in the library
+  (convention 12), the page object carries only vocabulary, and the live run
+  returns exactly the same values as the JavaScript it replaces.
+- **A reversible write scenario on both ABAP launchpad campaigns**: pin an
+  application from the App Finder, then unpin it, proving the home page is
+  returned to the state it was measured in. **Opt-in with two turns**, the
+  pattern of `tests/robot/cross/simulation_ecriture_lecture.robot`: the `write`
+  tag says what the test does, `-v ABAP_FLP_WRITE_OPT_IN:yes` says it was
+  intended, and without the variable the test is SKIPPED even in a full
+  `tests/robot/` run (a tag alone depends on the memory of whoever types the
+  command). The restoration is **observed**, never assumed: it is the
+  disappearance of the pinned intent that settles it, not a tile count back to
+  its starting value, which would only prove arithmetic. The teardown logs the
+  diagnostics BEFORE cleaning up (cleaning navigates away and destroys the
+  failing screen) and unpins even after a failure. Validated live on both
+  targets: 1.120 **22/22** and 1.71 **20/20** with the opt-in, 21/22 and 19/20
+  with one skip without it.
+- **An offline smoke for the versioned `__SAPFX` bundle**
+  (`tests/robot/fiori_bundle_version_smoke.robot`, no SAP, no network): it
+  plants a stale bundle in the page exactly as an rf-mcp hot swap does, then
+  measures in a real browser that a keyword call replaces it, that the `fetch`
+  and `XMLHttpRequest` wrappers are the SAME functions as before (so not
+  stacked), that the state carrier is the same object, that a witness dropped in
+  the toast capture survives, and that one request is still counted exactly
+  once. Counter-proof run with the old guard restored: the replacement test then
+  fails with the very field symptom, `window.__SAPFX.resolveByDom is not a
+  function`.
+- **A replayable campaign against the Fiori launchpad served by an ABAP server**
+  (the classic ushell of the `/sap/bc/ui2/flp` ICF service), generated from
+  `specs/exploration-flp-abap-a4h.md` and validated **live 19/19** against an
+  ABAP Platform 1909 serving SAPUI5 1.71:
+  `tests/robot/ui/fiori/exploration_flp_abap_a4h.robot`, with its page object
+  `resources/page_objects/abap_flp.resource`. The page object is deliberately
+  **parameterised by target** (URL, credentials, intents, classification
+  markers) rather than specialised on one system: a second campaign on another
+  ABAP release reuses it as is, and the values measured on this target live in
+  the suite. What this launchpad establishes, point by point against the Work
+  Zone cFLP already covered: there is **no iframe at all** (the application
+  lives in the shell's own document and is recognised by the container whose id
+  is derived from its intent), the catalogue is read through `LaunchPage`
+  because `SearchableContent` does not exist on this ushell (404), and the 1.71
+  runtime emits no deprecation, which makes the console triage readable (three
+  errors on a clean load, all traced to components that are not deployed).
+  Read-only: the home edit mode is entered only to be left without moving
+  anything, and the test **proves** it by comparing the groups before and after.
+- **The same launchpad campaign on a second ABAP release**, generated from
+  `specs/exploration-flp-abap-2023.md` and validated **live 21/21** against an
+  ABAP Platform 2023 serving SAPUI5 1.120.15, with the 1.71 suite replayed
+  **19/19** right after to prove the shared page object did not regress. It
+  exists because one release makes mono-release assumptions invisible, and it
+  proved the point on its first run: the user actions menu changes both its id
+  and its control type (`meAreaHeaderButton`/`ShellHeadItem` becomes
+  `userActionsMenuHeaderButton`/`sap.m.Avatar`), the navigation refusal dialog
+  gains a second button so acknowledging at position 0 **copies the message and
+  leaves the dialog open** while the logoff confirmation still answers at
+  position 0, the 1.71 tile probe returns empty titles and intents **without
+  failing** on 1.120 (five scenarios would have gone green on nothing, now a
+  named failure), the home control floor drops from 184 to 134, and the browser
+  back navigation needs 55 s to settle where 15 s was enough. What is confirmed
+  IDENTICAL is a result too: no iframe, the same catalogue (2 catalogues, 67
+  tiles, 62 intents, 61 resolvable), 54 App Finder tiles, the same user action
+  suffixes. Everything that differs is a **variable** or a **named strategy**
+  (the name of the keyword that knows how to read or close), never an `IF` on
+  the version: adding a release adds a keyword, not a branch.
+- **Three Fiori keywords that close capability gaps found on that live target**
+  (convention 12), each with its off-browser unit tests: `Get Ui5 Ids` (which
+  controls matched, the reading that completes the count and the properties
+  when the documented anchor is an id SUFFIX), `Get Ui5 Open Popups` (the Fiori
+  counterpart of ECC's `Get Open Windows`: a closed dialog stays **rendered**,
+  so no count and no resolution tells open from closed, only
+  `sap.m.InstanceManager` does) and `Click Ui5 Dialog Button` (acknowledge a
+  dialog by the POSITION of its button: MessageBox buttons carry a generated id
+  and translated text, which two live campaigns paid for in two languages).
+- **Two replayable campaigns against a live SAP BTP launchpad** (SAP Build Work
+  Zone behind a real SAP Cloud Identity Services tenant), generated from plans
+  and driven end to end through rf-mcp before being written:
+  `specs/workzone-launchpad-btp-perception.md` ->
+  `tests/robot/ui/fiori/exploration_launchpad_workzone.robot` (**live 9/9**),
+  and `specs/workzone-panier-parcours-applicatif.md` ->
+  `tests/robot/ui/fiori/parcours_panier_workzone.robot`. The first campaign
+  perceives the shell and is read-only; the second plays a **reversible**
+  business journey inside the application's cross-origin iframe and returns the
+  cart to the state it measured at the start. Both are **discovery-driven**:
+  the applications visited are the ones the shell's own catalogue service
+  declares on the day of the run (read through `SearchableContent`, which
+  answers what the signed-in user may open, not what the page happens to show),
+  and no category, product or volume is hard-coded. Locators live in two page
+  objects (`resources/page_objects/workzone_launchpad.resource`,
+  `workzone_shopping_cart.resource`); the site URL, user and password never get
+  a committed value (convention 11).
+  What the real target taught, and no fixture could: the Work Zone shell is a
+  **hybrid** page (UI5 runtime plus a shell bar built from scoped UI5 Web
+  Components, `ui5-shellbar-6bfd01e3`), the application iframe is created
+  **after** the navigation keyword returns and its generated id moves between
+  runs (`__container4` then `__container5` in one session, after three other
+  values the day before), entering that iframe does **not** mean the
+  application has started (its first perception can legitimately report zero
+  controls), and counting a launchpad's console errors is meaningless: 17 of
+  the 20 seen are `[FUTURE FATAL]` deprecations that SAP's own shell code
+  emits. The campaign therefore asserts the only property that holds, zero
+  uncaught page exception, and **classifies** the rest instead of failing on
+  code this repository does not maintain.
+- **Convention #12: a capability gap found on a live target is closed IN the
+  shipped library.** A library keyword that misbehaves gets fixed in `src/`; a
+  missing one gets created there (pure logic in `sapfx_common`), never as
+  inline JS in a page object, an `Evaluate` in a suite, or a helper only one
+  campaign will ever see; a workaround already sitting in an intermediate layer
+  gets promoted. The boundary is what makes the rule usable: libraries carry
+  CAPABILITIES (perception, resolution, waiting, engines, state, protocols),
+  `resources/` carries one site's BUSINESS VOCABULARY. It matters because the
+  libraries are what ships to PyPI: a fix left in a resource helps nobody else,
+  gets re-improvised in the next project, and leaves the defect in place for
+  every other user while the campaign that found it looks green. It is also the
+  one place where this repo's « Observe, do not fix » posture explicitly does
+  not apply: the system under test is observed, our own library is repaired.
+  Stated in CLAUDE.md and both mirrors, in the `sapfx` skill, and in the two
+  agents that write code (sap-generator, sap-healer, the latter gaining a
+  « library defect » failure class next to locator drift and timing).
+  `check_guidance_sync.py` now keeps that rule in those two definitions only
+  (a scoped marker map: the planner explores and the ISTQB agent writes
+  offline), with counter-proofs in both directions.
+- **Two engine defects the live launchpad exposed, fixed rather than
+  worked around.** (1) The `wc` engine's **short type never matched a two-word
+  component**: `ShellBar` became `shell-bar`, which contains a hyphen, so it was
+  taken for a FULL tag name and never prefixed with `ui5-`. Measured on a real
+  Work Zone shell bar, `tag=ShellBar` returned **0** while the page carried a
+  `<ui5-shellbar-6bfd01e3>`. UI5 Web Components uses both spellings, glued
+  (`ui5-shellbar`) and hyphenated (`ui5-side-navigation`), so the engine now
+  tries both; the two cases are locked offline in `fiori_wc_smoke.robot`.
+  (2) **`viewId` did not scope by view**, it compared the given id to the
+  CONTROL's id as a substring: that works for a factory-built control (whose id
+  contains its list's id) but not for a control with a fully generated id, and
+  `controlType=Button viewId=<view>` therefore returned 0 on a view that carried
+  three buttons. It now walks up to the owning view, keeping the substring form
+  as a second chance, so nothing that worked stops working and the parameter
+  finally does what its name promises.
+- **`Get Ui5 Property` / `Get Ui5 Properties`** (SapFioriLibrary): read a
+  control PROPERTY from the UI5 registry, for one control or for every match at
+  once. The complement of `Get Ui5 Text`, not its duplicate, and it exists
+  because the live campaign hit both of its limits in one afternoon. `Get Text`
+  returns what the browser DISPLAYS, so it requires the control to be VISIBLE
+  and it returns everything the control draws: a `sap.m.StandardListItem` with
+  a counter reads `"Accessories\n34"` where its `title` property is
+  `"Accessories"` (re-injected into a locator, that name matches nothing), and
+  a control rendered inside a collapsed `sap.f.FlexibleColumnLayout` column has
+  no readable text at all, so the read waits ten seconds for a visibility that
+  will never come and the failure looks like locator drift. Reading the
+  property is exact, needs no visibility, and lists an entire list of titles in
+  one call. An unknown property name fails naming the available ones, rather
+  than quietly returning a list of `None`.
+- **API-key authentication, and with it a third live target for the API
+  channel** (`Open Api Session    api_key=...    api_key_header=APIKey`): the
+  SAP Business Accelerator Hub sandbox (api.sap.com) authenticates by a header
+  key, not Basic, not OAuth2, not mTLS, so until now the channel simply could
+  not reach it. That target matters beyond the auth mode: it is the only one of
+  the three that serves the REAL shape of SAP S/4HANA Cloud APIs (the A4H
+  Gateway is a demo repository and cap-sflight is a Node app), it needs no
+  install, and it costs nothing. An empty key is refused **at open time**: sent
+  as an empty header it would authenticate nothing and surface much later as an
+  HTTP 401 that names neither cause nor remedy. The key never reaches a log,
+  and `List Api Sessions` reports `authenticated` without exposing the header.
+  Business layer in `resources/api_keywords.resource` (`Open Api Sandbox
+  Channel`, `Api Key Should Be Provided`, service paths per convention 1) and a
+  third `sandbox` lane in `tests/robot/api/canal_api_odata.robot`, so the same
+  business keywords are now exercised over three authentication protocols. That
+  lane is also the only one to serve **both OData protocols from one system**,
+  v2 (`API_BUSINESS_PARTNER`) and v4 (`api_purchaseorder_2`, 210 454 purchase
+  orders). The v4 service path was read off the live system rather than
+  deduced: the `odata4/sap/<api>/srvd_a2x/sap/<definition>/0001` shape varies
+  per API, and perfectly plausible candidates answer 404, or 403 `Unified
+  Connectivity: Forbidden` for an API the key does not cover.
+- **Three library keywords rejoin the rf-mcp intent maps** (`Read Ddic Table
+  Fields`, `Get Se16 Selection Criteria`, `Probe Odata Entity Sets`): added by
+  the cross-channel campaign without being routed, which the map-freshness
+  guard caught. Outside the map an agent re-improvises them, which is exactly
+  the divergent-copy problem those keywords were written to end.
+- **Cross-channel write/read simulation** (`specs/simulation-ecriture-lecture-cross-canal.md`
+  -> `tests/robot/cross/simulation_ecriture_lecture.robot`, live 8/8): a row is
+  written through the SCREEN and observed through the API, then deleted and its
+  disappearance verified on both channels. It exists because the cross-channel
+  campaign's write-candidate guard returns zero candidates, and that is not a
+  guard being too strict: a `sap:` annotation says what the SERVICE permits and
+  says nothing about whether a write is **reversible** or **cleanable**, the
+  two conditions that actually decide a write simulation. This suite produces
+  the dated observation that `reversibility_observed` was missing.
+  Reversibility is asserted on the ENTITY, never on a count alone: two writes
+  and one delete would leave the same count as no write at all.
+  Safety is mechanical rather than declared: the campaign **skips in Suite
+  Setup without opening a channel** unless an explicit opt-in variable is
+  passed (a tag alone depends on whoever types the command), every writing
+  keyword goes through an allowlist whose empty value refuses everything,
+  deletion re-reads the filtered grid and stops without deleting if the
+  selection is not exactly the intended row, and SE16's mass-delete menu index
+  appears nowhere in the page object, which a unit test enforces.
+- **The SE16 data-entry screen becomes a reusable page object**
+  (`resources/page_objects/se16_table_entry.resource`): create, search and
+  targeted delete of a table row. Those locators previously existed only raw
+  inside a self-contained demonstration suite, which deliberately departs from
+  convention 1, so nothing reusable could be built on them.
+- **Four more proven entity set to table couples** in the cross-channel
+  mapping, from the `Z_BIND_FLIGHT_R` service the campaign did not cover:
+  `Airline`/`/DMO/CARRIER` (16), `Connection`/`/DMO/CONNECTION` (20),
+  `Flight`/`/DMO/FLIGHT` (40), `Airport`/`/DMO/AIRPORT` (47), each established
+  by cross-counting and not by name. The campaign now runs 9/9 with 14 couples.
+- **Cross-channel acceptance campaign, ECC screen against the live API**
+  (`specs/croisement-ddic-odata-ecc-s4hana.md` ->
+  `tests/robot/cross/croisement_ddic_odata.robot`, 9 scenarios, validated live
+  9/9). The flagship suite already proved **one** hardcoded pair
+  (`SNWD_PD` = `SEPMRA_SHOP/Products`). This generalises it into a
+  discovery-driven, bounded and replayable campaign that answers the real
+  question: which tables and which entity sets a target actually exposes, and
+  whether the two channels agree. Three levels, each switchable: **existence**
+  (every declared entity set is really addressable), **volume** (the OData
+  `$count` equals the SE16 count of the mapped table), and **field contract**
+  (`$metadata` properties against the DDIC fields read from DD03L, the level
+  that catches a schema drift between ECC and S/4HANA). It consumes the DDIC
+  inventory as an upstream brick rather than restating it, produces a
+  deterministic artifact, and compares two targets offline. Read-only: the
+  write-simulation scenario identifies candidates without writing.
+- **Entity-set annotations in the `$metadata` contract**
+  (`sapfx_common.odata_metadata`): each entity set now carries `label`,
+  `capabilities` (the `sap:` annotations of the entity set itself, Gateway
+  default applied when the attribute is absent) and `declared_capabilities`
+  (only those actually written in the document), plus
+  `write_simulation_candidates` on top. This is what lets a suite tell a
+  **legitimate refusal from an anomaly** before making any call: measured
+  live, the single entity set of a 29-set service that answers HTTP 403 is
+  also the single one annotated `sap:addressable="false"`.
+- **New business keywords for the cross-channel layer**: `Read Ddic Table
+  Fields` and `Get Se16 Selection Criteria` (`SapEccLibrary`, DD03L read
+  through the shared SE16 result reader), `Probe Odata Entity Sets`
+  (`SapApiLibrary`, the **tolerant** probe that records HTTP status and OData
+  code per entity set instead of stopping at the first refusal; the
+  all-or-nothing behaviour of `Read Business Entities In One Roundtrip` is
+  untouched, it remains the right one for data preparation), and the business
+  vocabulary in `resources/cross_channel_keywords.resource`, which carries the
+  entity set to table mapping.
+- **`Api Base Url Should Be Provided`** (`resources/api_keywords.resource`),
+  the symmetric guard of `Api Credentials Should Be Provided`. A missing base
+  URL did not fail on open: it failed much later, on the first call, as
+  `ValueError: unknown url type: '/sap/opu/odata/...'`. That message names
+  neither the cause nor the remedy, and it points at a perfectly correct path,
+  which sends the reader looking in the wrong place.
+
+- **The IDP login is now proven against a real SAP IAS tenant**
+  (`tests/robot/ui/fiori/authentification_ias_live.robot`, live 5/5). The
+  fixture suite stays as the CI one: it needs no credentials and will outlive
+  the 90 days of a trial. The live suite proves what no fixture can: the real
+  redirect to the tenant's `/oauth2/authorize`, the `sap-ias` preset's
+  selectors matching an authentic form (which serves one page where the fixture
+  imitates two steps), and landing on a real cFLP shell.
+  Two failure paths are told apart on purpose, because they are two different
+  steps of the same form and nothing guarantees they look alike: an **unknown
+  identity** is refused at identification, a **wrong password** at
+  authentication. The second one runs against a **dedicated test account**,
+  never the working one: an IAS locks a user after a few failed attempts, and
+  the working account is the one that owns the trial, the site and the admin
+  console. Proving an error path must not damage the environment. Result: the
+  library was right, it reports "still on the IDP form" for both, and we now
+  know it instead of assuming it.
+  Also measured, and it cost two iterations: on a cFLP, `Wait For UI5 Ready`
+  can be satisfied while the shell has built **zero** controls. The runtime is
+  loaded, nothing is busy, and the page is empty. A fixture renders in one go
+  and never shows that intermediate state.
+- **The launchpad's application frame is found without knowing its generated
+  id** (`Get Ui5 App Frame`, `Push Ui5 App Frame`). First time the project ever
+  drove a **real cFLP**: a SAP Build Work Zone site on a BTP trial, with the new
+  shell bar. The whole chain worked on the first attempt, including login
+  through a genuine SAP IAS tenant with the `sap-ias` preset, which had only
+  ever seen a two-step fixture while the real tenant serves a single page. What
+  did not work was our own documentation: `Set Ui5 Frame` offered
+  `iframe[id*="application"]` as its example, and no iframe of that launchpad
+  carries such an id. The application frame gets a **generated** UI5 id whose
+  counter moves between runs, measured on three consecutive runs of the same
+  app: `__container1`, then `__container4`, then `__container3`. The new
+  keyword designates the frame by what it IS (visible, loading a document,
+  occupying the shell's content area) and returns a positional
+  `iframe >> nth=N`; the selection logic is pure and unit-tested off-browser.
+  Two findings kept alongside: the new Work Zone shell bar is built on **Web
+  Components** (the `wc` engine, written for SuccessFactors pages with no UI5
+  runtime, turns out to serve SAP's future launchpad), and the app iframe is
+  created **after** `Open App By Intent` returns, so an immediate perception
+  sees the shell alone and reports no frames.
+- **A credential can no longer get a committed default value** (convention 11,
+  `tests/unit/test_no_hardcoded_credentials.py`). In `resources/`,
+  `tests/robot/` and `variables/`, any variable whose name carries
+  `PASSWORD`/`PWD`/`SECRET`/`TOKEN`/`KEY` must keep `${EMPTY}`; exceptions are
+  declared with their reason, and a test removes dead ones. It exists because
+  the leak scanner of `export_public_tree.py` is a **blocklist of known
+  strings**: it stops what it was taught to recognise and would not see an
+  unknown API key crossing to the public repository. The realistic failure is
+  convenience, not malice: pasting a key into a resource for one run and
+  forgetting it. Two counter-proofs show the guard bites, on the lesson that
+  a guard whose failure was never witnessed is not a guard.
+
+### Fixed
+- **The injected `__SAPFX` bundle is replaceable within the life of a page.**
+  Its guard used to read « already present », so the first bundle a page
+  received was kept **for ever** and every later version was ignored in silence.
+  Field symptom, paid live on 2026-08-24: after hot swapping the library inside
+  a running rf-mcp server (module reload, `__class__` swap, `Reload Library`),
+  the new keywords are visible on the Robot side but the call comes out as
+  `window.__SAPFX.<x> is not a function`, a message that accuses the keyword
+  when the culprit is the injection cache, and only a page reload repaired it.
+  The bundle now carries a **version derived from its own content** (a short
+  fingerprint computed in Python), and the guard reads « present AND of the same
+  version »: the ordinary case, at every keyword call, still installs nothing.
+  The real risk of that change is what a reinstall does to the hooks placed at
+  injection time (the `fetch`/`XMLHttpRequest` instrumentation of
+  `Wait For Ui5 Idle`, the `MessageToast` capture): reinstalling them would
+  DOUBLE them (every request counted twice, so a page never « idle »), dropping
+  them would LOSE them (a page always idle, which is worse: the wait returns too
+  early and the failure lands elsewhere). The mutable state therefore lives on
+  the window and each wrapper carries its mark, so a reinstall neither stacks
+  nor forgets; the toast hook is marked by its RECEPTACLE rather than a boolean,
+  so a hook left by an older bundle cannot go on filling an orphan list.
+  `Ui5 Runtime Is Present` still injects nothing (an observation must not modify
+  the page).
+- **A grid locator now addresses the control, not the screen layout**
+  (`_grid.py`). On a modern ABAP release the ALV output is wrapped in one or
+  more `GuiSplitterShell`, so the historical path
+  `cntlGRID1/shellcont/shell` lands on a container and every grid read fails
+  with `no ColumnOrder` or `<unknown>.rowCount`. The wrapping depth **varies by
+  transaction** (one level in SE16, two in SM50, which adds an HTML header
+  pane), so no fixed suffix could be appended: the library now descends to the
+  first descendant carrying `ColumnOrder`, breadth-first and depth-bounded. The
+  descent is logged as a WARNING, never silent, on the same principle as
+  locator healing.
+  The vendored upstream primitives (`Get Row Count`, `Get Cell Value`, `Set
+  Cell Value`, `Click Toolbar Button`, `Select Table Row`) call `findById`
+  directly and therefore bypassed that choke point, which a first pass missed:
+  they are overridden in the mixin, one line each, leaving the vendored file
+  untouched (convention 4). Resolution is a no-op when the locator already
+  carries the grid, measured: not one descent warning on the reference 1909
+  system. Found by running the repo's own suites against a **second live
+  system**, which is exactly what a single target could never reveal:
+  `ecc_smoke` and `ecc_data_smoke` are now green on both releases.
+  A locator failure had been masquerading as a business diagnosis: the
+  "does demo data exist" guard reported missing data on a system where the
+  data was present, because its check goes through a grid read.
+- **A response compressed by the server is now decompressed** (`gzip` and
+  `deflate`, on every body the API channel reads: payloads, error excerpts,
+  preflight probes, token endpoint). Found live on the SAP Business
+  Accelerator Hub sandbox, which serves its `$metadata` with
+  `Content-Encoding: gzip` although the client sends **no** `Accept-Encoding`
+  at all. The failure blamed the wrong layer: the compressed bytes reached the
+  XML parser, which reported `not well-formed (invalid token): line 1,
+  column 0`, an error that accuses the document while the transport is at
+  fault, and that sends you reading a perfectly valid `$metadata`. JSON reads
+  passed throughout, because that server compresses only the XML path, so the
+  gap stayed invisible on two live targets out of three. An encoding we cannot
+  undo leaves the body untouched rather than raising: the layer above still
+  names status, URL and excerpt.
+- **The Libdoc freshness guard now watches content, not only the version
+  number** (`tests/unit/test_libdoc_pages_fresh.py`). It compared the version
+  embedded in each page against `pyproject.toml`, so it only bit on a bump:
+  between two releases, an added or removed keyword left the published pages
+  incomplete with nothing to announce it. Found by looking rather than by the
+  guard: three keywords were missing and four signatures had changed (the
+  `per_resolution` option) since the previous release, every guard green. The
+  new check compares the keyword NAMES of each committed spec against what the
+  library actually exposes, and it was counter-proved against the stale spec
+  before being kept. The pages and specs are regenerated accordingly (121 / 53
+  / 33 keywords).
+- **A write capability declared is not a write capability permitted**
+  (`write_simulation_candidates`). The guard counted the **presence** of a
+  `sap:` annotation, not its **value**, so an entity set declaring
+  `sap:creatable="false"` and `sap:deletable="false"` while staying silent on
+  `updatable` was reported as backed by the service, when the only verb it
+  allowed came from that silence. `evidence` is now derived from
+  `declared_allowed` (allowed **and** declared), so a verb only counts when it
+  is explicitly permitted. On the measured target this leaves zero candidates
+  instead of two that nothing supported. Same failure class, caught twice in
+  the same pass: an earlier version placed the guard at **service** level,
+  which a service declaring a restriction on one entity set while staying
+  silent on four others would have passed, green and wrong.
+- **Per-geometry visual baselines (`per_resolution=True`)** on the three
+  snapshot assertions, `Screen Should Match Baseline` and `Element Should
+  Match Baseline` (ECC) and `Ui5 Screen Should Match Baseline` (Fiori). A
+  perceptual hash encodes the **capture geometry** as much as the content, so
+  the same unchanged screen rendered at 1920x1032 and then at 4676x2454 drifts
+  by several bits: a baseline was implicitly tied to one machine, and the only
+  answers on offer were "pick a reference workstation" or "stop asserting".
+  With the option on, each geometry keeps its own committed reference,
+  `<name>@1920x1032.png`, created on that machine's first pass exactly like any
+  first pass. Drift detection is unchanged at constant geometry, which the unit
+  tests pin: a variant is a separate reference, never an amnesty. An already
+  committed `<name>.png` stays in use as long as its geometry matches, so
+  nothing has to be regenerated or renamed. Masking gains from it too: a mask
+  is a pixel rectangle, and it only means anything at constant geometry.
+
+- **The drift sentinel follows, split along the honest line**
+  (`Check Screen Against Watch`, `per_resolution=True`, on by default in
+  `tests/robot/ecc_drift_sentinel.robot`): a screen signature does not depend
+  on the display resolution and a perceptual fingerprint does, so the
+  structural reference stays shared while the visual ones (`.dhash.txt`,
+  `.tiles.txt`) become per geometry. A workstation whose geometry has no
+  visual reference yet registers one and compares the structural channel that
+  pass, instead of reporting a drift that is only a change of scale. The
+  `.dhash.txt` now carries its own geometry, older references without it stay
+  readable and keep working, and the `.tiles.txt` header already recorded it,
+  which is what lets an already committed reference be recognized as valid
+  here. Live against A4H: the committed references were reused, no variant
+  created, SE16 and SE38 unchanged.
+
+### Changed
+- **Convention #13 (no code file beyond 500 lines) enforced, and the initial
+  debt settled in one remaster pass** (23 files, 2026-08-25). Every split
+  follows a seam the repo already used, never a cut at line 500; every facade
+  keeps the historic import surface, so nothing changes for consumers:
+  - ECC mixins: `_grid.py` hands the classic dynpro **table controls** to
+    `_table_control.py`; `_perception.py` hands screenshots, visual assertions
+    and the drift sentinel to `_screenshots.py` / `_visual.py` / `_watch.py`;
+    `_ddic.py` hands the SE16 SCREEN primitives (`Reach Se16 Selection
+    Screen`, `Fill Multiple Selection`, criteria map, result reader) to
+    `_se16.py`. The `SapEccLibrary` MRO grows accordingly, keyword set
+    unchanged (`robot --dryrun` 221/221).
+  - `SapFioriLibrary` becomes a mixin package (`keywords/`: `_base`,
+    `_frames`, `_locators`, `_engines`, `_composition`, `_actions`, `_state`,
+    `_perception`, `_flp`), mirroring the ECC layout; a dead module constant
+    (`_INTERACTABLE`, unused since the fill logic moved into the JS bundle)
+    was removed on the way.
+  - `SapApiLibrary` splits into `_http.py` (session state, same-origin
+    redirect guard, body decompression), `_core.py` (`_ApiCore`:
+    URL/errors/CSRF/OAuth2 plumbing shared by all mixins), `_odata_read.py`,
+    `_odata_write.py`, `_discovery.py` and `_rfc.py`.
+  - The injected JS templates split into chapters (`_ui5_bundle_*.js.tpl`,
+    `_ui5_spy_*.js.tpl`) concatenated byte-identically by `_ui5_js.py`: same
+    assembled content, same bundle version, generated recorder files
+    untouched.
+  - The desktop recorder splits into `recorder_com/_capture/_poll/_native/`
+    `_native_loop/_replay.py` behind the `sapgui_recorder.py` facade (still
+    loadable by path as a Robot library); `recorder_exports.py` becomes a
+    facade over `recorder_exports_core/_robot/_docs/_report.py`; the GUI's
+    pure logic moves to `recorder_gui_logic.py`.
+  - `sapfx_common.semantic` keeps its public API and moves the geometric
+    building blocks to `_semantic_match.py`; `sapfx_common.cross_channel`
+    keeps its `__all__` (the Robot keyword surface) and moves the halves to
+    `_cross_channel_contract.py` / `_cross_channel_artifact.py`;
+    `export_public_tree.py` moves its declarative rules (scope, transforms,
+    leak patterns) to `scripts/_export_rules.py`, excluded from the public
+    export like the engine itself.
+  - The ten oversized test files split by theme, shared fakes extracted into
+    `_*_fixtures.py` modules; same collected count (1544), coverage
+    unchanged (94% src, 74% recorders).
+  The rule is now held mechanically by **`scripts/check_file_length.py`**
+  (CI + `PostToolUse` hook on every edited code file + a unit test scanning
+  the real tree): exact-count allowlist as the only escape hatch, empty.
+  Two downstream effects of a layout change, both caught by running the whole
+  publication chain rather than the tests alone: a leftover `build/` directory
+  made setuptools ship the two DELETED templates inside the wheel (purge it
+  before building, and diff the wheel against `src/`), and stating the rule
+  meant naming the private communication directory in its exemptions, which
+  the public export's leak scan refuses. `scripts/_export_rules.py` now
+  handles both mirrors the way it already handled their em-dash sentences (a
+  transform: the public tree must not describe a directory it does not have)
+  and allowlists the three guard files the way `check_bilingual_docs.py`
+  already was (an exemption prefix left without an object is harmless).
+- **A visual failure whose two geometries differ now says so**, with or
+  without the option: the message names the baseline geometry, the capture
+  geometry, the fact that the drift may be scale alone (the structural channel
+  would not have moved), the `per_resolution=True` remedy and the geometries
+  already known for that name. This is the diagnosis that cost time during the
+  0.6.7 test pass, spent in the failure message rather than in a memory entry.
+  The Robot log also names the geometry a baseline was created at or matched
+  on, so a reference says which workstation it is worth for.
+
 ## [0.6.7] - 2026-08-19
 
 ### Added
@@ -30,7 +512,7 @@ name that was current at the time).
 - **`tests/robot/api/canal_api_odata.robot`**: the API channel finally has a
   suite of its own. It was only ever exercised indirectly, by the two
   cross-paradigm suites and through a single read keyword each, while the
-  library exposes 33 public keywords: the two defects fixed below lived in
+  library exposes 32 public keywords: the two defects fixed below lived in
   precisely that blind spot. The suite runs the same business keywords against
   two protocols and two systems, OData v2 (tag `a4h`) and OData v4 (tag
   `capsflight`), which is the property worth testing. Live: 12/12. It also

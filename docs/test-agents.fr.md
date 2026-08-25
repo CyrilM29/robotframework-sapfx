@@ -206,6 +206,15 @@ cible :
 - **Perception avant action** : les agents ne devinent jamais un écran ; ils
   le lisent (`Get Screen Signature` / `Get Ui5 Page Tree`, `mode=diff` en
   boucle).
+- **Mémoire QA partagée avant les décisions de jugement** : quand le serveur
+  MCP optionnel `qa-brain` est monté (RAG sur la mémoire QA de l'équipe :
+  keywords, specs, docs, leçons écrites après incident réel), les quatre
+  agents l'interrogent (`qa_search`, `qa_ask`, `qa_status`) avant de décider
+  quelle ancre tient, dans quelle couche va un keyword, de quelle classe
+  relève un échec ou quel risque porte un cas de test. Cela ne remplace jamais
+  l'observation : le système live tranche, un passage retrouvé est une piste
+  que l'on cite, et un serveur absent tient en une ligne de rapport sans rien
+  bloquer (le pack de déploiement n'embarque pas `qa-brain`).
 - **Isolation des sessions** : l'état API/Fiori est partitionné par session
   rf-mcp ; les agents ECC utilisent une session live par process à cause des
   limites de contexte des resources imbriquées de rf-mcp 0.31.

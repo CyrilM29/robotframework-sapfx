@@ -1,6 +1,6 @@
 ---
 name: baselines-visuelles-liees-a-la-resolution
-description: 2026-08-19, les baselines visuelles ECC committées divergent dès que la fenêtre SAP GUI est rendue à une autre résolution (1920x1032 contre 4676x2454), à contenu strictement identique ; DÉCISION prise, ne pas les régénérer
+description: 2026-08-19, une empreinte perceptuelle encode la géométrie de capture autant que le contenu (1920x1032 contre 4676x2454 = 8 bits d'écart à contenu identique) ; mis à jour le 2026-08-20, l'outil répond désormais par `per_resolution=True` (une baseline par géométrie)
 type: projet
 date: 2026-08-19
 ---
@@ -17,22 +17,40 @@ valeurs, même titre, vérifié image contre image. Le diagnostic tient en une
 observation : la dérive est **visuelle seule**, aucune dérive **structurelle**
 n'est remontée (les ids sont inchangés).
 
-**Décision (Cyril, 2026-08-19) : on ne régénère pas.** Une baseline refaite ici
-ferait échouer l'autre poste ; le problème n'a pas de bonne réponse par la
-régénération, seulement par le choix du poste de référence.
+**Décision du 2026-08-19 : ne pas régénérer.** Une baseline refaite sur le
+second poste ferait échouer le premier ; la régénération déplace le problème,
+elle ne le résout pas. C'est aussi ce qu'interdit la règle « pas de mise à jour
+de baseline de confort », dont le vrai risque est de masquer une dérive future.
 
-**Pourquoi :** le réflexe naturel devant un rouge est de rafraîchir la
-référence, et c'est exactement ce que la règle « pas de mise à jour de baseline
-de confort » interdit. Ici ce réflexe serait doublement mauvais : il masquerait
-une vraie dérive future, et il déplacerait simplement l'échec sur un autre
-poste. À noter, aucune conséquence de portée : ces suites ne tournent dans
-AUCUN workflow de CI, donc l'écart ne bloque ni la CI ni une release.
+**Mise à jour du 2026-08-20 : le problème a une réponse dans l'outil.** Les
+trois assertions snapshot (`Screen Should Match Baseline`,
+`Element Should Match Baseline`, `Ui5 Screen Should Match Baseline`) acceptent
+`per_resolution=True` : une baseline **par géométrie**
+(`<nom>@1920x1032.png`), créée au premier passage du poste comme n'importe
+quel premier passage, committée à côté des autres. À géométrie constante, la
+détection de dérive est inchangée : une variante est une référence de plus,
+jamais une amnistie. Une baseline `<nom>.png` déjà committée reste utilisée
+tant que sa géométrie coïncide, donc rien à régénérer ni à renommer. Et sans
+l'option, l'échec dont les deux géométries diffèrent le **dit** maintenant dans
+son message (dérive peut-être d'échelle seule, remède nommé). Le poste de
+travail est par ailleurs revenu à la géométrie de référence, donc la baseline
+committée redevient valable telle quelle.
+
+**La sentinelle de dérive suit, coupée là où c'est honnête :** une signature
+d'écran ne dépend pas de la résolution, une empreinte perceptuelle si. Sous
+`per_resolution=True` (activé par défaut dans le harnais de veille), le canal
+structurel reste partagé et seules les références VISUELLES se déclinent par
+géométrie ; un poste dont la géométrie est inconnue enregistre sa référence
+visuelle et ne compare que le structurel ce passage-là. Le `.tiles.txt` portait
+déjà sa géométrie dans son en-tête : c'est ce témoin qui permet de reconnaître
+une référence committée comme valable ici, sans rien régénérer.
 
 **Comment appliquer :** devant un `Screen Should Match Baseline` rouge ou une
 dérive de sentinelle, comparer d'abord les DIMENSIONS du `.actual.png` à celles
-de la baseline. Si elles diffèrent, c'est le poste qui a changé, pas SAP :
-ne rien régénérer, et ne pas re-signaler le constat comme une régression. Si
-elles sont identiques, alors la dérive est réelle et mérite d'être lue. Le
+de la baseline (le message d'échec le fait désormais pour les baselines). Si
+elles diffèrent, c'est le poste qui a changé, pas SAP : ne rien régénérer, et
+passer la suite en `per_resolution=True` si elle doit tourner sur plusieurs
+postes. Si elles sont identiques, la dérive est réelle et mérite d'être lue. Le
 canal structurel (signature d'écran) reste dans tous les cas le juge de la
 non-régression fonctionnelle. Voir [[assertions-visuelles-masquage]] si le
 sujet est une zone volatile plutôt qu'une échelle.

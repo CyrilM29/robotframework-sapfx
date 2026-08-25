@@ -192,6 +192,15 @@ plus the reference example), and both MCP templates. On the target PC:
 
 - **Perception before action**: the agents never guess a screen; they read it
   (`Get Screen Signature` / `Get Ui5 Page Tree`, `mode=diff` in loops).
+- **Shared QA memory before judgement calls**: when the optional `qa-brain`
+  MCP server is mounted (a RAG over the team's QA memory: keywords, specs,
+  docs, lessons written after real incidents), the four agents query it
+  (`qa_search`, `qa_ask`, `qa_status`) before deciding which anchor holds,
+  which layer a keyword belongs to, which class a failure falls into or which
+  risk a test case carries. It never replaces observation: the live system
+  decides, a retrieved passage is a lead that gets cited, and an absent server
+  is one line in the report, never a blocker (the deployment pack ships no
+  `qa-brain`).
 - **Session isolation**: API/Fiori state is partitioned per rf-mcp session;
   ECC agents run one live session per process due to rf-mcp 0.31 nested-resource context limits.
 - **The agents hold the SAP user's authorizations**, nothing more, nothing

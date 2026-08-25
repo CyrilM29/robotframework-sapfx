@@ -6,22 +6,33 @@ Documentation       Suite du **canal API**, le troisième canal, celui qui n'a p
 ...                 Les défauts que cet angle mort abritait sont rappelés dans les
 ...                 scénarios qui les verrouillent.
 ...
-...                 Deux protocoles, deux systèmes, les MÊMES mots-clés métier : la
-...                 Gateway OData **v2** embarquée d'un ABAP Platform (tag ``a4h``) et
-...                 un service OData **v4** CAP (tag ``capsflight``). C'est cette
+...                 Trois protocoles d'authentification, trois systèmes, les MÊMES
+...                 mots-clés métier : la Gateway OData **v2** embarquée d'un ABAP
+...                 Platform en Basic (tag ``a4h``), un service OData **v4** CAP
+...                 (tag ``capsflight``), et le bac à sable SAP Business Accelerator
+...                 Hub authentifié par **clé d'API** (tag ``sandbox``). C'est cette
 ...                 symétrie qui vaut d'être testée : une bibliothèque qui ne
-...                 parlerait bien qu'à l'un des deux ne serait utile qu'à moitié.
+...                 parlerait bien qu'à l'un des trois ne serait utile qu'en partie.
+...                 La lane ``sandbox`` est la seule à voir la forme RÉELLE des APIs
+...                 S/4HANA Cloud, celle que rencontrera un client, et la seule à
+...                 servir les DEUX protocoles OData depuis un même système : v2
+...                 (``API_BUSINESS_PARTNER``) et v4 (``api_purchaseorder_2``).
 ...
 ...                 Prérequis lane ``a4h`` : système joignable, Gateway active
 ...                 (sinon le préflight le dit et nomme la remédiation).
 ...                 Prérequis lane ``capsflight`` : ``npx cds watch`` dans
 ...                 ``_cap-sflight`` (:4004).
+...                 Prérequis lane ``sandbox`` : un compte gratuit sur api.sap.com
+...                 et sa clé (bouton « Show API Key »). Aucune installation.
 ...
 ...                 Exemples :
 ...                 | robot --pythonpath src --include a4h
 ...                 | ...   -v API_USER:DEVELOPER -v "API_PASSWORD: Secret:***"
 ...                 | ...   tests/robot/api/canal_api_odata.robot
 ...                 | robot --pythonpath src --include capsflight
+...                 | ...   tests/robot/api/canal_api_odata.robot
+...                 | robot --pythonpath src --include sandbox
+...                 | ...   -v "API_KEY: Secret:***"
 ...                 | ...   tests/robot/api/canal_api_odata.robot
 
 Resource            ../../../resources/api_keywords.resource
@@ -45,6 +56,14 @@ ${CAP_API_URL}          http://localhost:4004
 ${CAP_USER}             alice
 ${TRAVEL_ENTITY}        Travel
 ${TRAVEL_KEY_FIELD}     TravelUUID
+
+# Lane sandbox : bac à sable SAP Business Accelerator Hub (api.sap.com). Pas de
+# mandant, pas de mot de passe : une clé d'API en en-tête, obtenue sur le site
+# (bouton « Show API Key ») et passée en -v "API_KEY: Secret:<clé>".
+${BUSINESS_PARTNER_ENTITY}    A_BusinessPartner
+${BUSINESS_PARTNER_FIELDS}    BusinessPartner
+${PURCHASE_ORDER_ENTITY}    PurchaseOrder
+${PURCHASE_ORDER_FIELDS}    PurchaseOrder
 
 
 *** Test Cases ***
@@ -198,8 +217,91 @@ Les Donnees De Test Creees Sont Retirees A La Fin
     Should Be Equal As Integers    ${total}    ${TOTAL_AVANT}
     ...    msg=Le compte a bougé : ${total} au lieu de ${TOTAL_AVANT}.
 
+Une Cle D Api Authentifie Le Canal Sans Identifiants Basic
+    [Documentation]    Quatrième mode d'authentification du canal : une clé
+    ...    portée par un en-tête. C'est ce qu'exige le bac à sable SAP Business
+    ...    Accelerator Hub, et c'est la seule cible des trois qui expose la forme
+    ...    RÉELLE des APIs S/4HANA Cloud (ni Gateway A4H, ni CAP).
+    ...
+    ...    L'état servi aux agents doit dire « authentifiée » sans jamais porter
+    ...    la clé : même contrat de non-fuite que le mot de passe.
+    [Tags]    sandbox
+    Ouvrir Le Bac A Sable
+    ${etat}=    List Api Sessions
+    ${session}=    Evaluate    [s for s in $etat['api_sessions'] if s['alias'] == 'sandbox'][0]
+    Should Be True    ${session}[authenticated]
+    ...    msg=La session ne se déclare pas authentifiée alors qu'une clé a été fournie.
+    ${json}=    Evaluate    __import__('json').dumps($etat)
+    Should Not Contain    ${json}    APIKey
+    ...    msg=L'état du canal expose l'en-tête d'authentification.
+
+Le Contrat Du Service S4 Publie Ses Entites Et Ses Cles
+    [Documentation]    Contrat lu à la source (`$metadata`) sur une API S/4HANA
+    ...    Cloud réelle. Ce que ce scénario ajoute aux deux autres lanes : la
+    ...    forme des APIs publiées par SAP, celle que rencontrera un client, et
+    ...    non celle d'un référentiel de démonstration.
+    [Tags]    sandbox
+    ${entite}=    Business Service Should Expose Entity Set
+    ...    ${BUSINESS_PARTNER_SERVICE}    ${BUSINESS_PARTNER_ENTITY}    alias=sandbox
+    Should Not Be Empty    ${entite}[keys]    msg=Ensemble d'entités sans clé déclarée.
+    Should Not Be Empty    ${entite}[properties]
+
+Le Comptage Et La Lecture Bornee Tiennent Sur Le Bac A Sable
+    [Documentation]    Le coeur du canal en lecture, sur la troisième cible. Le
+    ...    bac à sable sert un jeu de données figé : on n'affirme donc aucun
+    ...    volume attendu, seulement la cohérence entre ce qui est compté, ce qui
+    ...    est demandé et ce qui est rendu.
+    [Tags]    sandbox
+    ${total}=    Count Business Entities    ${BUSINESS_PARTNERS}    alias=sandbox
+    Should Be True    ${total} > 0
+    ...    msg=Le bac à sable ne rend aucun partenaire : jeu de données vide ou clé sans portée.
+    ${lot}=    Read Business Entities    ${BUSINESS_PARTNERS}    ${BUSINESS_PARTNER_FIELDS}
+    ...    limit=3    alias=sandbox
+    Should Not Be Empty    ${lot}
+    Should Be True    ${lot.__len__()} <= 3    msg=La borne de lecture n'est pas respectée.
+    Dictionary Should Contain Key    ${lot}[0]    ${BUSINESS_PARTNER_FIELDS}
+
+Le Meme Vocabulaire Metier Vaut Pour L Odata V4 Du Bac A Sable
+    [Documentation]    Le bac à sable sert les DEUX protocoles, et c'est ce qui
+    ...    en fait une cible complète : les mêmes mots-clés métier interrogent
+    ...    ici un service OData **v4** de S/4HANA Cloud, après le service v2 des
+    ...    scénarios précédents. Sans ce scénario, la lane prouvait la clé d'API
+    ...    et rien de la v4, alors que c'est la forme d'avenir des APIs SAP.
+    ...
+    ...    Le chemin du service est relevé live et non déduit : la forme
+    ...    `odata4/sap/<api>/srvd_a2x/sap/<définition>/0001` varie par API, et
+    ...    des candidats parfaitement plausibles répondent 404 ou 403.
+    [Tags]    sandbox
+    ${entite}=    Business Service Should Expose Entity Set
+    ...    ${PURCHASE_ORDER_SERVICE}    ${PURCHASE_ORDER_ENTITY}    alias=sandbox
+    Should Not Be Empty    ${entite}[keys]    msg=Ensemble d'entités v4 sans clé déclarée.
+    ${total}=    Count Business Entities    ${PURCHASE_ORDERS}    alias=sandbox
+    Should Be True    ${total} > 0
+    ...    msg=Le service v4 ne rend aucune commande d'achat : jeu de données vide ?
+    ${lot}=    Read Business Entities    ${PURCHASE_ORDERS}    ${PURCHASE_ORDER_FIELDS}
+    ...    limit=2    alias=sandbox
+    Should Not Be Empty    ${lot}
+    Should Be True    ${lot.__len__()} <= 2    msg=La borne de lecture n'est pas respectée.
+    Dictionary Should Contain Key    ${lot}[0]    ${PURCHASE_ORDER_FIELDS}
+
+Une Cle Invalide Est Refusee Explicitement
+    [Documentation]    Symétrique du refus 401 des autres lanes. Une clé fausse
+    ...    doit produire un refus nommé, pas une lecture vide qui passerait pour
+    ...    un jeu de données absent.
+    [Tags]    sandbox
+    Open Api Sandbox Channel    api_key=cle-invalide-de-recette    alias=refus
+    Run Keyword And Expect Error    *
+    ...    Count Business Entities    ${BUSINESS_PARTNERS}    alias=refus
+    Close Api Session    refus
+
 
 *** Keywords ***
+Ouvrir Le Bac A Sable
+    [Documentation]    Ouverture de la lane bac à sable : clé d'API fournie en
+    ...    ligne de commande (`Secret:`), jamais écrite dans la suite. Aucun
+    ...    mandant : le bac à sable est un système unique.
+    Open Api Sandbox Channel    alias=sandbox
+
 Ouvrir Le Canal A4H
     [Documentation]    Ouverture de la lane Gateway v2, identifiants fournis en
     ...    ligne de commande (`Secret:`), jamais écrits dans la suite.

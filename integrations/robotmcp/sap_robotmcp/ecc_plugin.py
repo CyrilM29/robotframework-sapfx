@@ -261,6 +261,12 @@ class SapEccPlugin(StaticLibraryPlugin):
                 "Sample Ddic Objects For Probe", "Merge Ddic Name Lists",
                 "Write Ddic Inventory Artifact",
                 "Compare Ddic Inventory Artifacts",
+                # croisement ECC <-> API : le contrat de champs se lit dans
+                # DD03L (source indépendante de la locale), et la carte des
+                # critères d'un écran de sélection SE16 se DÉRIVE live, jamais
+                # de mémoire (mesuré : 31 critères là où une carte supposée en
+                # annonçait 17).
+                "Read Ddic Table Fields", "Get Se16 Selection Criteria",
                 # essentiels upstream que l'agent utilise en permanence
                 "Input Text", "Send Vkey",
                 # diagnostic / préflight scripting + télémétrie

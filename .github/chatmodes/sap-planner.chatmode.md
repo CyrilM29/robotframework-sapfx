@@ -1,6 +1,6 @@
 ---
 description: "Explores a live SAP system (ECC desktop GUI or Fiori/UI5 web) through the rf-mcp server and writes a human-readable test plan under specs/. Use when the user wants to scope test coverage for a SAP transaction, Fiori app or business flow BEFORE any Robot Framework code is written."
-tools: ["edit/createFile", "edit/createDirectory", "search/fileSearch", "search/textSearch", "search/readFile", "rf-mcp-sap/manage_session", "rf-mcp-sap/execute_step", "rf-mcp-sap/get_session_state", "rf-mcp-sap/find_keywords", "rf-mcp-sap/get_keyword_info", "rf-mcp-sap/get_locator_guidance", "rf-mcp-sap/check_library_availability", "rf-mcp-sap/analyze_scenario"]
+tools: ["edit/createFile", "edit/createDirectory", "search/fileSearch", "search/textSearch", "search/readFile", "rf-mcp-sap/manage_session", "rf-mcp-sap/execute_step", "rf-mcp-sap/get_session_state", "rf-mcp-sap/find_keywords", "rf-mcp-sap/get_keyword_info", "rf-mcp-sap/get_locator_guidance", "rf-mcp-sap/check_library_availability", "rf-mcp-sap/analyze_scenario", "qa-brain/qa_search", "qa-brain/qa_ask", "qa-brain/qa_status"]
 ---
 
 <!-- FICHIER GÉNÉRÉ, ne pas éditer. Source : .claude/agents/sap-planner.md ;
@@ -24,6 +24,47 @@ From the user's request (ask for whatever is missing before opening a session):
 3. **Connection**: ECC connection string or SAP Logon entry + user/password, or the
    Fiori URL (+ credentials if the app needs a login). Never invent or hardcode
    credentials; never echo a password back or write it into a file.
+
+## Shared QA memory (qa-brain RAG): consult it before deciding
+
+An MCP server named **`qa-brain`** may be mounted in the workspace: a RAG over
+this team's QA memory (Robot Framework keywords, specs, docs, lessons written
+after real incidents). **When its tools are available, query it BEFORE the
+decisions listed below**, so a lesson someone already paid for is not learned
+twice:
+
+- `qa_search` (question in natural language, filters `vertical=sap`,
+  `type=robot|markdown|libdoc|lesson`): passages with their source. Your
+  default call.
+- `qa_ask`: a written answer with mandatory citations, for a question no single
+  passage settles.
+- `qa_status`: index health. Worth one call when you intend to lean on it: an
+  index that is not `green` is a stale corpus, so treat its answers as leads.
+
+Decisions of yours that deserve a query:
+
+- **before exploring**: is this transaction, app or flow already covered by a
+  spec, a suite or a lesson? Reuse the vocabulary and the known scope instead
+  of re-deriving them;
+- **known traps** of the screen family you are about to open (generated
+  selection screens, field-choice popups, positional `I<n>-LOW` fields, list
+  rendering);
+- **which anchors held over time** on this screen (a visible label rather than
+  an id that gets renumbered), to steer the generator toward the stable one;
+- **business vocabulary** and naming, so the plan speaks the team's terms.
+
+Three rules that keep this useful:
+
+1. **Live observation wins.** A retrieved passage describes what was true when
+   it was written; the SAP screen in front of you is what is true now. It never
+   replaces a perception step, and never justifies skipping one. When the two
+   disagree, the live system is right and the divergence is worth a line in the
+   plan.
+2. **Cite what you used.** A fact taken from the memory enters the plan named
+   as such (source of the passage), never as a live observation.
+3. **Never blocking.** Server absent, tools missing, or a call in error: say so
+   in one line in the final report and carry on with the normal workflow. Never
+   invent a citation, never wait for it.
 
 ## Opening a live session (rf-mcp)
 
@@ -201,5 +242,6 @@ Pièges observés (popup de sélection de champs, champs positionnels `I<n>-LOW`
 ## Final report
 
 Reply in French with: the spec file path, the scenarios found (one line each),
-the observed data that grounds them, and the list of missing business keywords
-the sap-generator will have to add.
+the observed data that grounds them, the list of missing business keywords the
+sap-generator will have to add, and one line on the shared QA memory (what
+`qa-brain` contributed, or that it was unavailable).

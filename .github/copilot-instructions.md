@@ -92,7 +92,9 @@ per file, update the index in the same operation, never secrets anywhere.
   sentinel** (`Check Screen Against Watch` +
   `tests/robot/ecc_drift_sentinel.robot`) detects screen changes without
   scripted tests (structured smart diff + global hash + per-tile baselines
-  that localize the drift; report-only by default). A **multi-session
+  that localize the drift; report-only by default; `per_resolution=True`
+  keeps the visual references per capture geometry, the structural one being
+  resolution-independent). A **multi-session
   registry** (`keywords/_sessions.py`: `Open Sap Session` (optional
   `RSYST-*` login with a never-logged `Secret` password),
   `Create Gui Session` (second window on the active connection, no
@@ -138,10 +140,22 @@ per file, update the index in the same operation, never secrets anywhere.
   action (a rendered view is not yet its data; it covers requests already
   in flight, so a first render is still awaited by an application
   condition); `Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type`
-  assert by message TYPE, never localized text; `Upload File Via Ui5`
+  assert by message TYPE, never localized text; `Get Ui5 Property` /
+  `Get Ui5 Properties` read a control PROPERTY from the registry (exact, and
+  readable even when the control is rendered but hidden), where `Get Ui5 Text`
+  returns what is DISPLAYED and therefore needs visibility;
+  `Upload File Via Ui5`
   reaches the inner file input through open shadow roots;
   `Get Ui5 Perceptual Hash`/`Ui5 Screen Should Match Baseline` mirror the ECC
-  visual snapshot cycle (shared `sapfx_common.visual_baseline`); `Open Fiori
+  visual snapshot cycle (shared `sapfx_common.visual_baseline`);
+  `Get Ui5 Property`/`Get Ui5 Properties` read a control PROPERTY from the
+  registry (text is what the browser displays: it needs visibility and adds
+  what the control draws), `Get Ui5 Ids` says WHICH controls matched
+  (`containedIn=` narrows to another control's DOM content),
+  `Get Ui5 Open Popups` tells open from merely rendered dialogs
+  (`sap.m.InstanceManager`) and `Click Ui5 Dialog Button` acknowledges by
+  POSITION (button ids are generated, texts translated, and the right
+  position varies by release); `Open Fiori
   App` (stable intent-hash FLP navigation), `Log In Via Identity Provider`
   (SAP IAS / Azure AD presets) and `Lookup Business Term` (FR/EN business
   vocabulary → ABAP fields) come from the playwright-praman analysis
@@ -165,7 +179,22 @@ per file, update the index in the same operation, never secrets anywhere.
   of its own, `tests/robot/api/canal_api_odata.robot`, exercising the same
   business keywords against OData v2 (tag `a4h`) and OData v4 (tag
   `capsflight`): a v4 target is not optional, it is what catches what a
-  forgiving SAP Gateway hides.
+  forgiving SAP Gateway hides. `tests/robot/cross/croisement_ddic_odata.robot`
+  (live 9/9) is the cross-channel campaign: discovery-driven, bounded,
+  read-only, reusable on ECC and S/4HANA, checking entity-set existence, volume
+  (`$count` vs the SE16 count of the mapped table) and field contract
+  (`$metadata` vs DD03L). Two rules it encodes, both paid live: a table's NAME
+  proves no mapping, and a `sap:` annotation being PRESENT does not make it
+  PERMISSIVE, so the write-candidate guard reads per entity set and verb by
+  verb. `tests/robot/cross/simulation_ecriture_lecture.robot` (live 8/8) is its
+  write counterpart: a row written through the SCREEN, observed through the API,
+  deleted, and its disappearance asserted on the ENTITY (a count alone proves
+  no cleanup). It skips in Suite Setup without opening a channel unless an
+  explicit opt-in variable is passed; its SE16 locators live in
+  `resources/page_objects/se16_table_entry.resource`, and SE16's mass-delete
+  menu index appears nowhere in it, which a unit test enforces. A third
+  criterion decides a write target and is invisible from OData: the table must
+  allow maintenance (`DD02L`), which the `/DMO/*` RAP model does not.
 - Business keywords live in `resources/*.resource`; recorders in `tools/`
   (shipped in the pack, so they are in the mypy scope and have their own
   coverage floor in CI; `--replay` fails on any step it could not run, and
@@ -186,7 +215,12 @@ per file, update the index in the same operation, never secrets anywhere.
   version-window guard (non-blocking warning on the entry-point path) and
   honours the declared capabilities, deployment pin rf-mcp 0.35.0; API stores
   and Fiori frame state
-  are partitioned by rf-mcp session; ECC remains one live session per process);
+  are partitioned by rf-mcp session; ECC remains one live session per process;
+  the injected `__SAPFX` bundle is versioned by its content, so hot swapping
+  the library replaces it at the next keyword call instead of leaving the
+  page with the first bundle it ever received, and a reinstall neither
+  doubles nor drops the fetch/XHR and MessageToast hooks; already-parsed
+  resources do stay frozen for the process);
   repo-wide consistency scripts
   (doc pairing, vendor drift, guidance sync) plus the Windows deployment-pack
   assembler (`build_release_pack.py`, sources in `packaging/`), the healing
@@ -235,7 +269,9 @@ per file, update the index in the same operation, never secrets anywhere.
   definitions in
   `.claude/agents/sap-*.md` (+ the `sapfx` toolkit skill in
   `.claude/skills/`, shipped in the pack), business test plans in `specs/`
-  (French). The
+  (French). All four query the **optional `qa-brain` MCP RAG** (shared QA
+  memory: keywords, specs, lessons from real incidents) before their judgement
+  calls; live observation still decides, and an absent server never blocks. The
   chat modes in `.github/chatmodes/` are **generated** from those definitions
   by `python scripts/regen_agent_definitions.py`: never edit a
   `*.chatmode.md` by hand; edit the `.claude/agents/` source and regenerate
@@ -269,7 +305,8 @@ per file, update the index in the same operation, never secrets anywhere.
   `sapfx_common/visual_hash.py` (pure perceptual dHash + crop/mask/tile
   primitives behind the visual assertions) and
   `sapfx_common/visual_baseline.py` (shared snapshot-baseline semantics +
-  the Pillow decode boundary for BOTH channels, optional extra `visual`)
+  the Pillow decode boundary for BOTH channels, optional extra `visual`,
+  plus the per-geometry baselines behind `per_resolution=True`)
   are the other shared primitives: extend them rather than
   duplicating scoring/diff/journal/geometry logic.
 - CI (`.github/workflows/ci.yml`) runs a Python 3.10/3.12/3.14 matrix (3.10 =
@@ -318,6 +355,35 @@ per file, update the index in the same operation, never secrets anywhere.
    then `memory/` (project, public-safe, one file per durable fact + index) and
    the private cross-project base (personal/machine/cross-repo facts + index).
    Memory entries are dated observations: correct a wrong one in the same lot.
+10. No credential ever gets a committed default value: passwords, API keys and
+   tokens come from the command line (`-v "NAME: Secret:…"`) or the
+   environment; such variables keep `${EMPTY}` in `resources/`,
+   `tests/robot/` and `variables/`.
+11. **A capability gap found on a live target is closed IN the shipped
+   library.** A library keyword that misbehaves is FIXED in `src/`, never
+   worked around in a suite/page object/resource; a missing one is CREATED in
+   `src/Sap*Library` (pure logic in `sapfx_common`), never as inline JS in a
+   page object nor an `Evaluate` in a suite; an existing workaround in an
+   intermediate layer is PROMOTED into the library. Boundary: libraries carry
+   CAPABILITIES (perception, resolution, waiting, engines, state, protocols),
+   `resources/` carries one site's BUSINESS VOCABULARY. The libraries are what
+   ships to PyPI, so a fix left in a resource helps nobody else. It still owes
+   its off-SAP unit test, its rf-mcp intent-map entry, its Libdoc page and its
+   CHANGELOG line; on a deployed pack, the workaround goes to
+   `resources/site_keywords.resource` AND the defect is reported upstream.
+12. **Never let a code file grow past 500 lines.** A file over the line is
+   doing several jobs: split it along a seam the repo already uses (one mixin
+   per capability under `keywords/`, pure logic into `sapfx_common`, one module
+   per concern), never by cutting at line 500 to satisfy the number. In scope:
+   everything a machine executes, whatever the language (Python, JavaScript
+   including the injected `*.js.tpl` bundles, PowerShell, batch, unit tests)
+   under `src/`, `integrations/`, `tools/`, `scripts/`, `packaging/`,
+   `tests/unit/`. Out of scope: HTML/CSS and graphical supports, generated
+   artefacts (the limit applies to
+   their generator), docs, Robot suites and `.resource` files, and `_vendor/`.
+   The files above the limit on 2026-08-25 were split the same day (debt
+   settled); enforced by `scripts/check_file_length.py` (CI + `PostToolUse`
+   hook + unit test), whose exact-count allowlist is empty.
 
 ## License
 

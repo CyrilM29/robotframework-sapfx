@@ -1,6 +1,6 @@
 ---
 name: deux-canaux-distribution-une-frontiere
-description: Deux canaux de distribution (dépôt public exporté, pack Windows) filtraient le privé chacun de leur côté, et un seul le faisait : copier un dossier PARENT dans le pack a livré du contenu que l'export excluait nommément, pendant une release entière
+description: Deux canaux de distribution (dépôt public exporté, pack Windows) filtraient le privé chacun de leur côté, et un seul le faisait : copier un dossier PARENT dans le pack a livré du contenu que l'export excluait nommément, pendant quatre releases consécutives
 type: projet
 date: 2026-08-19
 ---
@@ -14,10 +14,10 @@ doublée d'un scan anti-fuite bloquant. L'assembleur du pack, lui, copiait des
 ce qu'il fallait laisser.
 
 Résultat constaté à la revue du 2026-08-19 : une entrée de `.claude/skills/`
-que l'export excluait par son nom depuis toujours est partie dans le ZIP livré
-d'une release complète, parce que le pack copiait le dossier parent. Personne
-n'avait menti nulle part, aucune règle n'avait été oubliée : elle n'était
-simplement écrite qu'à un endroit sur les deux.
+que l'export excluait par son nom depuis toujours est partie dans les ZIP
+livrés, parce que le pack copiait le dossier parent. Personne n'avait menti
+nulle part, aucune règle n'avait été oubliée : elle n'était simplement écrite
+qu'à un endroit sur les deux.
 
 Trois leçons, dans l'ordre de leur valeur.
 
@@ -58,6 +58,18 @@ scripts restés au dépôt (la gate de conventions de sap-generator, et l'éval 
 aveugle du healer). Un fichier livré qui invoque un chemin absent est un échec
 silencieux chez l'utilisateur : le garde exige maintenant que tout script cité
 par un fichier du pack soit livré, ou explicitement justifié comme hors sujet.
+
+Cinquième leçon, celle de la remédiation (2026-08-20) : **le périmètre d'une
+fuite se mesure sur les artefacts publiés, pas sur la date du correctif**. La
+revue avait conclu « le dernier ZIP », parce que c'est celui qu'elle avait sous
+la main ; en listant les archives réellement attachées aux releases, l'entrée
+était présente dans QUATRE packs consécutifs, depuis celui qui avait fait
+entrer un dossier de skills dans le manifeste. Le remède appliqué (retirer les
+assets des releases, notes corrigées vers la version propre, arbres source et
+tags intacts) valait donc pour quatre versions, pas une. Corollaire de
+vérification : le pack de la version suivante a été téléchargé DEPUIS sa
+release et listé, pour constater la liste blanche sur l'artefact réel plutôt
+que sur le script.
 
 Voir aussi [[gardes-sortie-console-utf8]] pour l'autre moitié de la question
 (ce que les scripts embarqués peuvent supposer de leur voisinage).

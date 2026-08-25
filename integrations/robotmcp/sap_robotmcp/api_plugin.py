@@ -149,6 +149,12 @@ class SapApiPlugin(StaticLibraryPlugin):
                 # perception et découverte du canal (le canal sans écran)
                 "Get Odata Metadata", "Find Odata Property By Label",
                 "List Odata Services", "Lookup Business Term",
+                # sonde d'existence TOLÉRANTE : elle consigne statut HTTP et
+                # code technique par entity set au lieu de s'arrêter au premier
+                # refus. À ne pas confondre avec `Read Business Entities In One
+                # Roundtrip`, dont le tout ou rien est le bon comportement pour
+                # PRÉPARER des données, et le mauvais pour SONDER.
+                "Probe Odata Entity Sets",
                 # préflight Gateway (le miroir API des préflights GUI)
                 "Get Gateway Status", "Gateway Should Be Active",
                 "Wait Until Api Available",

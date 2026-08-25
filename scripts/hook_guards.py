@@ -30,6 +30,12 @@ from _common import force_utf8_stdio
 
 WATCHED = ("/specs/", "/tests/robot/", "/resources/", "/variables/")
 
+#: Extensions de CODE : celles du périmètre de check_file_length.py
+#: (convention #13). Le filtre d'extension évite un processus par .md édité ;
+#: le périmètre fin (générés, comms/, _vendor/) reste au garde lui-même.
+_CODE_SUFFIXES = (".py", ".js", ".mjs", ".ts", ".tsx", ".jsx",
+                  ".ps1", ".psm1", ".cmd", ".bat", ".sh", ".tpl")
+
 #: Signature d'un lanceur de garde : ``run(script, *args) -> CompletedProcess``.
 Runner = Callable[..., "subprocess.CompletedProcess[str]"]
 
@@ -63,6 +69,18 @@ def decide(file_path: str, run: Runner) -> tuple[int, str, str]:
         if em_dash.returncode != 0:
             # bloquant : l'assistant doit reformuler tout de suite
             return 2, em_dash.stdout + em_dash.stderr, ""
+
+        # Convention #13 : un fichier de CODE édité qui franchit les 500
+        # lignes se rattrape au moment où il grossit, pas à la CI suivante.
+        # Le garde applique lui-même le périmètre de la règle (générés,
+        # comms/, _vendor/ exclus) : ici on ne filtre que par extension pour
+        # ne pas lancer un processus sur chaque .md édité.
+        if normalized.lower().endswith(_CODE_SUFFIXES):
+            length = run("check_file_length.py", file_path)
+            if length.returncode != 0:
+                # bloquant : le fichier doit se découper (ou re-déclarer
+                # son compte exact dans l'allowlist du garde)
+                return 2, length.stdout + length.stderr, ""
 
         # Éditer un README/doc publié est LE moment où une version périmée (nom
         # du pack, épinglage pip) ou un badge de version gravé se glisse : le

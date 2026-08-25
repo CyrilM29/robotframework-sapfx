@@ -238,12 +238,30 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # contexte de frame (Work Zone / cFLP : apps dans des iframes,
                 # pile pour les frames IMBRIQUÉES)
                 "Set Ui5 Frame", "Push Ui5 Frame", "Pop Ui5 Frame",
+                # La frame d'application d'un launchpad porte un identifiant
+                # GÉNÉRÉ (mesuré : __container1, __container4, __container3
+                # pour la même app) : un agent qui écrit un sélecteur à la
+                # main se trompe. Ces deux keywords désignent la frame par ce
+                # qu'elle est.
+                "Get Ui5 App Frame", "Push Ui5 App Frame",
                 "Get Ui5 Frame Stack",
                 # actions
                 "Click Ui5 Control", "Click Ui5 By Xpath", "Fill Ui5 Input",
                 # lecture / assertions
                 "Read Ui5 Table", "Get Ui5 Text", "Ui5 Control Should Be Visible",
                 "Ui5 Text Should Be", "Get Ui5 Match Count",
+                # Lecture d'une PROPRIÉTÉ au registre : exacte (le rendu ajoute
+                # ce que le contrôle dessine) et lisible même quand le contrôle
+                # est masqué (colonne repliée), là où `Get Ui5 Text` exige la
+                # visibilité et expire.
+                "Get Ui5 Property", "Get Ui5 Properties",
+                # Quels contrôles ont matché : la lecture qui complète le
+                # comptage et les propriétés quand l'ancre est un SUFFIXE d'id.
+                "Get Ui5 Ids",
+                # Popups OUVERTS + acquittement par POSITION : un dialogue fermé
+                # reste RENDU (le comptage ne le voit pas), et les boutons d'une
+                # MessageBox ont un id généré et un texte traduit.
+                "Get Ui5 Open Popups", "Click Ui5 Dialog Button",
                 # repos réseau/busy + messages applicatifs + upload
                 "Wait For Ui5 Idle", "Get Ui5 Messages",
                 "Ui5 Should Have No Messages Of Type", "Upload File Via Ui5",

@@ -1,6 +1,6 @@
 [project]
 name = "sap-robotmcp"
-version = "0.6.7"
+version = "0.7.0"
 description = "SAP plugins for the rf-mcp (RobotMCP) server: real screen perception (never optimistic), keyword routing and selector guidance for SAP GUI (ECC/S4) and Fiori/UI5: MCP access to SAP for any agent."
 readme = "README.md"
 # Expression SPDX + fichiers de licence (PEP 639 ; le pourquoi vit dans la
@@ -51,7 +51,7 @@ requires-python = ">=3.10"
 # plugins se chargent dans un `robotmcp` standard, seule la version est
 # vérifiée, et en simple avertissement. Le pack, lui, épingle la version
 # qualifiée dans `packaging/constraints-deploy.txt`.
-dependencies = ["rf-mcp>=0.31", "robotframework-sapfx>=0.6.7"]
+dependencies = ["rf-mcp>=0.31", "robotframework-sapfx>=0.7.0"]
 
 [project.urls]
 Homepage = "https://github.com/CyrilM29/robotframework-sapfx"

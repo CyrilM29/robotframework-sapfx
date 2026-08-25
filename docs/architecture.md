@@ -92,8 +92,13 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     cropped region: a change inside an opaque GuiShell weighs on all 64 bits
     instead of being diluted into the whole screen) and
     `Get Screen Tile Hashes` (one fingerprint per tile of a 4×4 grid: drift
-    gets **localized**, not just detected). The pixel channel covers exactly
-    what the Scripting API cannot see: opaque GuiShell list rendering,
+    gets **localized**, not just detected). A perceptual hash encodes the
+    **capture geometry** as much as the content, so `per_resolution=True`
+    keeps one committed baseline per geometry (`<name>@1920x1032.png`) and a
+    suite stays comparable across workstations that do not render the same
+    size; without the option, a failure whose two geometries differ says so
+    rather than reading as a functional regression. The pixel channel covers
+    exactly what the Scripting API cannot see: opaque GuiShell list rendering,
     record-only charts.
   - `_diagnostics`: scripting **preflight** (`Get Scripting Status`,
     `Scripting Should Be Fully Enabled`, which fails early with the exact RZ11
@@ -140,7 +145,12 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     diff (renames paired, value changes named), the global visual hash, and
     the **tile grid**. A local drift too diluted for the global hash is
     caught by its own tile and reported with its position, pixel rectangle
-    and the elements covering it.
+    and the elements covering it. `per_resolution=True` gives every capture
+    geometry its own VISUAL references while the structural signature stays
+    shared, because a screen signature does not depend on the display
+    resolution and a perceptual fingerprint does; without it, a visual drift
+    between two different geometries is annotated as possibly being scale
+    alone.
 - **`SapEccLibrary.py`** wires them together and overrides `run_transaction` for
   locale-independent error detection. `ROBOT_LIBRARY_SCOPE = SUITE`: tests in
   one suite share their COM connection, while distinct normal Robot suites

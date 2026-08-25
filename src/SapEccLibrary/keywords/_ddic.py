@@ -29,11 +29,14 @@ réelle et critères positionnels détournés par un choix de champs persistant.
 La logique pure (barème de classification depuis le domaine relevé, entrée
 d'objet, artefact déterministe, hash, comparaison) vit dans
 ``sapfx_common.ddic_inventory`` ; ici uniquement les E/S écran et fichier.
+Les primitives d'ÉCRAN SE16 (`Reach Se16 Selection Screen`,
+`Fill Multiple Selection`, `Get Se16 Selection Criteria`, lecteur de
+résultat) vivent dans le mixin voisin ``_se16.py`` et sont atteintes par la
+composition.
 """
 import datetime
 import json
 
-from pythoncom import com_error
 from robot.api import logger
 
 from sapfx_common.ddic_inventory import (
@@ -49,25 +52,15 @@ from sapfx_common.ddic_inventory import (
     sample_for_probe,
     validate_scope,
 )
-from sapfx_common.polling import poll_until
 
 from ._diagnostics import _truthy
+from ._se16 import _SE16_MAX_HITS
 
-# Écrans standard pilotés par ce mixin. Le Data Browser et le dialogue de
-# sélection multiple sont des écrans SAP standard, stables par version : leurs
-# ids appartiennent à la bibliothèque (comme le popup F4 de `Pick F4 Value` ou
-# les champs RSYST du login), la convention 1 ne vise que les tests.
-_SE16_TABLE_FIELD = "wnd[0]/usr/ctxtDATABROWSE-TABLENAME"
-_SE16_GRID = "wnd[0]/usr/cntlGRID1/shellcont/shell"
-_SE16_MAX_HITS = "wnd[0]/usr/txtMAX_SEL"
+# Criteres positionnels de l'ecran DD02L (les champs cles viennent en tete
+# tant que le choix des champs de selection n'a pas ete modifie ; la sonde
+# canari `_verify_dd02l_criteria` tranche quand un lot revient vide).
 _DD02L_TABNAME_LOW = "wnd[0]/usr/ctxtI1-LOW"
 _DD02L_AS4LOCAL_LOW = "wnd[0]/usr/ctxtI2-LOW"
-_DD02L_MULTI_BUTTON = "wnd[0]/usr/btn%_I1_%_APP_%-VALU_PUSH"
-_MULTI_TABLE = ("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/"
-                "ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE")
-_MULTI_CELL = _MULTI_TABLE + "/ctxtRSCSEL_255-SLOW_I[1,{row}]"
-_MULTI_ACCEPT = "wnd[1]/tbar[0]/btn[8]"
-_DIALOG_TEXT = "wnd[1]/usr/txtMESSTXT{index}"
 
 #: Taille de lot par défaut, validée live (7 valeurs tiennent dans la fenêtre
 #: visible du table control SAPLALDBSINGLE, A4H/GUI 8.00, 2026-08-17). Depuis
@@ -84,6 +77,16 @@ _DD02L_COLUMNS = ("TABNAME", "TABCLASS", "AS4LOCAL", "AS4VERS")
 #: ligne DOIT revenir quand ``ctxtI1-LOW`` est bien TABNAME.
 _CANARY_TABLE = "DD02L"
 
+#: Table des champs du dictionnaire, source du contrat de champs.
+_DD03L_TABLE = "DD03L"
+
+#: Colonnes DD03L consommées par le contrat de champs : même règle que pour
+#: DD02L, la lecture est RESTREINTE aux ids techniques (indépendants de la
+#: locale et du profil d'affichage ALV). Relevé live : la grille en expose 31,
+#: neuf suffisent à décrire un champ.
+_DD03L_COLUMNS = ("FIELDNAME", "POSITION", "KEYFLAG", "ROLLNAME", "DATATYPE",
+                  "LENG", "DECIMALS", "DOMNAME", "CHECKTABLE")
+
 #: Marge de lignes DD02L par objet demandé (versions ``AS4LOCAL``/``AS4VERS``
 #: multiples comprises) : borne MAX_SEL et plafond de lecture d'un lot. Un
 #: plafond ATTEINT est un échec actionnable, jamais une troncature muette.
@@ -97,132 +100,86 @@ class DdicKeywords:
 
     _truthy = staticmethod(_truthy)
 
-    def reach_se16_selection_screen(self, table, timeout=None):
-        """SE16 jusqu'à l'écran de sélection de ``table``, verdict structuré.
+    def read_ddic_table_fields(self, table, active_only=True, max_fields=200,
+                               timeout=None):
+        """Champs d'une table du dictionnaire (DD03L), en liste de dicts.
 
-        Ouvre SE16, saisit le nom, valide (Entrée) et absorbe les modales de
-        génération : popup « choix des champs de sélection » des tables larges
-        (> 40 champs, première case cochée : le choix persiste par
-        utilisateur) et DIALOGUE de message modal (programme ``SAPMSDYP``,
-        lignes ``txtMESSTXT<n>``, texte relevé pour le journal puis Entrée).
-        La détection des dialogues est STRUCTURELLE, jamais un texte localisé.
+        Ouvre DD03L dans le Data Browser, filtre sur ``TABNAME`` (et
+        ``AS4LOCAL=A``, la version active, quand ``active_only``), exécute et
+        lit la grille RESTREINTE aux colonnes techniques consommées
+        (``FIELDNAME``, ``POSITION``, ``KEYFLAG``, ``ROLLNAME``, ``DATATYPE``,
+        ``LENG``, ``DECIMALS``, ``DOMNAME``, ``CHECKTABLE``). Les lignes sont
+        rendues triées par position : la lecture est déterministe et
+        indépendante de l'ordre d'affichage.
 
-        Retourne un dict JSON-safe : ``reached`` (booléen), ``verdict``
-        (``reached`` | ``rejected`` | ``dialog`` | ``modal``),
-        ``message_type`` (type du message de statut, ``E``…),
-        ``status_text`` et ``dialog_text`` (textes localisés, pour le journal
-        et les messages d'échec seulement, jamais une assertion).
+        Les critères sont résolus par NOM via `Get Se16 Selection Criteria`,
+        jamais par position : c'est ce qui rend le keyword insensible au choix
+        des champs de sélection persistant par utilisateur, sans avoir besoin
+        de la sonde canari que la classification DD02L doit, elle, exécuter.
 
-        - ``rejected`` : message de statut de type ``E`` (structure, include
-          ou table inconnue) ;
-        - ``dialog`` : dialogue de message refermé mais écran de sélection
-          jamais atteint (sondé brièvement : pas d'attente pleine durée) ;
-        - ``modal`` : modale inconnue laissée EN PLACE (ni ``MESSTXT`` ni
-          case à cocher), à percevoir avec `Get Screen Signature`.
-
-        Sans modale, l'attente de l'écran utilise ``timeout`` (défaut : le
-        timeout de la bibliothèque) : l'écran de sélection d'une table est
-        GÉNÉRÉ au premier accès et la fin du « busy » ne garantit pas qu'il
-        est là (vécu SAPLANE, 2026-08-17).
+        Mêmes garde-fous « jamais vert et faux » que `Classify Ddic Objects` :
+        un plafond de lecture ATTEINT est un échec (une troncature ne doit
+        jamais être muette), une grille absente hors écran de sélection nomme
+        `Use ALV Grid In Data Browser`, et un résultat VIDE est un échec (la
+        table est inconnue de DD03L) au lieu d'un contrat de champs vide qui
+        passerait pour une table sans champ. Lecture seule.
         """
-        self.run_transaction("SE16")
-        self.wait_until_busy_done()
-        self.input_text(_SE16_TABLE_FIELD, str(table).strip().upper())
-        self.send_vkey(0)
-        self.wait_until_busy_done()
-        message_type, status_text = self.get_status_message()
-        state = {"reached": False, "verdict": "reached",
-                 "message_type": str(message_type or ""),
-                 "status_text": str(status_text or ""), "dialog_text": ""}
-        if message_type == "E":
-            state["verdict"] = "rejected"
-            return state
-        dialog_parts = []
-        for _ in range(3):   # au plus : choix des champs + dialogue + marge
-            if self.session.findById("wnd[1]", False) is None:
-                break
-            text = self._read_message_dialog_text()
-            if text is not None:
-                if text:
-                    dialog_parts.append(text)
-                logger.info("Dialogue de message SE16 refermé (texte relevé "
-                            "pour le journal) : %s" % text)
-                self.send_vkey(0, window=1)
-                self.wait_until_busy_done()
-                continue
-            checkbox = self._first_popup_checkbox()
-            if checkbox is not None:
-                self.select_checkbox(checkbox)
-                self.send_vkey(0, window=1)
-                self.wait_until_busy_done()
-                continue
-            state["verdict"] = "modal"
-            state["dialog_text"] = " ".join(dialog_parts)
-            return state
-        state["dialog_text"] = " ".join(dialog_parts)
-        if dialog_parts:
-            # Après un dialogue refermé, l'écran est soit déjà derrière
-            # (sous-seconde), soit ne viendra jamais : sonde brève, jamais le
-            # timeout plein (30 s de sondage mort par objet rejeté, sinon).
-            if not self._probe_selection_screen(timeout or "5s"):
-                state["verdict"] = "dialog"
-                return state
-        else:
-            self.wait_until_element_present(_SE16_MAX_HITS, timeout=timeout)
-        state["reached"] = True
-        return state
-
-    def fill_multiple_selection(self, values, button_id=_DD02L_MULTI_BUTTON):
-        """Charge une LISTE de valeurs dans la sélection multiple d'un critère.
-
-        Ouvre le dialogue standard « Multiple Selection » par son bouton
-        (``${button_id}``, celui à droite du champ ; défaut : premier critère
-        ``I1``), remplit une valeur par ligne de l'onglet « Select Single
-        Values », puis reprend (F8) et vérifie le retour à l'écran de
-        sélection (aucune modale résiduelle).
-
-        Au-delà de la fenêtre VISIBLE du table control, le dialogue est
-        DÉFILÉ fenêtre par fenêtre (scrollbar verticale, objet ré-acquis
-        après chaque défilement, position RELUE : jamais des lignes réécrites
-        en silence). Comme pour tout GuiTableControl, la scrollbar PLAFONNE
-        (``sapfx_common.table_control.window_plan``) : la dernière fenêtre
-        chevauche alors la précédente et s'écrit à un index local DÉCALÉ, ce
-        que le décalage relu permet de faire au lieu d'échouer. Un défilement
-        qui ne couvre toujours pas les valeurs restantes reste un échec
-        actionnable invitant à traiter par lots. ``values`` accepte une liste
-        Robot ; une chaîne seule est refusée (elle serait itérée caractère par
-        caractère). La sélection chargée n'étant pas rémanente entre deux
-        passages SE16, les lots successifs ne se contaminent pas.
-        """
-        if isinstance(values, str):
+        name = str(table).strip().upper()
+        if not name:
+            raise AssertionError("read_ddic_table_fields: no table name given.")
+        try:
+            cap = int(str(max_fields).strip())
+        except (TypeError, ValueError):
+            cap = 0
+        if cap < 1:
             raise AssertionError(
-                "fill_multiple_selection: 'values' must be a LIST of values, "
-                "got the string %r. In Robot, build it with Create List (a "
-                "lone string would be iterated character by character)."
-                % values)
-        values = [str(v).strip() for v in values if str(v).strip()]
-        if not values:
-            raise AssertionError("fill_multiple_selection: no value provided.")
-        self.click_element(button_id)
-        self.wait_until_busy_done()
-        self.wait_until_element_present(_MULTI_TABLE)
-        table = self.session.findById(_MULTI_TABLE)
-        capacity = int(getattr(table, "VisibleRowCount", 0) or 0) or 1
-        for start in range(0, len(values), capacity):
-            window = values[start:start + capacity]
-            offset = 0
-            if start:
-                offset = self._scroll_multi_selection(
-                    start, capacity, len(values), len(window))
-            for local, value in enumerate(window):
-                self.input_text(_MULTI_CELL.format(row=offset + local), value)
-        self.click_element(_MULTI_ACCEPT)
-        self.wait_until_busy_done()
-        if self.session.findById("wnd[1]", False) is not None:
+                "read_ddic_table_fields: max_fields must be a strictly "
+                "positive integer.")
+        state = self.reach_se16_selection_screen(_DD03L_TABLE, timeout)
+        if not state["reached"]:
             raise AssertionError(
-                "fill_multiple_selection: a modal window is still open after "
-                "taking over the selection; perceive it with "
-                "Get Screen Signature before retrying.")
+                "read_ddic_table_fields: SE16 did not reach the %s selection "
+                "screen (verdict '%s'): %s. Check SE16/DDIC display "
+                "authorizations." % (_DD03L_TABLE, state["verdict"],
+                                     state["status_text"]
+                                     or state["dialog_text"]))
+        criteria = self.get_se16_selection_criteria()
+        self.input_text(self._dd03l_criterion(criteria, "TABNAME"), name)
+        if self._truthy(active_only):
+            self.input_text(self._dd03l_criterion(criteria, "AS4LOCAL"), "A")
+        self.input_text(_SE16_MAX_HITS, str(cap))
+        self.send_vkey(8)
+        self.wait_until_busy_done()
+        rows = self._read_se16_rows(cap, list(_DD03L_COLUMNS), timeout,
+                                    "read_ddic_table_fields")
+        if len(rows) >= cap:
+            raise AssertionError(
+                "read_ddic_table_fields: the DD03L read hit its row cap (%s "
+                "rows for '%s'): the field contract would be silently "
+                "truncated. Raise max_fields." % (cap, name))
+        if not rows:
+            raise AssertionError(
+                "read_ddic_table_fields: DD03L returned no field for '%s'. "
+                "The object is unknown to the dictionary (or has no active "
+                "version): classify it with Classify Ddic Objects before "
+                "asking for its field contract." % name)
+        return sorted(rows, key=lambda row: (str(row.get("POSITION", "")),
+                                             str(row.get("FIELDNAME", ""))))
+
+    @staticmethod
+    def _dd03l_criterion(criteria, field):
+        """Localisateur d'un critère DD03L attendu, échec listant les critères
+        réellement présents sinon (jamais une saisie à l'aveugle dans un champ
+        positionnel qui aurait bougé)."""
+        locator = criteria.get(field)
+        if locator is None:
+            raise AssertionError(
+                "read_ddic_table_fields: the DD03L selection screen exposes no "
+                "'%s' criterion; present criteria: %s. Reset the field "
+                "selection for DD03L in SE16 (Settings > Fields for Selection) "
+                "so the key fields are available."
+                % (field, ", ".join(sorted(criteria))))
+        return locator
 
     def get_ddic_classification_map(self, domain_values, extra=None):
         """Barème de classification restreint au domaine RELEVÉ sur la cible.
@@ -447,43 +404,9 @@ class DdicKeywords:
             "'%s'): %s" % (state["verdict"], detail))
 
     def _read_dd02l_results(self, max_rows, timeout=None):
-        """Résultat SE16 après exécution (F8) : lignes de la grille ALV par
-        colonnes TECHNIQUES, ou liste vide quand AUCUNE ligne ne répond (SE16
-        reste alors sur l'écran de sélection, sans message d'erreur). Toute
-        autre issue est un échec actionnable, jamais « zéro ligne » : la fin
-        du « busy » ne garantit pas l'écran (l'issue est SONDÉE), et une
-        grille absente hors écran de sélection signifie le plus souvent un
-        Data Browser resté en mode liste classique."""
-        def outcome():
-            if self.session.findById(_SE16_GRID, False) is not None:
-                return "grid"
-            if self.session.findById(_SE16_MAX_HITS, False) is not None:
-                return "selection"
-            return None
-
-        state = outcome()
-        if state is None:
-            seconds = (self._timeout_secs(timeout)
-                       if hasattr(self, "_timeout_secs") else 10.0)
-            step = float(getattr(self, "poll_interval", 0.2) or 0.2)
-            state = poll_until(outcome, seconds, step=step)
-        if state == "grid":
-            return self.read_full_grid(_SE16_GRID, max_rows=max_rows,
-                                       columns=list(_DD02L_COLUMNS))
-        if state == "selection":
-            message_type, message_text = self.get_status_message()
-            if message_type == "E":
-                raise AssertionError(
-                    "classify_ddic_objects: SE16 refused the DD02L selection "
-                    "(status type E): %s." % message_text)
-            return []
-        self.take_screenshot()
-        raise AssertionError(
-            "classify_ddic_objects: after execution neither the ALV grid nor "
-            "the selection screen is present: the Data Browser is likely in "
-            "classic list mode (no scriptable grid object). Run 'Use ALV "
-            "Grid In Data Browser' once (persistent per user), or perceive "
-            "the screen with Get Screen Signature.")
+        """Résultat SE16 d'un lot DD02L, colonnes techniques de classification."""
+        return self._read_se16_rows(max_rows, list(_DD02L_COLUMNS), timeout,
+                                    "classify_ddic_objects")
 
     def _verify_dd02l_criteria(self, active_only, timeout=None):
         """Sonde canari des critères positionnels de l'écran DD02L.
@@ -518,104 +441,3 @@ class DdicKeywords:
                 "Fields for Selection) so the key fields come first, then "
                 "rerun." % _CANARY_TABLE)
         self._dd02l_criteria_ok = True
-
-    def _scroll_multi_selection(self, position, capacity, total, needed):
-        """Fait défiler le table control du dialogue jusqu'à la ligne absolue
-        ``position`` et retourne l'index LOCAL où commencer à écrire.
-
-        La position atteinte est RELUE, jamais supposée. Comme toute scrollbar
-        de GuiTableControl, celle-ci PLAFONNE (leçon ``window_plan`` de
-        ``sapfx_common.table_control``, relevée live sur SE11) : la dernière
-        fenêtre chevauche alors la précédente, et les ``needed`` valeurs
-        restantes s'écrivent à partir de l'index local ``position - atteinte``,
-        qui les remet en face des bonnes lignes. Un défilement qui laisse ces
-        valeurs hors de la fenêtre visible (dialogue verrouillé, décalage
-        négatif) reste un échec actionnable : rejouer les mêmes lignes
-        visibles corromprait la sélection en silence."""
-        table = self.session.findById(_MULTI_TABLE)
-        scrollbar = getattr(table, "VerticalScrollbar", None)
-        error = None
-        offset = 0
-        if scrollbar is None:
-            error = "the dialog table has no vertical scrollbar"
-        else:
-            try:
-                scrollbar.Position = self._scroll_target(scrollbar, position)
-                self.wait_until_busy_done()
-                table = self.session.findById(_MULTI_TABLE)
-                actual = int(getattr(
-                    getattr(table, "VerticalScrollbar", None),
-                    "Position", -1))
-                offset = int(position) - actual
-                if offset < 0 or offset + int(needed) > int(capacity):
-                    error = ("the dialog refused to scroll to row %s "
-                             "(stayed at %s)" % (position, actual))
-                elif offset:
-                    logger.info(
-                        "Sélection multiple : défilement plafonné à la ligne "
-                        "%s (demandée : %s), les %s valeur(s) restantes "
-                        "s'écrivent à partir de l'index local %s de la "
-                        "fenêtre." % (actual, position, needed, offset))
-            except com_error as failure:
-                error = "scrolling raised %s" % failure
-        if error:
-            self.send_vkey(12, window=1)
-            raise AssertionError(
-                "fill_multiple_selection: %s values need scrolling beyond "
-                "the visible window (%s rows) but %s. Split the list into "
-                "batches of at most %s." % (total, capacity, error, capacity))
-        return offset
-
-    @staticmethod
-    def _scroll_target(scrollbar, position):
-        """Position de défilement à DEMANDER : bornée au ``Maximum`` de la
-        scrollbar quand il est exposé. Demander au-delà lève un ``com_error``
-        « invalid argument » sur un vrai table control (constaté live sur
-        SE11) : le plafond se demande, il ne se découvre pas par l'exception."""
-        maximum = getattr(scrollbar, "Maximum", None)
-        try:
-            if maximum is not None:
-                return min(int(position), int(maximum))
-        except (TypeError, ValueError):
-            pass
-        return int(position)
-
-    def _probe_selection_screen(self, timeout):
-        """Présence de l'écran de sélection SE16 (sonde bornée, sans échec)."""
-        try:
-            self.wait_until_element_present(_SE16_MAX_HITS, timeout=timeout)
-        except AssertionError:
-            return False
-        return True
-
-    def _read_message_dialog_text(self):
-        """Texte d'un DIALOGUE DE MESSAGE modal (``txtMESSTXT<n>``), ou
-        ``None`` quand ``wnd[1]`` n'est pas un dialogue de message. La
-        détection est structurelle ; le texte n'alimente que le journal."""
-        if self.session.findById(_DIALOG_TEXT.format(index=1), False) is None:
-            return None
-        parts = []
-        for index in range(1, 10):
-            element = self.session.findById(
-                _DIALOG_TEXT.format(index=index), False)
-            if element is None:
-                break
-            text = str(getattr(element, "Text", "") or "").strip()
-            if text:
-                parts.append(text)
-        return " ".join(parts)
-
-    def _first_popup_checkbox(self):
-        """Id (relatif à la session) de la première case à cocher de
-        ``wnd[1]``, ou ``None``. Parcours ``Count``/``ElementAt`` : jamais
-        d'itération Python directe sur une collection COM (motif du dépôt),
-        et jamais d'id absolu ``/app/...`` repassé à ``findById``."""
-        usr = self.session.findById("wnd[1]/usr", False)
-        children = getattr(usr, "Children", None) if usr is not None else None
-        for index in range(int(getattr(children, "Count", 0) or 0)):
-            child = children.ElementAt(index)
-            if getattr(child, "Type", "") == "GuiCheckBox":
-                raw = str(getattr(child, "Id", "") or "")
-                marker = raw.find("wnd[")
-                return raw[marker:] if marker >= 0 else raw
-        return None

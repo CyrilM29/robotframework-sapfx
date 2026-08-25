@@ -48,6 +48,23 @@ ${EPM_PRODUCTS}             /sap/opu/odata/sap/SEPMRA_SHOP/Products
 ${TRAVEL_SERVICE}           /processor
 ${TRAVEL_ENTITIES}          /processor/Travel
 
+# --- Cibles métier : bac à sable SAP Business Accelerator Hub (api.sap.com) ---
+# Troisième cible du canal, la seule qui expose la forme RÉELLE des APIs
+# S/4HANA Cloud (ni Gateway A4H, ni CAP). Authentification par clé d'API en
+# en-tête, pas de mandant : la clé se récupère sur api.sap.com, bouton
+# « Show API Key », et se passe en `-v "API_KEY: Secret:<clé>"`.
+${API_KEY}                  ${EMPTY}
+${S4_SANDBOX_BASE}          https://sandbox.api.sap.com/s4hanacloud
+# OData v2 sur le bac à sable.
+${BUSINESS_PARTNER_SERVICE}    /sap/opu/odata/sap/API_BUSINESS_PARTNER
+${BUSINESS_PARTNERS}        /sap/opu/odata/sap/API_BUSINESS_PARTNER/A_BusinessPartner
+# OData v4 sur le bac à sable. Chemin RELEVÉ live (2026-08-23), jamais deviné :
+# la forme `odata4/sap/<api>/srvd_a2x/sap/<définition>/0001` est propre à chaque
+# API, et plusieurs candidats plausibles répondent 404 ou 403 « Unified
+# Connectivity: Forbidden ». Celui-ci sert un edmx 4.0 de 13 entity sets.
+${PURCHASE_ORDER_SERVICE}    /sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001
+${PURCHASE_ORDERS}          /sap/opu/odata4/sap/api_purchaseorder_2/srvd_a2x/sap/purchaseorder/0001/PurchaseOrder
+
 
 *** Keywords ***
 Open Api Channel
@@ -59,8 +76,51 @@ Open Api Channel
     [Arguments]    ${base_url}=${API_BASE_URL}    ${user}=${API_USER}
     ...    ${password}=${API_PASSWORD}    ${client}=${API_CLIENT}
     ...    ${alias}=${API_ALIAS}
+    Api Base Url Should Be Provided    ${base_url}
     Open Api Session    ${base_url}    user=${user}    password=${password}
     ...    sap_client=${client}    alias=${alias}
+
+Api Base Url Should Be Provided
+    [Documentation]    Vérifie que la cible du canal API a bien été fournie.
+    ...    Sans cette garde, une base vide n'échoue pas à l'ouverture : elle
+    ...    échoue beaucoup plus tard, au premier appel, quand le chemin relatif
+    ...    du service part comme une URL absolue et ressort en
+    ...    `ValueError: unknown url type: '/sap/opu/odata/...'`. Ce message ne
+    ...    nomme ni la cause ni le remède, et il désigne un chemin parfaitement
+    ...    correct, ce qui envoie chercher au mauvais endroit.
+    ...
+    ...    Symétrique de `Api Credentials Should Be Provided` : le canal API a
+    ...    deux prérequis fournis de l'extérieur, ils méritent deux refus
+    ...    lisibles.
+    [Arguments]    ${base_url}
+    Should Not Be Empty    ${base_url}
+    ...    msg=Aucune cible fournie pour le canal API : passer -v API_BASE_URL:http://<hote>:<port>.
+
+Open Api Sandbox Channel
+    [Documentation]    Ouvre le canal API sur le bac à sable SAP Business
+    ...    Accelerator Hub, qui s'authentifie par une **clé d'API en en-tête**
+    ...    et non en Basic. Même vocabulaire métier que `Open Api Channel` pour
+    ...    la suite : seule la façon de prouver son identité change.
+    ...
+    ...    Aucun mandant n'est envoyé : le bac à sable est un système unique, et
+    ...    un `sap-client` y serait un paramètre de query sans destinataire.
+    [Arguments]    ${base_url}=${S4_SANDBOX_BASE}    ${api_key}=${API_KEY}
+    ...    ${alias}=${API_ALIAS}
+    Api Base Url Should Be Provided    ${base_url}
+    Api Key Should Be Provided    ${api_key}
+    Open Api Session    ${base_url}    api_key=${api_key}    alias=${alias}
+
+Api Key Should Be Provided
+    [Documentation]    Vérifie qu'une clé d'API a bien été fournie, SANS jamais
+    ...    en lire la valeur, exactement comme `Api Credentials Should Be
+    ...    Provided` le fait d'un mot de passe : une clé passée en type `Secret`
+    ...    refuse d'être mesurée, et l'erreur de garde masquerait la vraie
+    ...    cause. La bibliothèque refuse déjà une clé vide à l'ouverture ; cette
+    ...    garde-ci nomme le remède côté ligne de commande.
+    [Arguments]    ${api_key}
+    ${fourni}=    Evaluate    not isinstance($api_key, str) or bool($api_key)
+    Should Be True    ${fourni}
+    ...    msg=Aucune clé d'API fournie : passer -v "API_KEY: Secret:<clé>" (api.sap.com, bouton « Show API Key »).
 
 Api Credentials Should Be Provided
     [Documentation]    Vérifie qu'un mot de passe a bien été fourni, SANS jamais
@@ -114,6 +174,59 @@ Business Service Should Expose Entity Set
     Dictionary Should Contain Key    ${meta}[entity_sets]    ${entity_set}
     ...    msg=Le service ${service} ne publie pas l'ensemble d'entités ${entity_set}.
     RETURN    ${meta}[entity_sets][${entity_set}]
+
+Read Business Service Contract
+    [Documentation]    Le contrat de métadonnées COMPLET d'un service (entity
+    ...    sets, clés, propriétés, libellés, et les capacités déclarées au
+    ...    niveau entity set : adressabilité, création, modification,
+    ...    suppression). C'est la perception brute du canal, celle sur laquelle
+    ...    une campagne construit ses fiches ; pour vérifier la seule présence
+    ...    d'un ensemble d'entités, `Business Service Should Expose Entity Set`
+    ...    suffit.
+    [Arguments]    ${service}    ${alias}=${API_ALIAS}
+    ${meta}=    Get Odata Metadata    ${service}    alias=${alias}
+    RETURN    ${meta}
+
+Api Channel Client
+    [Documentation]    Le mandant SAP sur lequel le canal est ouvert, lu dans
+    ...    l'état RÉEL de la session (jamais dans la configuration attendue).
+    ...    Sert à prouver qu'un canal API et une session GUI regardent la même
+    ...    population avant de comparer des volumétries.
+    [Arguments]    ${alias}=${API_ALIAS}
+    ${state}=    List Api Sessions
+    # La table alias -> mandant est construite AVANT la recherche : un `$alias`
+    # placé dans le corps d'une compréhension ne serait pas visible depuis
+    # l'espace de noms d'`Evaluate` (portée Python), et l'erreur ne se voit
+    # qu'à l'exécution réelle.
+    ${clients}=    Evaluate    {s["alias"]: s["sap_client"] for s in $state["api_sessions"]}
+    ${client}=    Evaluate    $clients.get($alias) or ""
+    RETURN    ${client}
+
+Count Business Entities With Filter
+    [Documentation]    Le nombre d'entités d'un ensemble SOUS FILTRE OData,
+    ...    variante de `Count Business Entities`. Indispensable à deux cas que
+    ...    le comptage nu rend faux : un service draft-enabled, dont le
+    ...    `$count` nu agrège entités actives et brouillons (filtre d'activité),
+    ...    et une vue de consommation qui ne projette qu'un sous-ensemble
+    ...    métier de sa table (filtre de rôle, de type…).
+    [Arguments]    ${entity_set}    ${filter}    ${alias}=${API_ALIAS}
+    ${count}=    Get Odata Count    ${entity_set}    alias=${alias}    filter=${filter}
+    RETURN    ${count}
+
+Probe Business Entity Sets
+    [Documentation]    Sonde d'existence TOLÉRANTE : compte chaque ensemble
+    ...    d'entités en un aller-retour et enregistre les refus au lieu de
+    ...    s'arrêter au premier. À ne pas confondre avec `Read Business
+    ...    Entities In One Roundtrip`, qui échoue en bloc : c'est le bon
+    ...    comportement pour préparer un jeu de données (un échec partiel
+    ...    silencieux corromprait la préparation) et le mauvais pour une sonde,
+    ...    qui doit consigner et poursuivre. Chaque entrée porte le statut HTTP
+    ...    et le code technique OData, jamais un message localisé.
+    [Arguments]    ${service}    ${entity_sets}    ${max_entity_sets}=50
+    ...    ${alias}=${API_ALIAS}
+    ${probe}=    Probe Odata Entity Sets    ${service}    ${entity_sets}
+    ...    alias=${alias}    max_entity_sets=${max_entity_sets}
+    RETURN    ${probe}
 
 Find Business Field By Label
     [Documentation]    Localisateur « libellé humain » du canal API : le pendant

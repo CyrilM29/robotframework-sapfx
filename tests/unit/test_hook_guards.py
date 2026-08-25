@@ -47,11 +47,28 @@ def _runner(failing=(), stdout="rapport"):
 
 # --- les quatre branches de decide() ------------------------------------------
 
-def test_fichier_hors_perimetre_ne_lance_que_le_garde_de_redaction():
+def test_fichier_hors_perimetre_ne_lance_que_les_gardes_de_redaction_et_de_taille():
     run, calls = _runner()
     code, err, out = hook.decide("e:/depot/src/module.py", run)
     assert (code, err, out) == (0, "", "")
-    assert calls == [("check_no_em_dash.py", "e:/depot/src/module.py")]
+    # un .py edite passe le garde du cadratin ET celui de la taille (conv. #13),
+    # et rien d'autre : ni versions publiees, ni conventions/spec.
+    assert calls == [("check_no_em_dash.py", "e:/depot/src/module.py"),
+                     ("check_file_length.py", "e:/depot/src/module.py")]
+
+
+def test_fichier_de_code_trop_long_est_bloquant():
+    run, _ = _runner(failing=("check_file_length.py",), stdout="a decouper")
+    code, err, out = hook.decide("e:/depot/src/gros_module.py", run)
+    assert code == 2
+    assert "a decouper" in err
+    assert out == ""
+
+
+def test_le_garde_de_taille_ne_tourne_pas_sur_un_document():
+    run, calls = _runner()
+    hook.decide("e:/depot/docs/architecture.md", run)
+    assert ("check_file_length.py", "e:/depot/docs/architecture.md") not in calls
 
 
 def test_cadratin_detecte_est_bloquant_et_relaie_le_rapport():

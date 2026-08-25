@@ -1,6 +1,6 @@
 ---
 name: angle-mort-canal-teste-en-indirect
-description: 2026-08-19, un canal éprouvé seulement À TRAVERS d'autres suites cache ses défauts (33 keywords couverts par un seul keyword de lecture) ; et un test unitaire peut GRAVER le bug, ce qui rend la CI structurellement aveugle
+description: 2026-08-19, un canal éprouvé seulement À TRAVERS d'autres suites cache ses défauts (32 keywords couverts par un seul keyword de lecture) ; et un test unitaire peut GRAVER le bug, ce qui rend la CI structurellement aveugle
 type: projet
 date: 2026-08-19
 ---
@@ -8,7 +8,7 @@ date: 2026-08-19
 Deux défauts réels du canal API ont survécu à plusieurs versions, protégés par
 trois couches de masquage superposées.
 
-1. **Le canal n'avait pas de suite à lui.** Il exposait 33 keywords publics et
+1. **Le canal n'avait pas de suite à lui.** Il exposait 32 keywords publics et
    n'était exercé en live qu'INDIRECTEMENT, par deux suites cross-paradigme, sur
    un seul keyword de lecture chacune. Tout le reste (filtrage, écriture,
    fabrique de données) n'avait jamais rencontré de système réel.

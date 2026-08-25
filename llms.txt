@@ -19,7 +19,10 @@ its data); assertions are locale-independent (message *types*, never
 localized texts, on the web too through
 `Ui5 Should Have No Messages Of Type`); every keyword has an off-SAP unit test (fake COM /
 fake Browser); ambiguity is always surfaced with candidates, never resolved
-by silent first match. Distribution: `pip install robotframework-sapfx`
+by silent first match; and no code file grows past 500 lines, split along a
+seam the codebase already uses (one mixin per capability, pure logic in
+`sapfx_common`) rather than at the line count, enforced by
+`scripts/check_file_length.py`. Distribution: `pip install robotframework-sapfx`
 (PyPI: the four libraries only), the self-contained Windows deployment pack
 (GitHub Releases, the ONLY full-install channel: libraries + recorders +
 rf-mcp plugins + business resources + test agents; the installer still pulls
@@ -79,7 +82,29 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
   `resources/api_keywords.resource`: the business-readable keyword layer tests
   should call (one mirrored vocabulary across the three channels, ECC, Fiori
   and API; OData service paths live there under business names, never in a
-  suite)
+  suite), plus `resources/cross_channel_keywords.resource` which carries the
+  entity set to table mapping of the cross-channel campaign
+- `resources/page_objects/`: one `.resource` per screen or application
+  (locator variables + business keywords, the layer sap-healer repairs);
+  includes `abap_flp.resource`, a launchpad page object shared by two UI5
+  releases (1.71 and 1.120) where every divergence is a variable or a named
+  strategy, never a version `IF`
+- `tests/robot/ui/fiori/`: live launchpad campaigns, all read-only by default:
+  a SAP Build Work Zone cFLP behind a real IAS tenant (iframe scope,
+  catalogue by service) and the ABAP FLP explored on two releases
+  (`exploration_flp_abap_a4h.robot` 19/19, `exploration_flp_abap_2023.robot`
+  21/21, the second existing to break single-release assumptions and the
+  shared page object replayed on both to prove it)
+- `tests/robot/cross/croisement_ddic_odata.robot`: the cross-channel acceptance
+  campaign (spec `specs/croisement-ddic-odata-ecc-s4hana.md`), read-only and
+  reusable on ECC and S/4HANA: which tables and entity sets a target really
+  exposes, and whether the screen and the API agree on existence, volume and
+  field contract
+- `tests/robot/cross/simulation_ecriture_lecture.robot`: its write counterpart
+  (spec `specs/simulation-ecriture-lecture-cross-canal.md`), a reversible row
+  written through the screen and observed through the API, then deleted and its
+  disappearance asserted on the entity. Opt-in: it skips in Suite Setup without
+  opening a channel unless the opt-in variable is passed
 - `src/SapEccLibrary/`: vendored upstream base + mixins (connection, waits,
   grids, perception, diagnostics/preflights, healing, semantic labels,
   embedded browser, pointer fallback, multi-session registry: named session

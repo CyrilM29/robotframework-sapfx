@@ -1,14 +1,4 @@
-"""Tests off-SAP du moteur de localisateurs humains (convention #5 du CLAUDE.md).
-
-Moteur pur ``sapfx_common.semantic`` (géométrie libellé -> cible, grammaire,
-ambiguïté jamais tranchée en silence) + mixin ``SemanticKeywords`` (unicité,
-erreurs auto-corrigibles, délégation aux keywords upstream) + voie « ancre de
-libellé » de ``Resolve Element With Healing``.
-"""
-import pytest
-
-from SapEccLibrary import SapEccLibrary
-from sapfx_common.object_tree import ScreenElement
+"""Localisateurs humains : grammaire de resolution (ancres, grilles, portee >>). Doublures dans _semantic_fixtures (convention #13)."""
 from sapfx_common.semantic import (
     is_label,
     nearby_labels,
@@ -16,47 +6,18 @@ from sapfx_common.semantic import (
     text_matches,
 )
 
-
-def _el(eid, etype, text="", tooltip="", changeable=False, box=None):
-    left, top, width, height = box if box else (None, None, None, None)
-    return ScreenElement(id=eid, type=etype, text=text, tooltip=tooltip,
-                         changeable=changeable, left=left, top=top,
-                         width=width, height=height)
-
-
-# Un dynpro de connexion simplifié : libellés à gauche, champs à droite,
-# un en-tête de colonne avec champ dessous, deux boutons, une intersection.
-LOGIN = [
-    _el("wnd[0]", "GuiMainWindow", "SAP", box=(0, 0, 800, 600)),
-    _el("wnd[0]/usr/lblClient", "GuiLabel", "Client", box=(10, 20, 80, 20)),
-    _el("wnd[0]/usr/txtRSYST-MANDT", "GuiTextField", "001", changeable=True,
-        box=(100, 20, 60, 20)),
-    _el("wnd[0]/usr/lblUser", "GuiLabel", "User", box=(10, 50, 80, 20)),
-    _el("wnd[0]/usr/txtRSYST-BNAME", "GuiTextField", "", changeable=True,
-        box=(100, 50, 120, 20)),
-    # 2e champ de la même ligne, plus loin mais encore dans la tolérance :
-    # seul le PLUS PROCHE doit être désigné par le libellé.
-    _el("wnd[0]/usr/txtRSYST-LANGU", "GuiTextField", "", changeable=True,
-        box=(115, 50, 40, 20)),
-    _el("wnd[0]/usr/lblAmount", "GuiLabel", "Amount", box=(300, 20, 60, 20)),
-    _el("wnd[0]/usr/txtAMOUNT", "GuiTextField", "42,00", changeable=True,
-        box=(300, 45, 60, 20)),
-    _el("wnd[0]/tbar[0]/btn[0]", "GuiButton", "Enter", box=(10, 0, 30, 18)),
-    _el("wnd[0]/tbar[1]/btn[8]", "GuiButton", "", tooltip="Exécuter (F8)",
-        box=(50, 0, 30, 18)),
-    # intersection ligne/colonne (grille de champs)
-    _el("wnd[0]/usr/lblLigne1", "GuiLabel", "Ligne1", box=(40, 300, 50, 20)),
-    _el("wnd[0]/usr/lblQte", "GuiLabel", "Qté", box=(100, 270, 40, 20)),
-    _el("wnd[0]/usr/txtQTY-1", "GuiTextField", "", changeable=True,
-        box=(100, 300, 40, 20)),
-]
+from _semantic_fixtures import (  # noqa: F401
+    GRID,
+    LOGIN,
+    SCOPED,
+    SCOPE_FAR,
+    SELECTION_ROW,
+    _SELECTION_INPUT_TYPES,
+    _el,
+    _ids,
+)
 
 
-def _ids(matches):
-    return [m.element.id for m in matches]
-
-
-# --- moteur pur ---------------------------------------------------------------
 
 def test_champ_a_droite_du_libelle():
     matches = resolve_semantic(LOGIN, "Client")
@@ -103,19 +64,6 @@ def test_intersection_gauche_arobase_haut():
     assert matches[0].via == "intersection"
 
 
-# --- grilles de position : `N @ libellé` (verticale) / `libellé @ N` (horizontale) --
-
-GRID = [
-    _el("wnd[0]/usr/lblAddress", "GuiLabel", "Address", box=(10, 100, 80, 20)),
-    _el("wnd[0]/usr/txtLINE1", "GuiTextField", "", changeable=True, box=(10, 130, 100, 20)),
-    _el("wnd[0]/usr/txtLINE2", "GuiTextField", "", changeable=True, box=(10, 160, 100, 20)),
-    _el("wnd[0]/usr/txtLINE3", "GuiTextField", "", changeable=True, box=(10, 190, 100, 20)),
-    _el("wnd[0]/usr/lblPeriod", "GuiLabel", "Period", box=(10, 400, 60, 20)),
-    _el("wnd[0]/usr/txtFROM", "GuiTextField", "", changeable=True, box=(80, 400, 50, 20)),
-    _el("wnd[0]/usr/txtTO", "GuiTextField", "", changeable=True, box=(140, 400, 50, 20)),
-]
-
-
 def test_grille_verticale_n_arobase_libelle():
     assert _ids(resolve_semantic(GRID, "1 @ Address")) == ["wnd[0]/usr/txtLINE1"]
     matches = resolve_semantic(GRID, "2 @ Address")
@@ -138,25 +86,6 @@ def test_grille_horizontale_libelle_arobase_n():
 
 def test_grille_horizontale_position_hors_limites_ne_matche_rien():
     assert resolve_semantic(GRID, "Period @ 3") == []
-
-
-# Une ligne de selection screen SE16 réelle (géométrie relevée live sur A4H,
-# table T000) : libellé de ligne et séparateur « to » = champs texte en LECTURE
-# SEULE, bornes LOW/HIGH modifiables, bouton multi-valeurs en bout de ligne.
-SELECTION_ROW = [
-    _el("wnd[0]/usr/txt%_I1_%_APP_%-TEXT", "GuiTextField", "MTEXT",
-        box=(27, 197, 231, 24)),
-    _el("wnd[0]/usr/txtI1-LOW", "GuiTextField", "", changeable=True,
-        box=(283, 197, 151, 24)),
-    _el("wnd[0]/usr/txt%_I1_%_APP_%-TO_TEXT", "GuiTextField", "to",
-        box=(435, 197, 47, 24)),
-    _el("wnd[0]/usr/txtI1-HIGH", "GuiTextField", "", changeable=True,
-        box=(483, 197, 151, 24)),
-    _el("wnd[0]/usr/btn%_I1_%_APP_%-VALU_PUSH", "GuiButton", "",
-        box=(635, 196, 32, 26)),
-]
-
-_SELECTION_INPUT_TYPES = ("GuiTextField", "GuiCTextField")
 
 
 def test_grille_changeable_only_exclut_les_separateurs_lecture_seule():
@@ -191,28 +120,6 @@ def test_ancrage_simple_changeable_only_saute_le_separateur():
     assert _ids(matches) == ["wnd[0]/usr/txtI1-LOW"]
 
 
-# --- opérateur de portée `ancre >> reste` -------------------------------------
-
-SCOPED = [
-    # deux groupes avec le MÊME libellé non-unique ("Amount"), chacun ancré
-    # sous un libellé unique différent ("Header" / "Item").
-    _el("wnd[0]/usr/lblHeader", "GuiLabel", "Header", box=(10, 500, 60, 20)),
-    _el("wnd[0]/usr/lblAmountH", "GuiLabel", "Amount", box=(10, 530, 60, 20)),
-    _el("wnd[0]/usr/txtAMOUNTH", "GuiTextField", "", changeable=True, box=(80, 530, 60, 20)),
-    _el("wnd[0]/usr/lblItem", "GuiLabel", "Item", box=(300, 500, 60, 20)),
-    _el("wnd[0]/usr/lblAmountI", "GuiLabel", "Amount", box=(300, 530, 60, 20)),
-    _el("wnd[0]/usr/txtAMOUNTI", "GuiTextField", "", changeable=True, box=(370, 530, 60, 20)),
-    # deux champs SANS libellé propre, identifiés par tooltip (l'équivalent F1),
-    # chacun proche d'une ancre unique différente.
-    _el("wnd[0]/usr/lblSearch", "GuiLabel", "Search", box=(10, 700, 60, 20)),
-    _el("wnd[0]/usr/txtNOLABEL", "GuiTextField", "", changeable=True,
-        tooltip="Reference number", box=(80, 700, 100, 20)),
-    _el("wnd[0]/usr/lblOther", "GuiLabel", "Other", box=(300, 700, 60, 20)),
-    _el("wnd[0]/usr/txtNOLABEL2", "GuiTextField", "", changeable=True,
-        tooltip="Reference number", box=(370, 700, 100, 20)),
-]
-
-
 def test_sans_scope_le_libelle_non_unique_est_ambigu():
     assert len(resolve_semantic(SCOPED, "Amount")) == 2
     assert len(resolve_semantic(SCOPED, "Reference number")) == 2
@@ -245,15 +152,6 @@ def test_scope_imbrique():
             tooltip="Target C", box=(70, 900, 60, 20)),
     ]
     assert _ids(resolve_semantic(proches, "A >> B >> Target C")) == ["wnd[0]/usr/txtC"]
-
-
-# Une cible au-delà du rayon par défaut (100 px) de son ancre unique : le cas
-# relevé live sur SE16 (un écran réel est bien plus large que 100 px).
-SCOPE_FAR = [
-    _el("wnd[0]/usr/lblZone", "GuiLabel", "Zone", box=(0, 0, 50, 20)),
-    _el("wnd[0]/usr/txtFAR", "GuiTextField", "", changeable=True,
-        tooltip="Currency Key", box=(300, 0, 60, 20)),
-]
 
 
 def test_scope_radius_etend_le_voisinage():
@@ -340,253 +238,3 @@ def test_text_matches_et_nearby_labels():
     assert not text_matches("Exécuter", "")
     labels = nearby_labels(LOGIN)
     assert labels[:3] == ["Client", "User", "Amount"]
-
-
-# --- describe_element : l'inverse vérifié (usage recorder) ---------------------
-
-def test_describe_element_prefere_le_libelle_ancre_pour_un_champ():
-    from sapfx_common.semantic import describe_element
-    assert describe_element(LOGIN, "wnd[0]/usr/txtRSYST-MANDT") == "Client"
-
-
-def test_describe_element_texte_propre_pour_un_bouton_tooltip_sinon():
-    from sapfx_common.semantic import describe_element
-    assert describe_element(LOGIN, "wnd[0]/tbar[0]/btn[0]") == "Enter"
-    assert describe_element(LOGIN, "wnd[0]/tbar[1]/btn[8]") == "Exécuter (F8)"
-
-
-def test_describe_element_ne_se_sert_jamais_de_la_valeur_d_un_champ_modifiable():
-    # le texte de txtAMOUNT ("42,00") est sa VALEUR : jamais un localisateur.
-    from sapfx_common.semantic import describe_element
-    assert describe_element(LOGIN, "wnd[0]/usr/txtAMOUNT") == "Amount"
-
-
-def test_describe_element_retourne_none_si_aucun_libelle_ne_re_resout_unique():
-    from sapfx_common.semantic import describe_element
-    deux = LOGIN + [
-        _el("wnd[0]/usr/lblAmount2", "GuiLabel", "Amount", box=(300, 80, 60, 20)),
-        _el("wnd[0]/usr/txtAMOUNT2", "GuiTextField", "", changeable=True,
-            box=(370, 80, 60, 20)),
-    ]
-    # "Amount" est ambigu (2 éléments) : la vérification aller-retour échoue
-    assert describe_element(deux, "wnd[0]/usr/txtAMOUNT") is None
-
-
-def test_describe_element_inconnu_ou_sans_ancrage_donne_none():
-    from sapfx_common.semantic import describe_element
-    assert describe_element(LOGIN, "wnd[0]/usr/txtINCONNU") is None
-    sans_geo = [_el("wnd[0]/usr/txtX", "GuiTextField", "val", changeable=True)]
-    assert describe_element(sans_geo, "wnd[0]/usr/txtX") is None
-
-
-# --- mixin SemanticKeywords ----------------------------------------------------
-
-def _lib(elements=LOGIN):
-    lib = SapEccLibrary(screenshots_on_error=False)
-    lib._screen_elements = lambda: elements
-    return lib
-
-
-def test_find_element_by_label_retourne_l_id_en_chaine():
-    eid = _lib().find_element_by_label("User")
-    assert eid == "wnd[0]/usr/txtRSYST-BNAME"
-    assert isinstance(eid, str)
-
-
-def test_fill_field_by_label_delegue_a_input_text():
-    lib = _lib()
-    calls = []
-    lib.input_text = lambda eid, value: calls.append((eid, value))
-    assert lib.fill_field_by_label("Client", "100") == "wnd[0]/usr/txtRSYST-MANDT"
-    assert calls == [("wnd[0]/usr/txtRSYST-MANDT", "100")]
-
-
-def test_fill_field_by_label_via_grille_ecrit_dans_le_champ_modifiable():
-    # Reproduit le scénario live SE16/T000 : `MTEXT @ 2` doit saisir la borne
-    # HIGH, jamais le séparateur « to » en lecture seule (crash COM sinon).
-    lib = _lib(SELECTION_ROW)
-    calls = []
-    lib.input_text = lambda eid, value: calls.append((eid, value))
-    assert lib.fill_field_by_label("MTEXT @ 2", "ZLIVE") == "wnd[0]/usr/txtI1-HIGH"
-    assert calls == [("wnd[0]/usr/txtI1-HIGH", "ZLIVE")]
-
-
-def test_click_button_by_label_delegue_a_click_element():
-    lib = _lib()
-    calls = []
-    lib.click_element = lambda eid: calls.append(eid)
-    assert lib.click_button_by_label("Exécuter") == "wnd[0]/tbar[1]/btn[8]"
-    assert calls == ["wnd[0]/tbar[1]/btn[8]"]
-
-
-def test_read_field_by_label_relit_la_valeur_via_get_value():
-    lib = _lib()
-    lib.get_value = lambda eid: "VALEUR-FRAICHE"
-    assert lib.read_field_by_label("Client") == "VALEUR-FRAICHE"
-
-
-def test_read_field_by_label_via_grille_compte_les_memes_positions_que_fill():
-    # Cascade « modifiables d'abord » : `MTEXT @ 2` lit la borne HIGH (comme
-    # Find/Fill), jamais le séparateur « to » en lecture seule.
-    lib = _lib(SELECTION_ROW)
-    lus = []
-    lib.get_value = lambda eid: lus.append(eid) or "ZLIVE"
-    assert lib.read_field_by_label("MTEXT @ 2") == "ZLIVE"
-    assert lus == ["wnd[0]/usr/txtI1-HIGH"]
-
-
-def test_read_field_by_label_replie_sur_la_lecture_seule_d_un_affichage():
-    # Dynpro d'AFFICHAGE : aucune cible modifiable, la cascade replie sur le
-    # champ en lecture seule (la façon dont un dynpro montre ses valeurs).
-    affichage = [
-        _el("wnd[0]/usr/lblClient", "GuiLabel", "Client", box=(10, 20, 80, 20)),
-        _el("wnd[0]/usr/txtT000-MANDT", "GuiTextField", "001",
-            box=(100, 20, 60, 20)),
-    ]
-    lib = _lib(affichage)
-    lib.get_value = lambda eid: "001"
-    assert lib.read_field_by_label("Client") == "001"
-
-
-def test_read_field_by_label_ambiguite_de_la_passe_modifiable_remontee():
-    # Deux champs modifiables ancrés au même libellé (droite + dessous) : la
-    # cascade ne replie PAS sur la lecture seule : l'ambiguïté est remontée.
-    ambigu = [
-        _el("wnd[0]/usr/lblDouble", "GuiLabel", "Double", box=(10, 20, 60, 20)),
-        _el("wnd[0]/usr/txtDROITE", "GuiTextField", "", changeable=True,
-            box=(80, 20, 60, 20)),
-        _el("wnd[0]/usr/txtDESSOUS", "GuiTextField", "", changeable=True,
-            box=(10, 45, 60, 20)),
-    ]
-    with pytest.raises(AssertionError) as err:
-        _lib(ambigu).read_field_by_label("Double")
-    assert "ambigu" in str(err.value)
-
-
-def test_scope_radius_expose_sur_les_keywords_et_diagnostic_dans_l_erreur():
-    lib = _lib(SCOPE_FAR)
-    # hors rayon par défaut : l'échec diagnostique la portée (rayon + remède)
-    with pytest.raises(AssertionError) as err:
-        lib.find_element_by_label("Zone >> Currency")
-    assert "Portée '>>'" in str(err.value)
-    assert "scope_radius" in str(err.value)
-    # le rayon passé en argument Robot (chaîne) élargit le voisinage
-    assert lib.find_element_by_label("Zone >> Currency", scope_radius="300") \
-        == "wnd[0]/usr/txtFAR"
-
-
-def test_echec_sans_match_liste_les_libelles_visibles():
-    with pytest.raises(AssertionError) as err:
-        _lib().find_element_by_label("Inexistant")
-    assert "Libellés visibles" in str(err.value)
-    assert "Client" in str(err.value)
-
-
-def test_echec_ambigu_liste_les_candidats():
-    deux = LOGIN + [
-        _el("wnd[0]/usr/lblAmount2", "GuiLabel", "Amount", box=(300, 80, 60, 20)),
-        _el("wnd[0]/usr/txtAMOUNT2", "GuiTextField", "", changeable=True,
-            box=(370, 80, 60, 20)),
-    ]
-    with pytest.raises(AssertionError) as err:
-        _lib(deux).find_element_by_label("Amount")
-    assert "ambigu" in str(err.value)
-    assert "txtAMOUNT" in str(err.value) and "txtAMOUNT2" in str(err.value)
-
-
-def test_echec_sans_geometrie_l_explique():
-    sans_geo = [_el("wnd[0]/tbar[0]/btn[0]", "GuiButton", "Enter")]
-    with pytest.raises(AssertionError) as err:
-        _lib(sans_geo).find_element_by_label("Client")
-    assert "géométrie" in str(err.value)
-
-
-def test_control_types_accepte_une_chaine_robot():
-    assert _lib().find_element_by_label("Enter", control_types="GuiButton, GuiTab") \
-        == "wnd[0]/tbar[0]/btn[0]"
-
-
-# --- healing par ancre de libellé ----------------------------------------------
-
-class _NoFindSession:
-    """Session sans findById exploitable : _find retourne toujours None."""
-
-
-def test_healing_repare_par_ancre_de_libelle_quand_le_score_ne_suffit_pas():
-    lib = _lib()
-    lib.session = _NoFindSession()
-    healed = lib.resolve_element_with_healing(
-        "wnd[0]/usr/ctxtZZ-TOTALEMENT-DIFFERENT", label="User")
-    assert healed == "wnd[0]/usr/txtRSYST-BNAME"
-
-
-def test_healing_refuse_une_ancre_de_libelle_ambigue():
-    deux = LOGIN + [
-        _el("wnd[0]/usr/lblAmount2", "GuiLabel", "Amount", box=(300, 80, 60, 20)),
-        _el("wnd[0]/usr/txtAMOUNT2", "GuiTextField", "", changeable=True,
-            box=(370, 80, 60, 20)),
-    ]
-    lib = _lib(deux)
-    lib.session = _NoFindSession()
-    with pytest.raises(AssertionError):
-        lib.resolve_element_with_healing(
-            "wnd[0]/usr/ctxtZZ-TOTALEMENT-DIFFERENT", label="Amount")
-
-
-# --- perception sémantique : affordances (mode=semantic) ------------------------
-
-def test_actionable_targets_champs_modifiables_et_boutons_seulement():
-    from sapfx_common.semantic import actionable_targets
-    ids = [el.id for el in actionable_targets(LOGIN)]
-    assert "wnd[0]/usr/txtRSYST-MANDT" in ids       # champ modifiable
-    assert "wnd[0]/tbar[0]/btn[0]" in ids           # bouton
-    assert "wnd[0]/usr/lblClient" not in ids        # libellé : pas une cible
-    assert "wnd[0]" not in ids                      # structurel : pas une cible
-
-
-def test_affordances_champ_avec_libelle_verifie_et_valeur():
-    from sapfx_common.semantic import screen_affordances
-    lines = screen_affordances(LOGIN)
-    ligne_client = next(line for line in lines if "txtRSYST-MANDT" in line)
-    # champ modifiable : marqué *, libellé vérifié, id, type, valeur courante
-    assert ligne_client.startswith("* Client\t")
-    assert "GuiTextField" in ligne_client
-    assert ligne_client.endswith("= 001")
-
-
-def test_affordances_bouton_par_texte_et_par_tooltip():
-    from sapfx_common.semantic import screen_affordances
-    lines = screen_affordances(LOGIN)
-    enter = next(line for line in lines if "btn[0]" in line)
-    executer = next(line for line in lines if "btn[8]" in line)
-    assert enter.startswith("  Enter\t")
-    assert executer.startswith("  Exécuter (F8)\t")   # tooltip = localisateur
-
-
-def test_affordances_sans_libelle_fiable_marque_interrogation():
-    # deux libellés "Amount" -> describe_element ne re-résout plus de façon
-    # unique : la ligne garde "?" (jamais de devinette), l'id reste le chemin.
-    deux = LOGIN + [
-        _el("wnd[0]/usr/lblAmount2", "GuiLabel", "Amount", box=(300, 80, 60, 20)),
-        _el("wnd[0]/usr/txtAMOUNT2", "GuiTextField", "", changeable=True,
-            box=(300, 105, 60, 20)),
-    ]
-    from sapfx_common.semantic import screen_affordances
-    lines = screen_affordances(deux)
-    amount2 = next(line for line in lines if "txtAMOUNT2" in line)
-    assert amount2.startswith("* ?\t")
-
-
-def test_changeable_ne_suffit_jamais_lecon_live_a4h():
-    # le vrai SAP GUI marque Changeable=True sur GuiUserArea et les boutons de
-    # toolbar (constaté live A4H) : ni l'un ni l'autre n'est un champ de saisie.
-    from sapfx_common.semantic import is_editable_field, screen_affordances
-    usr = _el("wnd[0]/usr", "GuiUserArea", changeable=True, box=(0, 0, 800, 600))
-    btn = _el("wnd[0]/tbar[1]/btn[32]", "GuiButton", "Refresh", changeable=True,
-              box=(90, 0, 30, 18))
-    assert not is_editable_field(usr)
-    assert not is_editable_field(btn)
-    lines = screen_affordances([usr, btn])
-    assert len(lines) == 1                      # GuiUserArea : pas une cible
-    assert lines[0].startswith("  Refresh\t")   # bouton : clic, pas saisie
-    assert "= " not in lines[0]                 # jamais de « valeur » de bouton

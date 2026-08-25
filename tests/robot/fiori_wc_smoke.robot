@@ -36,6 +36,22 @@ Short Tag Matches Plain And Scoped Custom Elements
     Should Be Equal As Integers    ${count}    1
     Wc Control Should Be Visible    tag=Button    text=Scoped save
 
+Short Tag Matches Both Spellings Of A Two Word Component
+    [Documentation]    Un type court en DEUX mots doit atteindre les deux
+    ...                orthographes qu'emploie UI5 Web Components : collée
+    ...                (`ui5-shellbar`, la vraie barre shell d'un launchpad Work
+    ...                Zone) et avec tirets (`ui5-side-navigation`). Relevé live
+    ...                le 2026-08-24 : `tag=ShellBar` ne matchait rien, le type
+    ...                court étant converti en `shell-bar` puis traité comme un
+    ...                tag complet, donc jamais préfixé par `ui5-`.
+    ${count}=    Get Wc Match Count    tag=ShellBar
+    Should Be Equal As Integers    ${count}    1    # <ui5-shellbar-x1b2>, orthographe collée + scoping
+    ${count}=    Get Wc Match Count    tag=SideNavigation
+    Should Be Equal As Integers    ${count}    1    # <ui5-side-navigation>, orthographe à tirets
+    ${count}=    Get Wc Match Count    tag=ui5-side-navigation
+    Should Be Equal As Integers    ${count}    1    # le tag complet reste une demande explicite
+    Wc Control Should Be Visible    tag=ShellBar
+
 Attributes And Text Are Matchable Properties
     [Documentation]    Le matching `properties=` porte sur les attributs de l'hôte
     ...                (mêmes règles que le moteur role : sous-chaîne insensible à la casse).

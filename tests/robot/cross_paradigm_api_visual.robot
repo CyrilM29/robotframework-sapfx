@@ -104,13 +104,18 @@ SE16 Product Screen Matches Its Visual Baseline
     ...                1er passage = baseline créée (WARNING, PNG à committer) ; ensuite,
     ...                distance de Hamming <= ``${VISUAL_THRESHOLD}``. ``mask_elements=auto``
     ...                neutralise la barre de statut / le titre (zones volatiles) avant hachage.
+    ...                ``per_resolution=True`` garde une baseline par **géométrie de capture** :
+    ...                une empreinte perceptuelle encode l'échelle autant que le contenu, donc
+    ...                un poste qui n'affiche pas comme celui de la baseline committée
+    ...                enregistre la sienne (WARNING) au lieu d'échouer sur une dérive qui n'est
+    ...                pas fonctionnelle. La détection reste entière à géométrie constante.
     ...                Le screenshot est aussi incrusté dans le log (preuve visuelle).
     [Tags]    gui    visual
     Open Table In SE16    ${EPM_PRODUCTS_TABLE}
     Log Screenshot    Écran de sélection SE16 de ${EPM_PRODUCTS_TABLE} (source du compte GUI)
     Screen Should Match Baseline    ${VISUAL_BASELINE_NAME}
     ...    threshold=${VISUAL_THRESHOLD}    baseline_directory=${VISUAL_BASELINE_DIR}
-    ...    mask_elements=auto
+    ...    mask_elements=auto    per_resolution=${True}
 
 
 *** Keywords ***

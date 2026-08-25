@@ -31,7 +31,10 @@ _ALLOWED_KEYS = {
     "controlType",   # p. ex. "sap.m.Button"
     "properties",    # dict propriété -> valeur attendue, p. ex. {"text": "Create"}
     "bindingPath",   # dict, p. ex. {"path": "/Orders", "propertyPath": "Status"}
-    "viewId",        # restreint aux contrôles dont l'identifiant contient cet identifiant de vue
+    "viewId",        # restreint aux contrôles de cette VUE (ou dont l'id la contient)
+    "containedIn",   # restreint aux contrôles dont le NŒUD DOM descend de celui du
+                     # contrôle désigné (id exact ou suffixe d'id) : le containment
+                     # DOM, relation distincte de `viewId` (propriété/agrégation)
 }
 
 
@@ -293,3 +296,48 @@ def build_intent_hash(intent: str, params: dict[str, Any] | None = None) -> str:
             for k, v in sorted(params.items()))
         hash_ += "?" + pairs
     return hash_
+
+
+def choose_app_frame(frames: list[dict[str, Any]]) -> int | None:
+    """Index de l'iframe qui porte l'APPLICATION dans un launchpad, ou ``None``.
+
+    Un cFLP (SAP Build Work Zone, FLP classique) ouvre chaque application dans
+    une iframe dont l'identifiant est **généré** par UI5 : mesuré live le
+    2026-08-23, la même application reçoit ``__container1`` à une exécution et
+    ``__container4`` à la suivante, le compteur dépendant du nombre de
+    composants instanciés depuis le chargement. Aucun identifiant, aucune
+    classe et aucun attribut de nommage ne survit donc d'un run à l'autre, et
+    l'exemple ``iframe[id*="application"]`` que la documentation donnait ne
+    correspond à rien sur le launchpad actuel.
+
+    On désigne donc l'iframe par ce qu'elle EST plutôt que par son nom : celle
+    qui est visible, qui charge un document (``src`` non vide), et qui occupe
+    la plus grande surface. Le shell y place l'application en pleine zone de
+    contenu, alors que ses iframes techniques (suivi, notifications) sont
+    invisibles ou minuscules.
+
+    ``frames`` est la liste relevée dans le DOM, chaque entrée portant au moins
+    ``src``, ``width`` et ``height``. L'ordre de la liste est celui du document,
+    et l'index rendu s'y rapporte : il alimente un sélecteur positionnel
+    ``iframe >> nth=N``, stable pour l'état de page observé.
+    """
+    meilleur_index: int | None = None
+    meilleure_surface = 0
+    for index, frame in enumerate(frames or []):
+        if not str(frame.get("src") or "").strip():
+            continue
+        try:
+            largeur = int(frame.get("width") or 0)
+            hauteur = int(frame.get("height") or 0)
+        except (TypeError, ValueError):
+            continue
+        surface = largeur * hauteur
+        # Une iframe technique est invisible ou réduite à quelques pixels : le
+        # seuil écarte les pixels de suivi sans jamais écarter une application,
+        # qui occupe la zone de contenu du shell.
+        if largeur < 50 or hauteur < 50:
+            continue
+        if surface > meilleure_surface:
+            meilleure_surface = surface
+            meilleur_index = index
+    return meilleur_index

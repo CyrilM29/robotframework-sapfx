@@ -26,9 +26,10 @@ testé hors SAP ; l'E/S vit dans le keyword ``Check Screen Against Watch``.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 from .perception_diff import diff_perception
+from .visual_baseline import describe_geometry_mismatch, format_geometry
 from .visual_hash import hamming_distance, tile_rect
 
 # Marqueur « identiques » de diff_lines/diff_perception : la sentinelle s'y
@@ -48,6 +49,7 @@ class WatchOutcome:
     structural_diff: Optional[str] = None   # blocs -/~/+ si dérive structurelle
     visual_distance: Optional[int] = None   # Hamming, None si pas d'empreinte
     visual_tiles: Optional[str] = None      # dérive localisée par tuile, si dispo
+    geometry_note: Optional[str] = None     # référence et capture pas à la même échelle
 
     @property
     def drifted(self) -> bool:
@@ -81,6 +83,89 @@ def compare_watch(name: str, baseline_signature: str, current_signature: str,
         return WatchOutcome(name=name, status="drifted",
                             structural_diff=structural, visual_distance=visual)
     return WatchOutcome(name=name, status="unchanged", visual_distance=visual)
+
+
+@dataclass(frozen=True)
+class TilesReference:
+    """Le contenu d'un fichier de référence ``*.tiles.txt`` : le découpage et le
+    ``hash_size`` **de la référence** (rejouer avec une autre configuration ne
+    doit jamais fabriquer une dérive), la géométrie de capture d'origine, et
+    les empreintes tuile par tuile."""
+    tiles_x: int
+    tiles_y: int
+    hash_size: int
+    geometry: Tuple[int, int]
+    hashes: List[str]
+
+
+def format_dhash_reference(hash_hex: str,
+                           geometry: Optional[Tuple[int, int]] = None) -> str:
+    """Contenu d'un fichier ``*.dhash.txt`` : l'empreinte, et la **géométrie**
+    de la capture qui l'a produite quand elle est connue. Sans elle, une
+    référence ne peut pas dire si une dérive future n'est qu'un changement
+    d'échelle : c'est le manque que ce second champ comble."""
+    if geometry is None:
+        return hash_hex
+    return "%s %s" % (hash_hex, format_geometry(geometry))
+
+
+def parse_dhash_reference(text: str) -> Tuple[Optional[str],
+                                              Optional[Tuple[int, int]]]:
+    """Lecture tolérante de ``*.dhash.txt`` : ``(empreinte, géométrie)``. Les
+    références écrites avant l'ajout de la géométrie (empreinte seule) restent
+    lisibles, géométrie ``None``, donc utilisables telles quelles."""
+    parts = text.strip().split()
+    if not parts:
+        return None, None
+    geometry = None
+    if len(parts) > 1 and "x" in parts[1]:
+        try:
+            width, height = (int(v) for v in parts[1].split("x", 1))
+            geometry = (width, height)
+        except ValueError:
+            geometry = None
+    return parts[0], geometry
+
+
+def format_tiles_reference(hashes: Sequence[str], tiles_x: int, tiles_y: int,
+                           hash_size: int,
+                           geometry: Tuple[int, int]) -> str:
+    """Contenu d'un fichier ``*.tiles.txt`` : en-tête (découpage, hash_size,
+    géométrie) puis les empreintes. Format historique conservé."""
+    return "%d %d %d %d %d\n%s" % (tiles_x, tiles_y, hash_size,
+                                   geometry[0], geometry[1], " ".join(hashes))
+
+
+def parse_tiles_reference(text: str) -> Optional[TilesReference]:
+    """Lecture de ``*.tiles.txt``, ``None`` si le fichier est illisible (une
+    référence abîmée ne doit jamais devenir une dérive)."""
+    try:
+        header, hashes_line = text.splitlines()[:2]
+        values = [int(v) for v in header.split()[:5]]
+        tiles_x, tiles_y, hash_size, width, height = values
+    except (ValueError, IndexError):
+        return None
+    return TilesReference(tiles_x=tiles_x, tiles_y=tiles_y,
+                          hash_size=hash_size, geometry=(width, height),
+                          hashes=hashes_line.split())
+
+
+def annotate_geometry(outcome: WatchOutcome,
+                      reference_geometry: Optional[Tuple[int, int]],
+                      current_geometry: Optional[Tuple[int, int]],
+                      per_resolution: bool = False) -> WatchOutcome:
+    """Ajoute au verdict la note d'échelle quand la référence VISUELLE et la
+    capture ne sont pas à la même géométrie : le canal structurel, lui, est
+    insensible à la résolution, donc une dérive purement visuelle dans ce cas
+    demande d'abord de regarder l'écran, pas le système testé."""
+    note = describe_geometry_mismatch(reference_geometry, current_geometry,
+                                      reference="référence")
+    if not note:
+        return outcome
+    if not per_resolution:
+        note += ("Pour donner à chaque poste sa propre référence visuelle : "
+                 "per_resolution=True (canal structurel toujours partagé).\n")
+    return replace(outcome, geometry_note=note.rstrip("\n"))
 
 
 def locate_tile_drift(distances: Sequence[int], tiles_x: int, tiles_y: int,
@@ -143,6 +228,9 @@ def render_watch_report(outcomes: Sequence[WatchOutcome]) -> str:
         lines.append("## DÉRIVE : %s" % outcome.name)
         if outcome.visual_distance is not None:
             lines.append("- distance visuelle : %d bits" % outcome.visual_distance)
+        if outcome.geometry_note:
+            lines += ["- %s" % part
+                      for part in outcome.geometry_note.splitlines() if part]
         if outcome.visual_tiles:
             lines.append("- dérive visuelle localisée :")
             lines += ["  - %s" % tile for tile in outcome.visual_tiles.splitlines()]

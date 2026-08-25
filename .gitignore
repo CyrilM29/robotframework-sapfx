@@ -43,7 +43,7 @@ tests/robot/visual_baselines/*.actual.png
 # tout passage de sentinelle ayant détecté une dérive salit l'arbre, et
 # `export_public_tree.py` (qui exige un arbre propre, il lit `git archive HEAD`)
 # refuse de tourner : constaté le 2026-08-19, en pleine préparation de release.
-screen_watch/*.actual.signature.txt
+screen_watch/*.actual.*
 # Images clés des démos vidéo (livrables comm, extraites des prises validées) :
 # régénérables par script, non committés ; les .webm sont les intermédiaires
 # Playwright des prises (le livrable est le MP4 composé).
