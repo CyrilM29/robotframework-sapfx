@@ -327,6 +327,59 @@ Count Table Entries
     ${count}=    Count Entries On Current Selection Screen
     RETURN    ${count}
 
+Count Table Entries With Criteria
+    [Documentation]    Compte les entrées de ``${table}`` sous critères nommés
+    ...                (``CHAMP=valeur``, ids techniques), sans dictionnaire de
+    ...                localisateurs à maintenir : la carte des critères est
+    ...                DÉRIVÉE de l'écran par `Get Se16 Selection Criteria`.
+    ...                C'est la différence avec `Display Table Contents With
+    ...                Filter`, qui s'appuie sur les dictionnaires
+    ...                ``<TABLE>_SELECTION_FIELDS` écrits à la main : ceux-ci
+    ...                dérivent en silence quand le choix des champs de
+    ...                sélection change (il persiste par utilisateur), la
+    ...                perception non. Un critère inconnu échoue en listant
+    ...                ceux réellement présents. Retourne un entier (0 admis).
+    ...                Ex. : ``Count Table Entries With Criteria    SNWD_BPA    BP_ROLE=02``
+    [Arguments]    ${table}    &{criteria}
+    Open Table Selection Screen    ${table}
+    ${map}=    Get Se16 Selection Criteria
+    FOR    ${field}    ${value}    IN    &{criteria}
+        ${locator}=    Evaluate    $map.get($field.upper())
+        IF    $locator is None
+            Fail    Table '${table}' has no selection criterion '${field}'; present criteria: ${{ sorted($map) }}
+        END
+        Input Text    ${locator}    ${value}
+    END
+    ${count}=    Count Entries On Current Selection Screen
+    RETURN    ${count}
+
+Read Table Fields
+    [Documentation]    Contrat de champs d'une table du dictionnaire : liste de
+    ...                dicts par colonne technique (``FIELDNAME``,
+    ...                ``POSITION``, ``KEYFLAG``, ``DATATYPE``…), version
+    ...                active, triée par position. Nom métier de
+    ...                `Read Ddic Table Fields` : c'est la source DDIC d'un
+    ...                croisement de schéma avec un service OData.
+    [Arguments]    ${table}    ${max_fields}=200
+    ${fields}=    Read Ddic Table Fields    ${table}    max_fields=${max_fields}
+    RETURN    ${fields}
+
+Ecc Session Should Be Clean
+    [Documentation]    Préflight du canal GUI, à poser avant toute campagne :
+    ...                scripting pleinement activé, EXACTEMENT une session
+    ...                ouverte (une session résiduelle décale les index de
+    ...                connexion et fait piloter la mauvaise) et aucune fenêtre
+    ...                modale héritée. Retourne le **mandant** de la session,
+    ...                que l'appelant peut confronter à celui d'un autre canal.
+    Scripting Should Be Fully Enabled
+    ${sessions}=    List Sap Sessions
+    Length Should Be    ${sessions}    1
+    ...    msg=Expected exactly one SAP GUI session; a leftover session shifts the connection indices.
+    ${windows}=    Get Open Windows
+    ${modals}=    Evaluate    [w for w in $windows if w["modal"]]
+    Should Be Empty    ${modals}    msg=A modal window leaked into the campaign.
+    RETURN    ${sessions}[0][client]
+
 Count Flight Connections For Airline
     [Documentation]    Compte les liaisons de vol (table ``SPFLI``) de la compagnie
     ...                ``${carrid}`` : écran de sélection SE16, critère ``CARRID``

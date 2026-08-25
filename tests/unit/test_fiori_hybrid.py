@@ -249,7 +249,7 @@ def test_composition_can_skip_frame_probing():
 
 def test_fallback_heals_to_dom_last_and_records_telemetry(monkeypatch):
     import importlib
-    fiori_module = importlib.import_module("SapFioriLibrary.SapFioriLibrary")
+    fiori_module = importlib.import_module("SapFioriLibrary.keywords._locators")
     healed = []
     monkeypatch.setattr(fiori_module, "record_healing",
                         lambda channel, **kw: healed.append((channel, kw)))

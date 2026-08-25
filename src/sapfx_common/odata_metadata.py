@@ -35,13 +35,23 @@ def _attr_local(element: ElementTree.Element, name: str) -> Optional[str]:
 
 def parse_metadata(xml_text: str) -> dict[str, Any]:
     """Parse un document ``$metadata`` OData v2 ou v4 en dict JSON-safe :
-    ``{"version", "entity_sets": {nom: {"entity_type", "keys", "properties"}},
+    ``{"version", "entity_sets": {nom: {"entity_type", "label", "keys",
+    "properties", "capabilities", "declared_capabilities"}},
     "function_imports": [...], "actions": [...]}``.
 
     Chaque propriété porte ``{"type", "nullable", "label"}`` (``label`` =
     ``sap:label`` v2 ou annotation absente -> ``None``). Tolérant aux espaces
     de noms : le matching se fait sur les noms locaux, jamais sur les URLs de
     schéma (qui varient entre versions et implémentations).
+
+    ``capabilities`` porte les annotations ``sap:`` de l'entity set lui-même
+    (``addressable``, ``creatable``, ``updatable``, ``deletable``,
+    ``pageable``…), défaut appliqué quand l'attribut est absent, et
+    ``declared_capabilities`` ne liste que celles réellement écrites dans le
+    document. C'est ``addressable`` qui explique, AVANT tout appel, qu'un
+    entity set publié refuse d'être lu : constaté live, le seul entity set
+    d'un service à répondre 403 était aussi le seul annoté
+    ``sap:addressable="false"``.
     """
     try:
         root = ElementTree.fromstring(xml_text)
@@ -71,8 +81,13 @@ def parse_metadata(xml_text: str) -> dict[str, Any]:
                 for item in element:
                     item_local = _local(item.tag)
                     if item_local == "EntitySet":
+                        capabilities, declared = _parse_entity_set_flags(item)
                         entity_sets[item.get("Name") or ""] = {
-                            "entity_type": item.get("EntityType") or ""}
+                            "entity_type": item.get("EntityType") or "",
+                            "label": _attr_local(item, "label"),
+                            "capabilities": capabilities,
+                            "declared_capabilities": declared,
+                        }
                     elif item_local == "FunctionImport":
                         function_imports.append({
                             "name": item.get("Name"),
@@ -104,6 +119,117 @@ def parse_metadata(xml_text: str) -> dict[str, Any]:
         "function_imports": function_imports,
         "actions": actions,
     }
+
+
+# Annotations ``sap:`` portées par un EntitySet, avec la valeur que la
+# Gateway retient quand l'attribut est ABSENT. Elles décrivent ce que le
+# SERVICE autorise, jamais ce que l'autorisation de l'utilisateur permettra :
+# un entity set déclaré modifiable peut toujours répondre 403.
+_ENTITY_SET_FLAGS: dict[str, bool] = {
+    "addressable": True,
+    "creatable": True,
+    "updatable": True,
+    "deletable": True,
+    "pageable": True,
+    "countable": True,
+    "topable": True,
+    "searchable": False,
+    "subscribable": False,
+    "requires-filter": False,
+}
+
+_WRITE_FLAGS = ("creatable", "updatable", "deletable")
+
+
+def _parse_entity_set_flags(
+        element: ElementTree.Element) -> tuple[dict[str, bool], list[str]]:
+    """Annotations ``sap:`` d'un EntitySet, en deux valeurs volontairement
+    séparées : les capacités EFFECTIVES (défaut appliqué quand l'attribut est
+    absent) et la liste de celles que le document DÉCLARE explicitement.
+
+    La distinction n'est pas cosmétique : un service qui ne déclare aucune
+    restriction rend toutes ses capacités « vraies » par défaut, y compris sur
+    des aides à la recherche qui n'ont jamais été prévues pour être écrites.
+    Une capacité par défaut est donc un critère nécessaire, jamais suffisant.
+    """
+    capabilities: dict[str, bool] = {}
+    declared: list[str] = []
+    for flag, default in _ENTITY_SET_FLAGS.items():
+        key = flag.replace("-", "_")
+        raw = _attr_local(element, flag)
+        if raw is None:
+            capabilities[key] = default
+        else:
+            capabilities[key] = raw.strip().casefold() == "true"
+            declared.append(key)
+    return capabilities, sorted(declared)
+
+
+def write_simulation_candidates(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Qualifie les entity sets d'un service pour une future simulation
+    d'écriture, à partir du seul ``$metadata``.
+
+    Retourne ``{"service_declares_restrictions": bool, "candidates": [...]}``.
+    Chaque candidat porte ``{"entity_set", "addressable", "allowed",
+    "declared", "declared_allowed", "keys", "evidence"}`` : ``allowed`` est
+    l'effectif (défaut compris), ``declared`` les capacités écrites dans le
+    document quelle que soit leur VALEUR, ``declared_allowed`` celles qui sont
+    à la fois autorisées et déclarées, et ``evidence`` vaut ``"declared"``
+    quand ``declared_allowed`` n'est pas vide, sinon ``"default"``.
+
+    **La garde se lit par entity set, pas par service, et verbe par verbe.**
+    Deux pièges distincts, tous deux mesurés live, et le second n'a été vu
+    qu'après avoir corrigé le premier :
+
+    1. Un service peut déclarer une restriction sur UN entity set tout en
+       restant muet sur d'autres, qui paraissent alors entièrement
+       modifiables. Une garde posée au niveau du service serait verte, et
+       fausse.
+    2. Une annotation PRÉSENTE n'est pas une annotation PERMISSIVE. Un entity
+       set qui déclare ``sap:creatable="false"`` et ``sap:deletable="false"``
+       tout en se taisant sur ``updatable`` a bien des capacités déclarées,
+       mais la seule qu'il AUTORISE vient du silence. Compter la présence de
+       l'annotation, et non sa valeur, faisait passer ce cas pour appuyé :
+       constaté sur les deux seuls candidats d'une cible réelle.
+
+    D'où ``declared_allowed`` comme fondement de ``evidence`` : un verbe
+    n'engage que s'il est explicitement PERMIS.
+
+    ``service_declares_restrictions`` ne dit donc qu'une chose, plus faible :
+    ce service annote-t-il ses restrictions. Fausse, elle disqualifie tout le
+    document ; vraie, elle ne qualifie aucun entity set en particulier.
+
+    Limite assumée : les restrictions OData **v4** s'expriment en termes
+    ``Org.OData.Capabilities.V1`` et non en attributs ``sap:``. Sur un service
+    v4, rien n'est déclaré ici, donc la garde reste fausse et la fonction ne
+    propose aucun candidat, plutôt que d'en inventer.
+    """
+    sets = metadata.get("entity_sets", {})
+    declares = any(
+        flag in info.get("declared_capabilities", [])
+        for info in sets.values() for flag in _WRITE_FLAGS)
+    candidates: list[dict[str, Any]] = []
+    for name, info in sorted(sets.items()):
+        capabilities = info.get("capabilities", {})
+        allowed = [flag for flag in _WRITE_FLAGS if capabilities.get(flag)]
+        if not allowed:
+            continue
+        declared_here = [flag for flag in _WRITE_FLAGS
+                         if flag in info.get("declared_capabilities", [])]
+        # Une annotation PRÉSENTE n'est pas une annotation PERMISSIVE :
+        # ``sap:creatable="false"`` est déclarée et interdit. Seuls les verbes
+        # à la fois autorisés et déclarés engagent.
+        declared_allowed = [flag for flag in allowed if flag in declared_here]
+        candidates.append({
+            "entity_set": name,
+            "addressable": bool(capabilities.get("addressable", True)),
+            "allowed": allowed,
+            "declared": declared_here,
+            "declared_allowed": declared_allowed,
+            "evidence": "declared" if declared_allowed else "default",
+            "keys": list(info.get("keys", [])),
+        })
+    return {"service_declares_restrictions": declares, "candidates": candidates}
 
 
 def _parse_entity_type(element: ElementTree.Element) -> dict[str, Any]:

@@ -21,7 +21,9 @@ garde-fou de COHÉRENCE, dans le même esprit que ``check_bilingual_docs.py`` et
 2. Que le concept correspondant est toujours présent dans les hints de
    ``_guidance.py`` ;
 3. Que chaque définition d'agent contient encore les marqueurs des conventions
-   (``_AGENT_MARKERS``).
+   (``_AGENT_MARKERS``), plus ceux qui ne valent que pour certains agents
+   (``_AGENT_MARKERS_BY_FILE`` : la convention #12 ne régit que ceux qui
+   produisent ou réparent du code).
 
 Vérifie enfin la **fraîcheur des cartes de keywords** des plugins rf-mcp
 (``_MAP_MARKERS``) : chaque mixin « valeur ajoutée » des bibliothèques doit
@@ -75,6 +77,24 @@ _AGENT_MARKERS = [
     (0, "em dash"),
 ]
 
+# Convention #12 (« une lacune de capacité se comble DANS la bibliothèque
+# livrée ») : elle ne régit que les agents qui PRODUISENT ou RÉPARENT du code.
+# Le planner explore et l'agent ISTQB rédige hors ligne : la leur imposer en
+# ferait du bruit dans deux définitions qu'elle ne concerne pas. Un marqueur par
+# fichier, donc, plutôt qu'un marqueur pour tous.
+_AGENT_MARKERS_BY_FILE = {
+    "sap-generator.md": [(12, "convention #12")],
+    "sap-healer.md": [(12, "convention #12")],
+}
+
+# Passages de CLAUDE.md sans contrepartie dans les hints rf-mcp : ce sont des
+# règles de DÉVELOPPEMENT du dépôt, pas des consignes de pilotage SAP. On
+# vérifie seulement qu'elles n'ont pas disparu du guide canonique, sans quoi les
+# définitions d'agents citeraient une convention qui n'existe plus.
+_CLAUDE_ONLY = [
+    (12, "A capability gap found on a live target is closed IN the shipped"),
+]
+
 # Fraîcheur des cartes de keywords des plugins rf-mcp : pour chaque mixin
 # « valeur ajoutée », les keywords phares qui doivent apparaître (tels quels)
 # dans le fichier du plugin. Étendre cette liste à CHAQUE nouveau mixin/moteur.
@@ -86,7 +106,8 @@ _MAP_MARKERS = {
         "Close All Sap Sessions",
         # _waits.py (réglage dynamique)
         "Set Default Timeout", "Set Poll Interval",
-        # _perception.py (sémantique/annoté/visuel/sentinelle/fenêtres)
+        # _perception.py (fenêtres) / _screenshots.py (annoté) /
+        # _visual.py (baseline) / _watch.py (sentinelle)
         "Get Open Windows", "Get Annotated Screenshot",
         "Screen Should Match Baseline", "Check Screen Against Watch",
         # _perception.py (carte numérotée + action par référence @N)
@@ -95,10 +116,10 @@ _MAP_MARKERS = {
         "Click Element At Offset",
         # _semantic.py / _diagnostics.py
         "Lookup Business Term", "Client Security Should Be Hardened",
-        # _grid.py (GuiTableControl par titre) / _semantic.py (matchcode)
+        # _table_control.py (GuiTableControl par titre) / _semantic.py (matchcode)
         "Read Table Control", "Pick F4 Value",
         # _ddic.py (classification DD02L par lots, artefact d'inventaire) et
-        # l'ouverture d'écran de sélection SE16, en UN seul endroit
+        # _se16.py (écrans SE16 : l'ouverture en UN seul endroit, sélection multiple)
         "Classify Ddic Objects", "Fill Multiple Selection",
         "Write Ddic Inventory Artifact", "Reach Se16 Selection Screen",
         # _embedded_browser.py (pont WebView2/CDP)
@@ -172,6 +193,14 @@ def check():
                     "%s de _guidance.py ne mentionnent plus %r -- la guidance "
                     "a-t-elle dérivé ?" % (num, which, kw))
 
+    for num, claude_anchor in _CLAUDE_ONLY:
+        if claude_anchor not in claude_md:
+            problems.append(
+                "CLAUDE.md convention #%d : passage attendu introuvable (%r) -- "
+                "reformulée/supprimée ? Les définitions d'agents la citent : "
+                "mettre à jour les deux, ou scripts/check_guidance_sync.py."
+                % (num, claude_anchor))
+
     try:
         agent_files = sorted(
             name for name in os.listdir(_AGENTS_DIR)
@@ -185,7 +214,8 @@ def check():
     for filename in agent_files:
         with open(os.path.join(_AGENTS_DIR, filename), "r", encoding="utf-8") as f:
             agent_text = f.read().lower()
-        for num, marker in _AGENT_MARKERS:
+        attendus = _AGENT_MARKERS + _AGENT_MARKERS_BY_FILE.get(filename, [])
+        for num, marker in attendus:
             if marker not in agent_text:
                 # num == 0 : règle de rédaction, pas une convention numérotée.
                 label = ("règle de rédaction" if num == 0

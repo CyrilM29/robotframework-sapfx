@@ -97,7 +97,9 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   suite), `Get Open Windows` (JSON-safe window stack, `modal=True` on modal
   windows, the SESSION_MANAGER leftover-modal trap), the visual assertions `Get Screen Perceptual Hash`/`Screen Should
   Match Baseline` (with `mask_elements=auto` for the volatile status/title
-  bars) plus their element-scoped variants `Get Element Perceptual Hash`/
+  bars, and `per_resolution=True` for one baseline per capture geometry: a
+  perceptual hash encodes the geometry as much as the content) plus their
+  element-scoped variants `Get Element Perceptual Hash`/
   `Element Should Match Baseline` (baseline = the element's cropped PNG) and
   `Get Screen Tile Hashes` (per-tile grid, drift localized)), diagnostics
   (scripting preflight `Scripting Should Be Fully Enabled`, client-security
@@ -123,7 +125,9 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   position, the last resort for officially unscriptable zones (opaque
   GuiShell, charts, drag & drop)), a **drift sentinel**
   (`Check Screen Against Watch` + `tests/robot/ecc_drift_sentinel.robot`:
-  watched screens remembered (structured + visual + per-tile fingerprints),
+  watched screens remembered (structured + visual + per-tile fingerprints,
+  the visual ones per capture geometry under `per_resolution=True` while the
+  structural signature stays shared),
   later passes report only what moved: smart diff (renames paired), global
   hash, and tile localization naming WHERE the visual drift is, change
   detection without scripted tests), and a **multi-session registry**,
@@ -182,7 +186,22 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   through an application condition); `Get Ui5 Messages` /
   `Ui5 Should Have No Messages Of Type` read the MessageManager plus
   recent MessageToasts and assert by message TYPE, never localized text
-  (convention #3 on the web); `Upload File Via Ui5` targets the control's
+  (convention #3 on the web); `Get Ui5 Property` / `Get Ui5 Properties` read a
+  control PROPERTY from the registry, which `Get Ui5 Text` cannot replace: text
+  is what the browser DISPLAYS, so it needs visibility and returns everything
+  the control draws (a list item with a counter reads `"Accessories\n34"` where
+  its `title` is `"Accessories"`, and a control inside a collapsed
+  FlexibleColumnLayout column has no readable text at all); `Get Ui5 Ids`
+  returns WHICH controls matched (the reading you need when the documented
+  anchor is an id SUFFIX; `containedIn=` narrows any role-engine selector to
+  the DOM content of another control, where `viewId` follows the ownership
+  property); `Get Ui5 Open Popups` is the Fiori counterpart of ECC's
+  `Get Open Windows` (a closed dialog stays RENDERED, only
+  `sap.m.InstanceManager` tells open from closed) and
+  `Click Ui5 Dialog Button` acknowledges by button POSITION (MessageBox
+  buttons carry generated ids and translated text, and the right position
+  varies by release: measure it, do not hardcode it);
+  `Upload File Via Ui5` targets the control's
   inner file input through open shadow roots; `Get Ui5 Perceptual Hash` + `Ui5 Screen Should Match Baseline`
   give the web side the same visual snapshot cycle as ECC (shared
   `sapfx_common.visual_baseline`). It does not drive the page itself: it
@@ -227,7 +246,8 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   reconstruction for classic ABAP lists), `visual_hash` (pure perceptual
   dHash + crop/mask/tile primitives behind the visual assertions) and
   `visual_baseline` (the shared snapshot-baseline semantics + Pillow decode
-  boundary used by BOTH channels' visual keywords, optional extra `visual`).
+  boundary used by BOTH channels' visual keywords, optional extra `visual`,
+  including the per-geometry baselines behind `per_resolution=True`).
   New wait/retry loops go here, never inline; their deadlines run on
   `time.monotonic()`, never on the wall clock. Typed (`mypy`).
 - **Business keywords** live in `resources/` (`ecc_keywords.resource`,
@@ -238,7 +258,40 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   suite, `tests/robot/api/canal_api_odata.robot`, running the same business
   keywords against OData v2 (tag `a4h`) and OData v4 (tag `capsflight`): it
   was previously exercised only through the two cross-paradigm suites, and
-  that blind spot is where two real defects had been sitting. **Recorders** in `tools/recorder`
+  that blind spot is where two real defects had been sitting. The **cross-channel
+  campaign** `tests/robot/cross/croisement_ddic_odata.robot` (spec
+  `specs/croisement-ddic-odata-ecc-s4hana.md`, live 9/9) generalises the
+  flagship's single hardcoded pair into a discovery-driven, bounded, read-only
+  campaign reusable on ECC and S/4HANA: existence of every declared entity set,
+  volume (`$count` against the SE16 count of the mapped table), and field
+  contract (`$metadata` against DD03L). Its vocabulary and the **entity set to
+  table mapping** live in `resources/cross_channel_keywords.resource`, its pure
+  logic in `sapfx_common/cross_channel.py`, imported as a Robot library so a
+  pure primitive is reached by a keyword, never by `Evaluate __import__(...)`.
+  Two rules it encodes, both paid live: a table's NAME proves no mapping
+  (`SNWD_CONTACT` is a healthy empty table that a naming convention would have
+  paired with a 41-row entity set), and a `sap:` annotation being PRESENT does
+  not make it PERMISSIVE (`sap:creatable="false"` is declared and forbids), so
+  the write-candidate guard reads per entity set and verb by verb. Its
+  read-only sibling is `tests/robot/cross/simulation_ecriture_lecture.robot`
+  (spec `specs/simulation-ecriture-lecture-cross-canal.md`, live 8/8), the
+  campaign that actually WRITES: write through the screen, observe through the
+  API, delete, prove the initial state came back. It produces the dated
+  reversibility observation the crossing campaign leaves at `unknown`, and it
+  is **opt-in twice over** (tag `write` AND `-v WRITE_SIMULATION_OPT_IN:yes`,
+  otherwise every test skips itself, including inside a full `tests/robot/`
+  run). Its SE16 write screens live in the page object
+  `resources/page_objects/se16_table_entry.resource` and its pure logic in
+  `sapfx_common/write_simulation.py`, whose write-target allowlist is the
+  choke point every writing keyword goes through (an EMPTY allowlist refuses
+  everything, it never allows everything). Two facts it paid for live: a
+  screen write is refused by the DICTIONARY, not by authorisations (the eleven
+  `/DMO/*` RAP tables carry an empty `MAINFLAG`, so SE16 answers type `E` for
+  any user), and safety cannot rest on a menu index, since mass delete sits
+  one notch from selective delete: the filtered grid is re-read and the
+  keyword stops without deleting whenever the selection is not exactly the
+  targeted row.
+  **Recorders** in `tools/recorder`
   (desktop, COM, `--engine auto|native|poll`: native uses the API's own
   `Session.Record`+`Change` events, with automatic polling fallback;
   `--semantic` rewrites steps as human keywords when the label provably
@@ -290,6 +343,15 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
    provider's own reason, never faked;
    API/Fiori state is partitioned by rf-mcp synthetic-test
    namespace; ECC supports one live session per rf-mcp process.
+   **Hot swapping the library inside a running server also needs the PAGE to
+   let go**: the injected `__SAPFX` bundle is versioned by its content and its
+   guard reads « present AND same version », so a new build replaces the old
+   one at the next keyword call instead of being ignored for the life of the
+   page (the old guard produced `window.__SAPFX.<x> is not a function` on
+   keywords that were visible on the Robot side). Reinstalling neither doubles
+   nor drops the hooks placed at injection time (fetch/XHR counting,
+   MessageToast capture): the state lives on the window and each wrapper is
+   marked. Already-parsed RESOURCES, however, stay frozen for the process.
   **Repo-wide scripts** (doc pairing, vendor drift, guidance
   sync, consistency guards, not generators, plus the deployment-pack assembler
   `build_release_pack.py`, `regen_agent_definitions.py`,
@@ -357,6 +419,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   (blind healer evaluation via `scripts/agent_eval_harness.py`); every heal
   session appends the agent's diagnosis to `docs/heal-journal.md`
   (complementary to the runtime `SAPFX_HEALING_LOG` telemetry);
+  the four definitions also require querying the **optional `qa-brain` MCP
+  RAG** (shared QA memory: keywords, specs, lessons written after real
+  incidents) BEFORE their judgement calls (which anchor holds, which layer a
+  keyword belongs to, which failure class, which risk), live observation
+  still deciding and an absent server never blocking;
   `.github/chatmodes/` holds their VS Code / Copilot
   declination, **generated** by `python scripts/regen_agent_definitions.py`
   (never edit chat modes by hand; `--check` guards drift in CI/pytest);
@@ -444,6 +511,43 @@ followed by `robot --dryrun` on windows, on every push/PR to `main`.
    one wrong, fix it in the same lot instead of leaving a trap for the next
    session. The existing guards only cover figures, published versions and
    agent guidance: the rest is discipline, hence this rule.
+11. **No credential ever gets a committed default value**: passwords, API keys
+   and tokens come in through the command line (`-v "NAME: Secret:…"`) or the
+   environment; in `resources/`, `tests/robot/` and `variables/` such a variable
+   keeps `${EMPTY}`. Enforced by `tests/unit/test_no_hardcoded_credentials.py`.
+12. **A capability gap found on a live target is closed IN the shipped
+   library.** A library keyword that misbehaves gets FIXED in `src/`, never
+   routed around in a suite, a page object or a resource; a missing one gets
+   CREATED in `src/Sap*Library` (pure logic in `sapfx_common`), never as inline
+   JS in a page object nor an `Evaluate` in a suite; a workaround already
+   written in an intermediate layer is PROMOTED into the library as soon as it
+   is recognised as a capability. The boundary: libraries carry CAPABILITIES
+   (perception, resolution, waiting, engines, state, protocols), `resources/`
+   carries the BUSINESS VOCABULARY of one site. Why: the libraries are what
+   ships to PyPI, so a fix left in a resource helps nobody else and gets
+   re-improvised in the next project. This is also the one place where
+   « Observe, do not fix » does not apply: the system under test is observed,
+   but our own library is the work in progress. Each such keyword still owes
+   its off-SAP unit test (#5), its rf-mcp intent-map entry, its Libdoc page and
+   its CHANGELOG line. On a deployed pack (no `src/`), the workaround goes to
+   `resources/site_keywords.resource` AND the defect is reported upstream.
+13. **No code file grows past 500 lines.** A file over the line is a file doing
+   several jobs: split it along a seam the repo already uses (one mixin per
+   capability under `keywords/`, pure logic into `sapfx_common`, one module per
+   concern), never by cutting at line 500 to satisfy the number. **In scope**:
+   everything a machine executes, whatever the language (Python, JavaScript
+   including the injected `*.js.tpl` bundles, PowerShell, batch, and the unit
+   tests) under `src/`, `integrations/`, `tools/`, `scripts/`, `packaging/`,
+   `tests/unit/`. **Out of scope**: HTML/CSS pages and graphical supports,
+   GENERATED artefacts (the
+   limit applies to their generator: `recorder_snippet.js` and
+   `extension/recorder.js` come from `regen_recorder.py`), Markdown and docs,
+   Robot suites and `.resource` files (their length follows the scenarios and
+   the screen they name), and `_vendor/` (convention #4 forbids splitting it).
+   The 23 files above the limit on 2026-08-25 were split the same day (debt
+   settled); enforced mechanically by `scripts/check_file_length.py` (CI +
+   `PostToolUse` hook + unit test), whose exact-count `ALLOWED` map is the
+   only escape hatch and is empty.
 
 ## License
 

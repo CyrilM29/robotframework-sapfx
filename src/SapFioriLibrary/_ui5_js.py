@@ -14,11 +14,16 @@ Techniques adoptées depuis ce projet :
   * une liste de propriétés autorisées ordonnée par priorité, utilisée par le Spy pour
     choisir un sélecteur stable.
 
-Le bundle définit un espace de noms idempotent `window.__SAPFX`. `build_call()` enveloppe une
+Le bundle définit l'espace de noms `window.__SAPFX`, **versionné par le contenu** : une
+réinstallation de la MÊME version ne fait rien (le cas courant, à chaque appel de keyword),
+une version différente REMPLACE celle qui est en place. Sans ce numéro, une page gardait à
+vie le premier bundle reçu, et une bibliothèque mise à jour en cours de session (hot-swap
+rf-mcp) échouait en accusant le keyword appelé. `build_call()` enveloppe une
 méthode de l'espace de noms dans une expression de fonction que `Evaluate JavaScript` du navigateur
 peut exécuter. Le modèle de sélecteur Python pur réside dans `_ui5_runtime.py`.
 """
 
+import hashlib
 from importlib import resources
 
 # Propriétés ordonnées par priorité à placer dans l'arbre / à utiliser comme sélecteur,
@@ -102,11 +107,35 @@ _AICABRA_ICON = (
 )
 
 
-# Le bundle injecté. Idempotent (garde sur window.__SAPFX). Le JS vit dans
-# _ui5_bundle.js.tpl (gabarit % : les deux %s sont les listes autorisées).
-BUNDLE = (_read_js_template("_ui5_bundle.js.tpl")
-          % (_js_string_array(ALLOWED_PROPERTY_PRIORITY),
-             _js_string_array(ALLOW_WITHOUT_PROPERTIES))).strip()
+# Marqueur remplacé, APRÈS le formatage `%`, par l'empreinte du bundle : le
+# calculer sur le gabarit formaté (marqueur encore en place) le rend déterministe,
+# là où une empreinte du texte final serait circulaire.
+_VERSION_TOKEN = "__SAPFX_BUNDLE_VERSION__"
+
+
+def bundle_version(source):
+    """Empreinte courte et stable d'un texte de bundle (12 hexa de SHA-256).
+
+    Pourquoi une empreinte du CONTENU plutôt que la version du paquet : le
+    bundle doit être remplacé dès qu'il change, y compris entre deux versions
+    non publiées (travail en cours, hot-swap dans un serveur rf-mcp), et ne doit
+    PAS être réinstallé quand il n'a pas bougé."""
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
+
+
+# Le bundle injecté. Idempotent ET remplaçable : la garde en tête compare la
+# VERSION installée dans la page à celle-ci. Le JS vit dans les gabarits
+# _ui5_bundle_*.js.tpl (convention #13 : un chapitre par fichier, concaténés
+# ICI dans l'ordre en un seul IIFE ; gabarit % : les deux %s sont les listes
+# autorisées).
+_BUNDLE_TEMPLATES = ("_ui5_bundle_core.js.tpl",
+                     "_ui5_bundle_capture.js.tpl",
+                     "_ui5_bundle_engines.js.tpl")
+_BUNDLE_SOURCE = ("".join(_read_js_template(name) for name in _BUNDLE_TEMPLATES)
+                  % (_js_string_array(ALLOWED_PROPERTY_PRIORITY),
+                     _js_string_array(ALLOW_WITHOUT_PROPERTIES))).strip()
+BUNDLE_VERSION = bundle_version(_BUNDLE_SOURCE)
+BUNDLE = _BUNDLE_SOURCE.replace(_VERSION_TOKEN, BUNDLE_VERSION)
 
 
 def build_call(method):
@@ -132,6 +161,9 @@ RESOLVE_DOM_JS = build_call("resolveByDom")
 PAGE_COMPOSITION_JS = build_call("pageComposition")
 BEST_XPATH_JS = build_call("bestXpath")
 READ_TABLE_JS = build_call("readTable")
+READ_PROPERTY_JS = build_call("readProperty")
+OPEN_POPUPS_JS = build_call("openPopups")
+DIALOG_BUTTON_JS = build_call("dialogButton")
 DUMP_TREE_JS = build_call("dumpTree")
 IDLE_STATE_JS = build_call("idleState")
 GET_MESSAGES_JS = build_call("getMessages")
@@ -174,7 +206,14 @@ def sid_xpath(sid):
 # ne diverge jamais du résolveur de la bibliothèque. `tools/recorder_web/recorder_snippet.js`
 # est cette chaîne avec un commentaire d'en-tête ; `tests/unit/test_sid_and_spy.py` vérifie que
 # le fichier reste synchronisé.
-_SPY_LISTENER = _read_js_template("_ui5_spy_listener.js.tpl").strip()
+# Même règle que le bundle (convention #13) : le listener du Spy vit dans les
+# gabarits _ui5_spy_*.js.tpl, un chapitre par fichier (panneau, exports,
+# replay/import, record), concaténés ici dans l'ordre en un seul IIFE.
+_SPY_TEMPLATES = ("_ui5_spy_core.js.tpl",
+                  "_ui5_spy_exports.js.tpl",
+                  "_ui5_spy_replay.js.tpl",
+                  "_ui5_spy_record.js.tpl")
+_SPY_LISTENER = "".join(_read_js_template(name) for name in _SPY_TEMPLATES).strip()
 
 _SPY_HEADER = """\
 /*

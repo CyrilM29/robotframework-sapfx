@@ -5,5 +5,5 @@ correspond au module :  ``Library    SapEccLibrary``.
 """
 from .SapEccLibrary import SapEccLibrary
 
-__version__ = "0.6.7"
+__version__ = "0.7.0"
 __all__ = ["SapEccLibrary"]

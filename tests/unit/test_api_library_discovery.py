@@ -1,0 +1,360 @@
+"""Tests hors reseau de SapApiLibrary : $metadata, catalogue, Gateway, OAuth2/mTLS, telemetrie, BAPI et jobs. Doublures dans _api_library_fixtures."""
+from SapApiLibrary import SapApiLibrary
+from robot.api.types import Secret
+import gzip
+import io
+import json
+import pytest
+import ssl
+import urllib.error
+
+from _api_library_fixtures import (  # noqa: F401
+    _BATCH_RESPONSE,
+    _FakeResponse,
+    _JobConn,
+    _METADATA_V2,
+    _json_response,
+    _lib_with,
+    _sent_header,
+)
+
+
+
+def test_post_odata_batch_multipart_csrf_et_reponses_aplaties():
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _FakeResponse(_BATCH_RESPONSE, status=202,
+                      headers={"Content-Type": "multipart/mixed; boundary=b1"}),
+    ])
+    lib.open_api_session("http://h")
+    operations = [
+        {"method": "GET", "path": "Products('1')"},
+        {"method": "POST", "path": "Products", "payload": {"Id": "NEW"}},
+    ]
+    responses = lib.post_odata_batch("/svc", operations)
+    assert [r["status"] for r in responses] == [200, 201]
+    assert responses[1]["json"]["d"]["Id"] == "NEW"
+    # le fetch CSRF vise la RACINE du service (GET sur $batch n'existe pas)
+    assert lib.requests_seen[0].full_url == "http://h/svc/"
+    batch = lib.requests_seen[1]
+    assert batch.full_url.endswith("/svc/$batch")
+    assert (_sent_header(batch, "Content-Type") or "").startswith(
+        "multipart/mixed; boundary=")
+    assert b"POST Products HTTP/1.1" in batch.data
+    assert b"Content-ID: 1" in batch.data
+
+
+def test_post_odata_batch_echec_partiel_leve_sauf_optout():
+    failing = (
+        b"--b1\r\n"
+        b"Content-Type: application/http\r\n"
+        b"\r\n"
+        b"HTTP/1.1 400 Bad Request\r\n"
+        b"\r\n"
+        b"boom\r\n"
+        b"--b1--\r\n"
+    )
+    def make_lib():
+        lib = _lib_with([
+            _json_response({}, headers={"x-csrf-token": "TOK"}),
+            _FakeResponse(failing, status=202,
+                          headers={"Content-Type": "multipart/mixed; boundary=b1"}),
+        ])
+        lib.open_api_session("http://h")
+        return lib
+
+    with pytest.raises(AssertionError, match="1 opération"):
+        make_lib().post_odata_batch("/svc", [{"method": "GET", "path": "A"}])
+    responses = make_lib().post_odata_batch(
+        "/svc", [{"method": "GET", "path": "A"}], fail_on_error=False)
+    assert responses[0]["status"] == 400
+
+
+def test_post_odata_batch_accepte_les_operations_en_json():
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _FakeResponse(_BATCH_RESPONSE, status=202,
+                      headers={"Content-Type": "multipart/mixed; boundary=b1"}),
+    ])
+    lib.open_api_session("http://h")
+    operations = json.dumps([{"method": "GET", "path": "Products('1')"},
+                             {"method": "POST", "path": "Products",
+                              "payload": {"Id": "NEW"}}])
+    assert len(lib.post_odata_batch("/svc", operations)) == 2
+    with pytest.raises(ValueError, match="JSON"):
+        lib.post_odata_batch("/svc", "pas-du-json")
+
+
+def test_get_odata_metadata_parse_et_met_en_cache():
+    lib = _lib_with([_FakeResponse(_METADATA_V2.encode("utf-8")),
+                     _FakeResponse(_METADATA_V2.encode("utf-8"))])
+    lib.open_api_session("http://h")
+    metadata = lib.get_odata_metadata("/sap/opu/odata/sap/ZSVC")
+    assert lib.requests_seen[0].full_url.endswith("/ZSVC/$metadata")
+    assert _sent_header(lib.requests_seen[0], "Accept") == "application/xml"
+    assert metadata["version"] == "2.0"
+    products = metadata["entity_sets"]["Products"]
+    assert products["keys"] == ["Id"]
+    assert products["properties"]["Id"]["label"] == "Product ID"
+    assert metadata["function_imports"][0]["http_method"] == "POST"
+    # cache : pas de nouvelle requête…
+    lib.get_odata_metadata("/sap/opu/odata/sap/ZSVC")
+    assert len(lib.requests_seen) == 1
+    # …sauf refresh explicite
+    lib.get_odata_metadata("/sap/opu/odata/sap/ZSVC", refresh=True)
+    assert len(lib.requests_seen) == 2
+
+
+def test_reponse_gzip_non_demandee_est_decompressee():
+    """Relevé live sur le bac à sable SAP Business Accelerator Hub : le
+    `$metadata` revient en `Content-Encoding: gzip` alors que le client
+    n'envoie AUCUN `Accept-Encoding`. Sans décompression, les octets
+    compressés atteignaient le parseur XML, qui accusait le document
+    (« invalid token: line 1, column 0 ») là où le fautif était le
+    transport."""
+    comprime = gzip.compress(_METADATA_V2.encode("utf-8"))
+    assert comprime[:2] == b"\x1f\x8b"
+    lib = _lib_with([_FakeResponse(comprime,
+                                   headers={"Content-Encoding": "gzip"})])
+    lib.open_api_session("https://sandbox.api.sap.com/s4hanacloud")
+    metadata = lib.get_odata_metadata("/sap/opu/odata/sap/ZSVC")
+    assert metadata["version"] == "2.0"
+    assert metadata["entity_sets"]["Products"]["keys"] == ["Id"]
+
+
+def test_corps_json_gzippe_est_lu_comme_du_json():
+    lib = _lib_with([_FakeResponse(
+        gzip.compress(json.dumps({"value": [{"Id": "1"}]}).encode("utf-8")),
+        headers={"content-encoding": "GZIP"})])   # casse indifférente
+    lib.open_api_session("https://host")
+    assert lib.get_odata_entities("/Products") == [{"Id": "1"}]
+
+
+def test_encodage_inconnu_laisse_le_corps_intact():
+    """Un encodage qu'on ne sait pas défaire (brotli ici) ne doit pas lever
+    dans la couche transport : le diagnostic du niveau au-dessus nomme le
+    statut, l'URL et un extrait, ce qu'une exception de zlib ne ferait pas."""
+    lib = _lib_with([_FakeResponse(b"\x0b\x02\x80brotli",
+                                   headers={"Content-Encoding": "br"})])
+    lib.open_api_session("https://host")
+    with pytest.raises(AssertionError, match="illisible"):
+        lib.get_odata("/Products")
+
+
+def test_find_odata_property_by_label_et_echec_actionnable():
+    lib = _lib_with([_FakeResponse(_METADATA_V2.encode("utf-8"))])
+    lib.open_api_session("http://h")
+    found = lib.find_odata_property_by_label("/svc", "product id")
+    assert found == [{"entity_set": "Products", "property": "Id",
+                      "label": "Product ID", "type": "Edm.String",
+                      "match": "exact"}]
+    with pytest.raises(AssertionError) as err:
+        lib.find_odata_property_by_label("/svc", "Fournisseur")
+    message = str(err.value)
+    assert "Product ID" in message and "Get Odata Metadata" in message
+
+
+def test_list_odata_services_simplifie_le_catalogue():
+    catalog = {"d": {"results": [{
+        "ID": "ZSVC_0001", "Title": "Demo", "TechnicalServiceName": "ZSVC",
+        "ServiceUrl": "http://h/sap/opu/odata/sap/ZSVC",
+        "TechnicalServiceVersion": "0001", "Ignore": "x"}]}}
+    lib = _lib_with([_json_response(catalog)])
+    lib.open_api_session("http://h")
+    services = lib.list_odata_services()
+    assert services == [{"id": "ZSVC_0001", "title": "Demo",
+                         "technical_name": "ZSVC",
+                         "service_url": "http://h/sap/opu/odata/sap/ZSVC",
+                         "version": "0001"}]
+    url = lib.requests_seen[0].full_url
+    assert "catalogservice" in url and "%24format=json" in url
+
+
+def test_get_gateway_status_ok_inactive_et_injoignable():
+    ok = _lib_with([_json_response({"d": {"results": []}})])
+    ok.open_api_session("http://h")
+    assert ok.get_gateway_status()["status"] == "ok"
+
+    inactive = _lib_with([urllib.error.HTTPError(
+        "http://h/cat", 500, "ISE", None,
+        io.BytesIO(b"<message>error /IWFND/CM_COS/003 occurred</message>"))])
+    inactive.open_api_session("http://h")
+    status = inactive.get_gateway_status()
+    assert status["status"] == "gateway_inactive"
+    assert "/IWFND/IWF_ACTIVATE" in status["remediation"]
+
+    down = _lib_with([urllib.error.URLError("connexion refusée")])
+    down.open_api_session("http://h")
+    assert down.get_gateway_status()["status"] == "unreachable"
+
+
+def test_gateway_should_be_active_nomme_la_remediation():
+    lib = _lib_with([urllib.error.HTTPError(
+        "http://h/cat", 500, "ISE", None,
+        io.BytesIO(b"/IWFND/CM_COS/003"))])
+    lib.open_api_session("http://h")
+    with pytest.raises(AssertionError, match="IWF_ACTIVATE"):
+        lib.gateway_should_be_active()
+
+
+def test_wait_until_api_available_reussit_apres_echecs():
+    lib = _lib_with([urllib.error.URLError("boot en cours"),
+                     _json_response({"d": {"results": []}})])
+    lib.open_api_session("http://h")
+    result = lib.wait_until_api_available(timeout="2s", poll="0.01s")
+    assert result["available"] is True and result["status"] == "ok"
+    assert result["waited_seconds"] >= 0
+
+
+def test_wait_until_api_available_timeout_avec_diagnostic():
+    lib = _lib_with([urllib.error.URLError("down")] * 5)
+    lib.open_api_session("http://h")
+    with pytest.raises(AssertionError) as err:
+        lib.wait_until_api_available(timeout="0.05s", poll="0.01s")
+    assert "indisponible" in str(err.value)
+    assert "docker start" in str(err.value)
+
+
+def test_oauth_bearer_token_demande_une_fois_et_jamais_fuite():
+    lib = _lib_with([_json_response({"value": []}),
+                     _json_response({"value": []})])
+    token_requests = []
+
+    def fake_token_transport(session, request):
+        token_requests.append(request)
+        return _json_response({"access_token": "tok-1", "expires_in": 3600})
+
+    lib._token_transport = fake_token_transport
+    lib.open_api_session("https://api", token_url="https://ias/token",
+                         client_id="cid", client_secret=Secret("csec"))
+    lib.get_odata("/x")
+    lib.get_odata("/y")
+    assert len(token_requests) == 1   # token mis en cache
+    assert _sent_header(lib.requests_seen[0], "Authorization") == "Bearer tok-1"
+    token_request = token_requests[0]
+    assert (_sent_header(token_request, "Authorization") or "").startswith("Basic ")
+    assert b"grant_type=client_credentials" in token_request.data
+    state = lib.list_api_sessions()
+    assert state["api_sessions"][0]["oauth"] is True
+    assert "csec" not in json.dumps(state)
+
+
+def test_oauth_401_renouvelle_le_token_et_rejoue():
+    denied = urllib.error.HTTPError("https://api/x", 401, "Unauthorized",
+                                    None, io.BytesIO(b""))
+    lib = _lib_with([denied, _json_response({"value": []})])
+    issued = iter(["tok-old", "tok-new"])
+    lib._token_transport = lambda session, request: _json_response(
+        {"access_token": next(issued), "expires_in": 3600})
+    lib.open_api_session("https://api", token_url="https://ias/token",
+                         client_id="cid", client_secret="s")
+    lib.get_odata("/x")
+    assert _sent_header(lib.requests_seen[1], "Authorization") == "Bearer tok-new"
+
+
+def test_token_url_sans_client_id_refuse():
+    with pytest.raises(ValueError, match="client_id"):
+        SapApiLibrary().open_api_session("https://api",
+                                         token_url="https://ias/token")
+
+
+def test_client_cert_charge_le_contexte_mtls(monkeypatch):
+    loaded = []
+    monkeypatch.setattr(
+        ssl.SSLContext, "load_cert_chain",
+        lambda self, certfile, keyfile=None, password=None:
+        loaded.append((certfile, keyfile)))
+    lib = SapApiLibrary()
+    lib.open_api_session("https://api", client_cert="client.pem",
+                         client_key="client.key")
+    assert loaded == [("client.pem", "client.key")]
+    assert lib._session("default").tls_context is not None
+
+
+def test_telemetrie_compte_requetes_erreurs_et_statuts():
+    boom = urllib.error.HTTPError("http://h/ko", 500, "ISE", None,
+                                  io.BytesIO(b"boom"))
+    lib = _lib_with([_json_response({"value": []}), boom])
+    lib.open_api_session("http://h")
+    lib.get_odata("/ok")
+    with pytest.raises(AssertionError):
+        lib.get_odata("/ko")
+    telemetry = lib.get_api_telemetry()
+    assert telemetry["requests"] == 2 and telemetry["errors"] == 1
+    assert telemetry["last_status"] == 500
+    assert telemetry["alias"] == "default"
+    row = lib.list_api_sessions()["api_sessions"][0]
+    assert row["requests"] == 2 and row["errors"] == 1
+
+
+def test_call_bapi_verifie_return_par_type():
+    class FakeConn:
+        def call(self, name, **kwargs):
+            if name == "BAPI_FAIL":
+                return {"RETURN": [{"TYPE": "E", "ID": "XX", "NUMBER": "001",
+                                    "MESSAGE": "boom"}]}
+            return {"RETURN": {"TYPE": "S", "MESSAGE": "ok"}, "OUT": 1}
+
+    lib = SapApiLibrary()
+    lib._rfc_connections()["default"] = FakeConn()
+    assert lib.call_bapi("BAPI_OK")["OUT"] == 1
+    with pytest.raises(AssertionError) as err:
+        lib.call_bapi("BAPI_FAIL")
+    message = str(err.value)
+    assert "E XX/001" in message and "Rollback Bapi Transaction" in message
+
+
+def test_commit_et_rollback_bapi_transaction():
+    recorded = []
+
+    class FakeConn:
+        def call(self, name, **kwargs):
+            recorded.append((name, kwargs))
+            return {"RETURN": []}
+
+    lib = SapApiLibrary()
+    lib._rfc_connections()["default"] = FakeConn()
+    lib.commit_bapi_transaction()
+    lib.commit_bapi_transaction(wait=False)
+    lib.rollback_bapi_transaction()
+    assert recorded == [("BAPI_TRANSACTION_COMMIT", {"WAIT": "X"}),
+                        ("BAPI_TRANSACTION_COMMIT", {}),
+                        ("BAPI_TRANSACTION_ROLLBACK", {})]
+
+
+def test_wait_for_background_job_attend_puis_reussit():
+    lib = SapApiLibrary()
+    conn = _JobConn([["R"], ["F"]])
+    lib._rfc_connections()["default"] = conn
+    result = lib.wait_for_background_job("ZJOB", timeout="2s", poll="0.01s")
+    assert result["state"] == "done" and result["statuses"] == {"F": 1}
+    name, kwargs = conn.params[0]
+    assert name == "RFC_READ_TABLE"
+    assert kwargs["QUERY_TABLE"] == "TBTCO"
+    assert kwargs["OPTIONS"] == [{"TEXT": "JOBNAME EQ 'ZJOB'"}]
+
+
+def test_wait_for_background_job_annule_echoue():
+    lib = SapApiLibrary()
+    lib._rfc_connections()["default"] = _JobConn([["A", "F"]])
+    with pytest.raises(AssertionError, match="annulé"):
+        lib.wait_for_background_job("ZJOB", timeout="1s", poll="0.01s")
+
+
+def test_wait_for_background_job_timeout_actionnable():
+    lib = SapApiLibrary()
+    lib._rfc_connections()["default"] = _JobConn([[]])
+    with pytest.raises(AssertionError) as err:
+        lib.wait_for_background_job("ZJOB", timeout="0.05s", poll="0.01s")
+    assert "jobcount" in str(err.value)
+
+
+def test_wait_for_background_job_sans_connexion_guide():
+    with pytest.raises(RuntimeError, match="Open Rfc Connection"):
+        SapApiLibrary().wait_for_background_job("ZJOB")
+
+
+def test_lookup_business_term_meme_vocabulaire_que_les_canaux_gui():
+    info = SapApiLibrary().lookup_business_term("compagnie aérienne",
+                                                domain="FLIGHT")
+    assert info["abap_field"] == "CARRID"

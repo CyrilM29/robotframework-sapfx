@@ -13,7 +13,6 @@ sur les coordonnées de cellules.
 from pythoncom import com_error
 from robot.api import logger
 
-from sapfx_common import table_control
 from sapfx_common.abap_list import reconstruct_rows
 
 
@@ -217,205 +216,137 @@ class GridKeywords:
                 "présents mais aucun n'est positionné (géométrie indisponible).")
         return rows
 
-    # -- GuiTableControl (tables de dynpro classiques) -------------------------
-
-    def read_table_control(self, table_id, max_rows=None):
-        """Lit un **GuiTableControl** (table de dynpro classique : saisie de
-        postes, listes de champs SE11…) en liste de dicts
-        ``[{titre_de_colonne: texte}]``.
-
-        Un table control ne matérialise que ses lignes VISIBLES : la lecture
-        fait défiler la table par fenêtres via la scrollbar verticale et
-        ré-acquiert l'objet COM après chaque défilement (un aller-retour
-        serveur), le tout transparent pour le test. Colonnes sans titre
-        nommées ``COL<n>``, titres en doublon suffixés ``(2)``… : rien n'est
-        perdu en silence. ``max_rows`` plafonne la lecture (journalisé). La
-        position de défilement initiale est restaurée à la fin.
-
-        Piège vérifié live (SE11) : ``RowCount`` annonce les lignes
-        **réservées** par l'écran (47), pas les lignes remplies (26) ; les
-        lignes non matérialisées lèvent côté COM. Ce keyword retourne donc
-        les lignes RÉELLEMENT remplies et s'arrête à la première ligne dont
-        aucune cellule n'existe : jamais de lignes fantômes dans le résultat.
-        Pour une grille **ALV**, utiliser `Read Grid` (l'erreur redirige)."""
-        table = self._table_control(table_id)
-        titles = table_control.unique_titles(self._table_column_titles(table))
-        total = int(getattr(table, "RowCount", 0) or 0)
-        if max_rows is not None and total > int(max_rows):
-            logger.warn(
-                "Table control '%s' reserves %s rows; reading at most %s "
-                "(max_rows)." % (table_id, total, max_rows))
-            total = int(max_rows)
-        visible = int(getattr(table, "VisibleRowCount", 0) or 0)
-        original = self._table_scroll_position(table)
-        rows = []
-        for position, first_local, count in table_control.window_plan(total, visible):
-            table = self._scroll_table_to(table_id, position)
-            exhausted = False
-            for local in range(first_local, first_local + count):
-                values = [self._cell_text(table, local, index)
-                          for index, _ in enumerate(titles)]
-                if all(value is None for value in values):
-                    exhausted = True   # ligne réservée, jamais remplie : fin
-                    break
-                rows.append({title: (value or "")
-                             for title, value in zip(titles, values, strict=True)})
-            if exhausted:
-                break
-        self._scroll_table_to(table_id, original, best_effort=True)
-        return rows
-
-    def get_table_control_cell(self, table_id, row, column_title):
-        """Texte de la cellule ``(ligne absolue, titre de colonne)`` d'un
-        table control : ``row`` est l'index **absolu** 0-based, le défilement
-        jusqu'à la fenêtre qui contient la ligne est automatique."""
-        table = self._table_control(table_id)
-        column = table_control.column_index_by_title(
-            self._table_column_titles(table), column_title, table_id)
-        position, local = table_control.window_for_row(
-            int(row), int(getattr(table, "RowCount", 0) or 0),
-            int(getattr(table, "VisibleRowCount", 0) or 0))
-        table = self._scroll_table_to(table_id, position)
-        text = self._cell_text(table, local, column)
-        if text is None:
-            self.take_screenshot()
-            raise AssertionError(
-                "La ligne %s de '%s' n'est pas remplie : RowCount annonce %s "
-                "lignes RÉSERVÉES par l'écran, pas remplies (piège des table "
-                "controls). Read Table Control retourne les lignes réellement "
-                "remplies : compter dessus pour borner les indices."
-                % (row, table_id, getattr(table, "RowCount", "?")))
-        return text
-
-    def set_table_control_cell(self, table_id, row, column_title, value):
-        """Écrit ``value`` dans la cellule ``(ligne absolue, titre de
-        colonne)`` d'un table control : la saisie des transactions classiques
-        adressée comme l'ALV, par titre visible. Cellule non modifiable =
-        échec actionnable nommant la colonne. Retourne l'id de la table."""
-        table = self._table_control(table_id)
-        column = table_control.column_index_by_title(
-            self._table_column_titles(table), column_title, table_id)
-        position, local = table_control.window_for_row(
-            int(row), int(getattr(table, "RowCount", 0) or 0),
-            int(getattr(table, "VisibleRowCount", 0) or 0))
-        table = self._scroll_table_to(table_id, position)
-        cell = table.GetCell(local, column)
-        if not getattr(cell, "Changeable", True):
-            self.take_screenshot()
-            raise AssertionError(
-                "La cellule (ligne %s, colonne '%s') de '%s' n'est pas "
-                "modifiable (Changeable=False) : colonne d'affichage, ou "
-                "écran en mode consultation." % (row, column_title, table_id))
-        cell.Text = value
-        return table_id
-
-    def find_table_control_row(self, table_id, column_title, value,
-                               ignore_case=False):
-        """Index **absolu** (0-based) de la première ligne dont la colonne
-        ``column_title`` vaut ``value``, ou ``-1`` si aucune (miroir de
-        `Find Row By Column Value` côté ALV) : le défilement de recherche à
-        travers toutes les fenêtres est automatique, et la recherche s'arrête
-        à la fin des lignes réellement remplies (cf. `Read Table Control`)."""
-        table = self._table_control(table_id)
-        column = table_control.column_index_by_title(
-            self._table_column_titles(table), column_title, table_id)
-        total = int(getattr(table, "RowCount", 0) or 0)
-        visible = int(getattr(table, "VisibleRowCount", 0) or 0)
-        wanted = value.lower() if ignore_case else value
-        for position, first_local, count in table_control.window_plan(total, visible):
-            table = self._scroll_table_to(table_id, position)
-            for local in range(first_local, first_local + count):
-                cell = self._cell_text(table, local, column)
-                if cell is None:
-                    return -1   # fin des lignes remplies
-                if (cell.lower() if ignore_case else cell) == wanted:
-                    return position + local
-        return -1
-
     # -- helpers (méthodes internes) ------------------------------------------
+
+    # Profondeur maximale explorée sous un conteneur avant d'abandonner.
+    # Mesuré sur ABAP 2023 : la grille est à 2 niveaux sous le conteneur en
+    # SE16, à 4 en SM50 (qui insère un panneau HTML et un second splitter).
+    _MAX_CONTAINER_DEPTH = 6
 
     def _grid(self, table_id):
         self.element_should_be_present(table_id)
         grid = self.session.findById(table_id)
-        if not hasattr(grid, "ColumnOrder"):
-            self.take_screenshot()
-            raise ValueError(
-                "Element '%s' is not an ALV GridView (no ColumnOrder)." % table_id
-            )
-        return grid
+        if hasattr(grid, "ColumnOrder"):
+            return grid
+        # Le chemin visé ne porte pas la grille elle-même. Les releases
+        # récentes enveloppent l'ALV dans un ou plusieurs GuiSplitterShell
+        # (relevé live le 2026-08-23 sur ABAP 2023), et la profondeur varie
+        # d'une transaction à l'autre : il n'existe donc pas de suffixe fixe
+        # à concaténer au localisateur. On descend jusqu'au PREMIER GridView
+        # réel, c'est-à-dire qu'on adresse l'identité du contrôle plutôt que
+        # la mise en page de l'écran.
+        found, found_id = self._grid_below(grid, table_id)
+        if found is not None:
+            # Jamais silencieux : la même règle que l'auto-réparation de
+            # localisateurs. Un test qui passe grâce à une descente doit le
+            # dire, sinon le localisateur périmé survit indéfiniment.
+            logger.warn(
+                "Grid '%s' n'est pas la grille elle-même mais un conteneur : "
+                "grille trouvée à '%s' et utilisée. Les releases récentes "
+                "enveloppent l'ALV dans des GuiSplitterShell, à une profondeur "
+                "qui varie selon la transaction. Mettre le localisateur à jour "
+                "si ce système devient la cible principale." % (table_id, found_id))
+            return found
+        self.take_screenshot()
+        raise ValueError(
+            "Element '%s' is not an ALV GridView (no ColumnOrder), and no "
+            "GridView was found below it (%d niveaux explorés). Vérifier le "
+            "localisateur avec Get Screen Signature : l'écran rend-il bien une "
+            "grille ?" % (table_id, self._MAX_CONTAINER_DEPTH))
 
-    def _table_control(self, table_id):
-        self.element_should_be_present(table_id)
-        table = self.session.findById(table_id)
-        if hasattr(table, "ColumnOrder"):
-            raise ValueError(
-                "Element '%s' est une grille ALV (GuiGridView) : utiliser "
-                "Read Grid / Get Cell Value By Column Title, pas les keywords "
-                "Table Control." % table_id)
-        if not hasattr(table, "GetCell") or not hasattr(table, "Columns"):
-            self.take_screenshot()
-            raise ValueError(
-                "Element '%s' n'est pas un GuiTableControl (ni GetCell ni "
-                "Columns)." % table_id)
-        return table
+    def _resolved_grid_id(self, table_id):
+        """Identifiant de la grille RÉELLE derrière ``table_id``.
 
-    def _table_column_titles(self, table):
-        """Titres BRUTS des colonnes (Title, repli Tooltip puis Name) : la
-        normalisation (COL<n>, doublons) vit dans ``sapfx_common.table_control``."""
-        columns = table.Columns
-        titles = []
-        for index in range(int(getattr(columns, "Count", 0) or 0)):
-            column = columns.ElementAt(index)
-            titles.append((getattr(column, "Title", "")
-                           or getattr(column, "Tooltip", "")
-                           or getattr(column, "Name", "") or "").strip())
-        return titles
+        Rend l'identifiant INCHANGÉ dans les deux cas où il ne faut pas
+        intervenir : le chemin porte déjà la grille (cas du 1909 et de toutes
+        les suites vertes), ou rien qui ressemble à une grille n'existe en
+        dessous (un GuiTableControl, par exemple). La primitive amont produit
+        alors son propre message d'erreur, qui reste le plus juste.
+        """
+        try:
+            element = self.session.findById(table_id)
+        except Exception:                                  # noqa: BLE001
+            return table_id
+        if hasattr(element, "ColumnOrder"):
+            return table_id
+        found, found_id = self._grid_below(element, table_id)
+        if found is None or not found_id or found_id == table_id:
+            return table_id
+        logger.warn(
+            "Grid '%s' porte un conteneur : grille réelle '%s' utilisée."
+            % (table_id, found_id))
+        return found_id
+
+    # Primitives de grille héritées du code vendorisé : elles appellent
+    # `findById(table_id)` en direct, donc elles ne passent pas par `_grid`.
+    # On ne modifie pas le fichier amont (convention 4) : on résout
+    # l'identifiant ici, puis on délègue le comportement inchangé.
+
+    def get_row_count(self, table_id):
+        """Nombre de lignes d'une grille, y compris quand le localisateur vise
+        le conteneur qui l'enveloppe (releases récentes)."""
+        return super().get_row_count(self._resolved_grid_id(table_id))
+
+    def get_cell_value(self, table_id, row_num, col_id):
+        """Valeur d'une cellule, localisateur de conteneur toléré."""
+        return super().get_cell_value(
+            self._resolved_grid_id(table_id), row_num, col_id)
+
+    def set_cell_value(self, table_id, row_num, col_id, text):
+        """Écrit une cellule, localisateur de conteneur toléré."""
+        return super().set_cell_value(
+            self._resolved_grid_id(table_id), row_num, col_id, text)
+
+    def click_toolbar_button(self, table_id, button_id):
+        """Clique un bouton de la barre d'outils d'une grille, localisateur de
+        conteneur toléré."""
+        return super().click_toolbar_button(
+            self._resolved_grid_id(table_id), button_id)
+
+    def select_table_row(self, table_id, row_num):
+        """Sélectionne une ligne. Sur un GuiTableControl l'identifiant est rendu
+        inchangé, donc le comportement amont (qui gère les deux types) est
+        strictement préservé."""
+        return super().select_table_row(
+            self._resolved_grid_id(table_id), row_num)
 
     @staticmethod
-    def _cell_text(table, local_row, column):
-        """Texte d'une cellule de table control, ou ``None`` si la cellule
-        n'est pas MATÉRIALISÉE (``GetCell`` lève « invalid argument »).
-
-        Constaté live (SE11/SNWD_PD) : ``RowCount`` annonce 47 lignes quand
-        26 seulement sont remplies ; les lignes réservées n'ont aucune
-        cellule. ``None`` distingue « cellule absente » (fin des données) de
-        « cellule vide » (valeur légitime), ce dont dépendent l'arrêt de la
-        lecture et l'échec actionnable de `Get Table Control Cell`."""
+    def _children_of(node):
+        """Enfants d'un conteneur COM, ou liste vide. Tolérant par dessein :
+        un objet sans ``Children``, un accesseur absent ou un appel qui lève
+        ne doivent pas faire échouer une simple exploration."""
+        children = getattr(node, "Children", None)
+        if children is None:
+            return []
         try:
-            return table.GetCell(local_row, column).Text
-        except com_error:
-            return None
+            count = int(children.Count)
+        except Exception:                                  # noqa: BLE001
+            return []
+        items = []
+        for index in range(count):
+            for accessor in ("ElementAt", "Item"):
+                method = getattr(children, accessor, None)
+                if method is None:
+                    continue
+                try:
+                    child = method(index)
+                except Exception:                          # noqa: BLE001
+                    continue
+                if child is not None:
+                    items.append(child)
+                break
+        return items
 
-    @staticmethod
-    def _table_scroll_position(table):
-        scrollbar = getattr(table, "VerticalScrollbar", None)
-        if scrollbar is None:
-            return 0
-        return int(getattr(scrollbar, "Position", 0) or 0)
-
-    def _scroll_table_to(self, table_id, position, best_effort=False):
-        """Positionne la scrollbar verticale puis **ré-acquiert** l'objet
-        table : le défilement d'un table control est un aller-retour serveur
-        qui invalide l'objet COM. Position déjà atteinte = aucun aller-retour.
-        ``best_effort`` (restauration de fin de lecture) avale une erreur COM."""
-        table = self.session.findById(table_id)
-        scrollbar = getattr(table, "VerticalScrollbar", None)
-        if scrollbar is None:
-            return table
-        # La scrollbar plafonne à `total - visible` : une position au-delà
-        # lève un com_error (constaté live sur SE11). `window_plan` borne déjà
-        # ses positions ; cette borne est le garde-fou défensif pour les
-        # tables de saisie dont RowCount inclut des lignes virtuelles.
-        maximum = getattr(scrollbar, "Maximum", None)
-        if maximum is not None:
-            position = min(int(position), int(maximum))
-        if int(getattr(scrollbar, "Position", 0) or 0) == int(position):
-            return table
-        try:
-            scrollbar.Position = int(position)
-            self.wait_until_busy_done()
-        except com_error:
-            if not best_effort:
-                raise
-            return table
-        return self.session.findById(table_id)
+    def _grid_below(self, node, base_id):
+        """Premier descendant portant ``ColumnOrder``, en parcours en largeur
+        borné. Retourne ``(grille, identifiant)`` ou ``(None, None)``."""
+        queue = [(node, 0)]
+        while queue:
+            current, depth = queue.pop(0)
+            if depth >= self._MAX_CONTAINER_DEPTH:
+                continue
+            for child in self._children_of(current):
+                if hasattr(child, "ColumnOrder"):
+                    return child, str(getattr(child, "Id", "") or base_id)
+                queue.append((child, depth + 1))
+        return None, None

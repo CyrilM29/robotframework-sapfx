@@ -14,6 +14,13 @@ Documentation       **Sentinelle de dérive** : la surveillance d'écrans SANS t
 ...                 un tcode à ``@{WATCHED_TRANSACTIONS}``, aucun scénario à
 ...                 écrire.
 ...
+...                 ``${PER_RESOLUTION}`` (True ici) donne à chaque **géométrie de
+...                 capture** sa propre référence VISUELLE, le canal structurel
+...                 restant partagé : la même surveillance vaut sur des postes qui
+...                 n'affichent pas pareil, sans qu'un changement d'échelle se
+...                 rapporte comme une dérive. ``-v PER_RESOLUTION:False`` revient
+...                 au fichier unique.
+...
 ...                   robot --pythonpath src -v SAP_CONNECTION:... -v SAP_USER:...
 ...                   -v "SAP_PASSWORD: Secret:..." tests/robot/ecc_drift_sentinel.robot
 
@@ -29,6 +36,7 @@ Suite Teardown      Close SAP
 @{WATCHED_TRANSACTIONS}    SE16    SE38    SM50
 ${WATCH_DIR}               screen_watch
 ${FAIL_ON_DRIFT}           False
+${PER_RESOLUTION}          ${True}
 
 
 *** Test Cases ***
@@ -43,9 +51,16 @@ Watch Critical Screens
         Wait Until Busy Done
         ${verdict}=    Check Screen Against Watch    ${tcode}
         ...    directory=${WATCH_DIR}    fail_on_drift=${FAIL_ON_DRIFT}
+        ...    per_resolution=${PER_RESOLUTION}
         Append To List    ${outcomes}    ${verdict}
     END
+    # Le verdict porte EXACTEMENT les champs de WatchOutcome : le reconstruire
+    # champ par champ perdait la dérive localisée par tuile (et la note
+    # d'échelle) dans le rapport agrégé.
+    ${verdicts}=    Evaluate
+    ...    [sapfx_common.screen_watch.WatchOutcome(**o) for o in $outcomes]
+    ...    modules=sapfx_common.screen_watch
     ${report}=    Evaluate
-    ...    sapfx_common.screen_watch.render_watch_report([sapfx_common.screen_watch.WatchOutcome(name=o["name"], status=o["status"], structural_diff=o["structural_diff"], visual_distance=o["visual_distance"]) for o in $outcomes])
+    ...    sapfx_common.screen_watch.render_watch_report($verdicts)
     ...    modules=sapfx_common.screen_watch
     Log    ${report}

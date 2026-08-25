@@ -25,7 +25,12 @@ ne plus adresser le **DOM** mais à adresser directement le **contrôle UI5**.
 - **Browser library** (Playwright) gère la page, les clics et la saisie.
 - **`SapFioriLibrary`** transforme un *sélecteur de contrôle UI5* en un sélecteur utilisable par Browser,
   via un bundle JS injecté (`src/SapFioriLibrary/_ui5_js.py`) proposant trois
-  moteurs :
+  moteurs. Le bundle est idempotent **par version** (empreinte dérivée de son
+  contenu, exposée en `window.__SAPFX.__v`) : une page déjà à la version
+  courante ne réinstalle rien, et une version plus récente remplace l'ancienne
+  au prochain appel de keyword sans recharger la page, en préservant les hooks
+  posés à l'injection (instrumentation réseau, capture des MessageToast) au
+  lieu de les empiler ou de les perdre. Les moteurs :
   - **role** : parcourt le registre des contrôles en faisant correspondre `controlType` (nom court *ou* complet),
     `properties` (sous-chaîne insensible à la casse, ou `/regex/`), `id`,
     `bindingPath`, `viewId`. → `Resolve Ui5 Control`. Retourne
@@ -287,3 +292,6 @@ option complémentaire plus lourde.
       `Screen Should Match Baseline` (`sapfx_common.visual_baseline` partagé),
       sur une capture de page de la bibliothèque Browser. Couvre ce que
       l'arbre UI5 ne dit pas (canvas, images, thème/rendu globalement altéré).
+      La taille du viewport fait partie de l'empreinte : l'option ECC est donc
+      reprise ici, `per_resolution=True` garde une baseline par géométrie de
+      capture.

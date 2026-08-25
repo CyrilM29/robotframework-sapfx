@@ -110,3 +110,36 @@ def test_generated_page_keeps_repo_relative_sources(page):
     assert all(s.startswith("src/") for s in sources), (
         f"comms/libdoc/{page} : sources attendues relatives à la racine "
         f"(`src/…`), trouvé {sorted(sources)[:3]}")
+
+
+@pytest.mark.parametrize("library", [p[: -len(".html")] for p in _PAGES])
+def test_spec_lists_every_keyword_the_library_exposes(library):
+    """Le contenu suit le code, pas seulement le numéro de version.
+
+    La garde de version ci-dessus ne mord qu'à un bump : entre deux releases,
+    un keyword ajouté ou retiré laisse les pages publiées incomplètes sans que
+    rien ne l'annonce. Constaté le 2026-08-22 : trois keywords manquaient et
+    quatre signatures avaient changé (l'option ``per_resolution``) depuis la
+    release précédente, toutes les gardes au vert.
+
+    Le contrat vérifié ici est volontairement limité aux NOMS de keywords : ils
+    sont la surface publique, ils ne dépendent pas de la langue, et ils se
+    comparent sans rien exiger de la traduction anglaise des specs.
+    """
+    import json
+
+    from robot.libdocpkg import LibraryDocumentation
+
+    spec_path = os.path.join(_LIBDOC_DIR, "spec", f"{library}.json")
+    assert os.path.isfile(spec_path), f"spec Libdoc manquante : {spec_path}"
+    with open(spec_path, encoding="utf-8") as handle:
+        documented = {kw["name"] for kw in json.load(handle)["keywords"]}
+    exposed = {kw.name for kw in LibraryDocumentation(library).keywords}
+
+    manquants = sorted(exposed - documented)
+    en_trop = sorted(documented - exposed)
+    assert not manquants and not en_trop, (
+        f"comms/libdoc/spec/{library}.json ne suit plus la bibliothèque : "
+        f"absents de la spec {manquants or 'aucun'}, disparus du code "
+        f"{en_trop or 'aucun'}. Reporter le delta puis reconstruire les pages "
+        "(procédure dans comms/libdoc/README.md).")

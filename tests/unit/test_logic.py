@@ -240,6 +240,86 @@ def test_grid_raises_value_error_when_element_is_not_an_alv_grid():
         lib.get_grid_column_ids("not_a_grid")
 
 
+# --- ALV enveloppée dans des splitters (releases récentes) --------------------
+
+class FakeChildren:
+    """Collection COM d'enfants, façon GuiComponentCollection."""
+
+    def __init__(self, items):
+        self._items = list(items)
+
+    @property
+    def Count(self):
+        return len(self._items)
+
+    def ElementAt(self, index):
+        return self._items[index]
+
+
+class FakeContainer:
+    """Conteneur sans ColumnOrder : ce que rend `cntlGRID1/shellcont/shell`
+    sur ABAP 2023, où l'ALV est enveloppée dans un GuiSplitterShell."""
+
+    def __init__(self, element_id, children=()):
+        self.Id = element_id
+        self.Children = FakeChildren(children)
+
+
+def _wrapped_grid_lib(depth):
+    """Bibliothèque dont le localisateur historique porte un conteneur, la
+    grille étant `depth` niveaux plus bas."""
+    grid = FakeGrid()
+    grid.Id = "wnd[0]/usr/cntlGRID1/shellcont/shell" + "/shellcont[1]/shell" * depth
+    node = grid
+    for niveau in range(depth, 0, -1):
+        node = FakeContainer(
+            "wnd[0]/usr/cntlGRID1/shellcont/shell" + "/shellcont[1]/shell" * (niveau - 1),
+            [node])
+    return _grid_lib_with(node), grid
+
+
+def _grid_lib_with(root):
+    lib = _grid_lib()
+    lib.session._objects["grid"] = root
+    return lib
+
+
+def test_grille_atteinte_sous_un_splitter_se16(caplog):
+    """Relevé live le 2026-08-23 : sur ABAP 2023, SE16 place sa grille un
+    niveau sous le chemin historique, SM50 deux niveaux. Le localisateur du
+    dépôt vise le conteneur ; la bibliothèque doit descendre jusqu'au contrôle
+    réel plutôt que d'échouer sur `no ColumnOrder`."""
+    lib, grid = _wrapped_grid_lib(depth=1)
+    assert lib.get_grid_column_ids("grid") == grid.ColumnOrder
+
+
+def test_grille_atteinte_sous_deux_splitters_sm50():
+    lib, grid = _wrapped_grid_lib(depth=2)
+    assert lib.get_grid_column_ids("grid") == grid.ColumnOrder
+
+
+def test_descente_bornee_en_profondeur():
+    """Un conteneur profond sans grille ne doit pas faire boucler l'exploration
+    ni remonter une erreur muette : l'échec nomme le nombre de niveaux."""
+    lib, _ = _wrapped_grid_lib(depth=1)
+    profond = FakeContainer("c0")
+    node = profond
+    for i in range(1, 12):
+        enfant = FakeContainer("c%d" % i)
+        node.Children = FakeChildren([enfant])
+        node = enfant
+    lib.session._objects["profond"] = profond
+    with pytest.raises(ValueError, match="niveaux explorés"):
+        lib.get_grid_column_ids("profond")
+
+
+def test_grille_directe_reste_prioritaire_et_sans_descente():
+    """Non-régression : quand le localisateur porte DÉJÀ la grille, rien ne
+    change et aucune exploration n'a lieu."""
+    lib = _grid_lib()
+    assert lib.get_grid_column_ids("grid") == ["MANDT", "MTEXT"]
+
+
 # --- retry sur clic (synchronisation) ----------------------------------------
 
 def test_click_element_with_retry_succeeds_after_transient_failure():

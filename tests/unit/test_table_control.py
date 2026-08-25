@@ -9,6 +9,7 @@ import pytest
 from pythoncom import com_error
 
 from SapEccLibrary.keywords._grid import GridKeywords
+from SapEccLibrary.keywords._table_control import TableControlKeywords
 from sapfx_common.table_control import (
     column_index_by_title,
     unique_titles,
@@ -157,7 +158,7 @@ class FakeSession:
 
 
 def _lib(table):
-    cls = type("TestLib", (GridKeywords,), {})
+    cls = type("TestLib", (GridKeywords, TableControlKeywords), {})
     lib = cls()
     lib.session = FakeSession({"tbl": table})
     lib.element_should_be_present = lambda element_id, message=None: None

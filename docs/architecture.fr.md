@@ -94,9 +94,15 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     du hash couvre la région recadrée d'UN élément : un changement dans un
     GuiShell opaque pèse sur les 64 bits au lieu d'être dilué dans l'écran) et
     `Get Screen Tile Hashes` (une empreinte par tuile d'une grille 4×4 : la
-    dérive est **localisée**, pas seulement détectée). Le canal pixels couvre
-    exactement ce que l'API Scripting ne voit pas : rendu GuiShell opaque des
-    listes, graphiques record-only.
+    dérive est **localisée**, pas seulement détectée). Une empreinte
+    perceptuelle encode la **géométrie de capture** autant que le contenu :
+    `per_resolution=True` garde une baseline committée par géométrie
+    (`<name>@1920x1032.png`), donc une même suite reste comparable sur des
+    postes qui n'affichent pas la même taille ; sans l'option, un échec dont
+    les deux géométries diffèrent le dit, au lieu de se lire comme une
+    régression fonctionnelle. Le canal pixels couvre exactement ce que l'API
+    Scripting ne voit pas : rendu GuiShell opaque des listes, graphiques
+    record-only.
   - `_diagnostics` : **préflight** scripting (`Get Scripting Status`,
     `Scripting Should Be Fully Enabled`, soit un échec précoce avec le paramètre RZ11 exact à
     corriger), `Enable Test Tool Mode`, `Get Session Telemetry`.
@@ -145,6 +151,11 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     global, et la **grille de tuiles** : une dérive locale trop diluée pour le
     hash global est rattrapée par SA tuile et rapportée avec sa position, son
     rectangle en pixels et les éléments qui la recouvrent.
+    `per_resolution=True` donne à chaque géométrie de capture ses propres
+    références VISUELLES, le canal structurel restant partagé : une signature
+    d'écran ne dépend pas de la résolution, une empreinte perceptuelle si.
+    Sans l'option, une dérive visuelle entre deux géométries différentes est
+    annotée comme pouvant n'être qu'un changement d'échelle.
 - **`SapEccLibrary.py`** les assemble et redéfinit `run_transaction` pour une
   détection d'erreurs indépendante de la locale. `ROBOT_LIBRARY_SCOPE = SUITE` :
   les tests d'une suite partagent leur connexion COM, tandis que deux suites

@@ -71,6 +71,10 @@ _PNG_STUB = base64.b64encode(b"\x89PNG-fake").decode("ascii")
 _FAKE_IMAGES = {
     b"\x89PNG-gradient": _gradient(64, 64),
     b"\x89PNG-flat": _flat(64, 64),
+    # Le MÊME écran rendu par un poste qui n'affiche pas pareil : autre
+    # géométrie de capture, contenu de la même famille.
+    b"\x89PNG-gradient-hd": _gradient(96, 72),
+    b"\x89PNG-flat-hd": _flat(96, 72),
 }
 
 
@@ -108,6 +112,95 @@ def test_derive_visuelle_echoue_avec_distance_et_remede(tmp_path):
     message = str(err.value)
     assert "distance" in message and "supprimer la baseline" in message
     assert (tmp_path / "baselines" / "ecran.actual.png").exists()
+
+
+# --- baselines par géométrie (multi-résolution) ------------------------------------
+
+def test_geometries_et_nom_de_variante():
+    from sapfx_common.visual_baseline import (format_geometry, geometry_of,
+                                              variant_path)
+    assert geometry_of(_flat(96, 72)) == (96, 72)
+    assert geometry_of([]) == (0, 0)
+    assert format_geometry((1920, 1032)) == "1920x1032"
+    assert variant_path("/base", "se16", (1920, 1032)).endswith(
+        "se16@1920x1032.png")
+
+
+def test_existing_geometries_liste_trie_et_ignore_les_captures(tmp_path):
+    from sapfx_common.visual_baseline import existing_geometries
+    for nom in ("se16@1920x1032.png", "se16@800x600.png",
+                "se16@1920x1032.actual.png", "se16.png", "se38@640x480.png"):
+        (tmp_path / nom).write_bytes(b"x")
+    assert existing_geometries(str(tmp_path), "se16") == ["1920x1032", "800x600"]
+    assert existing_geometries(str(tmp_path / "absent"), "se16") == []
+
+
+def test_per_resolution_donne_une_baseline_par_geometrie(tmp_path):
+    """Deux postes, deux géométries : le second ENREGISTRE sa référence au lieu
+    d'échouer sur une dérive qui n'est que d'échelle."""
+    base_dir = str(tmp_path / "baselines")
+    assert _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution=True) == 0
+    assert _visual_lib("flat-hd").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution=True) == 0
+    assert (tmp_path / "baselines" / "ecran@64x64.png").exists()
+    assert (tmp_path / "baselines" / "ecran@96x72.png").exists()
+    assert not (tmp_path / "baselines" / "ecran.png").exists()
+    # chaque poste rejoue contre SA référence : conforme, aucune capture sauvée
+    assert _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution=True) == 0
+    assert not list((tmp_path / "baselines").glob("*.actual.png"))
+
+
+def test_per_resolution_detecte_toujours_une_vraie_derive(tmp_path):
+    """Une baseline par géométrie ne doit rien anesthésier : à géométrie
+    constante, un autre rendu échoue comme avant, et la capture est sauvée à
+    côté de LA variante concernée."""
+    base_dir = str(tmp_path / "baselines")
+    _visual_lib("flat-hd").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution=True)
+    with pytest.raises(AssertionError) as err:
+        _visual_lib("gradient-hd").screen_should_match_baseline(
+            "ecran", baseline_directory=base_dir, per_resolution=True)
+    assert "distance" in str(err.value)
+    assert (tmp_path / "baselines" / "ecran@96x72.actual.png").exists()
+
+
+def test_per_resolution_reutilise_une_baseline_committee_de_meme_geometrie(tmp_path):
+    """Compat : la baseline historique `<name>.png` reste la référence tant que
+    sa géométrie coïncide, aucune variante n'est créée en double."""
+    base_dir = str(tmp_path / "baselines")
+    _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir)             # baseline historique
+    assert _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution=True) == 0
+    assert not (tmp_path / "baselines" / "ecran@64x64.png").exists()
+
+
+def test_per_resolution_arrive_en_chaine_depuis_robot(tmp_path):
+    """« False » est truthy en Python : la coercition doit être Robot-friendly,
+    sinon l'option s'activerait toute seule depuis une suite."""
+    base_dir = str(tmp_path / "baselines")
+    _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir, per_resolution="False")
+    assert (tmp_path / "baselines" / "ecran.png").exists()
+    _visual_lib("gradient").screen_should_match_baseline(
+        "autre", baseline_directory=base_dir, per_resolution="True")
+    assert (tmp_path / "baselines" / "autre@64x64.png").exists()
+
+
+def test_echec_de_geometries_differentes_nomme_les_deux_et_le_remede(tmp_path):
+    """Le cas vécu : baseline prise sur un poste, capture sur un autre. Le
+    message doit dire que la dérive peut n'être que d'échelle."""
+    base_dir = str(tmp_path / "baselines")
+    _visual_lib("gradient").screen_should_match_baseline(
+        "ecran", baseline_directory=base_dir)
+    with pytest.raises(AssertionError) as err:
+        _visual_lib("flat-hd").screen_should_match_baseline(
+            "ecran", baseline_directory=base_dir)
+    message = str(err.value)
+    assert "baseline 64x64" in message and "capture 96x72" in message
+    assert "per_resolution=True" in message
 
 
 def test_nom_de_baseline_filtre_contre_le_path_traversal(tmp_path):
@@ -303,6 +396,18 @@ def test_fiori_baseline_meme_semantique_snapshot(tmp_path):
     assert (tmp_path / "baselines" / "shop.actual.png").exists()
 
 
+def test_fiori_per_resolution_miroir_de_l_option_ecc(tmp_path):
+    """Parité ECC ↔ Fiori : la taille de viewport fait partie de l'empreinte,
+    donc le canal web a la même baseline par géométrie."""
+    base_dir = str(tmp_path / "baselines")
+    assert _fiori_visual("gradient").ui5_screen_should_match_baseline(
+        "shop", baseline_directory=base_dir, per_resolution=True) == 0
+    assert (tmp_path / "baselines" / "shop@64x64.png").exists()
+    assert _fiori_visual("flat-hd").ui5_screen_should_match_baseline(
+        "shop", baseline_directory=base_dir, per_resolution=True) == 0
+    assert (tmp_path / "baselines" / "shop@96x72.png").exists()
+
+
 # --- frontières Pillow réelles (sautées si Pillow absent) ---------------------------
 
 def _real_png(width=40, height=30, color=(200, 60, 60)):
@@ -347,3 +452,24 @@ def test_decode_image_to_gray_partage_est_le_meme_des_deux_cotes():
     fiori = SapFioriLibrary._decode_image_to_gray(png)
     assert ecc == fiori
     assert len(ecc) == 9 and len(ecc[0]) == 12
+
+
+def test_geometrie_lue_sur_de_VRAIES_images_pas_transposee(tmp_path):
+    """La géométrie qui nomme une variante vient de la matrice décodée : sur de
+    vraies images non carrées, largeur et hauteur ne doivent pas s'inverser
+    (une variante mal nommée passerait inaperçue, les deux fichiers existant)."""
+    pytest.importorskip("PIL")
+    from sapfx_common.visual_baseline import (decode_image_to_gray,
+                                              match_baseline)
+    base_dir = str(tmp_path / "baselines")
+    for width, height in ((40, 30), (80, 60)):
+        outcome = match_baseline("ecran", _real_png(width, height),
+                                 decode_image_to_gray, base_dir,
+                                 per_resolution=True)
+        assert outcome.created and outcome.geometry == (width, height)
+    assert (tmp_path / "baselines" / "ecran@40x30.png").exists()
+    assert (tmp_path / "baselines" / "ecran@80x60.png").exists()
+    # rejoué sur la 1re géométrie : la variante existante est RELUE, pas récrite
+    again = match_baseline("ecran", _real_png(40, 30), decode_image_to_gray,
+                           base_dir, per_resolution=True)
+    assert not again.created and again.distance == 0

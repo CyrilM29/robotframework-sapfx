@@ -20,6 +20,12 @@
     <ui5-button id="saveBtn" design="Emphasized">Save</ui5-button>
     <ui5-button id="cancelBtn">Cancel</ui5-button>
     <ui5-button-x1b2>Scoped save</ui5-button-x1b2>
+    <!-- Les DEUX orthographes de type composé qu'emploie UI5 Web Components :
+         collée (`ui5-shellbar`, comme sur une vraie barre shell Work Zone, ici
+         avec son suffixe de scoping) et avec tirets (`ui5-side-navigation`).
+         Le type court `ShellBar`/`SideNavigation` doit atteindre les deux. -->
+    <ui5-shellbar-x1b2 id="shellBar">Shell</ui5-shellbar-x1b2>
+    <ui5-side-navigation id="sideNav">Navigation</ui5-side-navigation>
     <div>
       <!-- accessible-name : la convention UI5 Web Components pour nommer un
            champ sans label visible : la clé name= du moteur wc la lit. -->
@@ -49,6 +55,8 @@
     customElements.define('ui5-button', FixtureButton);
     customElements.define('ui5-button-x1b2', class extends FixtureButton {});
     customElements.define('ui5-input', FixtureInput);
+    customElements.define('ui5-shellbar-x1b2', class extends FixtureButton {});
+    customElements.define('ui5-side-navigation', class extends FixtureButton {});
     // accessibleName en PROPRIÉTÉ JS non reflétée en attribut (l'autre moitié
     // de la convention UI5 WC) : le moteur wc doit la lire aussi.
     document.getElementById('cancelBtn').accessibleName = 'Cancel order';

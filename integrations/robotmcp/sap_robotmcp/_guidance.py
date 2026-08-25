@@ -42,6 +42,11 @@ FIORI_HINTS = [
     "`issues`. Log Fiori Diagnostics écrit le rapport Markdown dans le log.",
     "Apps Fiori Elements V4 : préférer idSuffix=fe::table::<Entity>::LineItem::"
     "Table (ids stables documentés : le préfixe app/route varie, le suffixe non).",
+    "Contrôle rendu DANS un autre (tuile de launchpad rendue par un composant "
+    "séparé, carte, ligne) : containedIn=<id ou suffixe d'id> restreint au "
+    "CONTAINMENT DOM. viewId suit la vue propriétaire ou l'id de fabrique, donc "
+    "la propriété ; containedIn suit le rendu : deux relations distinctes, la "
+    "seconde atteint ce que la première ne voit pas.",
     "Launchpad Work Zone / cFLP : l'app tourne dans une IFRAME ; appeler "
     "Set Ui5 Frame <sélecteur iframe> avant de résoudre, sinon le shell (vide) "
     "est interrogé. Set Ui5 Frame sans argument revient à la page principale ; "

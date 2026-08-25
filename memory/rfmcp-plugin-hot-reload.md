@@ -30,6 +30,17 @@ Depuis, la **surcouche `sapfx-mcp`** (outils `sapfx_state`/`sapfx_screenshot`/
 (comportement du paquet rf-mcp installé) et coûtent une session de débogage à
 redécouvrir.
 
+**Complément du 2026-08-22, le cas le moins cher.** Quand la modification
+porte sur un module de logique pure et que la bibliothèque importe le
+**module** (`from sapfx_common import odata_metadata`, puis appel
+`odata_metadata.parse_metadata(...)`), un simple `importlib.reload` de ce
+module suffit : l'objet module est partagé, l'appel voit le nouveau code, sans
+redémarrer le serveur, sans hot-swap de classe et sans `Reload Library`.
+Vérifié en constatant que le keyword servait bien le contrat enrichi juste
+après. Cela ne marche PAS avec `from … import parse_metadata`, qui fige la
+fonction dans le namespace de l'appelant : la forme d'import de la
+bibliothèque décide donc du coût du rechargement.
+
 **Comment appliquer :** avant tout test live agent+MCP après modification de
 `src/`/`integrations/`, dérouler le hot-reload (1) OU redémarrer le serveur ;
 pour exercer le diff des providers, demander `page_source_filtered=true` ;

@@ -28,5 +28,8 @@
     "_upstream",
     "_pwsap",
     "_cap-sflight"
-  ]
+  ],
+  "window.autoDetectColorScheme": false,
+  "workbench.commandPalette.preserveInput": false,
+  "workbench.activityBar.autoHide": false
 }

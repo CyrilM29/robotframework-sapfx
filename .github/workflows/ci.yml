@@ -76,6 +76,13 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/check_no_em_dash.py
 
+      # Convention #13 : aucun fichier de code au-delà de 500 lignes (dette
+      # initiale apurée le 2026-08-25 ; l'allowlist à compte exact du garde
+      # est le seul échappatoire).
+      - name: No code file beyond 500 lines
+        if: matrix.python-version == '3.12'
+        run: python scripts/check_file_length.py
+
       # Une instruction publiée qui cite une version périmée (nom du pack,
       # épinglage pip, wheel) envoie l'utilisateur dans le mur ; et un badge de
       # version GRAVÉ serait faux dès la release suivante. Né de la 0.6.6.

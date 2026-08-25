@@ -75,10 +75,12 @@ def test_render_watch_report_derives_en_tete():
 
 # --- keyword (E/S stubbée) --------------------------------------------------------
 
-def _watch_lib(signature, visual="a1b2c3d4e5f60718"):
+def _watch_lib(signature, visual="a1b2c3d4e5f60718", geometry=(1920, 1032)):
+    """Frontière capture stubbée : ``(empreinte, géométrie)``, ce que rend une
+    vraie capture d'écran décodée."""
     lib = SapEccLibrary(screenshots_on_error=False)
     lib.get_screen_signature = lambda **kwargs: signature
-    lib.get_screen_perceptual_hash = lambda **kwargs: visual
+    lib._try_visual_fingerprint = lambda: (visual, geometry) if visual else None
     return lib
 
 
@@ -112,12 +114,12 @@ def test_keyword_fail_on_drift_transforme_en_assertion(tmp_path):
 
 
 def test_keyword_sans_pillow_reste_utilisable(tmp_path):
-    # get_screen_perceptual_hash lève (Pillow absent / vieux SAP GUI) : la
-    # sentinelle continue sur le seul canal structurel.
+    # la capture échoue (Pillow absent, vieux SAP GUI, aucune session) : la
+    # sentinelle continue sur le seul canal structurel. Chemin RÉEL, pas un
+    # stub : c'est `_try_visual_fingerprint` lui-même qu'on veut voir encaisser.
     lib = SapEccLibrary(screenshots_on_error=False)
     lib.get_screen_signature = lambda **kwargs: SIG_V1
-    lib.get_screen_perceptual_hash = lambda **kwargs: (_ for _ in ()).throw(
-        RuntimeError("Pillow manquant"))
+    assert lib._try_visual_fingerprint() is None
     verdict = lib.check_screen_against_watch("SE16", directory=str(tmp_path))
     assert verdict["status"] == "baseline-created"
     assert not (tmp_path / "SE16.dhash.txt").exists()
@@ -209,3 +211,87 @@ def test_keyword_sans_tuiles_reste_utilisable(tmp_path):
     verdict = lib.check_screen_against_watch("SE16", directory=str(tmp_path))
     assert verdict["status"] == "baseline-created"
     assert not (tmp_path / "SE16.tiles.txt").exists()
+
+
+# --- multi-résolution : le canal visuel par géométrie, le structurel partagé -------
+
+def test_fingerprint_rend_empreinte_et_geometrie_en_une_capture():
+    """`_try_visual_fingerprint` passe par la frontière image réelle du code :
+    une capture, une empreinte, et la géométrie qui l'accompagne."""
+    import base64
+    from sapfx_common.visual_hash import dhash_hex
+    lib = SapEccLibrary(screenshots_on_error=False)
+    pixels = [[(x * 7 + y * 3) % 256 for x in range(96)] for y in range(72)]
+    lib.get_screenshot_as_base64 = (
+        lambda image_format="png": base64.b64encode(b"\x89PNG-x").decode("ascii"))
+    lib._decode_image_to_gray = lambda image_bytes: pixels
+    assert lib._try_visual_fingerprint() == (dhash_hex(pixels), (96, 72))
+
+
+def test_reference_dhash_porte_sa_geometrie_et_relit_le_format_ancien():
+    from sapfx_common.screen_watch import (format_dhash_reference,
+                                           parse_dhash_reference)
+    texte = format_dhash_reference("a060000000000001", (1920, 1032))
+    assert texte == "a060000000000001 1920x1032"
+    assert parse_dhash_reference(texte) == ("a060000000000001", (1920, 1032))
+    # référence écrite avant l'ajout du champ : lisible, géométrie inconnue
+    assert parse_dhash_reference("a060000000000001\n") == (
+        "a060000000000001", None)
+    assert parse_dhash_reference("") == (None, None)
+
+
+def test_per_resolution_visuel_par_geometrie_structurel_partage(tmp_path):
+    """Deux postes, une seule signature structurelle (elle ne dépend pas de la
+    résolution), deux empreintes visuelles."""
+    poste_a = _watch_lib_tuiles(SIG_V1, TUILES_A)
+    assert poste_a.check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2,
+        per_resolution=True)["status"] == "baseline-created"
+    assert (tmp_path / "SE16@1920x1032.dhash.txt").exists()
+    assert (tmp_path / "SE16@1920x1032.tiles.txt").exists()
+    assert not (tmp_path / "SE16.dhash.txt").exists()
+    # poste B : MÊME écran, autre géométrie et donc autre empreinte. Le
+    # structurel compare (unchanged), le visuel s'enregistre au lieu de crier.
+    poste_b = _watch_lib(SIG_V1, visual="ff" * 8, geometry=(4676, 2454))
+    poste_b._try_tile_capture = lambda tx, ty, hs=8: (TUILES_A, 4676, 2454)
+    verdict = poste_b.check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2,
+        per_resolution=True)
+    assert verdict["status"] == "unchanged"
+    assert (tmp_path / "SE16@4676x2454.dhash.txt").exists()
+    assert len(list(tmp_path.glob("*.signature.txt"))) == 1
+    # passage suivant du poste B : sa propre référence est comparée
+    assert poste_b.check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2,
+        per_resolution=True)["status"] == "unchanged"
+
+
+def test_per_resolution_reutilise_une_reference_committee_de_meme_geometrie(tmp_path):
+    """Compat : les références historiques ne portent pas leur géométrie, c'est
+    l'en-tête du `.tiles.txt` qui en témoigne. Même géométrie = on les garde."""
+    (tmp_path / "SE16.signature.txt").write_text(SIG_V1, encoding="utf-8")
+    (tmp_path / "SE16.dhash.txt").write_text("a1b2c3d4e5f60718", encoding="utf-8")
+    (tmp_path / "SE16.tiles.txt").write_text(
+        "2 2 8 1920 1032\n%s" % " ".join(TUILES_A), encoding="utf-8")
+    verdict = _watch_lib_tuiles(SIG_V1, TUILES_A).check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2,
+        per_resolution=True)
+    assert verdict["status"] == "unchanged"
+    assert not list(tmp_path.glob("SE16@*"))
+
+
+def test_derive_visuelle_a_autre_geometrie_est_annotee(tmp_path):
+    """Sans l'option, la dérive est rapportée (c'est le contrat), mais le
+    verdict dit que les deux échelles diffèrent, et le rapport le reprend."""
+    from sapfx_common.screen_watch import WatchOutcome, render_watch_report
+    _watch_lib_tuiles(SIG_V1, TUILES_A).check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2)
+    autre_poste = _watch_lib(SIG_V1, visual="ff" * 8, geometry=(4676, 2454))
+    autre_poste._try_tile_capture = lambda tx, ty, hs=8: None
+    verdict = autre_poste.check_screen_against_watch(
+        "SE16", directory=str(tmp_path), tiles_x=2, tiles_y=2)
+    assert verdict["status"] == "drifted"
+    assert "1920x1032" in verdict["geometry_note"]
+    assert "per_resolution=True" in verdict["geometry_note"]
+    rapport = render_watch_report([WatchOutcome(**verdict)])
+    assert "Géométries différentes" in rapport

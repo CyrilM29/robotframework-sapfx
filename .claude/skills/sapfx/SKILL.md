@@ -56,6 +56,17 @@ et sans rien injecter dans la page). `Get Ui5 Application State` donne les trois
 d'un coup (portée de frame, runtime, messages) : le « où en suis-je » du canal
 web, à joindre au diagnostic d'un échec.
 
+Lire une VALEUR : `Get Ui5 Property` / `Get Ui5 Properties` (la propriété au
+registre), pas `Get Ui5 Text` (le rendu, qui exige la visibilité et ajoute ce
+que le contrôle dessine). `Get Ui5 Ids` répond LESQUELS ont matché (l'ancre
+d'un shell est un suffixe d'id ; `containedIn=` restreint au contenu DOM d'un
+autre contrôle, là où `viewId` suit la propriété). Dialogues :
+`Get Ui5 Open Popups` (le pendant Fiori de `Get Open Windows` : un dialogue
+fermé reste RENDU, seul `sap.m.InstanceManager` tranche) et
+`Click Ui5 Dialog Button` (acquitter par POSITION : les boutons d'une
+MessageBox portent un id généré et un texte traduit, et la bonne position
+varie par release, la relever avant de graver).
+
 ## Les règles non négociables
 
 1. **Aucun id SAP brut ni CSS/XPath dans les tests** : les localisateurs
@@ -71,6 +82,20 @@ web, à joindre au diagnostic d'un échec.
 4. **Toujours refermer les sessions ouvertes, même sur échec** (`Close SAP`,
    `Close All Sap Sessions`) : une connexion orpheline décale les indices du
    prochain attach.
+5. **Une lacune de capacité trouvée sur une cible réelle se comble DANS la
+   bibliothèque.** Un keyword de bibliothèque qui se comporte mal se CORRIGE
+   dans `src/` ; un keyword manquant se CRÉE dans `src/Sap*Library` (logique
+   pure dans `sapfx_common`), jamais en JS inline dans un page object, en
+   `Evaluate` dans une suite, ou en aide locale que seule cette campagne verra ;
+   un contournement déjà écrit dans une couche intermédiaire se REMONTE dans la
+   bibliothèque. La frontière : les bibliothèques portent les CAPACITÉS
+   (perception, résolution, attente, moteurs, état, protocoles), `resources/`
+   porte le VOCABULAIRE MÉTIER d'un site. Ce sont les bibliothèques qui partent
+   sur PyPI : un correctif resté dans une resource ne profite à personne
+   d'autre. C'est le seul endroit où « constater, ne pas corriger » ne
+   s'applique pas : la cible se constate, notre bibliothèque se répare. Chaque
+   keyword ainsi ajouté garde son dû : test unitaire hors SAP (règle 5 des
+   conventions du dépôt), carte d'intention rf-mcp, page Libdoc, CHANGELOG.
 
 ## Robustesse intégrée
 
@@ -84,6 +109,26 @@ web, à joindre au diagnostic d'un échec.
 - Écrans classiques ECC : `Read Table Control` et ses variantes (tables de
   dynpro adressées par TITRE de colonne, défilement automatique),
   `Pick F4 Value` (matchcode ouvert, entrée choisie, popup refermé).
+
+## La mémoire QA partagée (RAG `qa-brain`), si elle est montée
+
+Quand le serveur MCP `qa-brain` est disponible (RAG sur la mémoire QA de
+l'équipe : keywords, specs, docs, leçons écrites après incident réel),
+l'interroger AVANT les décisions de jugement, pour ne pas repayer une leçon
+déjà payée : quelle ancre tient sur cet écran, dans quelle couche va un
+keyword, de quelle classe relève un échec, quel piège porte cette famille de
+transactions. `qa_search` (question en langage naturel, filtres
+`vertical=sap`, `type=robot|markdown|libdoc|lesson`) rend les passages avec
+leur source ; `qa_ask` rédige une réponse à citations obligatoires ;
+`qa_status` donne la santé de l'index (hors `green` = corpus daté, réponses à
+traiter comme des pistes).
+
+Trois garde-fous : l'observation LIVE tranche (un passage n'est jamais une
+perception, ni une étape vérifiée, ni une preuve de réparation, et quand les
+deux divergent c'est le système qui a raison) ; la source se cite quand un
+passage a guidé un choix ; et c'est **jamais bloquant** (serveur absent ou en
+erreur : une ligne au rapport, le déroulé normal continue). Un pack déployé
+n'embarque pas `qa-brain` : traiter sa présence comme optionnelle, toujours.
 
 ## Le cycle agents
 

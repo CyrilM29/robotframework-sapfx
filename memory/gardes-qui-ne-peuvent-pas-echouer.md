@@ -1,5 +1,17 @@
 # Trois gardes verts qui ne pouvaient pas échouer
 
+> **Complément du 2026-08-22, une quatrième forme : le garde qui mesure la
+> bonne chose au mauvais moment.** Le garde de fraîcheur des pages de
+> documentation des keywords comparait la version embarquée dans chaque page à
+> celle du projet. Il peut échouer, et il échoue bien : mais seulement à un
+> BUMP de version. Entre deux releases, trois keywords ajoutés et quatre
+> signatures modifiées sont restés absents des pages publiées, toutes gardes au
+> vert, et c'est un contrôle à l'œil qui l'a vu. Une dimension surveillée n'est
+> pas la propriété : ici la propriété est « la page décrit le code », dont la
+> version n'est qu'un proxy à basse fréquence. Correctif : comparer les NOMS de
+> keywords de la spec à ceux que la bibliothèque expose réellement, et le
+> **contre-prouver sur la spec périmée** avant de le garder.
+
 **2026-08-19, revue de code de `integrations/`.** Trois tests écrits pour
 protéger une propriété la certifiaient sans jamais pouvoir la contredire. Tous
 les trois étaient verts, et deux venaient d'être ajoutés PAR la correction du

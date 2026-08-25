@@ -35,16 +35,23 @@ from .keywords import (
     HealingKeywords,
     PerceptionKeywords,
     PointerKeywords,
+    ScreenshotKeywords,
+    Se16Keywords,
     SemanticKeywords,
     SessionKeywords,
+    TableControlKeywords,
+    VisualKeywords,
     WaitKeywords,
+    WatchKeywords,
 )
 
 
 class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
-                    PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
+                    TableControlKeywords, PerceptionKeywords,
+                    ScreenshotKeywords, VisualKeywords, WatchKeywords,
+                    DiagnosticsKeywords, HealingKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
-                    SessionKeywords, DdicKeywords, SapGuiBase):
+                    SessionKeywords, DdicKeywords, Se16Keywords, SapGuiBase):
     """Bibliothèque Robot Framework pour automatiser le client bureau SAP GUI (ECC,
     backend S/4HANA GUI). Superset compatible de SapGuiLibrary.
 
@@ -74,7 +81,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.6.7"
+    __version__ = "0.7.0"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 

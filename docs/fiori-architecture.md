@@ -25,7 +25,12 @@ addressing the **DOM** and address the **UI5 control** instead.
 - **Browser library** (Playwright) owns the page, the clicking and the typing.
 - **`SapFioriLibrary`** turns a *UI5 control selector* into a selector Browser can
   use, via an injected JS bundle (`src/SapFioriLibrary/_ui5_js.py`) offering three
-  engines:
+  engines. The bundle is idempotent **per version** (a fingerprint derived from
+  its content, exposed as `window.__SAPFX.__v`): a page already carrying the
+  current version reinstalls nothing, and a newer version replaces an older one
+  at the next keyword call without a page reload, preserving the hooks posed at
+  injection (network instrumentation, MessageToast capture) instead of stacking
+  or losing them. The engines:
   - **role**: scan the control registry, matching `controlType` (short *or* full
     name), `properties` (case-insensitive substring, or `/regex/`), `id`,
     `bindingPath`, `viewId`. → `Resolve Ui5 Control`. Returns
@@ -271,4 +276,6 @@ resolution; a unit test guards the sync. SAP's built-in **UI5 Test Recorder**
       `Ui5 Screen Should Match Baseline`: the same snapshot-baseline cycle as
       `Screen Should Match Baseline` (shared `sapfx_common.visual_baseline`),
       over a Browser-library page capture. Covers what the UI5 tree does not
-      say (canvas, images, a globally altered theme/rendering).
+      say (canvas, images, a globally altered theme/rendering). The viewport
+      size is part of the fingerprint, so the ECC option is mirrored here:
+      `per_resolution=True` keeps one baseline per capture geometry.

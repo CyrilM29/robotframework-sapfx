@@ -276,7 +276,7 @@ def test_diagnostics_full_logs_and_frame_scope_are_passed_through():
 
 def test_log_fiori_diagnostics_logs_the_report_and_returns_the_dict(monkeypatch):
     import importlib
-    fiori_module = importlib.import_module("SapFioriLibrary.SapFioriLibrary")
+    fiori_module = importlib.import_module("SapFioriLibrary.keywords._composition")
     logged = []
     monkeypatch.setattr(fiori_module.logger, "info",
                         lambda msg, *a, **k: logged.append(msg))

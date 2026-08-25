@@ -43,9 +43,27 @@
  */
 
 (() => {
-  if (window.__SAPFX) return;
+  // Version du bundle : empreinte courte de son propre contenu, calculée côté
+  // Python à la construction. La garde n'est PAS « déjà présent » mais « présent
+  // ET de la même version » : l'idempotence reste entière (le cas courant, à
+  // chaque appel de keyword, sort ici sans rien réinstaller), et une version
+  // NEUVE remplace l'ancienne au lieu d'être ignorée en silence.
+  // Sans cela, une page ayant reçu un bundle le garde pour sa vie entière : après
+  // un hot-swap de la bibliothèque dans un serveur rf-mcp, les nouveaux keywords
+  // sont visibles côté Robot et l'appel sort en « window.__SAPFX.<x> is not a
+  // function », message qui accuse le keyword là où le fautif est ce cache.
+  const V = '804bd5b530a4';
+  if (window.__SAPFX && window.__SAPFX.__v === V) return;
   const ALLOWED = ['text','title','viewName','value','src','key','icon','number','description','headerText','href','label','selectedKey','placeholder','target','name','header','tooltip','html','htmlText','alt','subtitle','info','state','valueStateText','noDataText','count','status','design','type','level','intro'];
   const ALLOW_WITHOUT = ['SearchField','PullToRefresh','Row','ColumnListItem','Column','CustomListItem','GridListItem','StandardListItem','Table','List','Page','ToolbarSeparator'];
+
+  // État MUTABLE partagé, porté par la fenêtre et non par la clôture du bundle :
+  // c'est lui qui rend une réinstallation inoffensive. Les hooks posés au premier
+  // passage (fetch/XHR, MessageToast) continuent d'écrire ICI, donc une nouvelle
+  // version du bundle ne perd ni les requêtes en vol ni les toasts déjà captés,
+  // et n'a pas besoin de reposer des hooks qui feraient double emploi.
+  const STATE = window.__SAPFX_STATE ||
+    (window.__SAPFX_STATE = { net: { pending: 0, last: Date.now() }, toasts: [] });
 
   // Classe Element via le module AMD (chemin moderne, non déprécié sur UI5 >= 1.118)
   // si déjà chargé ; sinon null et on retombe sur le Core hérité. Element est un module
@@ -99,30 +117,41 @@
   function shortType(full) { return full ? full.split('.').pop() : ''; }
 
   // ---- Repos réseau/busy (Wait For Ui5 Idle) --------------------------------
-  // XHR et fetch instrumentés à l'INSTALLATION du bundle (la garde __SAPFX
-  // protège du double-wrap) : on ne compte que les requêtes lancées après
-  // l'injection, exactement le besoin du keyword (agir, puis attendre que la
-  // page ait fini de parler au serveur). Indépendant du runtime UI5 : les
-  // pages WC/hybrides en profitent aussi.
-  const NET = { pending: 0, last: Date.now() };
+  // XHR et fetch instrumentés au PREMIER passage du bundle : on ne compte que
+  // les requêtes lancées après l'injection, exactement le besoin du keyword
+  // (agir, puis attendre que la page ait fini de parler au serveur).
+  // Indépendant du runtime UI5 : les pages WC/hybrides en profitent aussi.
+  // Chaque enveloppe est MARQUÉE et l'état qu'elle nourrit vit sur la fenêtre :
+  // une réinstallation (version neuve du bundle) ne repose donc rien et ne perd
+  // rien. Réinstaller sans la marque empilerait une enveloppe par passage, et
+  // chaque requête serait comptée autant de fois.
+  const NET = STATE.net;
   function netDone() { NET.pending = NET.pending > 0 ? NET.pending - 1 : 0; NET.last = Date.now(); }
   try {
     const xhrSend = XMLHttpRequest.prototype.send;
-    XMLHttpRequest.prototype.send = function () {
-      NET.pending += 1; NET.last = Date.now();
-      try { this.addEventListener('loadend', netDone); } catch (e) { netDone(); }
-      return xhrSend.apply(this, arguments);
-    };
+    if (!xhrSend.__sapfxHook) {
+      const xhrHook = function () {
+        const net = window.__SAPFX_STATE.net;
+        net.pending += 1; net.last = Date.now();
+        try { this.addEventListener('loadend', netDone); } catch (e) { netDone(); }
+        return xhrSend.apply(this, arguments);
+      };
+      xhrHook.__sapfxHook = true;
+      XMLHttpRequest.prototype.send = xhrHook;
+    }
   } catch (e) {}
   try {
-    if (window.fetch) {
+    if (window.fetch && !window.fetch.__sapfxHook) {
       const realFetch = window.fetch;
-      window.fetch = function () {
-        NET.pending += 1; NET.last = Date.now();
+      const fetchHook = function () {
+        const net = window.__SAPFX_STATE.net;
+        net.pending += 1; net.last = Date.now();
         const p = realFetch.apply(this, arguments);
         try { p.then(netDone, netDone); } catch (e) { netDone(); }
         return p;
       };
+      fetchHook.__sapfxHook = true;
+      window.fetch = fetchHook;
     }
   } catch (e) {}
   function busyVisible() {
@@ -146,12 +175,19 @@
   // Les toasts sont éphémères à l'écran : un hook posé sur sap.m.MessageToast à
   // l'injection garde les 20 derniers (texte + horodatage). Best-effort : un
   // toast émis AVANT l'injection est perdu, jamais une erreur.
-  const TOASTS = [];
+  // Même règle que pour le réseau : la liste vit sur la fenêtre, le hook porte sa
+  // marque, donc une réinstallation ne double pas la capture et ne jette pas ce
+  // qui a déjà été capté.
+  const TOASTS = STATE.toasts;
   try {
     if (window.sap && sap.ui && sap.ui.require) {
       sap.ui.require(['sap/m/MessageToast'], function (MT) {
         try {
-          if (!MT || MT.__sapfxToastHook) return;
+          // La marque est le RÉCEPTACLE lui-même, pas un booléen : un booléen
+          // dirait « déjà accroché » alors qu'un hook laissé par une version
+          // antérieure du bundle remplirait une liste orpheline, et les toasts
+          // seraient perdus en silence après remplacement du bundle.
+          if (!MT || MT.__sapfxToastSink === TOASTS) return;
           const realShow = MT.show;
           MT.show = function (message) {
             try {
@@ -160,7 +196,7 @@
             } catch (e) {}
             return realShow.apply(this, arguments);
           };
-          MT.__sapfxToastHook = true;
+          MT.__sapfxToastSink = TOASTS;
         } catch (e) {}
       });
     }
@@ -336,10 +372,73 @@
   // `idSuffix` matche la FIN de l'id du contrôle : c'est le motif des ids stables
   // Fiori Elements (« <AppId>::<PageId>--fe::table::<Entity>::LineItem::Table »),
   // dont seul le suffixe `fe::…` est déterministe : le préfixe varie par app/route.
+  // `viewId` désigne la VUE propriétaire du contrôle. La forme historique
+  // comparait ce paramètre à l'id du CONTRÔLE (correspondance de sous-chaîne),
+  // ce qui marche pour un contrôle de fabrique (dont l'id contient celui de sa
+  // liste) mais pas pour un contrôle à id entièrement GÉNÉRÉ : mesuré live,
+  // `controlType=Button viewId=<vue>` rendait 0 sur une vue qui portait pourtant
+  // trois boutons. On remonte donc la hiérarchie jusqu'à la vue propriétaire, en
+  // gardant la correspondance de sous-chaîne en second : elle reste vraie pour
+  // tous les usages existants, ce keyword ne perd donc rien et gagne le cas que
+  // son nom promettait.
+  function ownerViewId(control) {
+    let node = control;
+    while (node) {
+      try { if (node.isA && node.isA('sap.ui.core.mvc.View')) return node.getId(); }
+      catch (e) {}
+      node = node.getParent ? node.getParent() : null;
+    }
+    return null;
+  }
+  function viewIdMatches(control, wanted) {
+    const want = String(wanted);
+    if (String(control.getId()).indexOf(want) !== -1) return true;
+    const view = ownerViewId(control);
+    if (!view) return false;
+    return view === want || String(view).slice(-want.length) === want;
+  }
+
+  // CONTAINMENT DOM : le nœud du contrôle désigné, cherché par id exact puis par
+  // suffixe d'id, et seulement parmi les contrôles RENDUS (un contrôle sans nœud
+  // ne contient rien). Relation distincte de `viewId`, qui suit la propriété/
+  // l'agrégation : une tuile de launchpad rendue par un composant séparé porte
+  // dans son nœud DOM des contrôles qui ne sont ni dans sa vue ni dans ses
+  // agrégations, et c'est précisément le cas que celle-ci attrape.
+  function containerDom(wanted) {
+    const want = String(wanted);
+    let exact = null;
+    let suffix = null;
+    registryForEach((c) => {
+      try {
+        if (exact) return;
+        const id = String(c.getId());
+        if (id !== want && id.slice(-want.length) !== want) return;
+        const d = c.getDomRef();
+        if (!d) return;
+        if (id === want) exact = d; else if (!suffix) suffix = d;
+      } catch (e) {}
+    });
+    if (exact || suffix) return exact || suffix;
+    // Repli sur le nœud DOM de même id : ce que retourne `Get Ui5 Ids` est l'id
+    // du NŒUD rendu, qui vaut celui du contrôle dans le cas ordinaire mais pas
+    // toujours (un contrôle peut se rendre sous un autre id). Refuser cet
+    // identifiant-là serait refuser la valeur que la bibliothèque vient de
+    // servir à l'appelant.
+    try { return document.getElementById(want) || null; } catch (e) { return null; }
+  }
+
   function resolveByRole(selJson) {
     if (!isUI5()) return null;
     const sel = JSON.parse(selJson);
     const shortWant = sel.controlType ? shortType(sel.controlType) : null;
+    // Conteneur résolu UNE fois pour toute la passe : le chercher par contrôle
+    // coûterait un parcours de registre par candidat. Conteneur absent ou non
+    // rendu = aucune correspondance, jamais un périmètre élargi en silence.
+    let scope = null;
+    if (sel.containedIn) {
+      scope = containerDom(sel.containedIn);
+      if (!scope) return [];
+    }
     const ids = [];
     registryForEach((c) => {
       try {
@@ -349,14 +448,134 @@
           const full = c.getMetadata().getName();
           if (full !== sel.controlType && shortType(full) !== shortWant) return;
         }
-        if (sel.viewId && c.getId().indexOf(sel.viewId) === -1) return;
+        if (sel.viewId && !viewIdMatches(c, sel.viewId)) return;
         if (sel.properties && !matchProps(c, sel.properties)) return;
         if (sel.bindingPath && !matchBinding(c, sel.bindingPath)) return;
         const d = c.getDomRef();
-        if (d && d.id) ids.push(d.id);
+        if (!d || !d.id) return;
+        // Descendant STRICT : le conteneur lui-même n'est pas son propre contenu.
+        if (scope && (d === scope || !scope.contains(d))) return;
+        ids.push(d.id);
       } catch (e) {}
     });
     return ids;
+  }
+
+  // Lit UNE propriété sur CHAQUE contrôle correspondant au sélecteur rôle, dans
+  // l'ordre du registre. Deux raisons de lire la propriété du CONTRÔLE plutôt
+  // que le texte rendu : la valeur est exacte (le rendu peut y ajouter ce que le
+  // contrôle affiche en plus, comme le compteur d'un StandardListItem), et elle
+  // reste lisible quand le contrôle est rendu mais MASQUÉ (colonne repliée d'un
+  // FlexibleColumnLayout, onglet inactif), là où une lecture de texte attend une
+  // visibilité qui ne viendra pas.
+  // Retourne { values, unknown, available } : `unknown` signale une propriété
+  // absente des métadonnées du contrôle, et `available` liste alors ce qui
+  // existe, pour que l'appelant puisse échouer en nommant les bons noms.
+  function readProperty(payload) {
+    if (!isUI5()) return null;
+    let req;
+    try { req = JSON.parse(payload); } catch (e) { return null; }
+    const name = String(req.property || '');
+    const ids = resolveByRole(JSON.stringify(req.selector || {}));
+    if (ids === null) return null;
+    const out = { values: [], unknown: false, available: [] };
+    ids.forEach((id) => {
+      const c = byId(id);
+      if (!c) return;
+      let known = false;
+      try {
+        const md = c.getMetadata();
+        const all = md.getAllProperties ? md.getAllProperties() : md.getProperties();
+        known = !!(all && Object.prototype.hasOwnProperty.call(all, name));
+        if (!known && !out.available.length && all) out.available = Object.keys(all).sort();
+      } catch (e) {}
+      if (!known) { out.unknown = true; return; }
+      let v = null;
+      try { v = c.getProperty(name); } catch (e) { v = null; }
+      if (v === undefined) v = null;
+      if (v !== null && typeof v === 'object') v = String(v);
+      out.values.push(v);
+    });
+    return out;
+  }
+
+  // --- popups OUVERTS ------------------------------------------------------
+  // Le pendant Fiori de `Get Open Windows` (ECC). Il existe parce qu'un
+  // dialogue FERMÉ reste RENDU : mesuré live sur un launchpad ABAP, le
+  // dialogue « À propos » garde son nœud DOM après acquittement, donc ni un
+  // comptage de correspondances ni une résolution ne distinguent ouvert de
+  // fermé. `sap.m.InstanceManager` est la seule source qui le sache.
+  function instanceManager() {
+    try {
+      const m = sap.ui.require && sap.ui.require('sap/m/InstanceManager');
+      if (m) return m;
+    } catch (e) {}
+    return (window.sap && sap.m && sap.m.InstanceManager) || null;
+  }
+
+  // Boutons RENDUS d'un popup, dans l'ordre de l'agrégation. Les MessageBox
+  // n'alimentent pas `buttons` mais `beginButton`/`endButton` : les deux
+  // formes donnent la même liste ordonnée.
+  function popupButtons(c) {
+    const out = [];
+    try {
+      const list = (typeof c.getButtons === 'function' && c.getButtons()) || [];
+      list.forEach((b) => { if (b && b.getDomRef && b.getDomRef()) out.push(b); });
+    } catch (e) {}
+    if (!out.length) {
+      ['getBeginButton', 'getEndButton'].forEach((name) => {
+        try {
+          const b = typeof c[name] === 'function' ? c[name]() : null;
+          if (b && b.getDomRef && b.getDomRef()) out.push(b);
+        } catch (e) {}
+      });
+    }
+    return out;
+  }
+
+  function popupEntry(c, kind) {
+    let state = '';
+    let type = '';
+    try { if (typeof c.getState === 'function') state = String(c.getState() || ''); } catch (e) {}
+    try { type = c.getMetadata().getName(); } catch (e) {}
+    return { id: String(c.getId()), controlType: type, kind: kind,
+             state: state, buttons: popupButtons(c).length };
+  }
+
+  function openPopups() {
+    if (!isUI5()) return null;
+    const IM = instanceManager();
+    if (!IM) return [];
+    const out = [];
+    try { (IM.getOpenDialogs() || []).forEach((d) => out.push(popupEntry(d, 'dialog'))); } catch (e) {}
+    try { (IM.getOpenPopovers() || []).forEach((p) => out.push(popupEntry(p, 'popover'))); } catch (e) {}
+    return out;
+  }
+
+  // Id DOM du bouton d'INDEX donné (base 0) du dialogue ouvert le plus récent.
+  // Les boutons d'une MessageBox portent un id GÉNÉRÉ (`__mbox-btn-0`) et un
+  // texte TRADUIT : la position est la seule adresse locale-indépendante
+  // (convention 3). Retourne { error } plutôt que de lever, pour que
+  // l'appelant Python compose un message actionnable.
+  function dialogButton(payload) {
+    if (!isUI5()) return null;
+    let req;
+    try { req = JSON.parse(payload) || {}; } catch (e) { req = {}; }
+    const IM = instanceManager();
+    if (!IM) return { error: 'no_instance_manager' };
+    let dialogs = [];
+    try { dialogs = IM.getOpenDialogs() || []; } catch (e) { dialogs = []; }
+    if (!dialogs.length) return { error: 'no_dialog' };
+    const d = dialogs[dialogs.length - 1];
+    const buttons = popupButtons(d);
+    const idx = parseInt(req.position, 10);
+    const pos = isNaN(idx) ? 0 : idx;
+    if (pos < 0 || pos >= buttons.length) {
+      return { error: 'out_of_range', count: buttons.length, dialog: String(d.getId()) };
+    }
+    const dom = buttons[pos].getDomRef();
+    if (!dom || !dom.id) return { error: 'not_rendered', count: buttons.length, dialog: String(d.getId()) };
+    return { id: dom.id, count: buttons.length, dialog: String(d.getId()) };
   }
 
   // Spy : trouve le contrôle UI5 le plus proche propriétaire d'un nœud DOM et propose un sélecteur stable.
@@ -652,14 +871,32 @@
   function wcKebab(name) {
     return String(name).replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   }
+  // Un type court en DEUX mots (ShellBar) devient 'shell-bar' : il contient donc
+  // un tiret, et l'ancienne version le prenait pour un tag COMPLET, jamais
+  // préfixé par 'ui5-'. Conséquence mesurée live sur une barre shell Work Zone :
+  // `tag=ShellBar` ne matchait RIEN alors que la page portait bien un
+  // <ui5-shellbar-6bfd01e3>. Deux orthographes cohabitent en outre chez UI5 Web
+  // Components : 'ui5-shellbar' (collé) et 'ui5-side-navigation' (avec tirets).
+  // On essaie donc toutes les formes plausibles, sans jamais élargir un tag
+  // déjà préfixé (celui-là est une demande explicite).
   function wcTagMatches(tag, wanted) {
     const want = wcKebab(wanted);
-    if (want.indexOf('-') !== -1) {           // tag complet donné (ui5-button)
-      return tag === want || tag.lastIndexOf(want + '-', 0) === 0;
+    const candidates = [];
+    let prefixed = false;
+    for (let i = 0; i < WC_PREFIXES.length; i++) {
+      if (want.lastIndexOf(WC_PREFIXES[i], 0) === 0) { prefixed = true; break; }
     }
-    for (let i = 0; i < WC_PREFIXES.length; i++) {   // type court (Button, TabContainer)
-      const full = WC_PREFIXES[i] + want;
-      if (tag === full || tag.lastIndexOf(full + '-', 0) === 0) return true;
+    if (prefixed || want.indexOf('-') !== -1) candidates.push(want);
+    if (!prefixed) {
+      for (let i = 0; i < WC_PREFIXES.length; i++) {
+        candidates.push(WC_PREFIXES[i] + want);              // ui5-side-navigation
+        const glued = want.split('-').join('');
+        if (glued !== want) candidates.push(WC_PREFIXES[i] + glued);   // ui5-shellbar
+      }
+    }
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      if (tag === c || tag.lastIndexOf(c + '-', 0) === 0) return true;
     }
     return false;
   }
@@ -949,11 +1186,13 @@
     } catch (e) { return null; }
   }
 
-  window.__SAPFX = { isUI5: isUI5, resolveByXPath: resolveByXPath,
+  window.__SAPFX = { __v: V, isUI5: isUI5, resolveByXPath: resolveByXPath,
                      resolveByRole: resolveByRole, resolveByWc: resolveByWc,
                      resolveByDom: resolveByDom, pageComposition: pageComposition,
                      capture: capture, captureWc: captureWc, captureDom: captureDom,
                      bestXpath: bestXpath, readTable: readTable, dumpTree: dumpTree,
+                     readProperty: readProperty,
+                     openPopups: openPopups, dialogButton: dialogButton,
                      idleState: idleState, getMessages: getMessages,
                      captureSid: captureSid, highlightInfo: highlightInfo };
 })();
