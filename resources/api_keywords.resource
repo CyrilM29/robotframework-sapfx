@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Mots-clés du canal **API** (OData v2 et v4) lisibles métier.
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Mots-clés du canal **API** (OData v2 et v4) lisibles métier.
 ...                 Troisième miroir de `ecc_keywords.resource` et de
 ...                 `fiori_keywords.resource` : un test se lit de la même façon
 ...                 (`Open ...`, `Count ...`, `Close ...`) qu'il pilote le client
@@ -28,6 +37,9 @@ Documentation       Mots-clés du canal **API** (OData v2 et v4) lisibles métie
 
 Library             SapApiLibrary
 Library             Collections
+# Primitive pure atteinte par un KEYWORD (décision DDIC 2026-08-17) :
+# `Secret Is Provided` teste la PRÉSENCE d'un identifiant sans jamais le lire.
+Library             sapfx_common.secrets
 
 
 *** Variables ***
@@ -47,6 +59,21 @@ ${EPM_PRODUCTS}             /sap/opu/odata/sap/SEPMRA_SHOP/Products
 # --- Cibles métier : service OData v4 (modèle Travel de cap-sflight) ---
 ${TRAVEL_SERVICE}           /processor
 ${TRAVEL_ENTITIES}          /processor/Travel
+
+# --- Cibles métier : modèle de voyage MODERNE servi par un serveur ABAP ---
+# Relevé live (ABAP Platform 2023, 2026-08-28) sur le catalogue de la cible,
+# jamais deviné : le système publie plusieurs services de voyage et ils ne
+# projettent PAS la même population. Celui-ci est la variante sans brouillons,
+# donc le seul dont le comptage égale celui de la table par le canal RFC ;
+# les variantes à brouillons agrègent des états que la table ne porte pas.
+#
+# Piège mesuré à connaître avant tout croisement : l'ensemble des compagnies
+# de ce service compte 16 lignes, celui du modèle de démonstration CLASSIQUE
+# en compte 18. Ce sont DEUX catalogues, pas deux vues du même : les
+# confondre fabrique un écart de deux lignes parfaitement reproductible.
+${MODERN_TRAVEL_SERVICE}    /sap/opu/odata/dmo/UI_TRAVEL_U_V2
+${MODERN_TRAVELS}           /sap/opu/odata/dmo/UI_TRAVEL_U_V2/Travel
+${MODERN_AIRLINES}          /sap/opu/odata/dmo/UI_TRAVEL_U_V2/Airline
 
 # --- Cibles métier : bac à sable SAP Business Accelerator Hub (api.sap.com) ---
 # Troisième cible du canal, la seule qui expose la forme RÉELLE des APIs
@@ -118,7 +145,7 @@ Api Key Should Be Provided
     ...    cause. La bibliothèque refuse déjà une clé vide à l'ouverture ; cette
     ...    garde-ci nomme le remède côté ligne de commande.
     [Arguments]    ${api_key}
-    ${fourni}=    Evaluate    not isinstance($api_key, str) or bool($api_key)
+    ${fourni}=    Secret Is Provided    ${api_key}
     Should Be True    ${fourni}
     ...    msg=Aucune clé d'API fournie : passer -v "API_KEY: Secret:<clé>" (api.sap.com, bouton « Show API Key »).
 
@@ -131,7 +158,7 @@ Api Credentials Should Be Provided
     ...    chose observable sans le déballer : une valeur non fournie est restée
     ...    la chaîne vide du défaut.
     [Arguments]    ${password}
-    ${fourni}=    Evaluate    not isinstance($password, str) or bool($password)
+    ${fourni}=    Secret Is Provided    ${password}
     Should Be True    ${fourni}
     ...    msg=Aucun mot de passe fourni : passer -v "API_PASSWORD: Secret:<motdepasse>".
 
@@ -290,16 +317,6 @@ Create Test Entity
     ${entity}=    Post Odata    ${entity_set}    ${payload}    alias=${alias}    track=${track}
     RETURN    ${entity}
 
-Draft Entity Path
-    [Documentation]    Chemin adressable d'un brouillon sur un service OData v4
-    ...    draft-enabled. La clé y est COMPOSITE : l'identifiant seul ne
-    ...    désigne rien, il faut lui adjoindre l'état actif ou brouillon. Un
-    ...    brouillon n'apparaît d'ailleurs ni dans le `$count` ni dans une
-    ...    lecture ordinaire, qui ne rendent que les entités actives : c'est
-    ...    pourquoi un compte inchangé ne prouve à lui seul aucun nettoyage.
-    [Arguments]    ${entity_set}    ${key_field}    ${key_value}    ${active}=false
-    RETURN    ${entity_set}(${key_field}=${key_value},IsActiveEntity=${active})
-
 Track Created Entity
     [Documentation]    Déclare le chemin réel d'une entité à supprimer en
     ...    teardown, quand le serveur n'en a pas annoncé un qui réponde.
@@ -331,7 +348,20 @@ Api Channel State Should Not Leak Credentials
     [Documentation]    L'état du canal est servi aux agents (rf-mcp) à chaque
     ...    tour : il ne doit JAMAIS transporter d'identifiants. Ce keyword le
     ...    vérifie sur l'état réellement exposé, pas sur l'intention.
+    ...
+    ...    Un état VIDE est refusé : constaté live (2026-08-26, reconnaissance
+    ...    BTP sous rf-mcp), l'oracle validait `{'api_sessions': []}`, où il
+    ...    n'y a rien à ne pas fuir. Un oracle qui se satisfait de l'absence
+    ...    de matière ne prouve rien ; l'échec nomme la cause la plus
+    ...    fréquente (sous rf-mcp, resource et bibliothèque peuvent servir
+    ...    deux registres partitionnés par namespace).
     ${state}=    List Api Sessions
+    ${sessions}=    Get From Dictionary    ${state}    api_sessions
+    ${vide}=    Catenate    État du canal VIDE : rien à vérifier, donc rien
+    ...    de prouvé. Ouvrir la session AVANT cet oracle (sous rf-mcp,
+    ...    vérifier que resource et bibliothèque servent le même namespace :
+    ...    List Api Sessions des deux côtés doit rendre les mêmes alias).
+    Should Not Be Empty    ${sessions}    msg=${vide}
     ${dump}=    Evaluate    str($state).lower()
     Should Not Contain    ${dump}    authorization
     ...    msg=Fuite : un en-tête d'authentification apparaît dans l'état du canal.

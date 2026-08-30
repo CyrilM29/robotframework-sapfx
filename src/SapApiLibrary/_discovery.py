@@ -99,6 +99,67 @@ class DiscoveryKeywords(OdataReadKeywords):
         entries = self.get_odata_entities(path, alias=alias, **query)
         return odata_metadata.simplify_catalog_entries(entries)
 
+    def get_http_response(self, path: str, alias: str = "default",
+                          max_chars: int = 20000,
+                          headers: Optional[dict] = None,
+                          **query: str) -> dict[str, Any]:
+        """Lecture HTTP **brute et tolérante** d'un chemin de la session :
+        retourne ``{"status", "headers", "body", "truncated", "error",
+        "url"}`` sans JAMAIS lever. C'est la perception de ce que le serveur
+        SERT vraiment, quand ce n'est pas de l'OData : la page HTML d'un
+        approuter BTP, un document de découverte OpenID, le corps exact d'un
+        refus. Né d'une reconnaissance live (2026-08-26, site SAP Build Work
+        Zone) où lire un corps HTML exigeait de le détourner du message
+        d'échec de `Get Odata` : un détournement, pas une méthode.
+
+        ``status`` est ``None`` avec ``error`` renseigné quand la connexion
+        elle-même a échoué (système éteint, ou redirection cross-origin vers
+        un fournisseur d'identité, refusée par le garde same-origin : le
+        message le dit). ``body`` est décodé UTF-8 (remplacement) et tronqué
+        à ``max_chars`` (``truncated`` le signale : troncature jamais
+        muette). ``headers`` ajoute des en-têtes à CETTE requête (poser
+        ``Accept`` autrement, sans toucher la session) ; les options de query
+        passent en arguments nommés. Compte dans la télémétrie comme toute
+        traversée réseau. Pour de l'OData, préférer `Get Odata Entities` et
+        ses assertions ; pour un verdict classé, `Get Gateway Status`."""
+        status, resp_headers, body, truncated, error, url = \
+            self._probe_response(alias, path, query or None,
+                                 max_chars=int(max_chars),
+                                 extra_headers=headers)
+        return {"status": status,
+                "headers": {str(k): str(v) for k, v in resp_headers.items()},
+                "body": body, "truncated": bool(truncated),
+                "error": error, "url": url}
+
+    def classify_http_response(self, response: dict) -> str:
+        """Range une réponse de `Get Http Response` dans une **famille de
+        reconnaissance**, par des critères purement structurels : statut,
+        en-tête technique du routeur de plateforme, et forme du corps (JSON ou
+        HTML), jamais un texte localisé (convention #3).
+
+        Familles : ``unreachable``, ``unknown_route`` (404 portant
+        ``x-cf-routererror`` : le préfixe n'est routé vers AUCUNE
+        application), ``missing_route`` (404 sans cet en-tête : une
+        application a répondu, cette route-là n'existe pas), ``forbidden``,
+        ``dialog`` (4xx au corps JSON : l'application traite et explique),
+        ``login_page`` (2xx au corps HTML : PAS une donnée, le « vert et
+        faux » d'une cible derrière un fournisseur d'identité), ``data``,
+        ``other``.
+
+        Le complément tolérant de `Get Gateway Status`, pour cartographier un
+        canal plutôt que le valider : trois familles de 404 se cachent sous un
+        même statut, et c'est la couche qui répond qu'il s'agit d'identifier.
+        Toujours sonder AUSSI un chemin volontairement absent sur le même hôte
+        (le témoin absurde) : sans lui, on ne sait pas si un 404 qualifie la
+        ressource ou l'hôte entier. ::
+
+            ${reponse}=    Get Http Response    /odata
+            ${famille}=    Classify Http Response    ${reponse}
+        """
+        return gateway_status.classify_http_response(
+            response.get("status"), response.get("headers"),
+            response.get("body") or "")
+
     def get_gateway_status(self, alias: str = "default",
                            catalog_path: Optional[str] = None) -> dict[str, Any]:
         """Préflight du canal API : sonde le catalogue Gateway et classe le
@@ -107,8 +168,14 @@ class DiscoveryKeywords(OdataReadKeywords):
         ``unreachable``, ``auth_failed``, ``forbidden``,
         ``catalog_not_found``, ``gateway_inactive`` (le cas A4H : conteneur
         re-créé → HTTP 500 ``/IWFND/CM_COS/003``, remédiation = activité IMG
-        ``/IWFND/IWF_ACTIVATE``), ``server_error``. Ne lève jamais : le
-        miroir API de `Get Scripting Status`."""
+        ``/IWFND/IWF_ACTIVATE``), ``server_error``, et les deux états d'une
+        cible derrière un fournisseur d'identité (relevés live sur un site
+        SAP Build Work Zone, 2026-08-26) : ``identity_provider_redirect``
+        (redirection vers l'IdP, ou refus du garde same-origin) et
+        ``login_page`` (HTTP 200 dont le corps est une page HTML de
+        connexion : un « vert et faux » sans ce classement, car AUCUNE route
+        d'un tel site ne renvoie de défi d'authentification). Ne lève
+        jamais : le miroir API de `Get Scripting Status`."""
         session = self._session(alias)
         path = catalog_path or gateway_status.CATALOG_SERVICE_PATH
         code, excerpt, error = self._probe(alias, path,

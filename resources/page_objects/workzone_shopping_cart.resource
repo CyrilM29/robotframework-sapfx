@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Page object de l'**application embarquée dans le launchpad
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Page object de l'**application embarquée dans le launchpad
 ...                 Work Zone** : le Shopping Cart (`sap.ui.demo.cart`), servi
 ...                 en application de type URL et donc ouvert dans une iframe
 ...                 CROSS-ORIGIN par le shell.

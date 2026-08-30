@@ -40,9 +40,15 @@ def test_bundle_never_requires_the_global_core():
 
 
 def test_wait_for_ui5_ready_does_not_require_getcore():
+    # Le prédicat vit désormais dans la bibliothèque (UI5_READY_PROBE_JS,
+    # convention #12) ; la resource ne garde que l'attente. Le contrat
+    # multi-version tient : Core hérité OU module Element (UI5 2.x),
+    # getUIDirty seulement quand le Core existe.
+    from SapFioriLibrary._ui5_js import UI5_READY_PROBE_JS
+    assert "s.ui.getCore ? s.ui.getCore() : null" in UI5_READY_PROBE_JS
+    assert "sap/ui/core/Element" in UI5_READY_PROBE_JS
     with open(_RESOURCE, encoding="utf-8") as fh:
         text = fh.read()
-    # Le mot-clé accepte Core hérité OU module Element (UI5 2.x) ; getUIDirty
-    # seulement quand le Core existe.
-    assert "s.ui.getCore ? s.ui.getCore() : null" in text
-    assert "sap/ui/core/Element" in text
+    assert "Ui5 Runtime Should Be Ready" in text, (
+        "Wait For UI5 Ready doit sonder le prédicat de la bibliothèque, pas "
+        "réimplémenter le JS inline.")

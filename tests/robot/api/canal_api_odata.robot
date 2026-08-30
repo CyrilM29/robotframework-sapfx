@@ -203,7 +203,8 @@ Les Donnees De Test Creees Sont Retirees A La Fin
     [Tags]    capsflight
     ${entite}=    Create Test Entity    ${TRAVEL_ENTITIES}    ${{ {'Description': 'Recette du canal API'} }}
     ...    alias=cap    track=${False}
-    ${chemin}=    Draft Entity Path    ${TRAVEL_ENTITIES}    ${TRAVEL_KEY_FIELD}    ${entite}[${TRAVEL_KEY_FIELD}]
+    ${chemin}=    Build Draft Entity Path    ${TRAVEL_ENTITIES}    ${TRAVEL_KEY_FIELD}
+    ...    ${entite}[${TRAVEL_KEY_FIELD}]
     Track Created Entity    ${chemin}    alias=cap
     Patch Odata    ${chemin}    ${{ {'Description': 'Recette du canal API, modifiee'} }}    alias=cap
     ${relue}=    Get Odata    ${chemin}    alias=cap
@@ -231,7 +232,9 @@ Une Cle D Api Authentifie Le Canal Sans Identifiants Basic
     ${session}=    Evaluate    [s for s in $etat['api_sessions'] if s['alias'] == 'sandbox'][0]
     Should Be True    ${session}[authenticated]
     ...    msg=La session ne se déclare pas authentifiée alors qu'une clé a été fournie.
-    ${json}=    Evaluate    __import__('json').dumps($etat)
+    # Auto-import Robot du module `json` : ni __import__ ni modules= dans une
+    # suite (décision DDIC 2026-08-17, tenue par check_conventions.py).
+    ${json}=    Evaluate    json.dumps($etat)
     Should Not Contain    ${json}    APIKey
     ...    msg=L'état du canal expose l'en-tête d'authentification.
 

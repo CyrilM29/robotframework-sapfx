@@ -13,5 +13,9 @@ robotframework-browser>=20.0,<21
 # sert qu'à décoder le PNG à la frontière (extra `visual` du wheel).
 Pillow>=10.0
 # Canal RFC de SapApiLibrary (`Open Rfc Connection`/`Call Rfc`) : nécessite
-# `pyrfc` + le SAP NW RFC SDK (téléchargement SAP sous licence, pas sur PyPI)
-# installation manuelle, voir la doc SAP ; les keywords OData n'en ont pas besoin.
+# `pyrfc` + le runtime SAP NW RFC. Provisionnement scripté par `install-rfc.ps1`,
+# procédure et pièges dans le README du pack (« Canal RFC ») : sur un poste
+# porteur de SAP GUI 8.00 le SDK sous licence est souvent inutile (runtime déjà
+# dans System32, mesuré le 2026-08-27), mais le venv doit être en Python
+# 3.10-3.12, aucune roue `pyrfc` n'existant au-delà. Les keywords OData, eux,
+# n'ont besoin de rien de tout cela.

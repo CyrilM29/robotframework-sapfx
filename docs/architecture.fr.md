@@ -254,7 +254,12 @@ DevTools Edge ; le prérequis restant sur un vrai SAP GUI est l'option poste
 
 ## Règles de conception
 
-1. Les tests ne contiennent jamais d'identifiants SAP bruts : ceux-ci résident dans `resources/`.
+1. Les tests ne contiennent jamais d'identifiants SAP bruts : ceux-ci résident dans
+   `resources/`. Cette couche est le vocabulaire métier d'**une** installation, donc
+   ce que le dépôt y livre sont des exemples relevés sur ses propres systèmes de
+   laboratoire, à vérifier sur votre cible et à adapter à votre métier
+   ([resources/README.fr.md](../resources/README.fr.md)) ; la moitié universelle,
+   c'est `src/`, les bibliothèques, qui portent les capacités.
 2. Ne jamais utiliser `time.sleep` pour attendre SAP ; utiliser les keywords `Wait Until ...`.
 3. Assertions indépendantes de la locale uniquement (type de *message*, pas *texte* du message).
 4. Limiter le diff avec le vendeur amont à une ligne.

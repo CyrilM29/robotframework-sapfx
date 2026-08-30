@@ -185,7 +185,8 @@ class _ApiSession:
                  client_secret: Optional[Union[str, Secret]] = None,
                  oauth_scope: Optional[str] = None,
                  api_key: Optional[Union[str, Secret]] = None,
-                 api_key_header: str = "APIKey") -> None:
+                 api_key_header: str = "APIKey",
+                 extra_headers: Optional[dict] = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.sap_client = sap_client
         self.timeout = timeout
@@ -200,6 +201,13 @@ class _ApiSession:
         if api_key is not None:
             self.api_key_header = api_key_header
             self.headers[api_key_header] = reveal_secret(api_key) or ""
+        # En-têtes par défaut de l'appelant, appliqués en DERNIER : ils
+        # peuvent surcharger l'``Accept`` maison (un approuter BTP arbitre
+        # HTML/JSON sur cet en-tête, relevé live 2026-08-26) ; les valeurs ne
+        # sont jamais journalisées.
+        if extra_headers:
+            self.headers.update({str(k): str(v)
+                                 for k, v in dict(extra_headers).items()})
         self.cookies = CookieJar()
         self.tls_context: Optional[ssl.SSLContext] = None
         if not verify_tls or client_cert:

@@ -1,4 +1,4 @@
-# Versions qualifiées ensemble pour sapfx-pack-0.7.0-win.zip.
+# Versions qualifiées ensemble pour sapfx-pack-0.8.0-win.zip.
 # Mettre à jour volontairement, puis rejouer le job release-pack complet.
 # La version est écrite sous la forme du NOM DU PACK, et pas en prose : c'est
 # celle que check_published_versions.py sait reconnaître, donc la seule qui ne

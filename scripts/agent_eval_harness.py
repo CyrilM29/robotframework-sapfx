@@ -25,9 +25,9 @@ stdlib, testée dans ``tests/unit/test_agent_eval_harness.py`` (convention #5).
 
 Usage :
     python scripts/agent_eval_harness.py list
-    python scripts/agent_eval_harness.py inject se16-count-button
-    python scripts/agent_eval_harness.py verify se16-count-button
-    python scripts/agent_eval_harness.py restore se16-count-button
+    python scripts/agent_eval_harness.py inject se16-table-field
+    python scripts/agent_eval_harness.py verify se16-table-field
+    python scripts/agent_eval_harness.py restore se16-table-field
 """
 from __future__ import annotations
 
@@ -62,13 +62,15 @@ IGNORED_SUFFIXES = (".pyc", ".pyo", ".actual.png")
 # `file` (sinon inject refuse : cible ambiguë). `suite` documente la suite à
 # donner au healer en aveugle.
 SCENARIOS: Dict[str, Dict[str, str]] = {
-    "se16-count-button": {
+    "se16-table-field": {
         "description": (
-            "Dérive simulée du bouton SE16 « Number of Entries » "
-            "(btn[31] -> btn[13]), l'exercice en aveugle de la release 0.3.0."),
+            "Dérive simulée du champ « nom de table » de SE16 "
+            "(ctxtDATABROWSE-TABLENAME -> ctxtDATABROWSE-TABNAME) : le "
+            "localisateur porte la suite entière, et sa proximité avec "
+            "l'original donne au healer une vraie matière de scoring."),
         "file": "resources/ecc_keywords.resource",
-        "old": "wnd[0]/tbar[1]/btn[31]",
-        "new": "wnd[0]/tbar[1]/btn[13]",
+        "old": "wnd[0]/usr/ctxtDATABROWSE-TABLENAME",
+        "new": "wnd[0]/usr/ctxtDATABROWSE-TABNAME",
         "suite": "tests/robot/ecc_scarr_spfli_liaisons.robot",
     },
 }

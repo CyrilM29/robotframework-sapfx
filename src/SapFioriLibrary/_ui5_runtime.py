@@ -14,7 +14,7 @@ import ast
 import json
 import re
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlsplit
 
 # Sélecteurs dont la valeur est un dict (propriété -> attendu). Robot Framework passe
 # un argument nommé `properties={'text': 'X'}` comme une *chaîne* ; on l'accepte aussi
@@ -277,6 +277,91 @@ def ui5_page_map(tree_xml: str,
 _INTENT_RE = re.compile(r"^[A-Za-z_][\w]*-[A-Za-z_][\w]*$")
 
 
+# Préfixe de la classe technique que le runtime UI5 pose sur ``<html>`` pour le
+# thème RÉELLEMENT appliqué. Indépendant de la locale, contrairement au libellé
+# de l'entrée de menu qui l'a choisi (convention #3).
+THEME_CLASS_PREFIX = "sapUiTheme-"
+
+
+def applied_theme(class_attribute: str | None) -> str:
+    """Thème réellement APPLIQUÉ, extrait de l'attribut ``class`` de ``<html>``.
+
+    Chaîne vide quand le document ne porte aucune classe de thème : ce n'est pas
+    un cas théorique, il existe une fenêtre transitoire, juste après un
+    changement de thème, où le runtime a retiré l'ancienne classe sans avoir
+    encore posé la nouvelle (mesuré live sur le Demo Kit OpenUI5 le 2026-08-30).
+    Un appelant qui asserte doit donc attendre la valeur voulue, jamais lire une
+    fois.
+
+    La classe est le témoin locale-safe : ``sapUiTheme-sap_horizon_dark`` porte
+    la clé technique du thème, là où l'entrée de menu qui l'a choisi porte un
+    libellé traduit.
+    """
+    for token in str(class_attribute or "").split():
+        if token.startswith(THEME_CLASS_PREFIX) and len(token) > len(THEME_CLASS_PREFIX):
+            return token[len(THEME_CLASS_PREFIX):]
+    return ""
+
+
+def table_read_verdict(payload: Any, description: str) -> list[dict[str, Any]]:
+    """Tranche le constat de lecture de table rendu par le bundle : les lignes,
+    ou un échec ACTIONNABLE. Le cœur de `Read Ui5 Table`.
+
+    Une table vide et un contrôle dont on ne sait pas lire les lignes rendent la
+    même liste vide, et c'est le pire des deux mondes : le test passe et
+    n'affirme rien. Mesuré live sur la ``sap.ui.documentation.LightTable`` du
+    Demo Kit OpenUI5 (2026-08-30) : le sélecteur résout exactement 1 contrôle,
+    ce contrôle porte bien ses lignes, et la lecture rendait ``[]`` sans un mot.
+    Trois issues sont donc distinguées ici, et une seule est un succès :
+
+    * le contrôle n'expose ni ``items`` ni ``rows`` : sa structure ne se lit pas
+      par cette voie, l'échec nomme le type et renvoie vers la lecture au
+      registre (`Get Ui5 Aggregation Info` / `Get Ui5 Properties`) ;
+    * il porte des lignes mais AUCUNE n'expose de cellules : même remède, et le
+      compte des lignes écartées est dit, parce que c'est lui qui prouve que la
+      table n'est pas vide ;
+    * il porte des lignes lisibles, ou n'en porte aucune : la liste est rendue
+      telle quelle, une table vraiment vide restant un résultat légitime.
+
+    ``payload`` absent (``None``) signifie que la page n'a pas de runtime UI5 ou
+    que le contrôle a disparu entre sa résolution et sa lecture.
+    """
+    if not isinstance(payload, dict):
+        raise AssertionError(
+            "Lecture de table impossible pour %s : pas de runtime UI5 sur la "
+            "portée courante, ou contrôle disparu entre sa résolution et sa "
+            "lecture. Sonder avec Ui5 Runtime Is Present, et vérifier la portée "
+            "de frame (Set/Push Ui5 Frame)." % description)
+
+    type_name = str(payload.get("type") or "contrôle de type inconnu")
+    rows = payload.get("rows")
+    rows = rows if isinstance(rows, list) else []
+    candidates = int(payload.get("candidates") or 0)
+    remedy = (
+        "Get Ui5 Control Info donne son type plein et ses agrégations, "
+        "Get Ui5 Aggregation Info les enfants d'une agrégation (rendus ou non) "
+        "et Get Ui5 Properties lit une propriété : c'est par là que se lisent "
+        "les tables qui ne suivent pas le contrat sap.m.Table / "
+        "sap.ui.table.Table.")
+
+    if not payload.get("source"):
+        raise AssertionError(
+            "%s a résolu un %s, qui n'expose ni l'agrégation items ni "
+            "l'agrégation rows : ses lignes ne se lisent pas par Read Ui5 "
+            "Table. %s" % (description, type_name, remedy))
+
+    if candidates and not rows:
+        raise AssertionError(
+            "%s a résolu un %s qui porte %d ligne(s), dont aucune n'expose de "
+            "cellules (getCells) : Read Ui5 Table ne sait pas la lire et rendre "
+            "une liste vide la ferait passer pour une table vide. %s"
+            % (description, type_name, candidates, remedy))
+
+    # Des lignes écartées alors qu'il en reste de lisibles est le cas légitime
+    # et fréquent des en-têtes de groupe d'une sap.m.Table : rien à signaler.
+    return rows
+
+
 def build_intent_hash(intent: str, params: dict[str, Any] | None = None) -> str:
     """Construit le hash de navigation FLP d'un intent ``SemanticObject-action``.
 
@@ -296,6 +381,38 @@ def build_intent_hash(intent: str, params: dict[str, Any] | None = None) -> str:
             for k, v in sorted(params.items()))
         hash_ += "?" + pairs
     return hash_
+
+
+def parse_location(url: str) -> dict[str, Any]:
+    """Décompose une adresse en dict JSON-safe ``{url, scheme, host, path,
+    query, fragment, intent, intent_params}``.
+
+    L'inverse de `build_intent_hash` : ce qu'une page a réellement ATTEINT.
+    ``intent`` n'est renseigné que si le fragment porte la forme
+    ``SemanticObject-action`` (même validation que la construction) ; un
+    fragment d'ancre ordinaire (``#section1``) laisse ``intent`` à ``None``
+    plutôt que d'inventer une navigation FLP. ``host`` est ce qui distingue
+    un fournisseur d'identité du site lui-même : sans ce constat, une page de
+    connexion servie par le site rendrait vert un test censé prouver la
+    redirection (leçon live 2026-08-26, campagnes Work Zone).
+    """
+    parsed = urlsplit(str(url or ""))
+    fragment = parsed.fragment or ""
+    intent: str | None = None
+    params: dict[str, str] = {}
+    head, _, tail = fragment.partition("?")
+    head = head.lstrip("#")
+    if _INTENT_RE.match(head):
+        intent = head
+        for pair in tail.split("&"):
+            if not pair:
+                continue
+            key, _, value = pair.partition("=")
+            params[unquote(key)] = unquote(value)
+    return {"url": str(url or ""), "scheme": parsed.scheme,
+            "host": parsed.netloc, "path": parsed.path,
+            "query": parsed.query, "fragment": fragment,
+            "intent": intent, "intent_params": params}
 
 
 def choose_app_frame(frames: list[dict[str, Any]]) -> int | None:

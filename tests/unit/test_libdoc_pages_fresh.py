@@ -23,6 +23,7 @@ sur son scan anti-fuite, au pire moment (le jour de la release).
 import importlib.util
 import os
 import re
+import sys
 
 import pytest
 
@@ -142,4 +143,78 @@ def test_spec_lists_every_keyword_the_library_exposes(library):
         f"comms/libdoc/spec/{library}.json ne suit plus la bibliothèque : "
         f"absents de la spec {manquants or 'aucun'}, disparus du code "
         f"{en_trop or 'aucun'}. Reporter le delta puis reconstruire les pages "
+        "(procédure dans comms/libdoc/README.md).")
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="Python 3.10 applique encore l'Optional implicite de PEP 484 : "
+           "get_type_hints y rend Optional[Any] pour un paramètre `Any = None` "
+           "(mesuré 2026-08-30 : 3.10.21 rend Optional[Any], 3.11.16 rend Any). "
+           "Les usages du type None gagnent donc les keywords à paramètre "
+           "`Any = None` sur cette seule version, et AUCUNE spec committée ne "
+           "peut satisfaire à la fois 3.10 et 3.11+. La spec est produite par un "
+           "interpréteur moderne, la comparaison ne vaut que là ; les noms de "
+           "keywords, eux, restent comparés sur toutes les versions.")
+@pytest.mark.parametrize("library", [p[: -len(".html")] for p in _PAGES])
+def test_spec_typedocs_follow_the_library(library):
+    """Les **types documentés** suivent le code, eux aussi.
+
+    L'angle mort que cette garde ferme, relevé le 2026-08-29 : la garde
+    voisine compare les NOMS de keywords et rien d'autre, or une spec porte
+    aussi des ``typedocs``, dont le champ ``usages`` liste les keywords qui
+    emploient chaque type et alimente les liens croisés « used by » des pages
+    publiées. Ajouter un keyword enrichit ces listes dans la bibliothèque sans
+    rien changer aux noms déjà documentés : la garde des noms reste donc verte
+    pendant que les pages publiées perdent des liens, et cela peut durer un
+    cycle entier. Mesuré au moment de poser la garde : six types
+    (``Any``, ``dictionary``, ``integer``, ``list``, ``None``, ``string``) ne
+    listaient qu'un sous-ensemble de leurs keywords.
+
+    Le contrat vérifié est volontairement STRUCTUREL (noms, catégorie de type,
+    types acceptés, liste d'usages) et exclut le champ ``doc`` : celui des
+    types standards est produit par Robot Framework, donc déjà en anglais et
+    identique des deux côtés, mais un type propre au projet pourrait un jour
+    porter une documentation française à traduire, et la garde n'a pas à
+    interdire cette traduction.
+    """
+    import json
+
+    from robot.libdocpkg import LibraryDocumentation
+
+    spec_path = os.path.join(_LIBDOC_DIR, "spec", f"{library}.json")
+    with open(spec_path, encoding="utf-8") as handle:
+        publies = {t["name"]: t for t in json.load(handle).get("typedocs", [])}
+    reels = {t.name: t for t in LibraryDocumentation(library).type_docs}
+
+    manquants = sorted(set(reels) - set(publies))
+    en_trop = sorted(set(publies) - set(reels))
+    assert not manquants and not en_trop, (
+        f"comms/libdoc/spec/{library}.json : types absents de la spec "
+        f"{manquants or 'aucun'}, disparus du code {en_trop or 'aucun'}. "
+        "Reprendre les typedocs de l'export frais puis reconstruire les pages "
+        "(procédure dans comms/libdoc/README.md).")
+
+    derives = []
+    for nom in sorted(reels):
+        attendu = {
+            "type": reels[nom].type,
+            "accepts": sorted(reels[nom].accepts),
+            "usages": sorted(reels[nom].usages),
+        }
+        trouve = {
+            "type": publies[nom].get("type"),
+            "accepts": sorted(publies[nom].get("accepts", [])),
+            "usages": sorted(publies[nom].get("usages", [])),
+        }
+        if attendu != trouve:
+            oublies = sorted(set(attendu["usages"]) - set(trouve["usages"]))
+            derives.append(
+                f"{nom} (usages {len(trouve['usages'])} -> "
+                f"{len(attendu['usages'])}"
+                + (f", manquants {oublies[:5]}" if oublies else "") + ")")
+    assert not derives, (
+        f"comms/libdoc/spec/{library}.json : typedocs périmés, donc des liens "
+        f"« used by » manquants sur la page publiée. {'; '.join(derives)}. "
+        "Reprendre les typedocs de l'export frais puis reconstruire les pages "
         "(procédure dans comms/libdoc/README.md).")

@@ -1,10 +1,20 @@
 *** Settings ***
-Documentation       Mots-clés ECC lisibles métier, construits sur SapEccLibrary.
-...                 Cette couche est celle que les tests doivent appeler : elle masque
-...                 les identifiants d'éléments SAP derrière des noms à intention
-...                 explicite. Le vocabulaire unifié correspondant pour Fiori/web se
-...                 trouve dans `fiori_keywords.resource` (phase 2), afin qu'un test
-...                 soit lisible de la même façon quelle que soit l'interface sous-jacente.
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Mots-clés ECC lisibles métier, construits sur SapEccLibrary.
+...                 Cette couche est celle que les tests appellent (chez vous : votre
+...                 copie adaptée) : elle masque les identifiants d'éléments SAP
+...                 derrière des noms à intention explicite. Le vocabulaire unifié
+...                 correspondant pour Fiori/web se trouve dans
+...                 `fiori_keywords.resource` (phase 2), afin qu'un test soit lisible
+...                 de la même façon quelle que soit l'interface sous-jacente.
 
 Library             Collections
 Library             SapEccLibrary    screenshots_on_error=${True}    default_timeout=30s
@@ -21,13 +31,14 @@ ${SAP_LANGUAGE}         EN
 ${SE16_TABLE_FIELD}     wnd[0]/usr/ctxtDATABROWSE-TABLENAME
 ${SE16_GRID}            wnd[0]/usr/cntlGRID1/shellcont/shell
 ${SM50_GRID}            wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell    # SM50 : vue Process Overview
-${SE16_SETTINGS_USER_PARAMS_MENU}    wnd[0]/mbar/menu[3]/menu[0]    # Settings > User Parameters (écran initial SE16)
-${SE16_ALV_GRID_RADIO}  wnd[1]/usr/tabsG_TABSTRIP/tabp0400/ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/radRSEUMOD-TBALV_GRID
 ${SE38_PROGRAM_FIELD}   wnd[0]/usr/ctxtRS38M-PROGRAMM
 # Écran de sélection SE16 (généré par table ; ids relevés live sur A4H, GUI 8.00).
+# NB : les ids du RÉGLAGE d'affichage ALV et du comptage « Number of Entries »
+# ne sont plus ici : ce sont des écrans SAP standard, donc des primitives de la
+# bibliothèque (`Use ALV Grid In Data Browser`, `Count Entries On Current
+# Selection Screen` dans `_se16.py`, convention #12). Ce qui reste ci-dessous
+# est ce qui VARIE par table ou par profil : le vrai sujet de healing.
 ${SE16_MAX_HITS_FIELD}      wnd[0]/usr/txtMAX_SEL              # « Maximum No. of Hits » : présent sur tout écran de sélection SE16
-${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]             # « Number of Entries » : compte sans ouvrir la grille (fiable même table vide)
-${SE16_COUNT_RESULT}        wnd[1]/usr/txtG_DBCOUNT            # compteur du popup « Number of Entries »
 # Champs de sélection positionnels (I<n> suit l'ordre des champs de la table, stable par version).
 ${DD07L_DOMNAME_FIELD}      wnd[0]/usr/ctxtI1-LOW              # DD07L : DOMNAME est le 1er champ
 ${TADIR_OBJECT_FIELD}       wnd[0]/usr/ctxtI2-LOW              # TADIR : OBJECT (TABL, VIEW…)
@@ -149,21 +160,6 @@ Save And Expect Success
     Send Vkey    11
     Wait Until Busy Done
     Status Message Should Be Success
-
-Use ALV Grid In Data Browser
-    [Documentation]    Bascule la sortie du Data Browser (SE16) de l'utilisateur
-    ...                courant en **grille ALV** (Settings → User Parameters →
-    ...                ALV Grid Display). Persistant par utilisateur et idempotent,
-    ...                indispensable avant `Display Table Contents` : la « Standard
-    ...                SE16 list » (défaut) est une liste ABAP classique sans objet
-    ...                grille scriptable.
-    Go To Transaction    SE16
-    Click Element    ${SE16_SETTINGS_USER_PARAMS_MENU}
-    Wait Until Busy Done
-    Wait Until Element Present    ${SE16_ALV_GRID_RADIO}
-    Select Radio Button    ${SE16_ALV_GRID_RADIO}
-    Send Vkey    0    window=1
-    Wait Until Busy Done
 
 Display Table Contents
     [Documentation]    Ouvre la table ``${table}`` dans le Data Browser (SE16) et
@@ -295,28 +291,6 @@ Open Table Selection Screen
         ${type}    ${text}=    Get Status Message
         Fail    SE16 did not open '${table}' (status message type '${type}'): ${text}
     END
-
-Count Entries On Current Selection Screen
-    [Documentation]    Suppose un écran de sélection SE16 déjà ouvert : clique
-    ...                « Number of Entries », lit le compteur du popup puis le
-    ...                referme (F12). Compte **toutes** les entrées répondant aux
-    ...                critères saisis : indépendant de « Maximum No. of Hits » et
-    ...                fiable sur table vide (retourne 0), contrairement à
-    ...                l'exécution F8 qui reste sur l'écran de sélection.
-    Click Element    ${SE16_COUNT_BUTTON}
-    Wait Until Busy Done
-    Wait Until Element Present    ${SE16_COUNT_RESULT}
-    ${raw}=    Get Value    ${SE16_COUNT_RESULT}
-    Send Vkey    12    window=1
-    Wait Until Busy Done
-    # Normalise les éventuels séparateurs de milliers (dépendants du profil
-    # utilisateur). PAS de regex ici : `\d`/`\D` dans une cellule Robot passe par
-    # deux couches d'échappement (fichier + Evaluate) qui rongent le backslash et
-    # changent silencieusement le sens du motif (piégé par
-    # tests/unit/test_se16_exploration_logic.py) ; le filtrage caractère par
-    # caractère ci-dessous n'a pas ce problème.
-    ${count}=    Evaluate    int(''.join(c for c in $raw if c.isdigit()) or 0)
-    RETURN    ${count}
 
 Count Table Entries
     [Documentation]    Compte les entrées de ``${table}`` via SE16 → « Number of

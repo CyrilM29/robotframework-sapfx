@@ -4,7 +4,8 @@
 `Push/Pop Ui5 Frame` (frames IMBRIQUEES, portee chainee ``a >>> b``),
 `Get Ui5 App Frame` / `Push Ui5 App Frame` (la frame APPLICATIVE d'un
 launchpad reconnue par ce qu'elle est, jamais par un id genere
-``__container<N>``) et `Get Ui5 Frame Stack`.
+``__container<N>``), `List Page Iframes` (l'inventaire brut) et
+`Get Ui5 Frame Stack`.
 
 Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
@@ -12,6 +13,9 @@ Extrait de ``SapFioriLibrary.py`` (convention #13).
 from robot.api import logger
 
 
+from .._ui5_js import (
+    IFRAMES_PROBE_JS,
+)
 from .._ui5_runtime import (
     choose_app_frame,
 )
@@ -140,6 +144,23 @@ class FrameKeywords:
         logger.info("UI5 resolution scope: %s"
                     % (self._ui5_frame or "main page (no frame)"))
         return popped
+
+    def list_page_iframes(self):
+        """Inventaire BRUT des iframes de la portée courante : liste de dicts
+        JSON-safe ``{id, src}``, dans l'ordre du DOM. La perception qui
+        permet d'asserter la STRUCTURE d'un launchpad (zéro iframe sur
+        l'accueil, une par application ouverte, destruction au retour) sans
+        jamais ancrer un test sur un identifiant généré ``__container<N>``
+        (un compteur, pas une ancre : relevés live 2026-08-23/26). ::
+
+            ${iframes}=    List Page Iframes
+            Should Be Empty    ${iframes}    msg=L'accueil ne doit porter aucune iframe.
+
+        Lecture pure (aucune injection), respecte `Set Ui5 Frame` /
+        `Push Ui5 Frame` (les iframes de la frame ciblée). Pour DÉSIGNER la
+        frame applicative, préférer `Get Ui5 App Frame`."""
+        frames = self._evaluate(IFRAMES_PROBE_JS)
+        return list(frames) if isinstance(frames, list) else []
 
     def get_ui5_frame_stack(self):
         """Retourne la pile de frames courante (liste de sélecteurs, du niveau

@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Préparation des jeux de données de démo de l'ABAP Platform Trial
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Préparation des jeux de données de démo de l'ABAP Platform Trial
 ...                 (A4H) : voir docs/sap-test-data.fr.md. Rend les smokes ECC
 ...                 data-driven déterministes : on garantit que SFLIGHT (modèle vol
 ...                 classique) et EPM (SNWD_*) contiennent des données avant de lire.

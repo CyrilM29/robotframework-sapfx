@@ -57,9 +57,12 @@ Le launchpad est servi derriere un fournisseur d identite distinct
     ...    vert.
     Should Contain    ${WORKZONE_URL_AVANT_AUTHENTIFICATION}    ${WORKZONE_IDP_URL_MARKER}
     ...    msg=La cible n'a pas redirigé vers un point d'autorisation : elle n'est pas protégée par un IDP.
-    ${hote_idp}=    Evaluate    urllib.parse.urlparse($WORKZONE_URL_AVANT_AUTHENTIFICATION).netloc
-    ...    modules=urllib.parse
-    ${hote_site}=    Evaluate    urllib.parse.urlparse($WORKZONE_SITE).netloc    modules=urllib.parse
+    # Décomposition par le keyword de bibliothèque (convention #12) : ni
+    # __import__ ni modules= dans une suite (décision DDIC 2026-08-17).
+    ${idp}=    Get Page Location    url=${WORKZONE_URL_AVANT_AUTHENTIFICATION}
+    ${site}=    Get Page Location    url=${WORKZONE_SITE}
+    ${hote_idp}=    Set Variable    ${idp}[host]
+    ${hote_site}=    Set Variable    ${site}[host]
     Should Not Be Equal    ${hote_idp}    ${hote_site}
     ...    msg=Le formulaire d'authentification est servi par le site lui-même : aucun IDP externe n'est en jeu.
     ${url_courante}=    Get Url

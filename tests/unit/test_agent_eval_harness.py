@@ -25,7 +25,7 @@ mod = _load()
 
 _RESOURCE = (
     "*** Variables ***\n"
-    "${SE16_COUNT_BUTTON}        wnd[0]/tbar[1]/btn[31]             # comptage\n")
+    "${SE16_TABLE_FIELD}     wnd[0]/usr/ctxtDATABROWSE-TABLENAME    # SE16\n")
 
 
 @pytest.fixture()
@@ -50,12 +50,13 @@ def _resource_text(root):
 
 
 def test_inject_applies_the_drift_and_backs_up_the_original(fake_repo):
-    messages = mod.inject("se16-count-button", root=fake_repo)
-    assert any("btn[31] -> " in m or "btn[13]" in m for m in messages)
+    messages = mod.inject("se16-table-field", root=fake_repo)
+    assert any("TABLENAME -> " in m or "TABNAME" in m for m in messages)
     text = _resource_text(fake_repo)
-    assert "btn[13]" in text and "btn[31]" not in text
-    state_path = os.path.join(fake_repo, mod.STATE_DIR, "se16-count-button.json")
-    backup_path = os.path.join(fake_repo, mod.STATE_DIR, "se16-count-button.orig")
+    assert "ctxtDATABROWSE-TABNAME" in text
+    assert "ctxtDATABROWSE-TABLENAME" not in text
+    state_path = os.path.join(fake_repo, mod.STATE_DIR, "se16-table-field.json")
+    backup_path = os.path.join(fake_repo, mod.STATE_DIR, "se16-table-field.orig")
     assert os.path.exists(state_path) and os.path.exists(backup_path)
     with open(backup_path, "r", encoding="utf-8") as f:
         assert f.read() == _RESOURCE
@@ -68,17 +69,17 @@ def test_inject_applies_the_drift_and_backs_up_the_original(fake_repo):
 
 
 def test_inject_refuses_a_double_injection(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     with pytest.raises(mod.HarnessError, match="déjà injecté"):
-        mod.inject("se16-count-button", root=fake_repo)
+        mod.inject("se16-table-field", root=fake_repo)
 
 
 def test_inject_refuses_an_ambiguous_target(fake_repo):
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "a", encoding="utf-8") as f:
-        f.write("${AUTRE}    wnd[0]/tbar[1]/btn[31]\n")
+        f.write("${AUTRE}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME\n")
     with pytest.raises(mod.HarnessError, match="ambiguë"):
-        mod.inject("se16-count-button", root=fake_repo)
+        mod.inject("se16-table-field", root=fake_repo)
 
 
 def test_inject_refuses_an_unknown_scenario(fake_repo):
@@ -87,33 +88,33 @@ def test_inject_refuses_an_unknown_scenario(fake_repo):
 
 
 def test_verify_passes_when_the_healer_repaired_the_one_line(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     # healer simulé : restaure exactement la ligne d'origine
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE)
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is True
     assert any("PASS" in m for m in messages)
     assert any("à l'identique" in m for m in messages)
     # PASS nettoie l'état : le harnais est prêt pour la prochaine éval
     assert not os.path.exists(
-        os.path.join(fake_repo, mod.STATE_DIR, "se16-count-button.json"))
+        os.path.join(fake_repo, mod.STATE_DIR, "se16-table-field.json"))
 
 
 def test_verify_fails_when_the_drift_was_not_repaired(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is False
     assert any("toujours présent" in m for m in messages)
     assert any("FAIL" in m for m in messages)
     # l'état est conservé pour restore
     assert os.path.exists(
-        os.path.join(fake_repo, mod.STATE_DIR, "se16-count-button.json"))
+        os.path.join(fake_repo, mod.STATE_DIR, "se16-table-field.json"))
 
 
 def test_verify_fails_when_a_test_file_was_touched(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE)
@@ -121,7 +122,7 @@ def test_verify_fails_when_a_test_file_was_touched(fake_repo):
                              "ecc_scarr_spfli_liaisons.robot")
     with open(test_path, "a", encoding="utf-8") as f:
         f.write("# le healer n'a PAS le droit de faire ça\n")
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is False
     assert any("fichiers protégés modifiés" in m
                and "ecc_scarr_spfli_liaisons.robot" in m for m in messages)
@@ -131,14 +132,14 @@ def test_verify_fails_when_the_healer_added_a_protected_file(fake_repo):
     # Régression : verify ne relisait que le manifeste, donc une CRÉATION
     # passait. C'est pourtant le cas le plus probable en pack déployé, où les
     # agents ont pour consigne d'écrire dans resources/site_keywords.resource.
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE)
     added = os.path.join(fake_repo, "resources", "site_keywords.resource")
     with open(added, "w", encoding="utf-8") as f:
         f.write("*** Keywords ***\n")
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is False
     assert any("site_keywords.resource (ajouté)" in m for m in messages)
 
@@ -146,7 +147,7 @@ def test_verify_fails_when_the_healer_added_a_protected_file(fake_repo):
 def test_verify_ignore_les_artefacts_de_run(fake_repo):
     # Le healer reproduit l'échec : il fait tourner pytest et robot. Leurs
     # traces ne sont pas des sources, elles ne doivent pas faire échouer l'éval.
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE)
@@ -156,40 +157,40 @@ def test_verify_ignore_les_artefacts_de_run(fake_repo):
         f.write(b"\x00")
     with open(os.path.join(fake_repo, "tests", "robot", "e.actual.png"), "wb") as f:
         f.write(b"\x89PNG")
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is True, messages
 
 
 def test_verify_passes_with_a_note_when_repaired_differently(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE + "# note du healer\n")
-    ok, messages = mod.verify("se16-count-button", root=fake_repo)
+    ok, messages = mod.verify("se16-table-field", root=fake_repo)
     assert ok is True
     assert any("diffère de" in m for m in messages)
 
 
 def test_restore_puts_the_original_back(fake_repo):
-    mod.inject("se16-count-button", root=fake_repo)
-    messages = mod.restore("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
+    messages = mod.restore("se16-table-field", root=fake_repo)
     assert any("restauré" in m for m in messages)
     assert _resource_text(fake_repo) == _RESOURCE
     state_dir = os.path.join(fake_repo, mod.STATE_DIR)
     assert not os.listdir(state_dir)
     # après restore, une nouvelle injection est possible
-    mod.inject("se16-count-button", root=fake_repo)
+    mod.inject("se16-table-field", root=fake_repo)
 
 
 def test_restore_without_backup_is_an_actionable_error(fake_repo):
     with pytest.raises(mod.HarnessError, match="rien à restaurer"):
-        mod.restore("se16-count-button", root=fake_repo)
+        mod.restore("se16-table-field", root=fake_repo)
 
 
 def test_the_default_scenario_matches_the_real_repo_resource():
     # Garde vivant : la cible du scénario canonique existe (exactement une
     # occurrence) dans la vraie resource du dépôt : sinon le harnais est mort.
-    scenario = mod.SCENARIOS["se16-count-button"]
+    scenario = mod.SCENARIOS["se16-table-field"]
     real = os.path.normpath(os.path.join(
         os.path.dirname(__file__), "..", "..", scenario["file"]))
     with open(real, "r", encoding="utf-8") as f:
@@ -200,10 +201,10 @@ def test_the_default_scenario_matches_the_real_repo_resource():
 
 def test_main_cli_list_and_error_paths(fake_repo, capsys, monkeypatch):
     assert mod.main(["list"]) == 0
-    assert "se16-count-button" in capsys.readouterr().out
+    assert "se16-table-field" in capsys.readouterr().out
     assert mod.main(["inject"]) == 2          # scénario manquant
     monkeypatch.setattr(mod, "_ROOT", fake_repo)
-    assert mod.main(["inject", "se16-count-button"]) == 0
-    assert mod.main(["verify", "se16-count-button"]) == 1   # pas réparé
-    assert mod.main(["restore", "se16-count-button"]) == 0
+    assert mod.main(["inject", "se16-table-field"]) == 0
+    assert mod.main(["verify", "se16-table-field"]) == 1   # pas réparé
+    assert mod.main(["restore", "se16-table-field"]) == 0
     assert mod.main(["inject", "nope"]) == 2

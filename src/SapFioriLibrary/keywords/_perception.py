@@ -10,6 +10,8 @@ snapshot que l'ECC via ``sapfx_common.visual_baseline``).
 Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
 
+import json
+
 from robot.api import logger
 from robot.utils import timestr_to_secs
 
@@ -17,6 +19,7 @@ from sapfx_common.perception_diff import diff_perception
 from sapfx_common.polling import poll_until
 
 from .._ui5_js import (
+    CONTROL_INFO_JS,
     DUMP_TREE_JS,
     RESOLVE_ROLE_JS,
 )
@@ -192,6 +195,89 @@ class PerceptionKeywords:
         selector = self._act_with_retry(_do, "fill ui5 ref @%s" % number)
         logger.info("Fill Ui5 Ref @%s -> %s" % (number, selector))
         return selector
+
+    # -- fiche de contrôle : type, propriétés, contexte de liaison --------------
+
+    def _control_info(self, selector_parts, aggregation=None, index=None,
+                      model=None):
+        """Appelle ``controlInfo`` du bundle et traduit ``null`` (pas de
+        runtime UI5) en échec actionnable, commun aux deux keywords."""
+        payload = {"selector": json.loads(
+            selector_to_json(build_control_selector(**selector_parts)))}
+        if aggregation is not None:
+            payload["aggregation"] = str(aggregation)
+            payload["index"] = int(index or 0)
+        if model:
+            payload["model"] = str(model)
+        result = self._evaluate(CONTROL_INFO_JS, arg=json.dumps(payload))
+        if result is None:
+            raise AssertionError(
+                "Aucun runtime UI5 sur la portée courante : impossible de "
+                "lire la fiche des contrôles. Sonder d'abord avec `Ui5 "
+                "Runtime Is Present`, et vérifier la portée de frame avec "
+                "`Get Ui5 Frame Stack`.")
+        return result
+
+    def get_ui5_control_info(self, model=None, **selector_parts):
+        """Fiche JSON-safe de CHAQUE contrôle **rendu** qui matche le
+        sélecteur (mêmes clés que `Resolve Ui5 Control`) : liste de dicts
+        ``{id, type, rendered, properties, binding}``.
+
+        ``type`` est le nom PLEIN de métadonnées (``sap.m.Avatar``) : la
+        lecture qui prouve la TECHNOLOGIE d'un contrôle, là où l'arbre de
+        `Get Ui5 Page Tree` n'en donne que la forme courte. ``binding`` porte
+        le **contexte de liaison** (``{path, object, object_keys}``, ``None``
+        sans contexte ; ``model=`` en vise un nommé) : la voie des items dont
+        l'identifiant est GÉNÉRÉ mais dont la clé technique vit dans le
+        modèle (rubriques de paramètres d'un shell, thèmes : relevés live
+        2026-08-24/26 sur deux launchpads). ``object`` est réduit aux entrées
+        primitives de premier niveau (les valeurs profondes portent des
+        contrôles et des cycles) ; ``object_keys`` liste tout ce qui existe. ::
+
+            ${fiches}=    Get Ui5 Control Info    idSuffix=userActionsMenuHeaderButton
+            Should Be Equal    ${fiches}[0][type]    sap.m.Avatar
+
+        Lecture, pas assertion : aucune correspondance rend une liste vide.
+        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`)."""
+        return list(self._control_info(selector_parts, model=model) or [])
+
+    def get_ui5_aggregation_info(self, aggregation, index=0, model=None,
+                                 **selector_parts):
+        """Fiche JSON-safe des **enfants d'une agrégation** du contrôle
+        résolu (``index``, base 0) : liste de dicts ``{id, type, rendered,
+        properties, binding}``, rendus OU NON.
+
+        C'est ce que le moteur role ne peut pas voir : les items d'un
+        ``Select`` n'existent pas dans le DOM tant que son popover est fermé,
+        et les items réservés d'une liste restent non rendus ; ils sont
+        pourtant DÉCLARÉS dans l'agrégation, avec leur clé, leur contexte de
+        liaison et leur position. ``rendered`` distingue les deux
+        populations. ::
+
+            ${items}=    Get Ui5 Aggregation Info    items
+            ...    controlType=List    idSuffix=--settingsList
+
+        Agrégation inconnue du contrôle = échec la nommant ; agrégation
+        déclarée mais vide = liste vide (les deux cas restent distincts).
+        Sélecteur sans correspondance = échec (il faut UN contrôle hôte)."""
+        result = self._control_info(selector_parts, aggregation=aggregation,
+                                    index=index, model=model)
+        if isinstance(result, dict) and "__out_of_range" in result:
+            matched = int(result["__out_of_range"] or 0)
+            if matched == 0:
+                raise AssertionError(
+                    "No UI5 control matched %s on the current page.%s"
+                    % (selector_parts, self._relaxed_hint(selector_parts)))
+            raise AssertionError(
+                "%s matched %d control(s); index %s is out of range."
+                % (selector_parts, matched, index))
+        if isinstance(result, dict) and "__no_aggregation" in result:
+            raise AssertionError(
+                "Le contrôle résolu ne déclare pas d'agrégation '%s' : "
+                "vérifier son type avec `Get Ui5 Control Info` (les listes "
+                "portent `items`, les tables `rows`/`items` selon la "
+                "famille)." % result["__no_aggregation"])
+        return list(result or [])
 
     # -- assertion visuelle (parité du canal ECC) -------------------------------
 

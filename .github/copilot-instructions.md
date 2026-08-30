@@ -57,7 +57,9 @@ per file, update the index in the same operation, never secrets anywhere.
   an empty batch triggers a canary probe and a missing grid names
   `Use ALV Grid In Data Browser`, so a campaign is never green and wrong;
   every SE16 selection screen is reached through the one library keyword
-  `Reach Se16 Selection Screen`;
+  `Reach Se16 Selection Screen`, alongside the two promoted SE16 screen
+  primitives `Use ALV Grid In Data Browser` and
+  `Count Entries On Current Selection Screen`;
   deterministic hashed JSON artifact; pure logic in
   `sapfx_common/ddic_inventory.py`), perception (`Get Screen Signature`: `mode=diff` with the
   `pair_renames` smart diff pairing lookalike ids into `~ old -> new` lines,
@@ -111,9 +113,10 @@ per file, update the index in the same operation, never secrets anywhere.
   resolves UI5 controls by **role** (controlType/properties/bindingPath, plus
   `idSuffix` for stable Fiori Elements ids `fe::…`), by
   **UI5 XPath** (`//Table//Button[@text='Edit']`), or by the **wc** engine
-  (`Resolve/Click/Fill Wc…`: light-DOM scan of `ui5-*` custom elements for UI5
-  Web Components pages without a classic UI5 runtime; short types match scoped
-  tags `ui5-button-<suffix>`); a `sid` engine covers classic
+  (`Resolve/Click/Fill Wc…`: scan of `ui5-*` custom elements in the light DOM
+  AND every open shadow root, for UI5 Web Components pages without a classic
+  UI5 runtime; short types match scoped tags `ui5-button-<suffix>` and every
+  glue/dash spelling, `ui5-shellbar-item` included); a `sid` engine covers classic
   SAP GUI for HTML, and a generic **dom** engine (`Resolve/Click/Fill Dom…`:
   CSS + text + computed ARIA role (explicit or implicit HTML semantics) +
   accessible name `name=` (simplified accname, user-intent locators, like
@@ -150,7 +153,16 @@ per file, update the index in the same operation, never secrets anywhere.
   visual snapshot cycle (shared `sapfx_common.visual_baseline`);
   `Get Ui5 Property`/`Get Ui5 Properties` read a control PROPERTY from the
   registry (text is what the browser displays: it needs visibility and adds
-  what the control draws), `Get Ui5 Ids` says WHICH controls matched
+  what the control draws), `Get Ui5 Control Info`/`Get Ui5 Aggregation Info`
+  read the full metadata type, the binding context and aggregation children
+  rendered OR NOT (a closed Select's items are in no engine's DOM), the pure
+  probes cover launchpad services (`Get Flp User`, `List Flp
+  Apps/Catalogs/Groups`, `Get Flp Intent Support`, `Flp Service Is
+  Available`), WebGUI presence/menus, `List Page Iframes`,
+  `Get Page Languages`, `Get Session Cookie Summary` (never a value),
+  `Get Ui5 Theme` (`{requested, applied}`, which diverge while the runtime
+  swaps its stylesheets) and
+  `Ui5 Runtime Is Ready`, `Get Ui5 Ids` says WHICH controls matched
   (`containedIn=` narrows to another control's DOM content),
   `Get Ui5 Open Popups` tells open from merely rendered dialogs
   (`sap.m.InstanceManager`) and `Click Ui5 Dialog Button` acknowledges by
@@ -162,13 +174,28 @@ per file, update the index in the same operation, never secrets anywhere.
   (Apache-2.0, NOTICE).
   It reuses the Browser library's active page: suites import
   `Library    Browser` alongside it.
+- **Security posture, one suite per target**:
+  `tests/robot/api/secu_configuration_a4h.robot` (live 12/12) and
+  `secu_configuration_abap2023.robot` (live 13/13), READ-ONLY, RFC channel.
+  Vocabulary in `resources/security_keywords.resource`, capability in
+  `SapApiLibrary._rfc_security`, pure logic in
+  `sapfx_common/security_baseline.py`. Two suites because the releases are not
+  hardened alike (password length 6 vs 10, composition requirements 0 vs 1,
+  auto-logout off vs 3600, `gw/rem_start` REMOTE_SHELL vs DISABLED). Only
+  controls whose deviation is an incident under any policy are asserted; the
+  rest is reported and watched by a drift sentinel against a committed
+  per-target reference. Trap: `TH_GET_PARAMETER` returns `RC=4` and an EMPTY
+  string for an unknown parameter and is CASE SENSITIVE, so judge the return
+  code before the value and keep `not_measurable` distinct from `deviation`.
 - `src/SapApiLibrary/` is the **API channel** (stdlib-only): OData v2/v4 with
   one keyword set: full CRUD (`Post/Patch/Delete Odata`, SAP CSRF protocol,
   `If-Match`), `Post Odata Batch` (atomic changeset), pagination
   (`follow_next=True`), test-data factory (`track=True` +
   `Delete Created Entities`, `Ensure Odata Entity`), discovery
   (`Get Odata Metadata`, `List Odata Services`), Gateway preflight
-  (`Gateway Should Be Active`, `Wait Until Api Available`), OAuth2/mTLS auth,
+  (`Gateway Should Be Active`, `Wait Until Api Available`, plus the tolerant
+  `Classify Http Response`: three families of 404 under one status, a 2xx with
+  an HTML body is not data), `Build Draft Entity Path`, OAuth2/mTLS auth,
   telemetry, optional RFC via pyrfc with `Call Bapi` (RETURN checked by type)
   and `Wait For Background Job`. Prefer preparing and
   cross-checking data through it; drive the screen only for what is under test
@@ -179,7 +206,29 @@ per file, update the index in the same operation, never secrets anywhere.
   of its own, `tests/robot/api/canal_api_odata.robot`, exercising the same
   business keywords against OData v2 (tag `a4h`) and OData v4 (tag
   `capsflight`): a v4 target is not optional, it is what catches what a
-  forgiving SAP Gateway hides. `tests/robot/cross/croisement_ddic_odata.robot`
+  forgiving SAP Gateway hides. The optional **RFC/BAPI** channel got its own
+  suite on 2026-08-27, `tests/robot/api/canal_rfc_a4h.robot` (spec
+  `specs/canal-rfc-a4h.md`, live 16/16) over
+  `resources/rfc_keywords.resource`, the fourth mirror of the business
+  vocabulary: read-only, cross-checking a table counted over RFC against the
+  OData `$count` of the same system, classifying every refusal by its
+  technical CODE, and **skipping cleanly** wherever the channel is absent
+  (`pyrfc` has no wheel past Python 3.12) instead of going red. Its first live
+  run felled two boundary defects, chief among them `pyrfc` rejecting a
+  `DotDict`, which is every dictionary Robot builds.
+  `tests/robot/api/canal_rfc_abap2023.robot` (spec `specs/canal-rfc-abap2023.md`,
+  live 10/10) looks at that same channel across TWO ABAP releases, the first
+  suite already passing on the newer target by variable override. What one
+  release hides: the system carries **two airline catalogues of different
+  populations** (18 classic, 16 modern, the smaller strictly included), so a
+  crossing that mixes them fabricates a reproducible two-row gap; identity is
+  proved by RELEASE, kernel and `CVERS` components, never by the system id, the
+  application host name or the IP address; and two logon refusals return the
+  same code AND the same text, so the test asserts the INDISTINCTION. It brings
+  refusal assertions by **ABAP message identifier**
+  (`Rfc Should Fail With Message Id`) and a deterministic **channel-surface
+  artifact** (`sapfx_common/rfc_surface.py`) carrying its target's identity and
+  scope. `tests/robot/cross/croisement_ddic_odata.robot`
   (live 9/9) is the cross-channel campaign: discovery-driven, bounded,
   read-only, reusable on ECC and S/4HANA, checking entity-set existence, volume
   (`$count` vs the SE16 count of the mapped table) and field contract
@@ -223,14 +272,26 @@ per file, update the index in the same operation, never secrets anywhere.
   resources do stay frozen for the process);
   repo-wide consistency scripts
   (doc pairing, vendor drift, guidance sync) plus the Windows deployment-pack
-  assembler (`build_release_pack.py`, sources in `packaging/`), the healing
+  assembler (`build_release_pack.py`, sources in `packaging/`, which also ship
+  `install-rfc.ps1`: the OPTIONAL RFC channel provisioned end to end except the
+  licensed SDK archive itself, which no script may download or redistribute,
+  and which a workstation carrying SAP GUI 8.00 often does not need at all: its
+  « SAP NWRFC x64 Shared » component already puts the RFC runtime in
+  `System32`, so `pyrfc` loads and calls without `SAPNWRFC_HOME`, measured
+  2026-08-27, which is what `-UseSapGuiRuntime` provisions; the 3.10 to 3.12
+  interpreter constraint is NOT lifted by that, and the SDK stays the target
+  for anything running off that one workstation),
+  the healing
   drift bot (`healing_drift_report.py`: proposes/applies `resources/` patches
   from the `SAPFX_HEALING_LOG` journal, never touches tests) and the
   spec-sync guard (`check_spec_sync.py`: generated suites carry a
   `Spec: … (sha256:…, <date>)` provenance marker, stale suites fail CI, as does
   a spec sap-healer marked `> **Statut : PÉRIMÉE (…)**`; stamp after every
   regeneration) and the conventions guard (`check_conventions.py`: raw
-  locators in a **generated** suite, `Sleep` anywhere; library-validation
+  locators in a **generated** suite, `Sleep` anywhere, and convention #12's
+  detectable motif: inline JS / `__import__` blocking in `resources/` under
+  an exact-count `ALLOWED_12` allowlist, `modules=` blocked in suites;
+  library-validation
   suites are informative only, `--strict` blocks them too) and the public
   export tool (`export_public_tree.py`: filtered tree for the public
   `robotframework-sapfx` repo: fail-closed transforms, blocking leak scan,
@@ -324,6 +385,11 @@ per file, update the index in the same operation, never secrets anywhere.
 1. Robot Framework **tests must not contain raw SAP element ids or CSS/XPath**:
    put locators in `resources/` keywords; tests speak business language. On the
    Fiori side, target UI5 controls, never DOM ids (they are dynamic).
+   What `resources/` ships are **examples, not a universal SAP truth**: the
+   business vocabulary of ONE installation, measured on this repo's lab targets,
+   reusable in good part but to be verified on the target and adapted to the
+   business domain (`resources/README.md`). What holds everywhere is `src/`, the
+   libraries and their capabilities.
 2. **Never suggest `time.sleep`/`Sleep` to wait for SAP.** Use
    `Wait Until Busy Done` / `Wait Until Element Present` (ECC) or
    `Wait For UI5 Ready` (Fiori).
@@ -371,6 +437,10 @@ per file, update the index in the same operation, never secrets anywhere.
    its off-SAP unit test, its rf-mcp intent-map entry, its Libdoc page and its
    CHANGELOG line; on a deployed pack, the workaround goes to
    `resources/site_keywords.resource` AND the defect is reported upstream.
+   Promoting can also change SCOPE in silence: `Evaluate JavaScript` with a
+   `${None}` selector evaluates on the page whatever the frame stack, a library
+   keyword honours it, and the empty result that follows is plausible enough to
+   misdirect the diagnosis. Check the promoted probe from EVERY caller.
 12. **Never let a code file grow past 500 lines.** A file over the line is
    doing several jobs: split it along a seam the repo already uses (one mixin
    per capability under `keywords/`, pure logic into `sapfx_common`, one module

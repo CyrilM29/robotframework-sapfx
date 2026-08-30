@@ -14,10 +14,30 @@
   // un tiret, et l'ancienne version le prenait pour un tag COMPLET, jamais
   // préfixé par 'ui5-'. Conséquence mesurée live sur une barre shell Work Zone :
   // `tag=ShellBar` ne matchait RIEN alors que la page portait bien un
-  // <ui5-shellbar-6bfd01e3>. Deux orthographes cohabitent en outre chez UI5 Web
-  // Components : 'ui5-shellbar' (collé) et 'ui5-side-navigation' (avec tirets).
-  // On essaie donc toutes les formes plausibles, sans jamais élargir un tag
-  // déjà préfixé (celui-là est une demande explicite).
+  // <ui5-shellbar-6bfd01e3>. Les orthographes réelles d'UI5 Web Components
+  // MÉLANGENT en outre les deux régimes : 'ui5-shellbar' (collé),
+  // 'ui5-side-navigation' (à tirets), et 'ui5-shellbar-item' (MIXTE : la
+  // famille collée, le composant séparé). Mesuré live sur la même barre le
+  // 2026-08-26 : les deux seules formes essayées ('ui5-shellbaritem',
+  // 'ui5-shell-bar-item') laissaient `tag=ShellBarItem` à 0 correspondance.
+  // On génère donc TOUTES les combinaisons collé/tiret entre les mots
+  // (2^(n-1), borné : au-delà de 8 mots, un nom pareil n'existe pas chez UI5,
+  // on retombe sur les deux formes extrêmes), sans jamais élargir un tag déjà
+  // préfixé (celui-là est une demande explicite).
+  function wcTagForms(want) {
+    const parts = want.split('-');
+    if (parts.length < 2) return [want];
+    if (parts.length > 8) return [want, parts.join('')];
+    const forms = [];
+    for (let mask = 0; mask < (1 << (parts.length - 1)); mask++) {
+      let form = parts[0];
+      for (let i = 1; i < parts.length; i++) {
+        form += (((mask >> (i - 1)) & 1) ? '-' : '') + parts[i];
+      }
+      forms.push(form);
+    }
+    return forms;
+  }
   function wcTagMatches(tag, wanted) {
     const want = wcKebab(wanted);
     const candidates = [];
@@ -27,10 +47,11 @@
     }
     if (prefixed || want.indexOf('-') !== -1) candidates.push(want);
     if (!prefixed) {
+      const forms = wcTagForms(want);
       for (let i = 0; i < WC_PREFIXES.length; i++) {
-        candidates.push(WC_PREFIXES[i] + want);              // ui5-side-navigation
-        const glued = want.split('-').join('');
-        if (glued !== want) candidates.push(WC_PREFIXES[i] + glued);   // ui5-shellbar
+        for (let j = 0; j < forms.length; j++) {
+          candidates.push(WC_PREFIXES[i] + forms[j]);
+        }
       }
     }
     for (let i = 0; i < candidates.length; i++) {
@@ -43,26 +64,10 @@
     const r = el.getBoundingClientRect();
     return !!(r.width || r.height);
   }
-  // Chemin CSS light-DOM ancré au plus proche ancêtre à id (sinon body) : les
-  // hôtes WC n'ont souvent PAS d'id, contrairement aux contrôles UI5 classiques,
-  // on ne peut pas retourner un simple [id=…]. Les ids contenant un guillemet
-  // (littéral CSS cassé) sont ignorés comme ancre.
-  function wcCssPath(el) {
-    const parts = [];
-    let cur = el;
-    while (cur && cur.nodeType === 1 && cur !== document.body) {
-      if (cur.id && cur.id.indexOf('"') === -1) {
-        parts.unshift('[id="' + cur.id + '"]');
-        return parts.join(' > ');
-      }
-      let idx = 1, sib = cur.previousElementSibling;
-      while (sib) { if (sib.tagName === cur.tagName) idx++; sib = sib.previousElementSibling; }
-      parts.unshift(cur.tagName.toLowerCase() + ':nth-of-type(' + idx + ')');
-      cur = cur.parentElement;
-    }
-    parts.unshift('body');
-    return parts.join(' > ');
-  }
+  // Les primitives de franchissement des frontières de shadow root
+  // (`deepQueryAll`, `deepParent`, `wcCssPath`, `piercingQueryAll`) vivent
+  // dans le chapitre `_ui5_bundle_shadow.js.tpl` (convention #13), concaténé
+  // dans le même IIFE.
   function wcMatches(el, sel) {
     const tag = el.tagName.toLowerCase();
     if (tag.indexOf('-') === -1) return false;         // pas un custom element
@@ -91,12 +96,15 @@
     }
     return true;
   }
-  // Résout un sélecteur WC vers des CHEMINS CSS light-DOM (pas des ids : voir
-  // wcCssPath). Ne retourne que les hôtes rendus (rect non nul).
+  // Résout un sélecteur WC vers des CHEMINS CSS (pas des ids : voir
+  // wcCssPath). Ne retourne que les hôtes rendus (rect non nul). Parcours
+  // PROFOND (deepQueryAll) : les hôtes imbriqués dans les shadow roots
+  // d'autres hôtes entrent dans le résultat, avec un chemin que le CSS de
+  // Playwright sait suivre (jonction descendante aux frontières).
   function resolveByWc(selJson) {
     const sel = JSON.parse(selJson);
     const out = [];
-    const nodes = document.querySelectorAll('*');
+    const nodes = deepQueryAll();
     for (let i = 0; i < nodes.length; i++) {
       const el = nodes[i];
       if (!wcMatches(el, sel)) continue;
@@ -105,7 +113,9 @@
     }
     return out;
   }
-  // Recorder : l'hôte custom element ui5-* propriétaire le plus proche du nœud.
+  // Recorder : l'hôte custom element ui5-* propriétaire le plus proche du
+  // nœud. Remontée par deepParent : un clic DANS le shadow root d'un hôte
+  // (la barre shell Work Zone) doit franchir la frontière pour le trouver.
   function closestWcElement(node) {
     let cur = (node && node.nodeType === 1) ? node : (node ? node.parentElement : null);
     while (cur) {
@@ -115,7 +125,7 @@
           if (tag.lastIndexOf(WC_PREFIXES[i], 0) === 0) return cur;
         }
       }
-      cur = cur.parentElement;
+      cur = deepParent(cur);
     }
     return null;
   }
@@ -143,7 +153,7 @@
     while (cur && cur !== document.body) {
       const role = ariaRole(cur);
       if (role && INTERACTIVE_ROLES[role]) return cur;
-      cur = cur.parentElement;
+      cur = deepParent(cur);   // franchit une frontière de shadow root
     }
     return null;
   }
@@ -171,11 +181,35 @@
   // grammaire, chaîne de fallback et télémétrie de healing comprises, au
   // lieu de retomber sur des sélecteurs Browser bruts hors bibliothèque.
   // Retourne des CHEMINS CSS light-DOM (wcCssPath), comme le moteur wc.
+  // Candidats du moteur dom, en DEUX temps. D'abord le parcours profond
+  // filtré par `matches()` : il couvre le light DOM (comportement
+  // historique, inchangé) et les éléments d'un shadow root désignés par un
+  // sélecteur ancré DANS leur portée. Puis, seulement si cela ne donne rien,
+  // la résolution perçante segment par segment : elle rattrape les chemins
+  // qui FRANCHISSENT une frontière, que `matches()` ne peut pas reconnaître
+  // (les ancêtres d'un élément shadow ne comprennent pas ses hôtes
+  // light-DOM), et c'est la forme exacte que rend `wcCssPath`. Le repli ne
+  // s'exécute qu'en l'absence de correspondance : un sélecteur qui résolvait
+  // déjà garde son résultat, à l'élément près.
+  function domCandidates(css) {
+    if (!css) return deepQueryAll();
+    const nodes = deepQueryAll();
+    const out = [];
+    for (let i = 0; i < nodes.length; i++) {
+      let hit = false;
+      try { hit = nodes[i].matches && nodes[i].matches(css); } catch (e) { hit = false; }
+      if (hit) out.push(nodes[i]);
+    }
+    return out.length ? out : piercingQueryAll(css);
+  }
   function resolveByDom(selJson) {
     const sel = JSON.parse(selJson);
-    let nodes;
-    try { nodes = document.querySelectorAll(sel.css || '*'); }
-    catch (e) { return []; }   // CSS invalide : aucune correspondance (l'échec du keyword mentionne cette cause)
+    if (sel.css) {
+      // CSS invalide : aucune correspondance (l'échec du keyword mentionne
+      // cette cause). Validé UNE fois ici, avant tout parcours.
+      try { document.querySelectorAll(sel.css); } catch (e) { return []; }
+    }
+    const nodes = domCandidates(sel.css);
     const out = [];
     for (let i = 0; i < nodes.length; i++) {
       const el = nodes[i];
@@ -233,16 +267,26 @@
       out.ui5_controls = n;
     }
     try {
-      const all = document.querySelectorAll('*');
-      let wc = 0;
+      // Comptage PROFOND (shadow roots ouverts compris) : mesuré live sur un
+      // shell Work Zone, 6 hôtes en light DOM et 16 en profondeur ; le
+      // comptage light-DOM sous-estimait ce que le moteur wc sait désormais
+      // atteindre. `wc_hosts_light` conserve la mesure de surface : l'écart
+      // entre les deux dit qu'un shell imbrique ses composants.
+      const all = deepQueryAll();
+      let wc = 0, light = 0;
       for (let i = 0; i < all.length; i++) {
         const tag = all[i].tagName.toLowerCase();
         if (tag.indexOf('-') === -1) continue;
         for (let j = 0; j < WC_PREFIXES.length; j++) {
-          if (tag.lastIndexOf(WC_PREFIXES[j], 0) === 0) { wc++; break; }
+          if (tag.lastIndexOf(WC_PREFIXES[j], 0) === 0) {
+            wc++;
+            if (all[i].getRootNode() === document) light++;
+            break;
+          }
         }
       }
       out.wc_hosts = wc;
+      out.wc_hosts_light = light;
     } catch (e) {}
     try { out.webgui_elements = document.querySelectorAll('[lsdata]').length; } catch (e) {}
     try {
@@ -312,6 +356,23 @@
     return null;
   }
 
+  // Les correspondances du moteur role dont le nœud DOM a un rectangle NON
+  // NUL. Le registre « rendu » ne suffit pas : mesuré live (2026-08-26, shell
+  // Work Zone), un champ de recherche RENDU garde un rectangle 0x0 en
+  // permanence (`offsetParent` nul), et `Ui5 Control Should Be Visible`
+  // passait dessus là où ses miroirs wc/dom exigent déjà un rect non nul.
+  function resolveVisibleByRole(selJson) {
+    const ids = resolveByRole(selJson) || [];
+    const out = [];
+    for (let i = 0; i < ids.length; i++) {
+      try {
+        const el = document.getElementById(ids[i]);
+        if (el && wcVisible(el)) out.push(ids[i]);
+      } catch (e) {}
+    }
+    return out;
+  }
+
   // Sérialise l'arbre de contrôles UI5 en chaîne XML (perception pour un agent IA :
   // il y lit types/ids/propriétés et en déduit un sélecteur role/xpath stable).
   // Renvoie null tant qu'AUCUN contrôle n'est monté, pour que le polling côté lib
@@ -328,9 +389,10 @@
   window.__SAPFX = { __v: V, isUI5: isUI5, resolveByXPath: resolveByXPath,
                      resolveByRole: resolveByRole, resolveByWc: resolveByWc,
                      resolveByDom: resolveByDom, pageComposition: pageComposition,
+                     resolveVisibleByRole: resolveVisibleByRole,
                      capture: capture, captureWc: captureWc, captureDom: captureDom,
                      bestXpath: bestXpath, readTable: readTable, dumpTree: dumpTree,
-                     readProperty: readProperty,
+                     readProperty: readProperty, controlInfo: controlInfo,
                      openPopups: openPopups, dialogButton: dialogButton,
                      idleState: idleState, getMessages: getMessages,
                      captureSid: captureSid, highlightInfo: highlightInfo };

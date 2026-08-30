@@ -14,6 +14,11 @@ from pythoncom import com_error
 from robot.api import logger
 
 from sapfx_common.abap_list import reconstruct_rows
+from sapfx_common.robot_args import as_name_list, as_optional_int
+
+# Le remède joint à l'erreur de conversion de `max_rows` : l'incident vécu est
+# une liste de colonnes passée en POSITION (donc dans le trou de max_rows).
+_COLUMNS_HINT = "Une liste de colonnes se passe par columns=."
 
 
 class GridKeywords:
@@ -126,9 +131,11 @@ class GridKeywords:
         `Read Grid`). Restaure la position de défilement initiale à la fin."""
         grid = self._grid(table_id)
         total = grid.RowCount
+        max_rows = as_optional_int(max_rows, "max_rows", hint=_COLUMNS_HINT)
         if max_rows is not None:
-            total = min(total, int(max_rows))
-        step = int(page_step) if page_step else int(getattr(grid, "VisibleRowCount", 0) or 0)
+            total = min(total, max_rows)
+        page_step = as_optional_int(page_step, "page_step")
+        step = page_step if page_step else int(getattr(grid, "VisibleRowCount", 0) or 0)
         if step <= 0:
             step = total or 1
         original = getattr(grid, "FirstVisibleRow", 0)
@@ -150,8 +157,11 @@ class GridKeywords:
         (voir `Scroll`) ou passez un plafond ``max_rows``. Le plafond est journalisé
         pour qu'une lecture tronquée ne soit jamais confondue avec une lecture complète.
 
-        ``columns`` (liste d'ids TECHNIQUES, ``CARRID``… ; une valeur seule est
-        acceptée) restreint la lecture à ces colonnes et fait des ids techniques
+        ``columns`` (liste d'ids TECHNIQUES, ``CARRID``… ; une valeur seule,
+        une chaîne à virgules ``CARRID,CONNID`` ou une liste-littérale
+        ``"['CARRID', 'CONNID']"`` sont acceptées : via rf-mcp tout argument
+        arrive en chaîne, et un id technique ne contient pas de virgule)
+        restreint la lecture à ces colonnes et fait des ids techniques
         les clés des dicts : indépendant de la locale ET du profil d'affichage
         ALV de l'utilisateur (les titres affichés n'égalent les ids techniques
         que quand le profil montre les noms de champs), et beaucoup moins
@@ -161,16 +171,15 @@ class GridKeywords:
         """
         grid = self._grid(table_id)
         row_count = grid.RowCount
-        if max_rows is not None and row_count > int(max_rows):
+        max_rows = as_optional_int(max_rows, "max_rows", hint=_COLUMNS_HINT)
+        if max_rows is not None and row_count > max_rows:
             logger.warn(
                 "Grid '%s' has %s rows; reading only the first %s (max_rows)."
                 % (table_id, row_count, max_rows)
             )
-            row_count = int(max_rows)
-        if columns:
-            if isinstance(columns, str):
-                columns = [columns]
-            wanted = [str(c).strip() for c in columns if str(c).strip()]
+            row_count = max_rows
+        wanted = as_name_list(columns, "columns")
+        if wanted:
             available = [str(cid) for cid in grid.ColumnOrder]
             missing = [c for c in wanted if c not in available]
             if missing:

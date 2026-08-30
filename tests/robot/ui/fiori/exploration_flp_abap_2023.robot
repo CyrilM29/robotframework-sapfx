@@ -149,9 +149,12 @@ La page de connexion est bien celle du serveur ABAP 2023 vise
     ...    la voie HTTP de l'un redirige vers l'autre. Sans ce contrôle, toute
     ...    la campagne serait verte sur le mauvais système.
     ${champs}=    La Page De Connexion Est Rendue
-    ${hote_demande}=    Evaluate    urllib.parse.urlparse($ABAP_FLP_URL).netloc    modules=urllib.parse
-    ${hote_atteint}=    Evaluate
-    ...    urllib.parse.urlparse($ABAP_FLP_URL_AVANT_CONNEXION).netloc    modules=urllib.parse
+    # Décomposition par le keyword de bibliothèque (convention #12) : ni
+    # __import__ ni modules= dans une suite (décision DDIC 2026-08-17).
+    ${demande}=    Get Page Location    url=${ABAP_FLP_URL}
+    ${atteint}=    Get Page Location    url=${ABAP_FLP_URL_AVANT_CONNEXION}
+    ${hote_demande}=    Set Variable    ${demande}[host]
+    ${hote_atteint}=    Set Variable    ${atteint}[host]
     Should Be Equal    ${hote_atteint}    ${hote_demande}
     ...    msg=Redirection vers un autre hôte que la cible : ${hote_atteint} au lieu de ${hote_demande}.
     ${composition}=    Lire La Composition De La Portee Courante

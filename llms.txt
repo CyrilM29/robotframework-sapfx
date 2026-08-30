@@ -19,7 +19,13 @@ its data); assertions are locale-independent (message *types*, never
 localized texts, on the web too through
 `Ui5 Should Have No Messages Of Type`); every keyword has an off-SAP unit test (fake COM /
 fake Browser); ambiguity is always surfaced with candidates, never resolved
-by silent first match; and no code file grows past 500 lines, split along a
+by silent first match; capabilities live in the LIBRARIES, never as inline
+JS or `Evaluate __import__` in the Robot layer (`resources/` carries the
+business vocabulary only, enforced by `scripts/check_conventions.py` with an
+exact-count allowlist), and that vocabulary ships as an EXAMPLE measured on
+this repo's lab targets, to be verified and customized per target and per
+business domain, `src/` being what makes truth everywhere; and no code file
+grows past 500 lines, split along a
 seam the codebase already uses (one mixin per capability, pure logic in
 `sapfx_common`) rather than at the line count, enforced by
 `scripts/check_file_length.py`. Distribution: `pip install robotframework-sapfx`
@@ -36,7 +42,8 @@ pinned dependencies from PyPI or an internal mirror), and the public source repo
 - [Fiori architecture](docs/fiori-architecture.md): the injected `__SAPFX`
   bundle and its five engines: role (UI5 registry), xpath (control
   hierarchy), sid (SAP GUI for HTML / WebGUI), wc (UI5 Web Components pages
-  without a UI5 runtime), dom (generic CSS/text + computed ARIA role +
+  without a UI5 runtime, light DOM and open shadow roots), dom (generic
+  CSS/text + computed ARIA role +
   accessible name `name=`: user-intent locators for the non-SAP regions of
   hybrid pages; `name=` also on the wc engine via the UI5 Web Components
   `accessible-name` convention), plus the hybrid-page probe
@@ -78,12 +85,19 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
 
 ## Key entry points
 
-- `resources/ecc_keywords.resource`, `resources/fiori_keywords.resource` and
-  `resources/api_keywords.resource`: the business-readable keyword layer tests
-  should call (one mirrored vocabulary across the three channels, ECC, Fiori
-  and API; OData service paths live there under business names, never in a
-  suite), plus `resources/cross_channel_keywords.resource` which carries the
-  entity set to table mapping of the cross-channel campaign
+- `resources/` (**examples to customize, never a universal SAP truth**, see
+  `resources/README.md`): the business-readable keyword layer a test calls,
+  measured live on this repo's lab targets. Much of it travels (standard
+  screens and services, the mirrored naming), none of it is authoritative:
+  verify on your target and adapt to your business domain. What IS universal
+  is `src/`, the libraries, which carry the capabilities.
+  `resources/ecc_keywords.resource`, `resources/fiori_keywords.resource`,
+  `resources/api_keywords.resource` and `resources/rfc_keywords.resource` are
+  one mirrored vocabulary across the four channels (ECC, Fiori, API and RFC;
+  OData service paths, function-module, BAPI and table names live there under
+  business names, never in a suite), plus
+  `resources/cross_channel_keywords.resource` which carries the entity set to
+  table mapping of the cross-channel campaign
 - `resources/page_objects/`: one `.resource` per screen or application
   (locator variables + business keywords, the layer sap-healer repairs);
   includes `abap_flp.resource`, a launchpad page object shared by two UI5
@@ -94,7 +108,11 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
   catalogue by service) and the ABAP FLP explored on two releases
   (`exploration_flp_abap_a4h.robot` 19/19, `exploration_flp_abap_2023.robot`
   21/21, the second existing to break single-release assumptions and the
-  shared page object replayed on both to prove it)
+  shared page object replayed on both to prove it), plus
+  `navigation_interaction_demokit.robot` (12/12), the one campaign that needs
+  no credentials and no system to provision: hash routing, deep links, API
+  tree, doc tables, popover cascades, theme and sample iframe on the public
+  OpenUI5 Demo Kit, browser visible by default
 - `tests/robot/cross/croisement_ddic_odata.robot`: the cross-channel acceptance
   campaign (spec `specs/croisement-ddic-odata-ecc-s4hana.md`), read-only and
   reusable on ECC and S/4HANA: which tables and entity sets a target really

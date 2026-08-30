@@ -40,10 +40,10 @@ ne plus adresser le **DOM** mais à adresser directement le **contrôle UI5**.
     attributs = ses propriétés) et évalue un XPath sur cet arbre, ce qui permet
     d'exprimer des relations d'ascendance et des prédicats. → `Resolve Ui5 By Xpath`.
     Même forme de retour.
-  - **wc** : scan du light DOM des custom elements `ui5-*`, pour les pages
-    **UI5 Web Components** sans runtime UI5 classique (voir plus bas).
-    → `Resolve Wc Control`.
-  - **dom** : scan light-DOM générique (CSS, texte, rôle ARIA calculé, nom
+  - **wc** : scan des custom elements `ui5-*`, light DOM **et shadow roots
+    ouverts**, pour les pages **UI5 Web Components** sans runtime UI5
+    classique (voir plus bas). → `Resolve Wc Control`.
+  - **dom** : scan générique (CSS, texte, rôle ARIA calculé, nom
     accessible, attributs) pour
     les **régions non-SAP** d'une page hybride (voir plus bas).
     → `Resolve Dom Element`.
@@ -81,10 +81,14 @@ et la logique de capture sont testés par des tests unitaires à la place.
 Les pages bâties sur les **UI5 Web Components** (page d'accueil SuccessFactors,
 apps ui5-webcomponents) n'ont **aucun runtime UI5 classique** : pas de
 `window.sap`, registre d'éléments vide : les moteurs role et xpath y sont
-structurellement aveugles. Le moteur `wc` scanne le **light DOM** du document à
-la recherche des custom elements `ui5-*` (le contenu applicatif reste dans le
-light DOM via les slots ; seuls les internals des composants vivent dans les
-shadow roots) :
+structurellement aveugles. Le moteur `wc` cherche les custom elements `ui5-*`
+dans le **light DOM et dans chaque shadow root ouvert** (les shadow roots
+fermés restent hors de portée, comme pour Playwright). Ce parcours profond
+date du 2026-08-26 : la description d'avant, « le contenu applicatif reste
+dans le light DOM via les slots, seuls les internals vivent dans les shadow
+roots », a été démentie par un shell SAP Build Work Zone, qui imbrique des
+composants DANS le shadow root d'autres composants (6 hôtes en light DOM, 16
+en profondeur, dont trois `ui5-button` que le moteur ne voyait pas) :
 
 - `tag=Button` (type court) matche `ui5-button` **et les tags scopés**
   `ui5-button-<suffixe>` (scoping UI5 WC) ; un tag complet (`tag=ui5-button`)
@@ -100,8 +104,9 @@ shadow roots) :
   utilisateur » pour un `ui5-button` à icône seule ou un `ui5-input` sans
   label ;
 - les hôtes WC n'ont souvent pas d'id : les correspondances reviennent en
-  **chemins CSS light-DOM** ancrés à l'ancêtre à id le plus proche ; les shadow
-  roots ouverts sont percés par le CSS de Playwright pour le clic/la saisie
+  **chemins CSS** ancrés à l'ancêtre à id le plus proche, une frontière de
+  shadow root s'y traduisant par un combinateur DESCENDANT (l'espace), la
+  seule forme que le CSS de Playwright sait percer pour le clic et la saisie
   réels (`Click Wc Control`, `Fill Wc Input` cible l'`<input>` interne).
 
 Le recorder web capture/enregistre aussi les hôtes WC sur les pages sans
@@ -142,7 +147,9 @@ des citoyens de première classe :
 - **le moteur `dom`** (`Resolve/Click/Fill Dom …`, `Get Dom Text`,
   `Get Dom Match Count`, `Dom Element Should Be Visible`) : correspondance
   générique sur CSS, texte, rôle ARIA et attributs (mêmes règles
-  `valueMatches` que role/wc, chemins CSS light-DOM comme wc) : les régions
+  `valueMatches` que role/wc, mêmes chemins CSS que wc, shadow roots ouverts
+  compris : un chemin qui franchit une frontière est résolu segment par
+  segment, à la façon dont le CSS de Playwright perce) : les régions
   non-SAP entrent dans la *même grammaire* (polling, chaîne de repli et
   télémétrie de healing compris) au lieu de retomber sur des sélecteurs
   Browser bruts hors bibliothèque. `role=` est le rôle ARIA **calculé**,

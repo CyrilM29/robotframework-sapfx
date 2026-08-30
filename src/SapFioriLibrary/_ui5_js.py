@@ -129,6 +129,8 @@ def bundle_version(source):
 # ICI dans l'ordre en un seul IIFE ; gabarit % : les deux %s sont les listes
 # autorisées).
 _BUNDLE_TEMPLATES = ("_ui5_bundle_core.js.tpl",
+                     "_ui5_bundle_info.js.tpl",
+                     "_ui5_bundle_shadow.js.tpl",
                      "_ui5_bundle_capture.js.tpl",
                      "_ui5_bundle_engines.js.tpl")
 _BUNDLE_SOURCE = ("".join(_read_js_template(name) for name in _BUNDLE_TEMPLATES)
@@ -155,6 +157,7 @@ def build_call(method):
 
 
 RESOLVE_ROLE_JS = build_call("resolveByRole")
+RESOLVE_VISIBLE_ROLE_JS = build_call("resolveVisibleByRole")
 RESOLVE_XPATH_JS = build_call("resolveByXPath")
 RESOLVE_WC_JS = build_call("resolveByWc")
 RESOLVE_DOM_JS = build_call("resolveByDom")
@@ -167,6 +170,7 @@ DIALOG_BUTTON_JS = build_call("dialogButton")
 DUMP_TREE_JS = build_call("dumpTree")
 IDLE_STATE_JS = build_call("idleState")
 GET_MESSAGES_JS = build_call("getMessages")
+CONTROL_INFO_JS = build_call("controlInfo")
 
 # Sonde de runtime UI5 AUTONOME : la seule expression du module qui n'embarque
 # PAS le bundle. Toute fonction bâtie par `build_call` (ré)installe `__SAPFX`,
@@ -182,6 +186,205 @@ UI5_RUNTIME_PROBE_JS = (
     "catch (e) {} "
     "const c = (window.sap && sap.ui && sap.ui.getCore) ? sap.ui.getCore() : null; "
     "return !!(c && typeof c.byId === 'function'); }")
+
+# Lecture de la configuration ushell (`window['sap-ushell-config']`), AUTONOME
+# pour la même raison que la sonde de runtime : une observation ne doit rien
+# modifier, or toute fonction bâtie par `build_call` (ré)installe le bundle et
+# instrumente `fetch`/XHR. La configuration est LA source locale-indépendante
+# d'un launchpad (elle déclare services, renderer et réglages AVANT tout
+# rendu : relevé live 2026-08-26, un site Work Zone y annonce ses 24 services
+# et son délai d'expiration de session). Sérialisation JSON-safe : fonctions
+# écartées, cycles coupés (`<cycle>`), l'appelant Python borne la taille.
+# Signature (first, second) : même double forme d'appel que `build_call`
+# (Browser passe l'élément résolu en premier quand un sélecteur de frame est
+# fourni), sans le bundle.
+USHELL_CONFIG_PROBE_JS = (
+    "(first, second) => { const path = (second === undefined) ? first : second; "
+    "const cfg = window['sap-ushell-config']; "
+    "if (!cfg) return { __no_config: true }; "
+    "let target = cfg; "
+    "if (path) { const parts = String(path).split('.'); "
+    "for (let i = 0; i < parts.length; i++) { "
+    "if (target === null || target === undefined || typeof target !== 'object') "
+    "{ target = undefined; break; } "
+    "target = target[parts[i]]; } } "
+    "if (target === undefined) return { __missing_path: String(path), "
+    "__known_keys: Object.keys(cfg || {}).slice(0, 40) }; "
+    "const seen = new WeakSet(); "
+    "const text = JSON.stringify(target, (k, v) => { "
+    "if (typeof v === 'function') return undefined; "
+    "if (v && typeof v === 'object') { "
+    "if (seen.has(v)) return '<cycle>'; seen.add(v); } "
+    "return v; }); "
+    "return text === undefined ? null : JSON.parse(text); }")
+
+# --- Sondes launchpad (ushell), page et WebGUI : AUTONOMES -------------------
+# Toutes ces sondes sont des lectures PURES sans bundle, pour la même raison
+# que UI5_RUNTIME_PROBE_JS : une observation ne doit rien modifier dans la
+# page. Elles sont nées dans des page objects (JS inline dupliqué entre
+# resources/page_objects/abap_flp.resource et workzone_*.resource) et ont été
+# promues ici au titre de la convention #12. Les services ushell répondent en
+# promesse (`getServiceAsync`) : le Evaluate JavaScript de Browser attend la
+# promesse retournée ; l'adaptateur ABAP livre certains résultats en
+# `progress` (jQuery Deferred), les sondes acceptent les deux formes. Même
+# double forme d'appel (first, second) que `build_call` pour les sondes à
+# argument (portée de frame : Browser passe l'élément résolu en premier).
+
+FLP_CONTAINER_PROBE_JS = (
+    "() => !!(window.sap && sap.ushell && sap.ushell.Container)")
+
+FLP_USER_PROBE_JS = (
+    "() => { const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getUser !== 'function') return { __no_container: true }; "
+    "const u = C.getUser(); "
+    "return { id: String(u && u.getId ? u.getId() : ''), "
+    "language: String(u && u.getLanguage ? u.getLanguage() : ''), "
+    "theme: String(u && u.getTheme ? u.getTheme() : '') }; }")
+
+FLP_SERVICE_PROBE_JS = (
+    "async (first, second) => { const name = (second === undefined) ? first : second; "
+    "const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getServiceAsync !== 'function') return false; "
+    "try { const s = await C.getServiceAsync(String(name)); return !!s; } "
+    "catch (e) { return false; } }")
+
+FLP_APPS_PROBE_JS = (
+    "async () => { const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getServiceAsync !== 'function') return { __no_container: true }; "
+    "let s; try { s = await C.getServiceAsync('SearchableContent'); } "
+    "catch (e) { return { __no_service: String((e && e.message) || e || '') }; } "
+    "if (!s || typeof s.getApps !== 'function') return { __no_service: 'SearchableContent sans getApps' }; "
+    "const apps = await s.getApps(); "
+    "return (apps || []).map(a => { const v = ((a && a.visualizations) || [])[0] || {}; "
+    "const url = String(v.targetURL || ''); "
+    "return { title: String((a && (a.label || a.title)) || v.title || ''), "
+    "viz_title: String(v.title || ''), "
+    "intent: url.replace(/^#/, '').split('?')[0], target_url: url }; }); }")
+
+FLP_CATALOGS_PROBE_JS = (
+    "async (first, second) => { const mode = (second === undefined) ? first : second; "
+    "const withTiles = mode !== 'no_tiles'; "
+    "const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getServiceAsync !== 'function') return { __no_container: true }; "
+    "let s; try { s = await C.getServiceAsync('LaunchPage'); } "
+    "catch (e) { return { __no_service: String((e && e.message) || e || '') }; } "
+    "const cats = await new Promise((res, rej) => { const out = []; "
+    "s.getCatalogs().done(a => res(out.length ? out : (a || []))).fail(rej).progress(c => out.push(c)); }); "
+    "const r = []; "
+    "for (const c of cats) { const entry = { id: String(s.getCatalogId(c)), tiles: [] }; "
+    "if (withTiles) { const tiles = await new Promise((res, rej) => s.getCatalogTiles(c).done(res).fail(rej)); "
+    "for (const tile of (tiles || [])) { const url = String(s.getCatalogTileTargetURL(tile) || ''); "
+    "entry.tiles.push({ intent: url.replace(/^#/, '').split('?')[0], target_url: url }); } } "
+    "r.push(entry); } "
+    "return r; }")
+
+FLP_GROUPS_PROBE_JS = (
+    "async () => { const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getServiceAsync !== 'function') return { __no_container: true }; "
+    "let s; try { s = await C.getServiceAsync('LaunchPage'); } "
+    "catch (e) { return { __no_service: String((e && e.message) || e || '') }; } "
+    "const groupes = await new Promise((res, rej) => { const out = []; "
+    "s.getGroups().done(a => res(out.length ? out : (a || []))).fail(rej).progress(g => out.push(g)); }); "
+    "return groupes.map(g => ({ id: String(s.getGroupId(g)), "
+    "tile_count: (s.getGroupTiles(g) || []).length })); }")
+
+FLP_INTENT_SUPPORT_PROBE_JS = (
+    "async (first, second) => { const raw = (second === undefined) ? first : second; "
+    "const intents = JSON.parse(String(raw || '[]')).map(String); "
+    "const C = window.sap && sap.ushell && sap.ushell.Container; "
+    "if (!C || typeof C.getServiceAsync !== 'function') return { __no_container: true }; "
+    "let s; try { s = await C.getServiceAsync('CrossApplicationNavigation'); } "
+    "catch (e) { return { __no_service: String((e && e.message) || e || '') }; } "
+    "const hashes = intents.map(i => '#' + i); "
+    "const r = await new Promise((res, rej) => s.isIntentSupported(hashes).done(res).fail(rej)); "
+    "return intents.map(i => ({ intent: i, "
+    "supported: !!(r['#' + i] && r['#' + i].supported) })); }")
+
+# Le moteur UI5 est-il INACTIF (pas seulement chargé) : runtime présent (Core
+# hérité OU module Element, UI5 2.x supprimant `sap.ui.getCore()`), aucune
+# mise à jour d'UI en attente (`getUIDirty` quand le Core l'expose), aucun
+# indicateur d'occupation visible. Le prédicat de `Wait For UI5 Ready` (couche
+# resources et exports du recorder), promu ici (convention #12) : lecture pure,
+# sans bundle, à la différence de `Wait For Ui5 Idle` qui instrumente le réseau.
+UI5_READY_PROBE_JS = (
+    "() => { const s = window.sap; if (!(s && s.ui)) return false; "
+    "let E = null; "
+    "try { E = s.ui.require && s.ui.require('sap/ui/core/Element'); } catch (e) {} "
+    "const c = s.ui.getCore ? s.ui.getCore() : null; "
+    "if (!c && !E) return false; "
+    "if (c && typeof c.getUIDirty === 'function' && c.getUIDirty()) return false; "
+    "const b = document.querySelectorAll('.sapUiLocalBusyIndicator, .sapMBusyDialog, #sapUiBusyIndicator'); "
+    "for (let i = 0; i < b.length; i++) { if (b[i].offsetParent !== null) return false; } "
+    "return true; }")
+
+# Thème : ce que le runtime a DEMANDÉ, et ce que le document porte réellement.
+# Les deux ne coïncident pas toujours, et c'est précisément ce que la sonde sert
+# à voir : il existe une fenêtre transitoire, juste après un changement, où la
+# classe de thème a été retirée sans que la nouvelle soit posée (mesuré live sur
+# le Demo Kit OpenUI5 le 2026-08-30). Le thème demandé se lit sur le module
+# `sap/ui/core/Theming` (la voie actuelle) avec repli sur la configuration du
+# Core hérité, que UI5 2.x supprime. Même contrat que les autres sondes : lecture
+# PURE, sans injection du bundle, une observation ne doit rien modifier.
+UI5_THEME_PROBE_JS = (
+    "() => { const s = window.sap; let requested = ''; "
+    "try { const T = s && s.ui && s.ui.require "
+    "? s.ui.require('sap/ui/core/Theming') : null; "
+    "if (T && typeof T.getTheme === 'function') requested = String(T.getTheme() || ''); } "
+    "catch (e) {} "
+    "if (!requested) { try { const c = s && s.ui && s.ui.getCore ? s.ui.getCore() : null; "
+    "const cfg = c && c.getConfiguration ? c.getConfiguration() : null; "
+    "if (cfg && typeof cfg.getTheme === 'function') requested = String(cfg.getTheme() || ''); } "
+    "catch (e) {} } "
+    "return { requested: requested, "
+    "classes: String(document.documentElement.className || '') }; }")
+
+IFRAMES_PROBE_JS = (
+    "() => Array.from(document.querySelectorAll('iframe'))"
+    ".map(f => ({ id: String(f.id || ''), src: String(f.src || '') }))")
+
+PAGE_LANGUAGES_PROBE_JS = (
+    "() => ({ document: String(document.documentElement.lang || ''), "
+    "navigator: String(navigator.language || '') })")
+
+# WebGUI (SAP GUI for HTML) : présence et menus. Le témoin de présence est le
+# nombre d'éléments porteurs de `lsdata` (l'attribut où vit le SID) ; les ids
+# de la barre de menus suivent la structure `wnd[N]/mbar/menu[i]` avec le
+# suffixe de rendu `-BtnChoiceMenu`, et les items DIRECTS d'un menu ouvert
+# n'ont plus aucun `/` après leur préfixe (relevés live 2026-07-18). Un
+# élément est visible quand son `offsetParent` n'est pas null. On itère sur
+# `[id]` plutôt que d'interpoler l'id dans un sélecteur CSS : les crochets des
+# ids SAP GUI y exigeraient un échappement fragile.
+WEBGUI_COUNT_PROBE_JS = (
+    "(first, second) => { const w = (second === undefined) ? first : second; "
+    "if (w === null || w === undefined || w === '') "
+    "return document.querySelectorAll('[lsdata]').length; "
+    "const tag = 'wnd[' + String(w) + ']'; "
+    "const nodes = document.querySelectorAll('[lsdata]'); let n = 0; "
+    "for (let i = 0; i < nodes.length; i++) { const e = nodes[i]; "
+    "if ((e.getAttribute('lsdata') || '').indexOf(tag) === -1) continue; "
+    "if (e.offsetParent === null) continue; n++; } "
+    "return n; }")
+
+WEBGUI_MENUS_PROBE_JS = (
+    "(first, second) => { const w = (second === undefined) ? first : second; "
+    "const prefix = 'wnd[' + String((w === null || w === undefined || w === '') ? 0 : w) + ']/mbar/menu['; "
+    "const out = []; const nodes = document.querySelectorAll('[id]'); "
+    "for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; const id = String(n.id || ''); "
+    "if (id.indexOf(prefix) !== 0) continue; "
+    "if (id.slice(-14) !== '-BtnChoiceMenu') continue; "
+    "if (n.offsetParent === null) continue; out.push(id); } "
+    "return out; }")
+
+WEBGUI_MENU_ITEMS_PROBE_JS = (
+    "(first, second) => { let base = String(((second === undefined) ? first : second) || ''); "
+    "if (base.slice(-14) === '-BtnChoiceMenu') base = base.slice(0, -14); "
+    "const prefix = base + '/menu['; "
+    "const out = []; const nodes = document.querySelectorAll('[id]'); "
+    "for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; const id = String(n.id || ''); "
+    "if (id.indexOf(prefix) !== 0) continue; "
+    "if (id.slice(prefix.length).indexOf('/') !== -1) continue; "
+    "if (n.offsetParent === null) continue; out.push(id); } "
+    "return out; }")
 
 
 def sid_xpath(sid):

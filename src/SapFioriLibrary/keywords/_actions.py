@@ -14,6 +14,7 @@ import json
 
 from robot.api import logger
 
+from sapfx_common.secrets import reveal_secret
 
 from .._ui5_js import (
     READ_PROPERTY_JS,
@@ -23,6 +24,7 @@ from .._ui5_js import (
 from .._ui5_runtime import (
     build_control_selector,
     selector_to_json,
+    table_read_verdict,
 )
 
 
@@ -63,7 +65,16 @@ class ActionKeywords:
         interne ``<input>``/``<textarea>`` ; on s'y positionne, il est impossible de saisir
         directement dans le ``<div>`` racine du contrôle. Re-résout puis ré-essaie en
         cas d'échec transitoire (*stale element* après re-rendu).
+
+        ``text`` accepte le type ``Secret`` de Robot Framework 7.4
+        (``-v "PASSWORD: Secret:…"``) : il est déballé ICI, à la frontière du
+        navigateur, jamais dans la couche Robot appelante (où un
+        ``getattr(value, 'value', value)`` sortait le secret dans l'espace des
+        variables de la suite). Baisser le niveau de log autour de l'appel
+        reste à la charge de l'appelant, comme pour toute saisie sensible.
         """
+        text = reveal_secret(text)
+
         def _fill():
             selector = build_control_selector(**selector_parts)
             ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
@@ -85,12 +96,21 @@ class ActionKeywords:
         d'en-tête de colonne (ou ``col<i>`` à défaut). Ne lit que les lignes
         **instanciées** : ``sap.ui.table.Table`` virtualise, faire défiler d'abord
         pour les grandes tables. Les lignes d'en-tête de groupe sont ignorées.
+
+        Une table vraiment vide rend une liste vide, mais un contrôle dont les
+        lignes ne se lisent pas par ce contrat ÉCHOUE en le nommant, au lieu de
+        rendre la même liste vide : les deux situations sont indiscernables pour
+        l'appelant, et la seconde produit un test vert qui n'affirme rien (relevé
+        live sur la ``sap.ui.documentation.LightTable`` du Demo Kit OpenUI5, où le
+        sélecteur résout pourtant exactement un contrôle porteur de ses lignes).
+        L'échec renvoie alors vers la lecture au registre (`Get Ui5 Control Info`,
+        `Get Ui5 Aggregation Info`, `Get Ui5 Properties`), la voie des tables qui
+        ne suivent pas le contrat.
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
         dom_id = self._pick_id(ids, index, selector, noun="table")
-        rows = self._evaluate(READ_TABLE_JS, arg=dom_id)
-        return rows or []
+        return table_read_verdict(self._evaluate(READ_TABLE_JS, arg=dom_id), str(selector))
 
 
     def upload_file_via_ui5(self, file_path, index=0, **selector_parts):

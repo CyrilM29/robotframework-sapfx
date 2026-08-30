@@ -26,6 +26,23 @@
          Le type court `ShellBar`/`SideNavigation` doit atteindre les deux. -->
     <ui5-shellbar-x1b2 id="shellBar">Shell</ui5-shellbar-x1b2>
     <ui5-side-navigation id="sideNav">Navigation</ui5-side-navigation>
+    <!-- La forme MIXTE relevée live sur une barre shell Work Zone
+         (2026-08-26) : la famille COLLÉE (`shellbar`), le composant à TIRET
+         (`-item`), plus le suffixe de scoping. Le type court `ShellBarItem`
+         doit l'atteindre : avant le correctif, seules `ui5-shellbaritem` et
+         `ui5-shell-bar-item` étaient essayées, 0 correspondance. -->
+    <ui5-shellbar-item-x1b2 id="shellItem">Item</ui5-shellbar-item-x1b2>
+    <!-- Hôtes IMBRIQUÉS : la barre d'un shell Work Zone rend des ui5-button
+         DANS son shadow root (6 hôtes en light DOM, 16 en profondeur mesurés
+         live). `deepToolbar` définit dans son shadow un ui5-button NON slotté
+         (aucune projection light-DOM) : seul un parcours profond le voit, et
+         le chemin retourné doit rester cliquable par le CSS Playwright. -->
+    <ui5-toolbar-x1b2 id="deepBar"></ui5-toolbar-x1b2>
+    <!-- Popups WC : témoin d'ouverture = l'attribut/propriété `open`, les
+         entrées d'un menu FERMÉ restant rendues (relevé live). Un ouvert, un
+         fermé : seul le premier doit sortir de `Get Ui5 Open Popups`. -->
+    <ui5-popover-x1b2 id="openPopover" open>Menu ouvert</ui5-popover-x1b2>
+    <ui5-popover-x1b2 id="closedPopover">Menu fermé</ui5-popover-x1b2>
     <div>
       <!-- accessible-name : la convention UI5 Web Components pour nommer un
            champ sans label visible : la clé name= du moteur wc la lit. -->
@@ -52,11 +69,33 @@
         root.innerHTML = '<input style="padding:4px">';
       }
     }
+    // Hôte à shadow root PEUPLÉ d'un autre hôte (pas un slot) : la structure
+    // interne d'une vraie barre shell. Le bouton profond est SANS id, à
+    // dessein : le chemin résolu doit joindre l'hôte et l'intérieur par
+    // combinateur DESCENDANT à la frontière (la forme que le CSS Playwright
+    // sait percer), et le clic dessus incrémente le même compteur : la preuve
+    // qu'un clic sur le chemin retourné agit vraiment.
+    class FixtureToolbar extends HTMLElement {
+      constructor() {
+        super();
+        const root = this.attachShadow({ mode: 'open' });
+        root.innerHTML = '<div style="padding:4px">'
+          + '<ui5-button>Deep save</ui5-button></div>';
+      }
+    }
+    // Popover : `open` reflété attribut <-> propriété, comme UI5 WC.
+    class FixturePopover extends HTMLElement {
+      get open() { return this.hasAttribute('open'); }
+      set open(v) { if (v) this.setAttribute('open', ''); else this.removeAttribute('open'); }
+    }
     customElements.define('ui5-button', FixtureButton);
     customElements.define('ui5-button-x1b2', class extends FixtureButton {});
     customElements.define('ui5-input', FixtureInput);
     customElements.define('ui5-shellbar-x1b2', class extends FixtureButton {});
+    customElements.define('ui5-shellbar-item-x1b2', class extends FixtureButton {});
     customElements.define('ui5-side-navigation', class extends FixtureButton {});
+    customElements.define('ui5-toolbar-x1b2', FixtureToolbar);
+    customElements.define('ui5-popover-x1b2', FixturePopover);
     // accessibleName en PROPRIÉTÉ JS non reflétée en attribut (l'autre moitié
     // de la convention UI5 WC) : le moteur wc doit la lire aussi.
     document.getElementById('cancelBtn').accessibleName = 'Cancel order';

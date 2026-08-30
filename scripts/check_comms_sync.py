@@ -29,6 +29,14 @@ de sortie, d'où ce script.
     datée et déclarative : son système cible et sa date sont obligatoires dans
     le manifeste.
 
+Un ratio live n'est plus forcément unique. Le manifeste porte un ratio phare
+(``live_scenarios``) et, depuis la 0.7.0, la liste des CAMPAGNES validées en
+direct (``live_campaigns`` : la même campagne de launchpad rejouée sur deux
+releases SAP en produit deux d'un coup). Une citation ``N/M scénarios`` est
+acceptée si elle correspond au ratio phare ou à l'une des campagnes déclarées,
+chacune avec sa cible et sa date. Ce qui reste refusé est ce qui comptait : un
+ratio que rien dans le dépôt n'appuie.
+
 Usage ::
 
     python scripts/check_comms_sync.py
@@ -91,7 +99,29 @@ def _load_proofs(root):
     live = data["live_scenarios"]
     if not live.get("target") or not live.get("validated_on"):
         raise ValueError("live_scenarios requires target and validated_on")
+    for campaign in data.get("live_campaigns", []):
+        missing = [k for k in ("name", "passed", "total", "target", "validated_on")
+                   if not campaign.get(k)]
+        if missing:
+            raise ValueError(
+                "live_campaigns entry requires " + ", ".join(missing))
     return data
+
+
+def live_ratios(proofs):
+    """Les ratios live que `comms/` a le droit de citer, phare et campagnes.
+
+    Une seule preuve live tenait tant qu'il n'y avait qu'un système cible.
+    Depuis que la même campagne se rejoue sur deux releases SAP, exiger un
+    ratio unique revenait à interdire de publier la seconde validation, ce qui
+    pousse à écrire le chiffre hors du périmètre du garde : exactement le trou
+    que ce fichier existe pour fermer.
+    """
+    live = proofs["live_scenarios"]
+    ratios = {(int(live["passed"]), int(live["total"]))}
+    ratios.update((int(c["passed"]), int(c["total"]))
+                  for c in proofs.get("live_campaigns", []))
+    return ratios
 
 
 def collect_pytest_tests(root=_ROOT):
@@ -172,13 +202,13 @@ def check(root=_ROOT, verify_runtime=False, coverage_xml=None, notes=None):
                 if int(cited) != proofs["unit_tests"]:
                     problems.append(f"{rel} cite {cited} tests alors que "
                                     f"{_PROOFS_FILE} en déclare {proofs['unit_tests']}.")
-            live_expected = (proofs["live_scenarios"]["passed"],
-                             proofs["live_scenarios"]["total"])
+            allowed = live_ratios(proofs)
             live_citations = _LIVE_RATIO_RE.findall(text) + _LIVE_WORDING_RE.findall(text)
             for passed, total in sorted(set(live_citations)):
-                if (int(passed), int(total)) != live_expected:
+                if (int(passed), int(total)) not in allowed:
+                    declared = ", ".join(f"{p}/{t}" for p, t in sorted(allowed))
                     problems.append(f"{rel} cite {passed}/{total} scénarios live alors que "
-                                    f"{_PROOFS_FILE} déclare {live_expected[0]}/{live_expected[1]}.")
+                                    f"{_PROOFS_FILE} déclare {declared}.")
 
     if verify_runtime and proofs is not None:
         actual_tests = collect_pytest_tests(root)

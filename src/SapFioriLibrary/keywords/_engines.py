@@ -1,6 +1,8 @@
 """Mixin moteurs sid / wc / dom : les pages sans registre UI5 classique.
 
-Le moteur **sid** (SAP GUI for HTML : le ``SID`` stable de ``lsdata``), le
+Le moteur **sid** (SAP GUI for HTML : le ``SID`` stable de ``lsdata``, plus
+la perception du canal : `Webgui Is Present`, `Get Webgui Element Count`,
+`List Webgui Menus` / `List Webgui Menu Items`), le
 moteur **wc** (UI5 Web Components en light-DOM, tags scopes compris,
 ``name=`` lisant ``accessible-name``/``accessibleName``) et le moteur **dom**
 generique (zones NON-SAP d'une page hybride : CSS + texte + role ARIA calcule
@@ -11,9 +13,14 @@ Extrait de ``SapFioriLibrary.py`` (convention #13).
 
 
 
+from sapfx_common.secrets import reveal_secret
+
 from .._ui5_js import (
     RESOLVE_DOM_JS,
     RESOLVE_WC_JS,
+    WEBGUI_COUNT_PROBE_JS,
+    WEBGUI_MENU_ITEMS_PROBE_JS,
+    WEBGUI_MENUS_PROBE_JS,
     sid_xpath,
 )
 from .._ui5_runtime import (
@@ -52,6 +59,55 @@ class EngineKeywords:
     def sid_should_be_visible(self, sid):
         """Vérifie qu'un élément SAP WebGUI avec le SID donné est visible."""
         self._wait_visible(self.resolve_sid(sid))
+
+    def webgui_is_present(self):
+        """Y a-t-il une page **WebGUI** (SAP GUI for HTML) rendue dans la
+        portée courante ? Retourne ``True``/``False``, jamais d'échec : une
+        page injoignable répond ``False``. Le témoin est la présence
+        d'éléments porteurs de ``lsdata`` (l'attribut où vit le SID) : le
+        miroir sid de `Ui5 Runtime Is Present`, lecture pure sans injection.
+        Zéro élément ``lsdata`` = la session WebGUI n'est pas (ou plus)
+        rendue : c'est aussi l'assertion locale-indépendante de fin de
+        session après un log off (avec `Get Webgui Element Count`)."""
+        try:
+            return int(self._evaluate(WEBGUI_COUNT_PROBE_JS) or 0) > 0
+        except Exception:      # noqa: BLE001 (sonde : jamais d'échec)
+            return False
+
+    def get_webgui_element_count(self, window=None):
+        """Nombre d'éléments WebGUI (porteurs de ``lsdata``) dans la portée
+        courante (0+). Sans argument : TOUS les éléments ``lsdata`` (rendus
+        ou non) : le témoin de fin de session après un log off (le compte
+        doit tomber à 0, assertion 100 % locale-indépendante). Avec
+        ``window=N`` : seuls les éléments VISIBLES de la fenêtre ``wnd[N]``
+        (``window=1`` = le popup courant, dont on attend la disparition après
+        fermeture). N'attend pas : c'est une mesure, à sonder dans un
+        ``Wait Until Keyword Succeeds``."""
+        arg = None if window is None or str(window).strip() == "" \
+            else str(int(window))
+        return int(self._evaluate(WEBGUI_COUNT_PROBE_JS, arg=arg) or 0)
+
+    def list_webgui_menus(self, window=0):
+        """Ids DOM **visibles** des menus de la barre de menus WebGUI de la
+        fenêtre ``window`` (``wnd[N]/mbar/menu[i]…-BtnChoiceMenu``), dans
+        l'ordre du DOM. La structure d'ids et le suffixe de rendu sont un
+        savoir du canal WebGUI (relevés live 2026-07-18), pas d'un site : la
+        POSITION qui compte (System = avant-dernier, Help = dernier, la
+        convention SAP) reste à l'appelant. Liste vide = aucun menu visible
+        (barre pas encore rendue : sonder dans un ``Wait Until Keyword
+        Succeeds``)."""
+        return list(self._evaluate(WEBGUI_MENUS_PROBE_JS,
+                                   arg=str(int(window))) or [])
+
+    def list_webgui_menu_items(self, menu_id):
+        """Items **directs et visibles** d'un menu WebGUI ouvert : ``menu_id``
+        est l'id rendu par `List Webgui Menus` (le suffixe ``-BtnChoiceMenu``
+        est accepté et retiré). Un item direct n'a plus aucun ``/`` après le
+        préfixe du menu (les sous-menus en ont) ; Log Off = dernier item du
+        menu System (convention SAP, à la charge de l'appelant). Liste vide =
+        menu pas (encore) ouvert."""
+        return list(self._evaluate(WEBGUI_MENU_ITEMS_PROBE_JS,
+                                   arg=str(menu_id)) or [])
 
     # -- moteur Web Components (pages UI5 Web Components, hors registre UI5) ---
 
@@ -119,7 +175,10 @@ class EngineKeywords:
 
         L'``<input>`` réel vit dans le **shadow root** (ouvert) de l'hôte : le
         sélecteur descend dedans via le CSS de Playwright, qui perce les shadow
-        roots ouverts. Re-résout puis ré-essaie en cas d'échec transitoire."""
+        roots ouverts. Re-résout puis ré-essaie en cas d'échec transitoire.
+        ``text`` accepte le type ``Secret``, déballé à la frontière."""
+        text = reveal_secret(text)
+
         def _fill():
             selector = build_wc_selector(**selector_parts)
             paths = self._resolve(RESOLVE_WC_JS, selector_to_json(selector),
@@ -210,7 +269,13 @@ class EngineKeywords:
         La cible peut être l'``<input>``/``<textarea>`` lui-même OU un
         conteneur : le sélecteur émis matche d'abord l'élément résolu s'il est
         saisissable, sinon descend vers son premier champ interne. Re-résout
-        puis ré-essaie en cas d'échec transitoire."""
+        puis ré-essaie en cas d'échec transitoire.
+
+        ``text`` accepte le type ``Secret`` de Robot Framework 7.4, déballé
+        ICI à la frontière du navigateur : c'est par ce moteur que se remplit
+        le mot de passe d'une page de connexion ICF, qui n'est pas du UI5."""
+        text = reveal_secret(text)
+
         def _fill():
             selector = build_dom_selector(**selector_parts)
             paths = self._resolve(RESOLVE_DOM_JS, selector_to_json(selector),

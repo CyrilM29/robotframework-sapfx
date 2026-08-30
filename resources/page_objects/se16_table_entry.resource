@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Page object des écrans de **saisie du Data Browser (SE16)** :
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Page object des écrans de **saisie du Data Browser (SE16)** :
 ...                 l'écran initial d'où se déclenche la création, l'écran de
 ...                 saisie d'un enregistrement, et le chemin de suppression
 ...                 CIBLÉE depuis la grille de résultats. Un seul écran métier,

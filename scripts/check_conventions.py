@@ -1,4 +1,4 @@
-"""Garde mécanique des conventions #1 et #2 : celles qu'un linter peut prouver.
+"""Garde mécanique des conventions #1, #2 et #12 : celles qu'un linter prouve.
 
 Les agents (sap-generator, sap-healer) et CLAUDE.md promettent en prose que :
 
@@ -10,7 +10,19 @@ Les agents (sap-generator, sap-healer) et CLAUDE.md promettent en prose que :
 * **convention #2** : jamais de ``Sleep`` pour attendre SAP ; les attentes
   réelles (``Wait Until Busy Done``, ``Wait Until Element Present``,
   ``Wait For UI5 Ready``) uniquement, dans les tests COMME dans la couche
-  ``resources/``.
+  ``resources/`` ;
+* **convention #12** : une capacité vit dans la BIBLIOTHÈQUE, jamais dans la
+  couche Robot. Le motif détectable : du JS inline (``Evaluate JavaScript``,
+  ``Wait For Function``) ou un ``Evaluate __import__(...)`` dans
+  ``resources/`` ou une suite : la capacité doit être promue dans ``src/``
+  (mixin, sonde du bundle, logique pure ``sapfx_common``). Dans une SUITE,
+  ``modules=`` est interdit aussi (décision DDIC 2026-08-17 : les primitives
+  pures s'atteignent par un keyword). L'``ALLOWED_12`` ci-dessous est
+  l'unique échappatoire, au COMPTE EXACT par fichier (modèle de
+  ``check_no_em_dash.py``) : chaque entrée est une sonde ASSUMÉE (spécifique
+  à une release, ou dont la promotion violerait son propre contrat, comme le
+  marqueur d'onglet volatile) : une occurrence de plus échoue, une de moins
+  aussi (allowlist périmée).
 
 Pourquoi ce garde existe : ``check_guidance_sync.py`` vérifie que les
 conventions restent *énoncées* (dans CLAUDE.md, dans les hints rf-mcp, dans les
@@ -95,6 +107,25 @@ _CELL_SPLIT = re.compile(r"\t|[ ]{2,}")
 # signe une suite GÉNÉRÉE depuis un plan (cf. § Périmètre de la convention #1).
 _PROVENANCE = re.compile(r"Spec:\s*specs/[^\s]+\.md\s*\(sha256:")
 
+# Convention #12 : keywords qui exécutent du JS inline depuis la couche Robot.
+_INLINE_JS_KEYWORD = re.compile(
+    r"^(browser\.)?(evaluate javascript|wait for function)$", re.IGNORECASE)
+# `modules=` en tête de cellule : la forme d'Evaluate proscrite dans une suite.
+_MODULES_ARG = re.compile(r"^modules\s*=", re.IGNORECASE)
+
+# Échappatoire de la convention #12, au COMPTE EXACT par fichier (chemin posix
+# relatif à la racine). Chaque entrée documente pourquoi la sonde reste :
+ALLOWED_12 = {
+    # Deux sondes assumées : la lecture des tuiles 1.71 (agrégations + contexte
+    # de liaison, SPÉCIFIQUE à la release, cf. le commentaire du fichier) et
+    # l'écriture d'un fragment MALFORMÉ dans l'URL (le geste que `Open Fiori
+    # App` refuse par contrat).
+    "resources/page_objects/abap_flp.resource": 2,
+    # Le marqueur d'onglet (pose + lecture) : VOLATILE par contrat documenté,
+    # un stockage persistant (sessionStorage) violerait sa propre docstring.
+    "resources/page_objects/workzone_session.resource": 2,
+}
+
 
 def is_generated_suite(path: Path) -> bool:
     """Vrai si la suite porte le marqueur de provenance de sap-generator."""
@@ -130,11 +161,14 @@ def _is_raw_locator(cell: str) -> bool:
                 or _UI5_ADDRESS.match(cell))
 
 
-def scan_file(path: Path, forbid_locators: bool) -> list[tuple[int, str, int]]:
+def scan_file(path: Path, forbid_locators: bool,
+              in_suite: bool = False) -> list[tuple[int, str, int]]:
     """(ligne, message, n° de convention) pour chaque violation du fichier.
 
     ``forbid_locators=True`` pour les fichiers de tests (convention #1) ;
-    le ``Sleep`` (convention #2) est interdit partout.
+    le ``Sleep`` (convention #2) et le JS inline / ``__import__``
+    (convention #12) sont interdits partout ; ``modules=`` (convention #12,
+    forme des suites) seulement quand ``in_suite``.
     """
     problems = []
     in_doc = False
@@ -158,6 +192,28 @@ def scan_file(path: Path, forbid_locators: bool) -> list[tuple[int, str, int]]:
                     (lineno, "Sleep interdit (convention #2) : utiliser "
                              "Wait Until Busy Done / Wait Until Element "
                              "Present / Wait For UI5 Ready", 2))
+                break
+        for cell in cells:
+            if _INLINE_JS_KEYWORD.match(cell):
+                problems.append(
+                    (lineno, "JS inline dans la couche Robot (convention "
+                             "#12) : « %s » ; promouvoir la capacité dans "
+                             "la bibliothèque (mixin src/, sonde du bundle, "
+                             "logique pure sapfx_common)" % cell, 12))
+                break
+            if "__import__" in cell:
+                problems.append(
+                    (lineno, "Evaluate __import__ (convention #12, décision "
+                             "DDIC 2026-08-17) : les primitives pures "
+                             "s'atteignent par un KEYWORD, jamais par "
+                             "__import__", 12))
+                break
+            if in_suite and _MODULES_ARG.match(cell):
+                problems.append(
+                    (lineno, "modules= dans une suite (convention #12, "
+                             "décision DDIC 2026-08-17) : l'auto-import "
+                             "d'Evaluate suffit pour un module de premier "
+                             "niveau, sinon passer par un keyword", 12))
                 break
         if forbid_locators:
             for cell in cells[1:] if first != "..." else cells:
@@ -196,13 +252,29 @@ def check(repo_root: Path, targets: list[str] | None = None,
     total = 0
     for file in files:
         in_tests = tests_root in file.resolve().parents
-        problems = scan_file(file, forbid_locators=in_tests)
-        # Une suite non générée n'est pas tenue par la convention #1.
+        problems = scan_file(file, forbid_locators=in_tests,
+                             in_suite=in_tests)
+        # Une suite non générée n'est pas tenue par les conventions #1/#12.
         lenient = in_tests and not strict and not is_generated_suite(file)
+        try:
+            rel = file.relative_to(repo_root).as_posix()
+        except ValueError:
+            rel = file.as_posix()
+        allowed_12 = None if in_tests else ALLOWED_12.get(rel)
+        count_12 = sum(1 for _p in problems if _p[2] == 12)
+        if allowed_12 is not None:
+            if count_12 == allowed_12:
+                # sondes assumées, au compte exact : rien à rapporter
+                problems = [p for p in problems if p[2] != 12]
+            else:
+                blocking.append(
+                    "%s : %d occurrence(s) de la convention #12 pour %d "
+                    "déclarée(s) dans ALLOWED_12 (allowlist à compte exact : "
+                    "chaque sonde restante est ASSUMÉE et documentée, jamais "
+                    "un raccourci)" % (rel, count_12, allowed_12))
         for lineno, message, convention in problems:
-            entry = "%s:%d : %s" % (
-                file.relative_to(repo_root), lineno, message)
-            if convention == 1 and lenient:
+            entry = "%s:%d : %s" % (rel, lineno, message)
+            if convention in (1, 12) and lenient:
                 informative.append(entry)
             else:
                 blocking.append(entry)
@@ -216,9 +288,10 @@ def check(repo_root: Path, targets: list[str] | None = None,
         for entry in informative:
             by_file[entry.split(":")[0]] = by_file.get(
                 entry.split(":")[0], 0) + 1
-        print("  (info : convention #1 dans des suites NON générées, dont "
-              "l'objet est de piloter SAP par ses ids bruts ; --strict pour "
-              "les rendre bloquantes)")
+        print("  (info : conventions #1/#12 dans des suites NON générées, "
+              "dont l'objet est de piloter SAP par ses ids bruts ou de "
+              "planter du JS d'épreuve ; --strict pour les rendre "
+              "bloquantes)")
         for name, count in sorted(by_file.items()):
             print("    · %s : %d" % (name, count))
     if blocking:

@@ -11,6 +11,7 @@ from SapFioriLibrary.SapFioriLibrary import SapFioriLibrary
 from SapFioriLibrary._ui5_js import (
     READ_TABLE_JS,
     RESOLVE_ROLE_JS,
+    RESOLVE_VISIBLE_ROLE_JS,
     RESOLVE_XPATH_JS,
 )
 
@@ -19,8 +20,14 @@ class FakeBrowser:
     """Doublure de la bibliothèque Browser : sert des ids de résolution cannés,
     enregistre clics/saisies, et peut faire échouer N clics (simulation stale)."""
 
-    def __init__(self, role_ids=None, table_rows=None, texts=None):
+    def __init__(self, role_ids=None, table_rows=None, texts=None,
+                 visible_ids=None):
         self.role_ids = list(role_ids) if role_ids is not None else []
+        # Les matches à rectangle NON NUL servis au filtre de visibilité :
+        # par défaut tous les matches (le cas nominal), surchargables pour
+        # simuler le contrôle rendu à 0x0 du shell Work Zone (2026-08-26).
+        self.visible_ids = (list(visible_ids) if visible_ids is not None
+                            else list(self.role_ids))
         self.table_rows = table_rows
         self.texts = texts or {}     # selector -> texte, pour get_text
         self.clicks = []
@@ -28,6 +35,8 @@ class FakeBrowser:
         self.click_fail = 0          # nombre de clics à faire échouer avant succès
 
     def evaluate_javascript(self, selector, js, arg=None):
+        if js == RESOLVE_VISIBLE_ROLE_JS:
+            return list(self.visible_ids)
         if js in (RESOLVE_ROLE_JS, RESOLVE_XPATH_JS):
             return list(self.role_ids)
         if js == READ_TABLE_JS:
@@ -121,15 +130,64 @@ def test_set_poll_interval_change_le_pas_reellement_utilise(monkeypatch):
 
 # --- Read Ui5 Table ----------------------------------------------------------
 
+def _table_payload(rows, **surcharges):
+    """Constat de lecture rendu par le bundle, forme nominale d'une sap.m.Table."""
+    payload = {"type": "sap.m.Table", "source": "items", "hasColumns": True,
+               "headers": ["Name", "City"], "candidates": len(rows),
+               "skipped": 0, "rows": rows}
+    payload.update(surcharges)
+    return payload
+
+
 def test_read_ui5_table_returns_rows_from_bundle():
     rows = [{"Name": "Acme", "City": "NY"}, {"Name": "Globex", "City": "LA"}]
-    lib = _lib(FakeBrowser(role_ids=["__table0"], table_rows=rows))
+    lib = _lib(FakeBrowser(role_ids=["__table0"], table_rows=_table_payload(rows)))
     assert lib.read_ui5_table(controlType="sap.m.Table") == rows
 
 
-def test_read_ui5_table_empty_when_bundle_returns_none():
-    lib = _lib(FakeBrowser(role_ids=["__table0"], table_rows=None))
+def test_read_ui5_table_returns_empty_list_for_a_genuinely_empty_table():
+    # Aucune ligne candidate : la table est vide, c'est un résultat légitime.
+    lib = _lib(FakeBrowser(role_ids=["__table0"], table_rows=_table_payload([])))
     assert lib.read_ui5_table(controlType="sap.m.Table") == []
+
+
+def test_read_ui5_table_keeps_readable_rows_when_group_headers_are_skipped():
+    rows = [{"Name": "Acme", "City": "NY"}]
+    lib = _lib(FakeBrowser(role_ids=["__table0"],
+                           table_rows=_table_payload(rows, candidates=3, skipped=2)))
+    assert lib.read_ui5_table(controlType="sap.m.Table") == rows
+
+
+def test_read_ui5_table_fails_when_rows_exist_but_expose_no_cells():
+    # Le cas LightTable du Demo Kit OpenUI5 : le sélecteur résout bien UN
+    # contrôle, ce contrôle porte ses lignes, et la lecture rendait [] en
+    # silence. Une liste vide le ferait passer pour une table vide : vert et
+    # faux. L'échec doit nommer le type, le compte de lignes et la voie de repli.
+    payload = _table_payload([], type="sap.ui.documentation.LightTable",
+                             source="rows", hasColumns=False, headers=[],
+                             candidates=12, skipped=12)
+    lib = _lib(FakeBrowser(role_ids=["__lt0"], table_rows=payload))
+    with pytest.raises(AssertionError) as echec:
+        lib.read_ui5_table(controlType="sap.ui.documentation.LightTable")
+    message = str(echec.value)
+    assert "LightTable" in message and "12 ligne(s)" in message
+    assert "Get Ui5 Aggregation Info" in message
+
+
+def test_read_ui5_table_fails_when_the_control_has_no_rows_aggregation():
+    payload = _table_payload([], type="sap.m.Panel", source=None,
+                             hasColumns=False, headers=[])
+    lib = _lib(FakeBrowser(role_ids=["__p0"], table_rows=payload))
+    with pytest.raises(AssertionError, match="ni l'agrégation items ni"):
+        lib.read_ui5_table(controlType="sap.m.Panel")
+
+
+def test_read_ui5_table_fails_when_bundle_returns_none():
+    # Ni runtime UI5, ni contrôle : l'ancien contrat rendait [] et laissait
+    # l'appelant conclure « table vide » sur une page qui n'en portait aucune.
+    lib = _lib(FakeBrowser(role_ids=["__table0"], table_rows=None))
+    with pytest.raises(AssertionError, match="Ui5 Runtime Is Present"):
+        lib.read_ui5_table(controlType="sap.m.Table")
 
 
 def test_read_ui5_table_raises_when_no_table_matches():
@@ -230,6 +288,18 @@ def test_ui5_control_should_be_visible_raises_when_none_match():
     lib = _lib(FakeBrowser(role_ids=[]), timeout="0.1s")
     with pytest.raises(AssertionError, match="found none"):
         lib.ui5_control_should_be_visible(controlType="sap.m.Button")
+
+
+def test_ui5_control_should_be_visible_refuse_un_rectangle_nul():
+    # Le vert-et-faux mesuré live (2026-08-26, shell Work Zone) : un champ
+    # RENDU au registre garde un rectangle 0x0 en permanence, et l'assertion
+    # passait dessus. L'échec doit nommer les ids en cause et distinguer
+    # cette cause de « aucune correspondance ».
+    lib = _lib(FakeBrowser(role_ids=["__search0"], visible_ids=[]))
+    with pytest.raises(AssertionError) as err:
+        lib.ui5_control_should_be_visible(controlType="sap.m.SearchField")
+    assert "rectangle non nul" in str(err.value)
+    assert "__search0" in str(err.value)
 
 
 def test_get_ui5_match_count_returns_cardinality_without_waiting():

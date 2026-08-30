@@ -6,20 +6,32 @@ continu : « rendu » ne veut pas dire « donnees arrivees »),
 observation ne doit rien modifier), `Get Ui5 Application State` (portee de
 frame + runtime + messages en UN aller-retour de contexte RF) et
 `Get Ui5 Messages` / `Ui5 Should Have No Messages Of Type` (assertion par
-TYPE, convention #3 cote web).
+TYPE, convention #3 cote web). Aussi deux lectures d'etat de session :
+`Get Session Cookie Summary` (cookies sans leur valeur, predicat
+« expiration FUTURE » : la sentinelle 1969 d'un cookie de session ne passe
+jamais pour une expiration), `Get Page Languages` (langue servie) et
+`Get Ui5 Theme` (theme DEMANDE et theme APPLIQUE : ils divergent le temps
+que le runtime echange ses feuilles de style).
 
 Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
 
+import time
+
 from robot.utils import secs_to_timestr, timestr_to_secs
 
 from sapfx_common.polling import poll_until
+from sapfx_common.web_cookies import summarize_cookies
 
 from .._ui5_js import (
     GET_MESSAGES_JS,
     IDLE_STATE_JS,
+    PAGE_LANGUAGES_PROBE_JS,
+    UI5_READY_PROBE_JS,
     UI5_RUNTIME_PROBE_JS,
+    UI5_THEME_PROBE_JS,
 )
+from .._ui5_runtime import applied_theme
 
 
 
@@ -43,7 +55,11 @@ class StateKeywords:
         PAS du runtime UI5, les pages Web Components et hybrides en profitent
         aussi (dans la portée de frame courante). Ne compte que les requêtes
         lancées APRÈS la première injection du bundle : exactement le besoin
-        (agir, puis attendre). ``timeout`` défaut = ``ui5_timeout``. Retourne
+        (agir, puis attendre). ``timeout`` et ``settle`` sont des temps
+        Robot : un nombre NU est en secondes (``settle=2000`` = 2 000 s, pas
+        2 s), écrire ``settle=2 s`` ; le message d'échec affiche le calme
+        exigé en ms pour rendre une mauvaise unité visible.
+        ``timeout`` défaut = ``ui5_timeout``. Retourne
         l'état final ``{"pending", "busy", "quiet_ms"}`` (JSON-safe). Jamais
         une pause fixe : convention n°2. ::
 
@@ -63,12 +79,15 @@ class StateKeywords:
         budget = timestr_to_secs(timeout if timeout is not None else self.ui5_timeout)
         settle_ms = timestr_to_secs(settle) * 1000.0
         state = {}
+        last_error = {}
 
         def _check():
             try:
                 result = self._evaluate(IDLE_STATE_JS) or {}
-            except Exception:
+            except Exception as exc:      # noqa: BLE001 (sondage : on continue)
+                last_error["error"] = exc
                 return False
+            last_error.clear()
             state.clear()
             state.update(result)
             return (not result.get("busy")
@@ -76,11 +95,32 @@ class StateKeywords:
                     and float(result.get("quiet_ms") or 0) >= settle_ms)
 
         if not poll_until(_check, budget, step=self.poll_interval):
+            # Le `settle` CALCULÉ est affiché : un nombre nu est des SECONDES
+            # Robot (settle=2000 = 2 000 000 ms), et sans ce chiffre l'état
+            # final (quiet_ms confortable, pending=0) semble contredire
+            # l'échec au lieu de dénoncer l'unité.
+            if state:
+                detail = "dernier état : %s" % state
+            elif "error" in last_error:
+                exc = last_error["error"]
+                detail = (
+                    "dernier état : illisible, la sonde d'inactivité échoue "
+                    "dans la portée courante (%s: %s ; portée de frame : %s). "
+                    "Frame sans bundle évaluable (Set/Push Ui5 Frame manquant "
+                    "ou de trop ?) ou page/contexte détruit : Get Page "
+                    "Composition tranche."
+                    % (type(exc).__name__, exc,
+                       self.get_ui5_frame_stack() or "aucune"))
+            else:
+                detail = ("dernier état : illisible, la sonde d'inactivité "
+                          "n'a rien rendu dans la portée courante (portée de "
+                          "frame : %s)." % (self.get_ui5_frame_stack()
+                                            or "aucune"))
             raise AssertionError(
-                "La page n'est pas revenue au repos après %s (dernier état : "
-                "%s). Log Fiori Diagnostics donne le détail (console, erreurs, "
-                "composition)." % (secs_to_timestr(budget),
-                                   state or "illisible"))
+                "La page n'est pas revenue au repos après %s (calme continu "
+                "exigé : %d ms ; %s). Log Fiori Diagnostics donne le détail "
+                "(console, erreurs, composition)."
+                % (secs_to_timestr(budget), settle_ms, detail))
         return dict(state)
 
     def ui5_runtime_is_present(self):
@@ -140,6 +180,96 @@ class StateKeywords:
             except Exception as exc:      # noqa: BLE001 (état best-effort)
                 state["messages_error"] = str(exc)
         return state
+
+    def ui5_runtime_is_ready(self):
+        """Le moteur UI5 de la portée courante est-il **inactif** (pas
+        seulement chargé) ? Retourne ``True``/``False``, jamais d'échec :
+        runtime présent (Core hérité OU module ``Element``, UI5 2.x
+        supprimant ``sap.ui.getCore()``), aucune mise à jour d'UI en attente
+        (``getUIDirty`` quand le Core l'expose), aucun indicateur
+        d'occupation visible.
+
+        Le prédicat du ``Wait For UI5 Ready`` de la couche resources (qui le
+        sonde en ``Wait Until Keyword Succeeds`` via `Ui5 Runtime Should Be
+        Ready`). Lecture PURE, sans bundle : à la différence de `Wait For Ui5
+        Idle`, cette sonde n'instrumente rien : c'est le témoin « moteur au
+        repos », pas « réseau au repos »."""
+        try:
+            return bool(self._evaluate(UI5_READY_PROBE_JS))
+        except Exception:      # noqa: BLE001 (sonde : jamais d'échec)
+            return False
+
+    def ui5_runtime_should_be_ready(self):
+        """Assertion : le moteur UI5 est chargé ET inactif. La forme à sonder
+        dans un ``Wait Until Keyword Succeeds`` (voir
+        `Ui5 Runtime Is Ready`)."""
+        if not self.ui5_runtime_is_ready():
+            raise AssertionError(
+                "Le moteur UI5 n'est pas (encore) inactif sur la portée "
+                "courante : runtime absent, mise à jour d'UI en attente, ou "
+                "indicateur d'occupation visible. `Get Page Composition` "
+                "tranche si la page n'est pas UI5 du tout.")
+
+    def get_session_cookie_summary(self):
+        """Cookies du contexte Browser COURANT, réduits à ce qui peut entrer
+        dans un test : liste triée de ``{name, domain, future_expiration}``.
+        Aucune VALEUR de cookie n'est retournée ni journalisée : un jeton de
+        session ne doit jamais finir dans un log.
+
+        ``future_expiration`` est le prédicat qui a un sens, et pas
+        « expiration renseignée » : la bibliothèque Browser rend un cookie de
+        SESSION (sans expiration) avec une date de **1969** (epoch moins un),
+        qu'un test naïf lirait comme une expiration renseignée donc
+        permanente : les six cookies d'un site passaient pour permanents et
+        le test était vert à l'envers (leçon live 2026-08-26, campagne de
+        résilience Work Zone ; logique pure ``sapfx_common.web_cookies``). ::
+
+            ${cookies}=    Get Session Cookie Summary
+            ${permanents}=    Evaluate    [c for c in $cookies if c['future_expiration']]
+        """
+        try:
+            from Browser.utils.data_types import CookieType
+            kind = CookieType.dictionary
+        except ImportError:               # Browser absent (fakes de test)
+            kind = "dictionary"
+        raw = self._browser().get_cookies(kind)
+        return summarize_cookies(raw, time.time())
+
+    def get_page_languages(self):
+        """La **langue réellement servie** : dict JSON-safe ``{document,
+        navigator}`` (attribut ``lang`` du document de la portée courante,
+        langue déclarée du navigateur). C'est la mesure qui tranche « le
+        réglage de langue est-il appliqué » sans lire un seul texte localisé
+        (convention #3) : le document sert ``fr`` ou ne le sert pas. Lecture
+        pure (aucune injection), respecte la portée de frame."""
+        result = self._evaluate(PAGE_LANGUAGES_PROBE_JS)
+        return result if isinstance(result, dict) else {"document": "",
+                                                        "navigator": ""}
+
+    def get_ui5_theme(self):
+        """Le **thème** du runtime UI5 : dict JSON-safe ``{requested, applied}``.
+
+        Deux valeurs et non une, parce qu'elles divergent et que la différence
+        est mesurable. ``requested`` est le thème que le runtime a reçu ordre
+        d'appliquer (module ``sap/ui/core/Theming``, repli sur la configuration
+        du Core hérité que UI5 2.x supprime) ; ``applied`` est celui que le
+        document porte réellement, extrait de la classe technique
+        ``sapUiTheme-<clé>`` de ``<html>``.
+
+        Le témoin **locale-safe** d'un changement de thème (convention n°3) :
+        l'entrée de menu qui l'a choisi porte un libellé traduit, la clé
+        technique ``sap_horizon_dark`` non. Relevé live sur le Demo Kit OpenUI5
+        (2026-08-30) : juste après le clic, ``applied`` est VIDE le temps que le
+        runtime échange les feuilles de style, alors que ``requested`` porte déjà
+        la cible. Asserter le thème demande donc d'attendre la valeur voulue,
+        jamais de lire une fois. Lecture pure (aucune injection du bundle, donc
+        aucune instrumentation de la page), respecte la portée de frame.
+        """
+        result = self._evaluate(UI5_THEME_PROBE_JS)
+        if not isinstance(result, dict):
+            return {"requested": "", "applied": ""}
+        return {"requested": str(result.get("requested") or ""),
+                "applied": applied_theme(result.get("classes"))}
 
     def get_ui5_messages(self, include_toasts=True):
         """Lit les **messages UI5** de la page : le MessageManager (module
