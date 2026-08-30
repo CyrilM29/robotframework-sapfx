@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Mots-clés web Fiori / S/4HANA lisibles métier.
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Mots-clés web Fiori / S/4HANA lisibles métier.
 ...                 Miroir délibéré de `ecc_keywords.resource` : un test se lit de la
 ...                 même façon (`Open ...`, `Go To ...`, `Save And Expect Success`)
 ...                 qu'il pilote le client lourd SAP GUI ou l'interface web Fiori.
@@ -35,6 +44,9 @@ Library             Browser
 # budget appelle `Set Ui5 Timeout` (0.6.1) au lieu de ré-importer la lib avec
 # d'autres arguments : Robot ignorerait le second import avec un warning.
 Library             SapFioriLibrary
+# Primitives pures atteintes par un KEYWORD (décision DDIC 2026-08-17) :
+# `Displayed Count` normalise un compteur affiché (séparateurs de milliers).
+Library             sapfx_common.robot_args
 
 
 *** Variables ***
@@ -88,9 +100,10 @@ Wait For UI5 Ready
     ...                indicateur d'occupation visible (BusyIndicator local/global,
     ...                BusyDialog), proxy fiable d'une requête OData/XHR en vol. Bien
     ...                plus fort que le simple test « `sap.ui.require` existe », qui
-    ...                passait avant le rendu.
-    Wait For Function    () => { const s = window.sap; if (!(s && s.ui)) return false; let E = null; try { E = s.ui.require && s.ui.require('sap/ui/core/Element'); } catch (e) {} const c = s.ui.getCore ? s.ui.getCore() : null; if (!c && !E) return false; if (c && typeof c.getUIDirty === 'function' && c.getUIDirty()) return false; const b = document.querySelectorAll('.sapUiLocalBusyIndicator, .sapMBusyDialog, #sapUiBusyIndicator'); for (let i = 0; i < b.length; i++) { if (b[i].offsetParent !== null) return false; } return true; }
-    ...    message=UI5 runtime did not become idle
+    ...                passait avant le rendu. Le prédicat vit dans la bibliothèque
+    ...                (`Ui5 Runtime Is Ready`, lecture pure sans bundle,
+    ...                convention #12) ; ce keyword n'en garde que l'attente.
+    Wait Until Keyword Succeeds    15s    0.5s    Ui5 Runtime Should Be Ready
 
 Open App
     [Documentation]    Navigue vers une application Fiori par le texte de sa tuile /
@@ -193,8 +206,16 @@ WebGui Should Be Rendered
     [Documentation]    Sonde jusqu'au rendu d'au moins un élément WebGUI (attribut
     ...                `lsdata`), le pendant WebGUI de `Wait Until Busy Done` / `Wait
     ...                For UI5 Ready` après une navigation ou un aller-retour serveur.
-    Wait For Function    () => document.querySelectorAll('[lsdata]').length > 0
-    ...    timeout=${WEBGUI_TIMEOUT}
+    ...                La perception vit dans la bibliothèque (`Webgui Is Present`).
+    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
+    ...    WebGui Elements Should Be Present
+
+WebGui Elements Should Be Present
+    [Documentation]    Assertion instantanée : au moins un élément WebGUI
+    ...                (`lsdata`) est rendu. La forme à sonder dans un
+    ...                `Wait Until Keyword Succeeds`.
+    ${present}=    Webgui Is Present
+    Should Be True    ${present}    msg=Aucun élément WebGUI (lsdata) rendu dans la portée courante.
 
 WebGui Ok Code Field Should Be Present
     [Documentation]    Vérifie que le champ OK-code (transaction) est adressable par
@@ -245,10 +266,7 @@ Read WebGui Popup Count
     Sid Should Be Visible    ${WEBGUI_COUNT_RESULT_SID}
     ${sel}=    Resolve Sid    ${WEBGUI_COUNT_RESULT_SID}
     ${raw}=    Get Text    ${sel}
-    # Filtrage caractère par caractère : un motif regex à backslash serait
-    # silencieusement défiguré par l'échappement Robot (leçon verrouillée par
-    # tests/unit/test_se16_exploration_logic.py).
-    ${count}=    Evaluate    int(''.join(c for c in $raw if c.isdigit()) or 0)
+    ${count}=    Displayed Count    ${raw}
     RETURN    ${count}
 
 Close WebGui Popup
@@ -260,10 +278,17 @@ Close WebGui Popup
 
 No WebGui Popup Should Be Visible
     [Documentation]    Sonde jusqu'à la disparition de tout élément WebGUI de la
-    ...                fenêtre popup (`wnd[1]/*` dans l'attribut `lsdata`).
-    Wait For Function
-    ...    () => Array.from(document.querySelectorAll('[lsdata]')).filter(e => (e.getAttribute('lsdata') || '').indexOf('wnd[1]') !== -1 && e.offsetParent !== null).length === 0
-    ...    timeout=${WEBGUI_TIMEOUT}
+    ...                fenêtre popup (`wnd[1]`), via la perception de la
+    ...                bibliothèque (`Get Webgui Element Count    window=1`).
+    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s    WebGui Popup Should Be Gone
+
+WebGui Popup Should Be Gone
+    [Documentation]    Assertion instantanée : plus aucun élément VISIBLE de la
+    ...                fenêtre popup `wnd[1]`. La forme à sonder dans un
+    ...                `Wait Until Keyword Succeeds`.
+    ${n}=    Get Webgui Element Count    window=1
+    Should Be Equal As Integers    ${n}    0
+    ...    msg=Le popup WebGUI (wnd[1]) est encore rendu (${n} élément(s) visibles).
 
 Count WebGui Table Entries
     [Documentation]    Depuis l'écran initial du Data Browser (SE16), compte les
@@ -287,27 +312,45 @@ Log Off WebGui
     ...                SPOP, puis assertion 100 % locale-indépendante de fin de
     ...                session : plus AUCUN élément `lsdata`.
     Click    ${WEBGUI_MORE_BUTTON_SELECTOR}
-    Wait For Function
-    ...    () => Array.from(document.querySelectorAll('[id^="wnd[0]/mbar/menu["][id$="-BtnChoiceMenu"]')).filter(e => e.offsetParent !== null).length > 0
-    ...    timeout=${WEBGUI_TIMEOUT}
-    ${menu_ids}=    Evaluate JavaScript    ${None}
-    ...    () => Array.from(document.querySelectorAll('[id^="wnd[0]/mbar/menu["][id$="-BtnChoiceMenu"]')).filter(e => e.offsetParent !== null).map(e => e.id)
+    ${menu_ids}=    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
+    ...    WebGui Menu Bar Entries
     ${system_menu}=    Set Variable    ${menu_ids}[-2]    # System = avant-dernier, Help = dernier
     Click    css=[id="${system_menu}"]
-    ${menu_base}=    Evaluate    $system_menu.replace('-BtnChoiceMenu', '')
-    Wait For Function
-    ...    () => Array.from(document.querySelectorAll('[id^="${menu_base}/menu["]')).filter(e => e.offsetParent !== null).length > 0
-    ...    timeout=${WEBGUI_TIMEOUT}
-    # Items DIRECTS du menu System seulement (pas les sous-menus) : après le
-    # préfixe, plus aucun « / » dans l'id. Log Off = dernier item (convention SAP).
-    ${items}=    Evaluate JavaScript    ${None}
-    ...    () => Array.from(document.querySelectorAll('[id^="${menu_base}/menu["]')).filter(e => e.offsetParent !== null && e.id.slice('${menu_base}/menu['.length).indexOf('/') === -1).map(e => e.id)
+    # Items DIRECTS du menu System seulement (pas les sous-menus, que la
+    # bibliothèque écarte). Log Off = dernier item (convention SAP).
+    ${items}=    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
+    ...    WebGui Open Menu Items    ${system_menu}
     ${logoff_item}=    Set Variable    ${items}[-1]
     Click    css=[id="${logoff_item}"]
     Sid Should Be Visible    ${WEBGUI_POPUP_CONFIRM_SID}
     Click Sid    ${WEBGUI_POPUP_CONFIRM_SID}
-    Wait For Function    () => document.querySelectorAll('[lsdata]').length === 0
-    ...    timeout=${WEBGUI_TIMEOUT}
+    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
+    ...    WebGui Session Should Be Over
+
+WebGui Menu Bar Entries
+    [Documentation]    Menus VISIBLES de la barre de menus WebGUI (perception
+    ...                `List Webgui Menus`), échec quand la barre n'est pas
+    ...                encore rendue : la forme à sonder dans un
+    ...                `Wait Until Keyword Succeeds`.
+    ${ids}=    List Webgui Menus
+    Should Not Be Empty    ${ids}    msg=La barre de menus WebGUI n'est pas (encore) rendue.
+    RETURN    ${ids}
+
+WebGui Open Menu Items
+    [Documentation]    Items directs et visibles du menu WebGUI ouvert
+    ...                (`List Webgui Menu Items`), échec tant que le menu
+    ...                n'est pas déroulé : la forme à sonder.
+    [Arguments]    ${menu_id}
+    ${items}=    List Webgui Menu Items    ${menu_id}
+    Should Not Be Empty    ${items}    msg=Le menu ${menu_id} n'est pas (encore) déroulé.
+    RETURN    ${items}
+
+WebGui Session Should Be Over
+    [Documentation]    Assertion 100 % locale-indépendante de fin de session :
+    ...                plus AUCUN élément `lsdata` dans la page.
+    ${n}=    Get Webgui Element Count
+    Should Be Equal As Integers    ${n}    0
+    ...    msg=La session WebGUI est encore rendue (${n} élément(s) lsdata).
 
 Close WebGui
     [Documentation]    Ferme le navigateur, après un log off best-effort si une
@@ -315,7 +358,7 @@ Close WebGui
     ...                sessions GUI serveur). Prévu pour Suite Teardown, miroir
     ...                WebGUI de `Close SAP`.
     ${status}    ${still}=    Run Keyword And Ignore Error
-    ...    Evaluate JavaScript    ${None}    () => document.querySelectorAll('[lsdata]').length
+    ...    Get Webgui Element Count
     IF    '${status}' == 'PASS'
         IF    ${still} > 0
             Run Keyword And Ignore Error    Log Off WebGui

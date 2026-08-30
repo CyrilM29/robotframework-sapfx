@@ -21,6 +21,7 @@ from .._ui5_js import (
     OPEN_POPUPS_JS,
     RESOLVE_DOM_JS,
     RESOLVE_ROLE_JS,
+    RESOLVE_VISIBLE_ROLE_JS,
     RESOLVE_WC_JS,
     RESOLVE_XPATH_JS,
 )
@@ -103,12 +104,32 @@ class LocatorKeywords:
         return self._pick(ids, int(index), "xpath %s" % xpath)
 
     def ui5_control_should_be_visible(self, **selector_parts):
-        """Vérifie qu'au moins un contrôle UI5 correspond au sélecteur et est rendu."""
+        """Vérifie qu'au moins un contrôle UI5 correspond au sélecteur, est
+        rendu ET occupe un rectangle non nul.
+
+        La présence au registre rendu ne suffit pas : mesuré live (2026-08-26,
+        shell Work Zone), un champ de recherche RENDU garde un rectangle 0x0
+        en permanence (implémentation désactivée par la configuration), et
+        cette assertion passait dessus, le vert-et-faux type. Le contrat
+        rejoint celui des miroirs `Wc Control Should Be Visible` /
+        `Dom Element Should Be Visible`, qui exigeaient déjà le rect non nul.
+        L'échec distingue les deux causes : aucune correspondance, ou des
+        correspondances toutes de rectangle nul (en les nommant)."""
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
         if not ids:
             raise AssertionError("Expected a UI5 control matching %s, found none.%s"
                                  % (selector, self._relaxed_hint(selector_parts)))
+        visible = self._evaluate(RESOLVE_VISIBLE_ROLE_JS,
+                                 arg=selector_to_json(selector)) or []
+        if not visible:
+            raise AssertionError(
+                "%d contrôle(s) UI5 correspondent à %s mais AUCUN n'occupe un "
+                "rectangle non nul (rendus, invisibles à l'écran : %s). Un "
+                "contrôle peut rester rendu à 0x0 quand son implémentation "
+                "est désactivée par la configuration ou sa zone repliée : "
+                "vérifier avec `Get Ui5 Property` / `Get Ushell Config`."
+                % (len(ids), selector, ", ".join(str(i) for i in ids[:5])))
 
     def get_ui5_match_count(self, **selector_parts):
         """Retourne le nombre de contrôles rendus qui correspondent actuellement au sélecteur (0+).
@@ -154,33 +175,55 @@ class LocatorKeywords:
         return [str(i) for i in ids]
 
     def get_ui5_open_popups(self):
-        """Retourne les popups actuellement **OUVERTS** (dialogues et popovers),
-        une liste de dicts JSON-safe ``{id, controlType, kind, state, buttons}``.
+        """Retourne les popups actuellement **OUVERTS** (dialogues et
+        popovers), une liste de dicts JSON-safe ``{id, controlType, kind,
+        state, buttons, technology}``.
 
         Le pendant Fiori de `Get Open Windows` (ECC), et il existe pour la même
         raison qu'un test ne doit jamais deviner : un dialogue fermé reste
         **rendu**. Mesuré live sur un launchpad ABAP, le dialogue « À propos »
         garde son nœud DOM après acquittement, donc `Get Ui5 Match Count` en
         rapporte encore 1 : ni un comptage ni une résolution ne distinguent
-        ouvert de fermé. La source qui le sait est ``sap.m.InstanceManager``.
+        ouvert de fermé. Deux sources, cumulées : ``sap.m.InstanceManager``
+        pour les popups UI5 classiques (``technology=ui5``), et le balayage
+        PROFOND des popups Web Components ouverts (``technology=wc`` :
+        ``ui5-popover``/``ui5-dialog``/``ui5-menu``/``ui5-toast``, tags scopés
+        compris, témoin = leur propriété ``open``). Le second existe parce que
+        le menu utilisateur d'un shell Work Zone est un popover WC (mesuré
+        live 2026-08-26) : ouvert, ce keyword rendait ``[]``, et ses entrées
+        restent rendues menu fermé, exactement le piège que ce keyword doit
+        lever. Une entrée WC porte en plus ``css`` (le chemin résolvable de
+        l'hôte, son ``id`` étant souvent vide) et ``state`` vide.
 
-        ``state`` porte la propriété d'état du dialogue quand elle existe
-        (``Error``, ``Warning``, ``None``) : c'est l'ancre locale-indépendante
-        d'un refus, là où le titre et le texte sont traduits. ``kind`` vaut
-        ``dialog`` ou ``popover``, ``buttons`` compte les boutons rendus. ::
+        **Filtrer une entrée WC par ``kind`` et ``technology``, jamais par
+        ``id``** : mesuré sur le même shell, le popover du menu utilisateur
+        remonte l'id de l'hôte INTERNE au shadow root (``user-menu-rp``) et un
+        ``controlType`` portant le suffixe de scoping de l'application
+        (``ui5-responsive-popover-6bfd01e3``), jamais l'identifiant ushell que
+        l'on croirait trouver (``sapUshellUserActionsMenuPopover``). Les deux
+        dépendent de l'implémentation du composant et du build du site.
+
+        ``state`` porte la propriété d'état d'un dialogue UI5 quand elle
+        existe (``Error``, ``Warning``, ``None``) : c'est l'ancre
+        locale-indépendante d'un refus, là où le titre et le texte sont
+        traduits. ``kind`` vaut ``dialog``, ``popover`` ou ``toast``,
+        ``buttons`` compte les boutons rendus (0 côté WC). ::
 
             ${popups}=    Get Ui5 Open Popups
             Should Be Equal    ${popups}[0][state]    Error
 
-        Lecture pure. Échoue seulement si la portée courante n'a pas de runtime
-        UI5 (sonder d'abord avec `Ui5 Runtime Is Present`).
+        Lecture pure. Échoue si la portée courante n'a NI runtime UI5 NI popup
+        Web Components ouvert (sonder d'abord avec `Ui5 Runtime Is Present`) ;
+        sur une page wc/hybride sans runtime, les popups WC ouverts sont
+        retournés au lieu de l'échec d'avant.
         """
         result = self._evaluate(OPEN_POPUPS_JS, arg=None)
         if result is None:
             raise AssertionError(
-                "Aucun runtime UI5 sur la portée courante : impossible de lister "
-                "les popups ouverts. Sonder d'abord avec `Ui5 Runtime Is Present`, "
-                "et vérifier la portée de frame avec `Get Ui5 Frame Stack`.")
+                "Ni runtime UI5 ni popup Web Components ouvert sur la portée "
+                "courante : impossible de lister les popups. Sonder d'abord "
+                "avec `Ui5 Runtime Is Present`, et vérifier la portée de "
+                "frame avec `Get Ui5 Frame Stack`.")
         return [dict(entry) for entry in result]
 
     def click_ui5_dialog_button(self, position=0):

@@ -269,8 +269,32 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # exige UI5 (pages wc/sid/dom = cibles légitimes, pas des pannes)
                 # + l'état du canal en un appel (ce que sert sapfx_state)
                 "Ui5 Runtime Is Present", STATE_KEYWORD,
+                # moteur au repos (runtime chargé ET inactif : le prédicat de
+                # Wait For UI5 Ready, lecture pure sans instrumentation)
+                "Ui5 Runtime Is Ready", "Ui5 Runtime Should Be Ready",
+                # fiche de contrôle : type PLEIN, contexte de liaison (la clé
+                # d'un item à id généré), enfants d'agrégation RENDUS OU NON
+                # (les items d'un Select popover fermé n'existent pas au DOM)
+                "Get Ui5 Control Info", "Get Ui5 Aggregation Info",
+                # services launchpad (ushell) : catalogue de DROITS, pas rendu
+                "Flp Container Is Present", "Flp Container Should Be Present",
+                "Flp Service Is Available", "Get Flp User", "List Flp Apps",
+                "List Flp Catalogs", "List Flp Groups",
+                "Get Flp Intent Support",
+                # état de session : cookies SANS valeur (prédicat « expiration
+                # future », la sentinelle 1969 d'un cookie de session ne passe
+                # jamais pour une expiration), langue servie, iframes
+                "Get Session Cookie Summary", "Get Page Languages",
+                "List Page Iframes",
+                # thème : la clé technique (locale-safe) que le runtime a
+                # DEMANDÉE, et celle que le document porte réellement
+                "Get Ui5 Theme",
                 # moteur WebGUI sid (SAP GUI for HTML)
                 "Resolve Sid", "Click Sid", "Fill Sid Input", "Sid Should Be Visible",
+                # perception WebGUI : présence (miroir sid de Ui5 Runtime Is
+                # Present), comptage global ou par fenêtre, menus visibles
+                "Webgui Is Present", "Get Webgui Element Count",
+                "List Webgui Menus", "List Webgui Menu Items",
                 # moteur Web Components (pages ui5-* hors registre UI5)
                 "Resolve Wc Control", "Click Wc Control", "Fill Wc Input",
                 "Get Wc Text", "Wc Control Should Be Visible", "Get Wc Match Count",
@@ -287,6 +311,15 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # navigation FLP par intent + login IDP + vocabulaire métier
                 "Open Fiori App", "Log In Via Identity Provider",
                 "Lookup Business Term",
+                # configuration ushell : ce qu'un launchpad DÉCLARE avant de
+                # rendre (services, renderer, expiration de session), la
+                # source la plus locale-indépendante d'un shell ; lecture
+                # pure, sans injection du bundle (relevé Work Zone 2026-08-26)
+                "Get Ushell Config",
+                # « où suis-je » du canal web : l'adresse RÉELLEMENT atteinte,
+                # décomposée (hôte, chemin, fragment, intent). L'hôte est ce
+                # qui distingue un fournisseur d'identité du site lui-même.
+                "Get Page Location",
                 # assertions visuelles (parité du canal ECC)
                 "Get Ui5 Perceptual Hash", "Ui5 Screen Should Match Baseline",
                 # réglage dynamique des attentes

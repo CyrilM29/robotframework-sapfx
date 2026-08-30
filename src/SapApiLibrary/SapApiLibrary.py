@@ -60,10 +60,10 @@ from ._http import (  # noqa: F401  (re-exports : surface historique du module)
 )
 from ._odata_read import OdataReadKeywords
 from ._odata_write import OdataWriteKeywords
-from ._rfc import RfcKeywords
+from ._rfc_security import RfcSecurityKeywords
 
 class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
-                    OdataReadKeywords, RfcKeywords, _ApiCore):
+                    OdataReadKeywords, RfcSecurityKeywords, _ApiCore):
     """Bibliothèque Robot Framework pour parler aux APIs SAP (OData v2/v4, RFC).
 
     == Sessions ==
@@ -113,9 +113,39 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     `Close All Api Sessions` ferme AUSSI les connexions RFC du namespace
     (une connexion RFC orpheline = une session utilisateur restée ouverte
     côté serveur) ; `Close All Rfc Connections` existe seul au besoin.
+
+    == Posture de sécurité (lecture seule) ==
+    `Read Profile Parameters` lit un lot de paramètres de profil et rend, pour
+    chacun, ``defined`` avec sa valeur ou ``unknown`` avec ``None``. C'est
+    toute la raison d'être du keyword : le module ABAP ne refuse PAS un
+    paramètre qu'il ignore, il rend un code de retour non nul et une chaîne
+    VIDE, et il est SENSIBLE À LA CASSE. Une lecture directe confond donc
+    « absent » et « à zéro », et un contrôle écrit sur un nom mal orthographié
+    passe au vert en affirmant une absence de durcissement jamais mesurée.
+    `Profile Parameters Should Be Defined` en fait la garde à poser en tête de
+    campagne, avant tout jugement de conformité.
+
+    `Get Audit Configuration` complète le paramètre `rsau/enable`, qui répond
+    « armé » sans dire si le journal FILTRE : un journal armé avec zéro slot
+    actif n'enregistre pas ce qu'un auditeur croit, d'où le verdict
+    ``armed_without_filter``, distinct de ``filtering``.
+    `Read Rfc Destination Inventory` classe les destinations et dit lesquelles
+    conservent un logon vers un autre système, un chemin d'élévation dont
+    l'indice n'est pas dans une colonne mais dans un agrégat de marqueurs ;
+    il ne lit jamais un secret, il constate qu'il en existe un.
+    `Read Standard Users Status` rend l'état des comptes livrés par SAP, un
+    compte ABSENT étant rendu comme tel plutôt qu'omis.
+
+    `Build Security Posture` assemble un artefact déterministe (hash calculé
+    hors horodatage), `Write` / `Read Security Posture` le persistent, et
+    `Security Posture Should Not Have Drifted` le compare à une référence
+    committée : sémantique snapshot, le premier passage écrit la référence avec
+    un avertissement et réussit, les suivants nomment chaque écart. C'est ce
+    qui rend une campagne de sécurité rejouable, la question posée devenant
+    « la configuration a-t-elle bougé » plutôt que « ce système est-il durci ».
     """
 
-    __version__ = "0.7.0"
+    __version__ = "0.8.0"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -146,9 +176,17 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
                          client_secret: Optional[Union[str, Secret]] = None,
                          oauth_scope: Optional[str] = None,
                          api_key: Optional[Union[str, Secret]] = None,
-                         api_key_header: str = "APIKey") -> str:
+                         api_key_header: str = "APIKey",
+                         headers: Optional[dict] = None) -> str:
         """Ouvre une session API vers ``base_url`` (mémorise auth,
         ``sap-client`` ajouté à chaque requête, cookies). Retourne l'alias.
+
+        ``headers`` : en-têtes par défaut supplémentaires de la session,
+        appliqués en DERNIER (ils peuvent donc surcharger l'``Accept:
+        application/json`` maison). Cas d'usage relevé live (2026-08-26, site
+        SAP Build Work Zone) : un approuter BTP arbitre entre page HTML et
+        réponse JSON sur l'en-tête ``Accept``, que la session ne permettait
+        pas de poser. Les valeurs ne sont jamais journalisées.
 
         Quatre modes d'authentification, cumulables avec ``sap_client`` :
         **Basic** (``user``/``password``), **OAuth2 client credentials**
@@ -204,7 +242,8 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
             client_cert=client_cert, client_key=client_key,
             token_url=token_url, client_id=client_id,
             client_secret=client_secret, oauth_scope=oauth_scope,
-            api_key=api_key, api_key_header=api_key_header)
+            api_key=api_key, api_key_header=api_key_header,
+            extra_headers=headers)
         return alias
 
     def close_api_session(self, alias: str = "default") -> None:

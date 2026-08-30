@@ -6,7 +6,7 @@ description: >-
 
 Run the **blind evaluation of the sap-healer agent** using the replayable
 harness `scripts/agent_eval_harness.py`. Scenario (default:
-`se16-count-button`) and connection variables: $ARGUMENTS
+`se16-table-field`) and connection variables: $ARGUMENTS
 
 This is the safety net for evolving the agent definitions and the rf-mcp
 guidance: the harness injects a known simulated drift, the healer must repair

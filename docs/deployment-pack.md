@@ -73,6 +73,14 @@ import smoke check, and, with `-WithMcp`, renders `mcp.generated.json` with
 the absolute path of the venv's `robotmcp.exe`. Nothing global is touched (no
 `PATH` change, no system site-packages).
 
+**If the optional RFC channel is in scope, the interpreter is decided here.**
+`pyrfc` has no prebuilt wheel beyond Python 3.12, so a venv created on 3.13 or
+3.14 closes the channel until it is recreated: run `install.cmd` with a **3.10
+to 3.12** interpreter on the `PATH`. The rest of the provisioning, including
+the case where SAP GUI already supplies the RFC runtime and the SDK download
+becomes unnecessary, is covered by the pack's README (« RFC channel ») and by
+`install-rfc.ps1`.
+
 ## 4. Validate
 
 ```bat

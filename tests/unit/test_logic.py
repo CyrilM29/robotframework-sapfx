@@ -158,6 +158,35 @@ def test_read_grid_respects_max_rows():
     assert len(lib.read_grid("grid", max_rows=1)) == 1
 
 
+def test_read_grid_columns_acceptent_les_trois_formes_de_liste():
+    """Via rf-mcp (``execute_step``), tout argument arrive en CHAÎNE : la
+    liste de colonnes techniques doit passer en liste vraie, en chaîne à
+    virgules et en liste-littérale sérialisée (incidents d'agents du
+    2026-08-27, chaque colonne pourtant listée dans « Available »)."""
+    attendu = [{"MANDT": "100", "MTEXT": "Acme"},
+               {"MANDT": "200", "MTEXT": "Globex"}]
+    for forme in (["MANDT", "MTEXT"], "MANDT,MTEXT", "['MANDT', 'MTEXT']"):
+        assert _grid_lib().read_grid("grid", columns=forme) == attendu, forme
+
+
+def test_read_grid_colonne_inconnue_liste_les_disponibles():
+    lib = _grid_lib()
+    lib.take_screenshot = lambda: None
+    with pytest.raises(ValueError, match="Available: MANDT, MTEXT"):
+        lib.read_grid("grid", columns="MANDT,NOPE")
+
+
+def test_read_grid_max_rows_liste_nomme_l_argument_et_le_remede():
+    """L'incident : ``${cols}`` liste passée en POSITION de ``max_rows``
+    sortait en ``TypeError: int() ... not 'list'`` nu, sans nommer
+    l'argument fautif ni le remède."""
+    lib = _grid_lib()
+    with pytest.raises(ValueError) as err:
+        lib.read_grid("grid", ["MANDT", "MTEXT"])
+    message = str(err.value)
+    assert "max_rows" in message and "columns=" in message
+
+
 def test_set_cell_value_by_column_title_resolves_column_then_writes():
     lib = _grid_lib()
     lib.set_cell_value_by_column_title("grid", 0, "Name", "Zzz")

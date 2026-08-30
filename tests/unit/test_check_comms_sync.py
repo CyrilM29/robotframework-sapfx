@@ -24,7 +24,7 @@ mod = _load()
 
 
 def _repo(tmp_path, project="0.5.2", reference="0.5.2", deck_cites=None,
-          unit_tests=617):
+          unit_tests=617, live_campaigns=None):
     """Un faux dépôt minimal : un pyproject, une base comms/ et ses sources deck."""
     (tmp_path / "pyproject.toml").write_text(
         f'[project]\nname = "x"\nversion = "{project}"\n', encoding="utf-8")
@@ -37,7 +37,7 @@ def _repo(tmp_path, project="0.5.2", reference="0.5.2", deck_cites=None,
         "- **17/17** scénarios validés.\n"
         "- **94 %** de couverture.\n",
         encoding="utf-8")
-    (comms / "proofs.json").write_text(json.dumps({
+    proofs = {
         "version": project,
         "unit_tests": unit_tests,
         "coverage_percent": 94,
@@ -47,7 +47,10 @@ def _repo(tmp_path, project="0.5.2", reference="0.5.2", deck_cites=None,
             "validated_on": "2026-07-13",
         },
         "ui5_range": {"minimum": "1.60", "maximum": "2.0"},
-    }), encoding="utf-8")
+    }
+    if live_campaigns is not None:
+        proofs["live_campaigns"] = live_campaigns
+    (comms / "proofs.json").write_text(json.dumps(proofs), encoding="utf-8")
     if deck_cites:
         (comms / "deck" / "build_deck_fr.py").write_text(
             f'chips = ["v{deck_cites}", "Apache 2.0"]\n', encoding="utf-8")
@@ -135,6 +138,39 @@ def test_le_total_de_tests_est_un_plancher_pas_une_egalite(tmp_path, monkeypatch
     monkeypatch.setattr(mod, "collect_pytest_tests", lambda root: 600)
     problems = mod.check(repo, verify_runtime=True, coverage_xml="coverage.xml")
     assert any("600" in problem and "617" in problem for problem in problems)
+
+
+_CAMPAGNE = [{
+    "name": "launchpad ABAP 1.120", "passed": 22, "total": 22,
+    "target": "ABAP Platform 2023", "validated_on": "2026-08-25",
+}]
+
+
+def test_un_ratio_live_de_campagne_declaree_est_accepte(tmp_path):
+    # La même campagne rejouée sur une seconde release SAP produit un second
+    # ratio : il est publiable dès qu'il est déclaré, cible et date comprises.
+    repo = _repo(tmp_path, live_campaigns=_CAMPAGNE)
+    (repo / "comms" / "web.md").write_text(
+        "Sur la 1.120 : **22/22** scénarios validés en direct.\n", encoding="utf-8")
+    assert mod.check(repo) == []
+
+
+def test_un_ratio_live_non_declare_echoue_et_liste_les_ratios_admis(tmp_path):
+    # La contre-épreuve : sans déclaration, le même chiffre est refusé, et le
+    # message dit contre quoi il a été comparé.
+    repo = _repo(tmp_path)                       # aucune campagne déclarée
+    (repo / "comms" / "web.md").write_text(
+        "Sur la 1.120 : **22/22** scénarios validés en direct.\n", encoding="utf-8")
+    problems = mod.check(repo)
+    assert any("22/22" in problem and "17/17" in problem for problem in problems)
+
+
+def test_une_campagne_sans_cible_ni_date_est_refusee(tmp_path):
+    # Une preuve live est une observation DATÉE : un ratio nu n'en est pas une.
+    repo = _repo(tmp_path, live_campaigns=[{"name": "x", "passed": 9, "total": 9}])
+    problems = mod.check(repo)
+    assert any("target" in problem and "validated_on" in problem
+               for problem in problems)
 
 
 def test_verification_runtime_signale_une_couverture_divergente(tmp_path, monkeypatch):

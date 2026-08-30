@@ -62,6 +62,15 @@ API drives a genuine system. **Full step-by-step procedure: [ecc-validation.md](
   `TimeoutError` and points you at connectivity, where there is nothing to find.
   Measured: 2.2 s on the first catalogue call, 0.1 s on the second. Replay
   before diagnosing.
+- **Installing SAP GUI also provisions the RFC runtime** (observed 2026-08-27,
+  SAP GUI 8.00). Its « SAP NWRFC x64 Shared » component puts `sapnwrfc.dll` and
+  the `icu*50` libraries into `C:\Windows\System32`, so the prebuilt `pyrfc`
+  wheel loads and a real RFC call reaches the trial (`STFC_CONNECTION`,
+  `RFC_READ_TABLE` on T000) without the licensed SAP NW RFC SDK, without
+  `SAPNWRFC_HOME` and without a `PATH` entry. What this does NOT remove is the
+  interpreter constraint: no prebuilt `pyrfc` wheel exists beyond Python 3.12,
+  and building from source needs the very SDK headers the client omits. The
+  reasons the SDK still matters are in the pack README, « RFC channel ».
 - Then point `Open Sap Logon` / `Connect To Session` at it and run
   `tests/robot/ecc_smoke.robot`.
 

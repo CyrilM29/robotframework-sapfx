@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Page object de la **List Report « Travel processor »** (application
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Page object de la **List Report « Travel processor »** (application
 ...                 Fiori Elements v4 `sap.fe.cap.travel`, vue `TravelList`, cible
 ...                 locale cap-sflight). Un seul écran, donc un seul fichier :
 ...                 ses localisateurs en tête, ses mots-clés métier ensuite.
@@ -74,12 +83,18 @@ Wait For Travel List Data
     ...                prédicat par la bibliothèque Browser. Sondage, jamais
     ...                d'attente fixe (convention 2).
     Travel List Should Be Displayed
-    ${table}=    Resolve Ui5 Control    idSuffix=${TRAVEL_INNER_TABLE}
-    Wait For Function
-    ...    (table) => { const s = window.sap; if (!(s && s.ui)) return false; let E = null; try { E = s.ui.require('sap/ui/core/Element'); } catch (e) {} const t = (E && E.getElementById) ? E.getElementById(table.id) : (s.ui.getCore ? s.ui.getCore().byId(table.id) : null); if (!t || !t.getItems) return false; return t.getItems().length > 0; }
-    ...    selector=${table}
-    ...    timeout=${TRAVEL_DATA_TIMEOUT}
-    ...    message=La liste des voyages n'a matérialisé aucune ligne : données non chargées ?
+    Wait Until Keyword Succeeds    ${TRAVEL_DATA_TIMEOUT}    1s
+    ...    Travel Table Should Have Rows
+
+Travel Table Should Have Rows
+    [Documentation]    Assertion instantanée : la table interne porte au moins
+    ...                une ligne dans son agrégation `items` (lecture de la
+    ...                bibliothèque, `Get Ui5 Aggregation Info` : la sonde JS
+    ...                inline historique est promue, convention #12). La forme
+    ...                à sonder dans un `Wait Until Keyword Succeeds`.
+    ${items}=    Get Ui5 Aggregation Info    items    idSuffix=${TRAVEL_INNER_TABLE}
+    Should Not Be Empty    ${items}
+    ...    msg=La liste des voyages n'a matérialisé aucune ligne : données non chargées ?
 
 Travel List Should Be Displayed
     [Documentation]    Vérifie que la liste des voyages est rendue : la table interne

@@ -245,7 +245,12 @@ same route (see `NOTICE`).
 
 ## Design rules
 
-1. Tests never contain raw SAP ids: those live in `resources/`.
+1. Tests never contain raw SAP ids: those live in `resources/`. That layer is
+   the business vocabulary of **one** installation, so what this repo ships
+   there are examples measured on its own lab systems, to be verified against
+   your target and adapted to your business domain
+   ([resources/README.md](../resources/README.md)); the universal half is
+   `src/`, the libraries, which carry the capabilities.
 2. Never `time.sleep` to wait for SAP; use the `Wait Until ...` keywords.
 3. Locale-independent assertions only (message *type*, not message *text*).
 4. Keep the upstream vendor diff to one line.

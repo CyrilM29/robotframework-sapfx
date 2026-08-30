@@ -102,6 +102,10 @@ class _FakeSession:
     def findById(self, element_id, raise_on_error=True):  # noqa: N802 (API COM)
         if element_id.endswith("tblSAPLALDBSINGLE"):
             return self.table
+        # Popup « Number of Entries » : son compteur n'existe QUE lorsque le
+        # popup est ouvert (le clic sur btn[31] le pose), comme le vrai SE16.
+        if "txtG_DBCOUNT" in element_id:
+            return object() if self.popup == "count" else None
         if "cntlGRID1" in element_id:
             return object() if self.screen == "grid" else None
         if element_id == MAX_HITS:
@@ -135,9 +139,12 @@ class _Recorder(DdicKeywords, Se16Keywords):
 
     def __init__(self, rows=(), screen="grid", popup=None, visible=7,
                  locked=False, status=("", ""), alv_mode=True,
-                 scroll_max=None):
+                 scroll_max=None, count_text="0"):
         self.session = _FakeSession(screen, popup, visible, locked, scroll_max)
         self.calls = []
+        #: Ce que le popup de comptage AFFICHE (séparateurs de milliers
+        #: compris : ils dépendent du profil utilisateur).
+        self.count_text = count_text
         self._rows = list(rows)
         self._status = status
         self.screenshots = 0
@@ -167,10 +174,24 @@ class _Recorder(DdicKeywords, Se16Keywords):
 
     def click_element(self, element_id):
         self.calls.append(("click", element_id))
+        # Les deux gestes qui OUVRENT une modale sur les écrans SE16 pilotés
+        # par le mixin : le comptage et le réglage d'affichage.
+        if element_id == "wnd[0]/tbar[1]/btn[31]":
+            self.session.popup = "count"
+        elif element_id == "wnd[0]/mbar/menu[3]/menu[0]":
+            self.session.popup = "alv"
+
+    def get_value(self, element_id):
+        self.calls.append(("get_value", element_id))
+        return self.count_text
+
+    def select_radio_button(self, element_id):
+        self.calls.append(("radio", element_id))
 
     def send_vkey(self, vkey, window=0):
         self.calls.append(("vkey", vkey, window))
-        if window == 1 and vkey == 0:
+        # Entrée valide une modale, F12 l'annule : les deux la referment.
+        if window == 1 and vkey in (0, 12):
             self.session.dismiss_popup()
         if vkey == 8:
             self._execute_selection()

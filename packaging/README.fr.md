@@ -10,7 +10,7 @@ cloner le dépôt source :
 |---|---|
 | `wheels/robotframework_sapfx-*.whl` | `SapEccLibrary` (SAP GUI desktop / ECC), `SapFioriLibrary` (web Fiori / UI5), `SapApiLibrary` (canal API : OData v2/v4, RFC optionnel) et `sapfx_common`, dans un seul wheel. |
 | `wheels/sap_robotmcp-*.whl` | Plugins rf-mcp (RobotMCP) `SapEccPlugin` / `SapFioriPlugin` / `SapApiPlugin` (routage de keywords, perception SAP, guidance de sélecteurs), plus le **lanceur surcouche `sapfx-mcp`** (rf-mcp inchangé + outils `sapfx_state`/`sapfx_screenshot`/`sapfx_reload`, garde de compatibilité au démarrage). Optionnel (`-WithMcp`). |
-| `resources/` | Keywords Robot Framework en langage métier (`ecc_keywords.resource`, `fiori_keywords.resource`, `a4h_demo_data.resource`). Les tests importent ces fichiers, jamais d'ids SAP bruts. |
+| `resources/` | Keywords Robot Framework en langage métier, un vocabulaire en miroir par canal (`ecc_keywords`, `fiori_keywords`, `api_keywords`, `rfc_keywords`), plus les page objects et les garanties de données. **Des exemples à personnaliser**, relevés sur les systèmes du laboratoire du projet : réutilisables en bonne part, jamais faisant autorité, à vérifier sur votre cible et à adapter à votre métier (voir `resources/README.fr.md`). Les tests importent cette couche, jamais d'ids SAP bruts ; ce qui tient sur tout système SAP, c'est le wheel des bibliothèques, pas ce dossier. Vos propres keywords vont dans `resources\site_keywords.resource` (voir plus bas), qu'une mise à jour du pack n'écrase jamais. |
 | `tools/recorder/` + `recorder.cmd` | Recorder desktop (SAP GUI via COM) : dump / capture / survol / record ; le record utilise les événements natifs de l'API de scripting (boutons exacts) avec repli polling automatique. Double-cliquez `recorder.cmd` pour ouvrir le lanceur graphique, qui expose le choix du moteur (auto/native/poll) et le mode sémantique (keywords humains par libellé visible). |
 | `tools/recorder_web/` | Recorder web : `recorder_snippet.js` (à coller dans DevTools) et `extension/` (extension Chrome MV3, à charger non empaquetée via `chrome://extensions`). |
 | `tests/robot/` | Sept suites d'exemple : smokes ECC/Fiori plus `fiori_wc_smoke.robot` déterministe et hors ligne, campagne d'exploration autonome, sentinelle de dérive, flagship cross-paradigme, et `api/canal_api_odata.robot` (le canal API pour lui-même, les mêmes mots-clés métier contre OData v2 avec `--include a4h` et v4 avec `--include capsflight`). |
@@ -19,6 +19,29 @@ cloner le dépôt source :
 | `install.cmd` / `install.ps1` | Installateur : crée un `.venv` local, installe les wheels + dépendances épinglées, rend les configs MCP. |
 | `mcp.json.template` / `vscode-mcp.json.template` | Gabarits de déclaration du serveur rf-mcp ; `install.ps1 -WithMcp` les rend en place en `.mcp.json` (Claude Code) et `.vscode/mcp.json` (VS Code / Copilot), plus `mcp.generated.json` à copier dans un autre projet. |
 | `LICENSE` / `NOTICE` | Licence Apache-2.0 et attributions upstream, à conserver à côté des binaires. |
+
+## Ce que le pack contient, et ce qu'il ne contient pas
+
+Le pack est un environnement d'**exécution**, pas une copie du dépôt source.
+Ce qui en découle sur le poste :
+
+- **Pas de `src/`** : les bibliothèques sont installées comme wheel dans le
+  venv, donc on ne corrige pas leur code sur place. C'est la raison de la règle
+  `resources\site_keywords.resource` (plus bas) : keywords ajoutés et
+  surcharges de localisateurs y vont, et une mise à jour du pack ne les écrase
+  pas. Un défaut de bibliothèque se signale en amont au lieu d'être contourné
+  localement, sinon le même bug est payé deux fois.
+- **Sept suites d'exemple**, pas la suite de validation complète du dépôt :
+  elles servent de contrôle d'installation et de modèle à copier, pas de
+  couverture.
+- **Quatre scripts de maintenance** sur la quinzaine du dépôt : les autres sont
+  des gardes de développement (appariement bilingue, dérive du vendor,
+  cohérence des supports IA) sans objet hors du dépôt.
+- **Aucun test unitaire** : ils s'exécutent en CI sur le dépôt source.
+
+Ce qui est rigoureusement identique, en revanche, c'est le **code** des
+bibliothèques : le wheel contient exactement `src/`, donc un keyword se
+comporte ici comme sur le poste de développement.
 
 ## Prérequis sur le PC cible
 
@@ -47,6 +70,154 @@ L'installateur crée `.venv\` dans le dossier du pack, installe les wheels et
 rend les configs MCP avec le chemin absolu du lanceur `sapfx-mcp` du venv
 (repli `robotmcp` sur un wheel plus ancien) :
 `.mcp.json`, `.vscode\mcp.json` et `mcp.generated.json`.
+
+## Canal RFC : optionnel, et non installé
+
+`pip` n'installe pas `pyrfc`, et c'est délibéré : ce binding a besoin du
+**runtime SAP NW RFC**, une bibliothèque C absente de PyPI. Son véhicule
+officiel est le **SAP NW RFC SDK**, que SAP distribue sous licence depuis son
+portail de téléchargement : aucun installateur ne peut donc le provisionner à
+votre place.
+
+Son absence ne casse rien : l'import se fait à l'intérieur du keyword, pas au
+chargement du module. `SapApiLibrary` s'importe et fonctionne, et **tout le
+canal OData** reste disponible (v2 et v4, `$batch`, protocole CSRF,
+`$metadata`, catalogue, préflight Gateway, fabrique de données de test).
+
+Six keywords seulement en dépendent : `Open Rfc Connection`, `Call Rfc`,
+`Call Bapi`, `Commit Bapi Transaction`, `Rollback Bapi Transaction` et
+`Wait For Background Job`. Les appeler sans `pyrfc` donne un échec de test
+nommant la marche à suivre, jamais un `ModuleNotFoundError` au démarrage de la
+suite.
+
+### Si SAP Logon est installé, vous pouvez déjà faire des tests RFC (constaté le 2026-08-27)
+
+À lire avant de partir en quête d'un S-user : **un poste qui fait tourner SAP
+Logon porte déjà le runtime RFC.** Installer SAP GUI for Windows 8.00 installe
+son composant « SAP NWRFC x64 Shared », qui dépose dans `C:\Windows\System32` un
+`sapnwrfc.dll` (version 7530.1116 au relevé, variante kernel, release 750 patch
+level 11) plus `icudt50.dll`, `icuin50.dll` et `icuuc50.dll`. Le loader Windows
+les y trouve sans `SAPNWRFC_HOME` ni entrée de `PATH` : la roue précompilée de
+`pyrfc` se charge, et un appel RFC **réel** passe. Mesuré contre une ABAP
+Platform trial, `STFC_CONNECTION` a renvoyé son écho et `RFC_READ_TABLE` a lu
+T000 à travers `Open Rfc Connection` / `Call Rfc`.
+
+En pratique cela couvre le cas courant, puisqu'un poste qui teste le canal ECC a
+SAP GUI par définition. Une commande vous situe, pour moins cher qu'un portail
+de téléchargement :
+
+```bat
+REM aucune archive, aucun S-user : le runtime déjà installé par SAP GUI
+powershell -ExecutionPolicy Bypass -File install-rfc.ps1 -UseSapGuiRuntime
+```
+
+Elle refuse proprement si le runtime n'est pas là (pas de SAP GUI sur ce poste),
+installe le `pyrfc` épinglé dans le venv du pack et contrôle l'import pour de
+vrai. Un import n'est toujours pas une connexion : confirmer par un appel RFC
+réel avant de conclure. `install-rfc.ps1 -CheckOnly` rapporte cette
+configuration pour ce qu'elle est, au lieu de déclarer le SDK manquant.
+
+**Cela dit, le SDK reste le but à viser**, et ce raccourci est ce qui vous
+débloque en attendant, pas ce qui le remplace. Trois raisons, par ordre de
+rapidité à vous rattraper :
+
+- **C'est la seule voie hors de ce poste.** Un runner de CI, un agent de build
+  ou la machine d'un collègue sans SAP GUI n'ont aucun runtime. Tout ce qui doit
+  s'exécuter ailleurs demande le SDK, et l'anticiper évite de le découvrir le
+  jour où un pipeline doit passer au vert.
+- **Licence et support.** Cette DLL est livrée avec le client SAP GUI, pour le
+  client. L'artefact que SAP supporte pour le développement RFC, ses versions et
+  ses correctifs, c'est le SDK : un ticket de support demandera lequel est
+  installé.
+- **Un patch level subi, et pas de compilation.** Vous prenez celui du client,
+  et une incompatibilité avec `pyrfc` ne se verrait pas à l'import, seulement à
+  l'usage. Sur un Python sans roue précompilée (3.13 et au-delà), compiler exige
+  les en-têtes du SDK, que le client ne fournit pas.
+
+Une contrainte que le raccourci ne lève **pas** : l'interpréteur. Aucune roue
+`pyrfc` précompilée n'existe au-delà de Python 3.12, donc le venv se crée en
+3.10 à 3.12, que vous ayez le SDK ou non.
+
+### Procédure de provisionnement (une fois par poste)
+
+1. **Récupérer l'archive.** SAP for Me, rubrique Software Downloads : il faut un
+   S-user portant l'autorisation « Software Download », donc un contrat client
+   ou partenaire. Chercher `SAP NW RFC SDK 7.50`, plateforme *Windows on x64
+   64bit*. La note SAP **2573790** fait référence pour la disponibilité, les
+   plateformes supportées et les patch levels.
+2. **Prérequis Windows.** Installer le *Visual C++ Redistributable for Visual
+   Studio 2013* (x64) : la bibliothèque C en dépend à l'exécution, et son
+   absence produit une erreur de chargement de DLL, pas un message clair.
+3. **Décompresser** l'archive, par exemple dans `C:\nwrfcsdk`, de sorte que
+   `C:\nwrfcsdk\lib` existe.
+4. **Déclarer les variables d'environnement** : `SAPNWRFC_HOME=C:\nwrfcsdk`, et
+   ajouter `C:\nwrfcsdk\lib` au `PATH` (c'est par là que les DLL sont trouvées
+   à l'exécution).
+5. **Installer le binding** dans le venv du pack :
+   `.venv\Scripts\python.exe -m pip install pyrfc==3.3.1`
+6. **Vérifier** :
+   `.venv\Scripts\python.exe -c "from pyrfc import Connection; print('pyrfc OK')"`
+
+Les étapes 2 à 6 sont scriptées par `install-rfc.ps1` (voir plus bas).
+
+### État amont, à connaître avant de s'engager (constaté le 2026-08-26)
+
+- SAP a **archivé** le dépôt PyRFC le 2026-05-28 : le projet n'est plus
+  maintenu et aucun remplaçant officiel n'est annoncé.
+- **Toutes les versions publiées sur PyPI sont « yanked »** : pip ne les
+  sélectionne plus tout seul, d'où la version épinglée exacte à l'étape 5.
+- Les **roues précompilées Windows s'arrêtent à Python 3.12**. Sur un venv en
+  3.13 ou 3.14, pip tenterait une compilation depuis les sources (Cython plus
+  les Build Tools MSVC). Si le canal RFC vous est indispensable, créez le venv
+  du pack avec un interpréteur **3.10 à 3.12**, choix qui se fait au moment de
+  l'installation et pas après.
+- La dernière version est construite contre un patch level du SDK que SAP ne
+  supporte plus.
+
+Rien de tout cela ne concerne le canal OData, qui reste le chemin nominal.
+
+### Automatiser ce provisionnement
+
+`install-rfc.ps1` scripte tout **sauf** l'obtention de l'archive :
+
+```bat
+REM l'archive est déjà sur le poste (ou sur un partage)
+powershell -ExecutionPolicy Bypass -File install-rfc.ps1 -SdkZip C:\downloads\nwrfc750P_13-70002755.zip
+
+REM ou tirée du miroir interne de l'entreprise
+powershell -ExecutionPolicy Bypass -File install-rfc.ps1 -SdkUrl https://artefacts.interne/sap/nwrfc750.zip -SdkUrlToken $env:ARTIFACTS_TOKEN
+
+REM ou aucune archive du tout, sur un poste qui fait tourner SAP Logon
+powershell -ExecutionPolicy Bypass -File install-rfc.ps1 -UseSapGuiRuntime
+```
+
+Il décompresse dans `-SdkHome` (défaut `C:\nwrfcsdk`), pose `SAPNWRFC_HOME` et
+le `PATH` de l'utilisateur, installe le `pyrfc` épinglé dans le venv du pack et
+exécute un vrai contrôle d'import. `-Machine` écrit les variables pour toute la
+machine (shell élevé requis), `-CheckOnly` diagnostique une installation
+existante sans rien modifier.
+
+`-UseSapGuiRuntime` est le mode sans archive décrit plus haut : il s'appuie sur
+le runtime RFC installé par le client SAP GUI, donc ne touche aucune variable
+d'environnement (les DLL sont dans `System32`, que le loader lit de toute
+façon), installe le binding et contrôle l'import. Il refuse si aucun runtime
+n'est là, et refuse d'être combiné à `-SdkZip`, `-SdkUrl` ou `-SkipPyrfc`
+plutôt que d'ignorer en silence la moitié de la demande. À utiliser pour
+travailler dès aujourd'hui, en gardant le SDK comme cible : ce mode n'est vrai
+que de **ce** poste.
+
+Le **téléchargement**, lui, ne peut pas être anonyme : le portail exige un S-user et
+la licence interdit de redistribuer l'archive, donc elle ne sera jamais dans le
+pack ni dans un dépôt public. Deux voies praticables, dans cet ordre :
+
+1. **Miroir interne** (recommandé) : télécharger l'archive une fois à la main,
+   la déposer dans le dépôt d'artefacts de l'entreprise (Artifactory, Nexus,
+   Azure Artifacts, partage interne), et pointer `-SdkUrl` dessus.
+2. **Téléchargement direct authentifié** : les URL `softwaredownloads.sap.com`
+   acceptent une authentification basique S-user (`curl -u` / `wget`), pratique
+   courante mais non contractuelle : l'outil supporté reste le SAP Download
+   Manager, et les identifiants doivent vivre en secrets d'usine, jamais dans
+   un script versionné (convention 11 du dépôt source).
 
 ## Validation
 
@@ -155,7 +326,10 @@ dans le dépôt source.
   localisée à sa tuile (position, rectangle en pixels, éléments recouvrants).
   Surveiller un écran de plus = ajouter son tcode à
   `@{WATCHED_TRANSACTIONS}` ; `-v FAIL_ON_DRIFT:True` transforme le rapport
-  en assertion.
+  en assertion. Les références visuelles suivent la géométrie de capture :
+  `${PER_RESOLUTION}` vaut `True` dans cette suite, si bien qu'une résolution
+  d'écran encore inconnue **enregistre** sa référence visuelle et ne compare
+  que le structurel ce passage-là, au lieu de crier à la dérive.
 - **Assertions visuelles** (Pillow, installé par `requirements-deploy.txt`) :
   `Screen Should Match Baseline` et `Element Should Match Baseline` (ECC ; la
   variante élément recadre la baseline sur UN contrôle : GuiShell opaques,
@@ -164,6 +338,14 @@ dans le dépôt source.
   conserver), ensuite toute dérive fait échouer avec la distance de Hamming
   et sauve un `.actual.png` à côté ; `mask_elements=auto` neutralise les
   barres de statut et de titre volatiles avant hachage.
+  **Une empreinte encode la géométrie de capture autant que le contenu** :
+  des baselines venues d'un autre poste échouent donc sur une simple
+  différence de résolution d'écran, sans qu'aucun écran ait bougé. Les
+  enregistrer sur le poste qui les rejouera, ou passer `per_resolution=True`
+  pour garder une baseline par géométrie (`<nom>@1920x1032.png`, créée au
+  premier passage du poste comme n'importe quelle première baseline) ; quand
+  les deux géométries diffèrent, le message d'échec le dit et liste celles
+  déjà connues.
 - **Télémétrie de healing → propositions de patch** : exécutez les suites avec
   `SAPFX_HEALING_LOG=<chemin>.jsonl` positionné, puis
   `.venv\Scripts\python.exe scripts\healing_drift_report.py --log <chemin>.jsonl`
@@ -184,6 +366,14 @@ dans le dépôt source.
 - SAP GUI « scripting support is disabled » → activer le scripting dans les
   options de SAP Logon et vérifier le paramètre profil `sapgui/user_scripting`
   côté serveur.
+- `Call Rfc a besoin de pyrfc (et du SAP NW RFC SDK)` → attendu : voir
+  « Canal RFC » plus haut. Les keywords OData n'en ont pas besoin.
+- Un `dev_rfc.log` apparaît à côté de votre suite → normal : la bibliothèque
+  NW RFC écrit sa trace dans le répertoire COURANT quand une connexion échoue.
+  La lire (elle nomme le runtime RFC chargé), puis la supprimer.
+- Une assertion visuelle échoue au premier run sur un poste neuf → vérifier
+  d'abord la résolution d'écran : voir la note de géométrie dans « Veille et
+  maintenance ».
 
 ---
 Ce pack est généré depuis le dépôt source par

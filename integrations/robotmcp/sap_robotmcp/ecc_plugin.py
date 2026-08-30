@@ -256,6 +256,13 @@ class SapEccPlugin(StaticLibraryPlugin):
                 # ré-improvise ces trois branches, soit exactement les copies
                 # divergentes que ce keyword a supprimées.
                 "Reach Se16 Selection Screen", "Fill Multiple Selection",
+                # Les deux primitives d'ÉCRAN SE16 promues de la couche
+                # resources : le RÉGLAGE que les échecs de lecture de grille
+                # prescrivent (sans lui, la sortie SE16 est une liste ABAP
+                # sans objet grille scriptable) et le comptage « Number of
+                # Entries », fiable sur table vide là où F8 ne rend rien.
+                "Use ALV Grid In Data Browser",
+                "Count Entries On Current Selection Screen",
                 "Classify Ddic Objects", "Get Ddic Classification Map",
                 "Validate Ddic Scope", "Record Ddic Probe",
                 "Sample Ddic Objects For Probe", "Merge Ddic Name Lists",

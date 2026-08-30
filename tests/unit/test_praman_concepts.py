@@ -204,6 +204,97 @@ def test_open_fiori_app_refuses_invalid_intent_without_navigating():
     assert browser.gone_to == []
 
 
+def test_parse_location_decompose_et_reconnait_un_intent():
+    from SapFioriLibrary._ui5_runtime import parse_location
+
+    ou = parse_location(
+        "https://site.example/flp.html?sap-client=001"
+        "#SalesOrder-manage?SalesOrder=1234&Note=a%20b")
+    assert ou["host"] == "site.example"
+    assert ou["path"] == "/flp.html"
+    assert ou["query"] == "sap-client=001"
+    assert ou["intent"] == "SalesOrder-manage"
+    assert ou["intent_params"] == {"SalesOrder": "1234", "Note": "a b"}
+
+
+def test_parse_location_n_invente_pas_d_intent():
+    from SapFioriLibrary._ui5_runtime import parse_location
+
+    # Un fragment d'ancre ordinaire n'est PAS une navigation FLP.
+    ancre = parse_location("https://site.example/page#section1")
+    assert ancre["fragment"] == "section1"
+    assert ancre["intent"] is None and ancre["intent_params"] == {}
+    # Une adresse sans fragment non plus, et rien ne lève.
+    nu = parse_location("https://tenant.example/oauth2/authorize")
+    assert nu["host"] == "tenant.example"
+    assert nu["path"] == "/oauth2/authorize"
+    assert nu["intent"] is None
+    assert parse_location("")["url"] == ""
+
+
+def test_parse_location_est_l_inverse_de_build_intent_hash():
+    from SapFioriLibrary._ui5_runtime import build_intent_hash, parse_location
+
+    params = {"SalesOrder": "1234", "Note": "a b"}
+    hash_ = build_intent_hash("SalesOrder-manage", params)
+    ou = parse_location("https://site.example/flp.html" + hash_)
+    assert ou["intent"] == "SalesOrder-manage"
+    assert ou["intent_params"] == params
+
+
+def test_get_page_location_lit_l_adresse_du_navigateur():
+    lib = _fiori(FakeNavBrowser("https://site.example/flp.html#Shell-home"))
+    ou = lib.get_page_location()
+    assert ou["host"] == "site.example"
+    assert ou["intent"] == "Shell-home"
+
+
+class FakeUshellBrowser:
+    """Doublure de `Get Ushell Config` : rejoue ce que la sonde JS retourne
+    (le dict extrait, le marqueur `__missing_path`, ou `__no_config`)."""
+
+    def __init__(self, result):
+        self.result = result
+        self.args_seen = []
+
+    def evaluate_javascript(self, selector, js, arg=None):
+        self.args_seen.append(arg)
+        return self.result
+
+
+def test_get_ushell_config_rend_le_dict_et_transmet_le_chemin():
+    browser = FakeUshellBrowser({"services": {"Container": {}},
+                                 "renderers": {}})
+    lib = _fiori(browser)
+    config = lib.get_ushell_config()
+    assert "services" in config
+    assert browser.args_seen == [None]
+    lib.get_ushell_config(path="ushell.sessionTimeoutIntervalInMinutes")
+    assert browser.args_seen[-1] == "ushell.sessionTimeoutIntervalInMinutes"
+
+
+def test_get_ushell_config_page_sans_launchpad_echoue_en_nommant_les_causes():
+    # Le marqueur __no_config distingue « pas de config » d'une valeur
+    # légitimement nulle DANS la config (les deux arrivaient en None sinon).
+    lib = _fiori(FakeUshellBrowser({"__no_config": True}))
+    with pytest.raises(AssertionError) as err:
+        lib.get_ushell_config()
+    assert "pas un launchpad" in str(err.value)
+    assert "Pop Ui5 Frame" in str(err.value)
+    # une valeur null DANS la config reste une valeur, jamais un échec
+    assert _fiori(FakeUshellBrowser(None)).get_ushell_config(
+        path="ushell.opt") is None
+
+
+def test_get_ushell_config_chemin_absent_liste_les_cles_connues():
+    lib = _fiori(FakeUshellBrowser(
+        {"__missing_path": "ushell.absent", "__known_keys": ["services", "ushell"]}))
+    with pytest.raises(AssertionError) as err:
+        lib.get_ushell_config(path="ushell.absent")
+    assert "ushell.absent" in str(err.value)
+    assert "services" in str(err.value)
+
+
 def test_idp_login_two_step_flow():
     browser = FakeIdpBrowser(two_step=True)
     _fiori(browser).log_in_via_identity_provider("USER", Secret("PASS"))

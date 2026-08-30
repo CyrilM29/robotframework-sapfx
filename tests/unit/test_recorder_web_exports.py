@@ -278,7 +278,7 @@ def test_extension_manifest_bumped_for_recorder_features():
     with open(os.path.join(_RECORDER_WEB, "extension", "manifest.json"),
               encoding="utf-8") as fh:
         manifest = json.load(fh)
-    assert manifest["version"] == "0.10.0"
+    assert manifest["version"] == "0.10.1"
     # Le Chrome Web Store refuse une description > 132 caractères : bloquant
     # de soumission attrapé lors de la revue croisée avec rf-web-recorder.
     assert len(manifest["description"]) <= 132

@@ -197,6 +197,95 @@ def test_gateway_should_be_active_nomme_la_remediation():
         lib.gateway_should_be_active()
 
 
+def test_gateway_status_200_html_nest_plus_un_vert_et_faux():
+    # Le cas Work Zone (2026-08-26) : toute route déclarée répond 200 avec la
+    # page HTML d'amorçage de connexion. `Gateway Should Be Active` passait.
+    lib = _lib_with([_FakeResponse(
+        b"<!DOCTYPE html><html><head><script>bootstrap login</script>")])
+    lib.open_api_session("https://site.example")
+    status = lib.get_gateway_status()
+    assert status["status"] == "login_page"
+    lib2 = _lib_with([_FakeResponse(b"<!DOCTYPE html><html>")])
+    lib2.open_api_session("https://site.example")
+    with pytest.raises(AssertionError, match="aucune donnée"):
+        lib2.gateway_should_be_active()
+
+
+def test_gateway_status_redirection_cross_origin_classee_idp():
+    # Le garde same-origin lève une URLError marquée : elle doit ressortir en
+    # identity_provider_redirect, jamais en « système éteint ».
+    lib = _lib_with([urllib.error.URLError(
+        "Cross-origin API redirect blocked: https://tenant/oauth2/authorize")])
+    lib.open_api_session("https://site.example")
+    status = lib.get_gateway_status()
+    assert status["status"] == "identity_provider_redirect"
+    assert "clé de service" in status["remediation"]
+
+
+def test_les_sondes_alimentent_la_telemetrie():
+    # Mesuré live avant correctif (reconnaissance BTP) : ~15 sondes réseau,
+    # `requests: 2`. Une reconnaissance faite de sondes doit compter, sinon
+    # `Api Channel Should Show Activity` échoue sur un canal qui a bien
+    # traversé le réseau. Un refus de sonde reste un RÉSULTAT : errors à 0.
+    lib = _lib_with([
+        _json_response({"d": {"results": []}}),
+        urllib.error.HTTPError("http://h/x", 404, "NF", None,
+                               io.BytesIO(b"not here")),
+        urllib.error.URLError("down"),
+    ])
+    lib.open_api_session("http://h")
+    lib.get_gateway_status()
+    lib.get_gateway_status()
+    lib.get_gateway_status()
+    telemetry = lib.get_api_telemetry()
+    assert telemetry["requests"] == 3
+    assert telemetry["errors"] == 0
+    assert telemetry["last_status"] == 404  # l'URLError n'a pas de statut
+
+
+def test_get_http_response_lit_le_corps_brut_sans_lever():
+    # Né de la reconnaissance BTP : lire une page HTML exigeait de la
+    # détourner du message d'échec de Get Odata.
+    lib = _lib_with([
+        _FakeResponse(b"<!DOCTYPE html><html>page</html>", status=200,
+                      headers={"Content-Type": "text/html"}),
+        urllib.error.HTTPError("http://h/absent", 404, "NF",
+                               {"X-Marker": "yes"}, io.BytesIO(b"rien ici")),
+        urllib.error.URLError("connexion refusée"),
+    ])
+    lib.open_api_session("http://h")
+    ok = lib.get_http_response("/site")
+    assert ok["status"] == 200
+    assert ok["body"].startswith("<!DOCTYPE html>")
+    assert ok["headers"]["Content-Type"] == "text/html"
+    assert ok["truncated"] is False and ok["error"] is None
+    assert ok["url"].startswith("http://h/site")
+    refus = lib.get_http_response("/absent")
+    assert refus["status"] == 404 and "rien ici" in refus["body"]
+    down = lib.get_http_response("/down")
+    assert down["status"] is None and "connexion refusée" in down["error"]
+
+
+def test_get_http_response_tronque_en_le_disant_et_pose_ses_en_tetes():
+    lib = _lib_with([_FakeResponse(b"A" * 50)])
+    lib.open_api_session("http://h")
+    court = lib.get_http_response("/big", max_chars=10,
+                                  headers={"Accept": "text/html"})
+    assert court["body"] == "A" * 10 and court["truncated"] is True
+    assert _sent_header(lib.requests_seen[-1], "Accept") == "text/html"
+
+
+def test_open_api_session_headers_surchargent_l_accept_maison():
+    # Un approuter BTP arbitre HTML/JSON sur l'Accept : la session doit
+    # pouvoir le poser une fois pour toutes.
+    lib = _lib_with([_json_response({"value": []})])
+    lib.open_api_session("http://h",
+                         headers={"Accept": "text/html", "X-Custom": "v"})
+    lib.get_odata_entities("/svc/Set")
+    assert _sent_header(lib.requests_seen[-1], "Accept") == "text/html"
+    assert _sent_header(lib.requests_seen[-1], "X-Custom") == "v"
+
+
 def test_wait_until_api_available_reussit_apres_echecs():
     lib = _lib_with([urllib.error.URLError("boot en cours"),
                      _json_response({"d": {"results": []}})])

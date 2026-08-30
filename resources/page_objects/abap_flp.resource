@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Page object d'un **launchpad Fiori hébergé par un serveur
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Page object d'un **launchpad Fiori hébergé par un serveur
 ...                 ABAP** (FLP « ushell classique », service ICF
 ...                 `/sap/bc/ui2/flp`), par opposition au cFLP SAP Build Work
 ...                 Zone dont le page object voisin
@@ -74,6 +83,9 @@ Documentation       Page object d'un **launchpad Fiori hébergé par un serveur
 Resource            ../fiori_keywords.resource
 Library             Collections
 Library             String
+# Primitive pure atteinte par un KEYWORD (décision DDIC 2026-08-17) :
+# `Secret Is Provided` teste la PRÉSENCE d'un identifiant sans jamais le lire.
+Library             sapfx_common.secrets
 
 
 *** Variables ***
@@ -172,6 +184,12 @@ ${ABAP_FLP_BACK_BUTTON}             backBtn
 ${ABAP_FLP_APP_TITLE}               shellAppTitle
 ${ABAP_FLP_SEARCH_BUTTON}           sf
 ${ABAP_FLP_SEARCH_INPUT}            searchFieldInShell-input
+# Ouverture de la recherche : le premier clic ne rend pas le champ (mesuré live
+# le 2026-08-29 sur la 1.71), donc l'ouverture se retente jusqu'à ce que le
+# champ occupe une surface. Trois passages suffisent largement, le second
+# ouvrant en pratique.
+${ABAP_FLP_SEARCH_ESSAIS}           3x
+${ABAP_FLP_SEARCH_PAUSE}            1s
 ${ABAP_FLP_ALL_APPS_LIST}           sapUshellAllMyAppsDataSourcesList
 ${ABAP_FLP_ALL_APPS_ENTRY}          sap.m.CustomListItem
 # Le mode édition de l'accueil se CONSTATE par son bouton de validation : la
@@ -269,19 +287,14 @@ ${ABAP_FLP_FRAGMENT_MALFORME}       FragmentSansAction
 @{ABAP_FLP_MARQUEURS_DEPRECATION}    @{EMPTY}
 @{ABAP_FLP_MARQUEURS_SESSION}       @{EMPTY}
 
-# --- Sondes JavaScript (perception du shell) ---------------------------------
-# Le conteneur ushell est présent bien avant que la page soit au repos : c'est
-# la première marche d'attente d'un chargement.
-${ABAP_FLP_CONTAINER_JS}            () => !!(window.sap && sap.ushell && sap.ushell.Container)
-${ABAP_FLP_IDENTITE_JS}             () => { const u = sap.ushell.Container.getUser(); return {utilisateur: u.getId(), langue: u.getLanguage(), theme: u.getTheme()}; }
-${ABAP_FLP_LANGUES_JS}              () => { const s = document.querySelector('#LANGUAGE_SELECT'); return s ? Array.from(s.options).map(o => o.value).filter(v => !!v) : []; }
-# Catalogues assignés à l'utilisateur, lus au service `LaunchPage` : ce que
-# l'utilisateur a le DROIT d'ouvrir, et non ce que cette page affiche. Les
-# résultats arrivent en `progress`, d'où la promesse qui accepte les deux
-# formes de réponse de l'adaptateur ABAP.
-${ABAP_FLP_CATALOGUES_JS}           async () => { const C = window.sap && sap.ushell && sap.ushell.Container; if (!C) return null; const s = await C.getServiceAsync('LaunchPage'); const cats = await new Promise((res, rej) => { const out = []; s.getCatalogs().done(a => res(out.length ? out : (a || []))).fail(rej).progress(c => out.push(c)); }); const r = []; for (const c of cats) { const tiles = await new Promise((res, rej) => s.getCatalogTiles(c).done(res).fail(rej)); const t = []; for (const tile of (tiles || [])) { const url = String(s.getCatalogTileTargetURL(tile) || ''); t.push({intent: url.replace(/^#/, '').split('?')[0], cible: url}); } r.push({id: s.getCatalogId(c), tuiles: t}); } return r; }
-# Groupes de l'accueil et volume de chacun, même source de vérité.
-${ABAP_FLP_GROUPES_JS}              async () => { const C = window.sap && sap.ushell && sap.ushell.Container; if (!C) return null; const s = await C.getServiceAsync('LaunchPage'); const groupes = await new Promise((res, rej) => { const out = []; s.getGroups().done(a => res(out.length ? out : (a || []))).fail(rej).progress(g => out.push(g)); }); return groupes.map(g => ({id: s.getGroupId(g), tuiles: (s.getGroupTiles(g) || []).length})); }
+# --- Perception du shell : keywords de bibliothèque (convention #12) ---------
+# Les sondes ushell qui vivaient ici en JS inline (conteneur, identité,
+# catalogues LaunchPage, groupes, résolvabilité d'intents, SearchableContent)
+# sont devenues des keywords de SapFioriLibrary : `Flp Container Is Present`,
+# `Get Flp User`, `List Flp Catalogs`, `List Flp Groups`,
+# `Get Flp Intent Support`, `Flp Service Is Available`, `List Flp Apps`.
+# Ce fichier n'en garde que la traduction en vocabulaire français, plus les
+# DEUX sondes assumées ci-dessous (spécifiques à la release ou au geste).
 # Tuiles RENDUES de l'accueil : titre lu sur la PROPRIÉTÉ d'en-tête (le rendu
 # d'une tuile y ajoute sous-titre, compteur et libellé de compteur), intent lu
 # dans le contexte de liaison (`getTileTarget` retourne null sur cet adaptateur)
@@ -295,27 +308,10 @@ ${ABAP_FLP_GROUPES_JS}              async () => { const C = window.sap && sap.us
 # `Lire Les Tuiles De L Accueil`), et la cible 1.120 déclare une autre STRATÉGIE
 # de lecture (`${ABAP_FLP_TUILES_STRATEGIE}`), par containment DOM.
 ${ABAP_FLP_TUILES_JS}               () => { const E = sap.ui.require('sap/ui/core/Element'); const out = []; E.registry.forEach(c => { if (c.getMetadata().getName() !== 'sap.ushell.ui.launchpad.Tile' || !c.getDomRef()) return; const ctx = c.getBindingContext(); const o = (ctx && ctx.getObject()) || {}; const titres = [], valeurs = []; const walk = k => { if (!k || typeof k.getMetadata !== 'function') return; const n = k.getMetadata().getName(); if (n === 'sap.m.GenericTile' && k.getHeader) titres.push(k.getHeader() || ''); if (n === 'sap.m.NumericContent' && k.getValue) valeurs.push(k.getValue()); const agg = k.mAggregations || {}; Object.keys(agg).forEach(a => { const v = agg[a]; (Array.isArray(v) ? v : [v]).forEach(walk); }); }; (o.content || []).forEach(walk); out.push({titre: titres[0] || '', intent: String(o.target || '').replace(/^#/, '').split('?')[0], compteur: valeurs.length ? String(valeurs[0]) : '', dynamique: valeurs.length > 0}); }); return out; }
-# Résolvabilité d'une LISTE d'intents, en un aller-retour. Le marqueur
-# `__INTENTS__` est remplacé par le JSON de la liste : passer un argument à la
-# fonction évaluée n'est pas fiable quand aucun sélecteur n'est fourni.
-${ABAP_FLP_RESOLUTION_JS}           async () => { const intents = __INTENTS__; const C = window.sap && sap.ushell && sap.ushell.Container; const s = await C.getServiceAsync('CrossApplicationNavigation'); const hashes = intents.map(i => '#' + i); const r = await new Promise((res, rej) => s.isIntentSupported(hashes).done(res).fail(rej)); return intents.map(i => ({intent: i, resolvable: !!(r['#' + i] && r['#' + i].supported)})); }
 # Écriture directe d'un fragment dans l'URL : la seule façon de soumettre au
-# shell une chaîne qui n'a PAS la forme d'un intent.
+# shell une chaîne qui n'a PAS la forme d'un intent (`Open Fiori App` valide la
+# forme). Sonde ASSUMÉE dans l'allowlist de check_conventions.py.
 ${ABAP_FLP_FRAGMENT_JS}             () => { window.location.hash = '__FRAGMENT__'; return window.location.hash; }
-# Service de contenu recherchable : PRÉSENT sur les ushell récents, absent des
-# plus anciens (son module y répond 404). La sonde répond vrai ou faux et
-# n'échoue jamais : c'est un prédicat de branchement, pas une assertion. Elle
-# vaut mieux qu'un test de version, qui supposerait ce qu'elle mesure.
-${ABAP_FLP_SEARCHABLE_DISPO_JS}     async () => { const C = window.sap && sap.ushell && sap.ushell.Container; if (!C) return false; try { const s = await C.getServiceAsync('SearchableContent'); return !!(s && typeof s.getApps === 'function'); } catch (e) { return false; } }
-# Inventaire des applications par ce même service : une liste de dicts
-# `{intent, titre}`. Retourne null quand le service manque, ce que le prédicat
-# ci-dessus permet d'éviter de rencontrer.
-${ABAP_FLP_SEARCHABLE_JS}           async () => { const C = window.sap && sap.ushell && sap.ushell.Container; if (!C) return null; let s; try { s = await C.getServiceAsync('SearchableContent'); } catch (e) { return null; } if (!s || !s.getApps) return null; const apps = await s.getApps(); return (apps || []).map(a => { const v = (a.visualizations || [])[0] || {}; return {intent: String(v.targetURL || '').replace(/^#/, '').split('?')[0], titre: String(v.title || a.title || '')}; }); }
-# Clés techniques des rubriques de paramètres lues dans le CONTEXTE DE LIAISON,
-# la voie des releases dont les identifiants de rubrique sont générés. La cible
-# ne choisit pas cette sonde directement : elle choisit la STRATÉGIE de lecture
-# (`${ABAP_FLP_RUBRIQUES_STRATEGIE}`), qui sait quelle sonde appeler.
-${ABAP_FLP_RUBRIQUES_PAR_CONTEXTE_JS}    () => { const E = sap.ui.require('sap/ui/core/Element'); let liste = null; E.registry.forEach(c => { if (!liste && c.getId().endsWith('__LISTE__') && c.getItems) liste = c; }); if (!liste) return null; return liste.getItems().filter(i => !!i.getDomRef()).map(i => { const ctx = i.getBindingContext(); const o = (ctx && ctx.getObject()) || {}; return String(o.id || ''); }); }
 # Contrôles porteurs du titre et du compteur DANS le nœud d'une tuile, pour la
 # lecture par containment (voir `Lire Les Tuiles Par Containment`).
 ${ABAP_FLP_TILE_HEADER}             sap.m.GenericTile
@@ -341,7 +337,7 @@ La Cible Et Les Identifiants Sont Fournis
     ...    msg=La cible doit être attaquée en HTTPS direct : la voie HTTP redirige vers un nom d'hôte virtuel partagé et mène possiblement à un AUTRE système.
     Should Not Be Empty    ${ABAP_FLP_USER}
     ...    msg=Utilisateur absent : passer -v ABAP_FLP_USER:<utilisateur ABAP>.
-    ${fourni}=    Evaluate    not isinstance($ABAP_FLP_PASSWORD, str) or bool($ABAP_FLP_PASSWORD)
+    ${fourni}=    Secret Is Provided    ${ABAP_FLP_PASSWORD}
     Should Be True    ${fourni}
     ...    msg=Mot de passe absent : passer -v "ABAP_FLP_PASSWORD: Secret:<motdepasse>".
 
@@ -399,7 +395,10 @@ Lire Les Langues De Connexion
     ...    connexion, entrée vide exclue (le sélecteur porte une option vide en
     ...    tête, qui n'est pas une langue). Les CODES sont techniques, les
     ...    libellés qui les accompagnent ne le sont pas.
-    ${langues}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_LANGUES_JS}
+    ${nb}=    Get Dom Match Count    css=${ABAP_FLP_LOGIN_LANGUAGES}
+    IF    ${nb} == 0    RETURN    ${{ [] }}
+    ${options}=    Get Select Options    css=${ABAP_FLP_LOGIN_LANGUAGES}
+    ${langues}=    Evaluate    [str(o['value']) for o in $options if o['value']]
     RETURN    ${langues}
 
 Tenter Une Connexion
@@ -408,9 +407,11 @@ Tenter Une Connexion
     ...    branche de refus. Le mot de passe n'est jamais journalisé.
     [Arguments]    ${utilisateur}    ${mot_de_passe}
     Fill Dom Input    ${utilisateur}    css=${ABAP_FLP_LOGIN_USER}
+    # Le type `Secret` traverse INTACT jusqu'au moteur, qui le déballe à la
+    # frontière du navigateur : plus aucun déballage dans la couche Robot,
+    # où la valeur claire entrait dans l'espace des variables (convention #12).
     ${niveau}=    Set Log Level    NONE
-    ${clair}=    Evaluate    getattr($mot_de_passe, 'value', $mot_de_passe)
-    Fill Dom Input    ${clair}    css=${ABAP_FLP_LOGIN_PASSWORD}
+    Fill Dom Input    ${mot_de_passe}    css=${ABAP_FLP_LOGIN_PASSWORD}
     Set Log Level    ${niveau}
     Click Dom Element    css=${ABAP_FLP_LOGIN_SUBMIT}
 
@@ -441,7 +442,8 @@ Le Shell Du Launchpad Est Rendu
     [Documentation]    Sonde en trois marches, chacune nécessaire : le conteneur
     ...    ushell existe, la page revient au repos réseau, et le shell a
     ...    construit des contrôles. Un runtime chargé ne prouve aucun rendu.
-    Wait For Function    ${ABAP_FLP_CONTAINER_JS}    timeout=${ABAP_FLP_BOOT_TIMEOUT}
+    Wait Until Keyword Succeeds    ${ABAP_FLP_BOOT_TIMEOUT}    1s
+    ...    Flp Container Should Be Present
     Wait For Ui5 Idle    settle=${ABAP_FLP_SETTLE}    timeout=${ABAP_FLP_IDLE_TIMEOUT}
     Wait Until Keyword Succeeds    60s    2s    Le Shell Porte Des Controles
 
@@ -486,7 +488,9 @@ Lire L Identite De Session
     [Documentation]    Utilisateur connecté, sa langue et son thème, lus au
     ...    conteneur ushell : la seule source qui dise ce que le SERVEUR a
     ...    ouvert, plutôt que ce que le test croit avoir demandé.
-    ${identite}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_IDENTITE_JS}
+    ${brut}=    Get Flp User
+    ${identite}=    Create Dictionary    utilisateur=${brut}[id]
+    ...    langue=${brut}[language]    theme=${brut}[theme]
     RETURN    ${identite}
 
 Compter Les Elements De La Barre Shell
@@ -507,7 +511,14 @@ Inventorier Les Catalogues
     ...    Source choisie à dessein : le service dit ce que l'utilisateur a le
     ...    DROIT d'ouvrir, là où l'App Finder ne rend que ce qui est filtré et
     ...    visible (mesuré : 54 vignettes rendues pour 67 tuiles déclarées).
-    ${catalogues}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_CATALOGUES_JS}
+    ${bruts}=    List Flp Catalogs
+    ${catalogues}=    Create List
+    FOR    ${cat}    IN    @{bruts}
+        ${tuiles}=    Evaluate
+        ...    [{'intent': t['intent'], 'cible': t['target_url']} for t in $cat['tiles']]
+        ${entree}=    Create Dictionary    id=${cat}[id]    tuiles=${tuiles}
+        Append To List    ${catalogues}    ${entree}
+    END
     RETURN    ${catalogues}
 
 Lire Les Intents Du Catalogue
@@ -530,7 +541,7 @@ Le Service De Contenu Recherchable Est Disponible
     ...    échec, parce que son absence n'est pas un défaut : c'est une
     ...    caractéristique de la release, et la campagne doit pouvoir se réduire
     ...    à la voie universelle en le disant plutôt qu'en échouant.
-    ${disponible}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_SEARCHABLE_DISPO_JS}
+    ${disponible}=    Flp Service Is Available    SearchableContent
     RETURN    ${disponible}
 
 Inventorier Les Applications Recherchables
@@ -542,9 +553,11 @@ Inventorier Les Applications Recherchables
     ...    celle du service historique (il fusionne des visualisations qui
     ...    partagent une cible), donc ce sont les INTENTS qui se comparent, pas
     ...    les cardinalités.
-    ${applications}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_SEARCHABLE_JS}
-    Should Not Be Equal    ${applications}    ${None}
-    ...    msg=Le service de contenu recherchable n'a rien retourné : le sonder avec « Le Service De Contenu Recherchable Est Disponible » avant de l'interroger.
+    ${bruts}=    List Flp Apps
+    # Priorité de titre conservée de la sonde historique : le titre de la
+    # visualisation d'abord, le libellé de l'application à défaut.
+    ${applications}=    Evaluate
+    ...    [{'intent': a['intent'], 'titre': a['viz_title'] or a['title']} for a in $bruts]
     RETURN    ${applications}
 
 Lire Les Intents Des Applications Recherchables
@@ -563,9 +576,9 @@ Les Intents Sont Ils Resolvables
     ...    intent : c'est ce qui permet de NOMMER l'écart plutôt que de conclure
     ...    globalement.
     [Arguments]    ${intents}
-    ${json}=    Evaluate    json.dumps(list($intents))    modules=json
-    ${js}=    Replace String    ${ABAP_FLP_RESOLUTION_JS}    __INTENTS__    ${json}
-    ${resolutions}=    Evaluate JavaScript    ${None}    ${js}
+    ${verdicts}=    Get Flp Intent Support    ${intents}
+    ${resolutions}=    Evaluate
+    ...    [{'intent': v['intent'], 'resolvable': v['supported']} for v in $verdicts]
     RETURN    ${resolutions}
 
 Separer Les Intents Non Resolvables
@@ -584,7 +597,8 @@ Inventorier Les Groupes De L Accueil
     ...    une liste de dicts `{id, tuiles}`. L'ancre est l'identifiant TECHNIQUE
     ...    du groupe, jamais son titre : celui rendu à l'écran diffère de celui
     ...    que retourne le service, et les deux sont traduits.
-    ${groupes}=    Evaluate JavaScript    ${None}    ${ABAP_FLP_GROUPES_JS}
+    ${bruts}=    List Flp Groups
+    ${groupes}=    Evaluate    [{'id': g['id'], 'tuiles': g['tile_count']} for g in $bruts]
     RETURN    ${groupes}
 
 Lire Les Tuiles De L Accueil
@@ -991,10 +1005,10 @@ Lire Les Rubriques Par Contexte De Liaison
     ...    La sonde ne rend que les rubriques réellement RENDUES : une rubrique
     ...    déclarée par le modèle mais jamais construite n'est pas offerte à
     ...    l'utilisateur, donc pas relevée.
-    ${js}=    Replace String    ${ABAP_FLP_RUBRIQUES_PAR_CONTEXTE_JS}    __LISTE__    ${ABAP_FLP_SETTINGS_LIST}
-    ${cles}=    Evaluate JavaScript    ${None}    ${js}
-    Should Not Be Equal    ${cles}    ${None}
-    ...    msg=La liste maître des paramètres est introuvable : aucune liste rendue dont l'identifiant se termine par « ${ABAP_FLP_SETTINGS_LIST} ».
+    ${items}=    Get Ui5 Aggregation Info    items
+    ...    idSuffix=${ABAP_FLP_SETTINGS_LIST}
+    ${cles}=    Evaluate
+    ...    [str((i['binding'] or {}).get('object', {}).get('id') or '') for i in $items if i['rendered']]
     ${triees}=    Evaluate    sorted({c for c in $cles if c})
     RETURN    ${triees}
 
@@ -1320,9 +1334,34 @@ Fermer Le Popover Courant
 
 Ouvrir La Recherche Du Shell
     [Documentation]    Déplie la recherche depuis la barre shell et attend que
-    ...    son champ soit rendu.
-    Click Ui5 Control    idSuffix=${ABAP_FLP_SEARCH_BUTTON}
-    Wait For Ui5 Idle    settle=${ABAP_FLP_SETTLE}    timeout=${ABAP_FLP_IDLE_TIMEOUT}
+    ...    son champ occupe RÉELLEMENT une surface.
+    ...
+    ...    L'ouverture est IDEMPOTENTE et se retente, parce qu'un seul clic ne
+    ...    suffit pas : mesuré live le 2026-08-29 sur la 1.71, le premier clic
+    ...    crée le contrôle sans le rendre (champ ABSENT du DOM, bouton
+    ...    toujours `visible=True`), et c'est le second qui l'ouvre vraiment
+    ...    (560x36, input 528x26, bouton passé à `visible=False`).
+    ...
+    ...    Ce que coûtait le clic unique, et pourquoi le témoin est la surface
+    ...    et non la présence au registre : le contrôle EXISTE après le premier
+    ...    clic et se déclare `visible=True`, si bien qu'une assertion de
+    ...    présence passait. La suite du scénario saisissait alors dans un
+    ...    champ inexistant, `Fill Ui5 Input` relisait une valeur vide, et la
+    ...    touche Entrée partait à la tuile qui avait le focus, ouvrant une
+    ...    application au lieu de lancer la recherche.
+    Wait Until Keyword Succeeds    ${ABAP_FLP_SEARCH_ESSAIS}    ${ABAP_FLP_SEARCH_PAUSE}
+    ...    Deplier La Recherche Du Shell
+
+Deplier La Recherche Du Shell
+    [Documentation]    Un passage d'ouverture : ne clique que si la recherche
+    ...    n'est pas déjà ouverte (le bouton disparaît quand elle l'est, donc
+    ...    recliquer échouerait), puis CONSTATE la surface du champ.
+    ${ouverte}=    Run Keyword And Return Status
+    ...    Ui5 Control Should Be Visible    idSuffix=${ABAP_FLP_SEARCH_INPUT}
+    IF    not ${ouverte}
+        Click Ui5 Control    idSuffix=${ABAP_FLP_SEARCH_BUTTON}
+        Wait For Ui5 Idle    settle=${ABAP_FLP_SETTLE}    timeout=${ABAP_FLP_IDLE_TIMEOUT}
+    END
     Ui5 Control Should Be Visible    idSuffix=${ABAP_FLP_SEARCH_INPUT}
 
 Rechercher Dans Le Shell

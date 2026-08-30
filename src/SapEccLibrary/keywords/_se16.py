@@ -3,6 +3,13 @@
 Les primitives d'ECRAN de SE16, partagees par l'inventaire DDIC, la couche
 resources et les campagnes (fin des trois copies divergentes) :
 
+- `Use ALV Grid In Data Browser` : le REGLAGE que trois messages d'echec de
+  cette bibliotheque nomment deja comme remede (sans lui, la sortie SE16 est
+  une liste ABAP sans objet grille scriptable) ; promu de la couche resources,
+  hors de portee d'un utilisateur PyPI a qui l'erreur le prescrivait pourtant ;
+- `Count Entries On Current Selection Screen` : le comptage « Number of
+  Entries », independant du plafond de hits et fiable sur table vide, la ou
+  une execution F8 resterait sur l'ecran de selection ;
 - `Reach Se16 Selection Screen` : SE16 jusqu'a l'ecran de selection d'une
   table, verdict structure ``reached``/``rejected``/``dialog``/``modal``,
   modales de generation absorbees (popup « choix des champs », dialogue de
@@ -25,9 +32,11 @@ composition dans :class:`SapEccLibrary`.
 """
 from pythoncom import com_error
 from robot.api import logger
+from robot.api.deco import keyword
 
 from sapfx_common.cross_channel import selection_criteria
 from sapfx_common.polling import poll_until
+from sapfx_common.robot_args import displayed_count
 from sapfx_common.semantic import screen_affordances
 
 # Ecrans standard pilotes par ce mixin. Le Data Browser et le dialogue de
@@ -37,6 +46,12 @@ from sapfx_common.semantic import screen_affordances
 _SE16_TABLE_FIELD = "wnd[0]/usr/ctxtDATABROWSE-TABLENAME"
 _SE16_GRID = "wnd[0]/usr/cntlGRID1/shellcont/shell"
 _SE16_MAX_HITS = "wnd[0]/usr/txtMAX_SEL"
+_SE16_COUNT_BUTTON = "wnd[0]/tbar[1]/btn[31]"
+_SE16_COUNT_RESULT = "wnd[1]/usr/txtG_DBCOUNT"
+_SE16_SETTINGS_MENU = "wnd[0]/mbar/menu[3]/menu[0]"
+_SE16_ALV_GRID_RADIO = ("wnd[1]/usr/tabsG_TABSTRIP/tabp0400/"
+                        "ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/"
+                        "radRSEUMOD-TBALV_GRID")
 _DD02L_MULTI_BUTTON = "wnd[0]/usr/btn%_I1_%_APP_%-VALU_PUSH"
 _MULTI_TABLE = ("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/"
                 "ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE")
@@ -124,6 +139,63 @@ class Se16Keywords:
             self.wait_until_element_present(_SE16_MAX_HITS, timeout=timeout)
         state["reached"] = True
         return state
+
+    # Nom EXPOSÉ forcé : la conversion automatique rendrait « Use Alv Grid In
+    # Data Browser », alors que trois messages d'échec de cette bibliothèque
+    # et huit suites écrivent « ALV ». Robot matche sans la casse, donc rien
+    # ne casserait, mais la documentation publiée doit citer le sigle juste.
+    @keyword("Use ALV Grid In Data Browser")
+    def use_alv_grid_in_data_browser(self):
+        """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
+        **grille ALV** (Settings → User Parameters → ALV Grid Display).
+
+        Le REMÈDE que trois messages d'échec de cette bibliothèque nomment
+        déjà (`Read Grid`, la classification DDIC, le lecteur SE16) : sans ce
+        réglage, la sortie par défaut est la « Standard SE16 list », une liste
+        ABAP classique SANS objet grille scriptable, donc aucune lecture de
+        grille n'est possible. Il vivait dans la couche resources du dépôt,
+        hors de portée d'un utilisateur PyPI à qui l'erreur le prescrivait
+        pourtant : promu ici au titre de la convention #12.
+
+        **Persistant par utilisateur** (le réglage survit à la session) et
+        idempotent : à appeler UNE fois en Suite Setup. Repart de l'écran
+        initial SE16, donc utilisable à tout moment. Lecture seule au sens
+        métier : ne modifie aucune donnée, seulement une préférence
+        d'affichage du compte de service."""
+        self.run_transaction("SE16")
+        self.wait_until_busy_done()
+        self.click_element(_SE16_SETTINGS_MENU)
+        self.wait_until_busy_done()
+        self.wait_until_element_present(_SE16_ALV_GRID_RADIO)
+        self.select_radio_button(_SE16_ALV_GRID_RADIO)
+        self.send_vkey(0, window=1)
+        self.wait_until_busy_done()
+
+    def count_entries_on_current_selection_screen(self):
+        """Compte les entrées répondant à l'écran de sélection SE16 COURANT,
+        via « Number of Entries », puis referme le popup (F12).
+
+        La primitive d'écran du comptage SE16, à distinguer d'une exécution
+        F8 : elle compte **toutes** les entrées qui répondent aux critères
+        saisis, indépendamment de « Maximum No. of Hits », et reste fiable sur
+        une table VIDE (retourne 0), là où F8 resterait sur l'écran de
+        sélection sans grille. L'écran de sélection est intact après l'appel :
+        on peut enchaîner une exécution ou un autre critère.
+
+        Retourne un entier. Le compteur affiché porte les séparateurs de
+        milliers du profil utilisateur : la normalisation est locale-safe
+        (``sapfx_common.robot_args.displayed_count``, chiffres seuls). ::
+
+            Reach Se16 Selection Screen    SPFLI
+            ${n}=    Count Entries On Current Selection Screen
+        """
+        self.click_element(_SE16_COUNT_BUTTON)
+        self.wait_until_busy_done()
+        self.wait_until_element_present(_SE16_COUNT_RESULT)
+        raw = self.get_value(_SE16_COUNT_RESULT)
+        self.send_vkey(12, window=1)
+        self.wait_until_busy_done()
+        return displayed_count(raw)
 
     def fill_multiple_selection(self, values, button_id=_DD02L_MULTI_BUTTON):
         """Charge une LISTE de valeurs dans la sélection multiple d'un critère.

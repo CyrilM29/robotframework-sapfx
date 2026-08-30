@@ -134,6 +134,20 @@ PACK_FILES = [
     # lancent séparément selon ce que le poste a sous la main.
     ("tests/robot/api/canal_api_odata.robot",
      "tests/robot/api/canal_api_odata.robot"),
+    # Campagne Demo Kit : la SEULE suite du pack qui ne demande NI identifiants
+    # NI système à provisionner (cible publique `sdk.openui5.org`), et la seule
+    # qui exerce `resources/page_objects/openui5_demokit.resource`, livré juste
+    # à côté : même raison que la suite du canal API ci-dessus, un page object
+    # sans exemple n'est ni montré ni validé au dryrun. Elle apporte aussi au
+    # pack son premier couple plan -> suite complet, donc l'exemple exécutable
+    # du cycle des agents. Navigateur VISIBLE par défaut, `-v
+    # DEMOKIT_HEADLESS:True` pour un poste sans affichage. Son plan voyage avec
+    # elle : sans lui, le `check_spec_sync.py` embarqué signalerait à raison un
+    # marqueur cassé.
+    ("tests/robot/ui/fiori/navigation_interaction_demokit.robot",
+     "tests/robot/ui/fiori/navigation_interaction_demokit.robot"),
+    ("specs/openui5-demokit-navigation-interaction.md",
+     "specs/openui5-demokit-navigation-interaction.md"),
     # Outillage de maintenance, stdlib pure, exécutable depuis la racine du
     # pack : bot télémétrie de healing -> patch resources/ proposé, et garde
     # spec <-> suite générée (source de vérité) pour les suites des agents.
@@ -154,6 +168,11 @@ PACK_FILES = [
     ("packaging/README.fr.md", "README.fr.md"),
     ("packaging/install.ps1", "install.ps1"),
     ("packaging/install.cmd", "install.cmd"),
+    # Provisionnement OPTIONNEL du canal RFC : le SDK NW RFC est sous licence
+    # SAP et ne peut pas voyager dans le pack, mais tout ce qui vient APRÈS
+    # l'obtention de l'archive est scriptable, et l'était jusqu'ici à la main
+    # sur chaque poste.
+    ("packaging/install-rfc.ps1", "install-rfc.ps1"),
     ("packaging/recorder.cmd", "recorder.cmd"),
     ("packaging/mcp.json.template", "mcp.json.template"),
     ("packaging/vscode-mcp.json.template", "vscode-mcp.json.template"),

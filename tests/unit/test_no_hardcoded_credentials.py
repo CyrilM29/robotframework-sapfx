@@ -39,6 +39,21 @@ TOLERES: dict[tuple[str, str], str] = {
         "mot de passe du faux IDP de fixtures/idp_login_fixture.html",
     ("resources/page_objects/abap_flp.resource", "ABAP_FLP_LOGIN_PASSWORD"):
         "sélecteur CSS du champ de saisie du formulaire ICF, pas un secret",
+    ("resources/rfc_keywords.resource", "WRONG_PASSWORD"):
+        "sonde de refus : un mot de passe qui DOIT être rejeté, jamais un accès",
+    # Le mot « key » d'un contrôle UI5 désigne sa CLÉ TECHNIQUE (propriété
+    # `key` d'une entrée de menu, d'un onglet, d'une colonne) : justement
+    # l'ancre qui rend une assertion indépendante de la locale (convention #3),
+    # là où le libellé visible est traduit. Aucune de ces valeurs n'ouvre quoi
+    # que ce soit, et la cible est un site public sans authentification.
+    ("resources/page_objects/openui5_demokit.resource", "DEMOKIT_MENU_SETTINGS_KEY"):
+        "clé technique d'entrée de menu UI5, pas un identifiant d'accès",
+    ("resources/page_objects/openui5_demokit.resource", "DEMOKIT_MENU_APPEARANCE_KEY"):
+        "clé technique d'entrée de menu UI5, pas un identifiant d'accès",
+    ("resources/page_objects/openui5_demokit.resource", "DEMOKIT_DOC_NAME_KEY"):
+        "clé technique de colonne de documentation, pas un identifiant d'accès",
+    ("resources/page_objects/openui5_demokit.resource", "DEMOKIT_ALTERNATE_THEME_KEY"):
+        "clé technique de thème UI5 (sap_horizon_dark), pas un identifiant d'accès",
 }
 
 

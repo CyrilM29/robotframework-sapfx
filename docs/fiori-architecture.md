@@ -39,9 +39,10 @@ addressing the **DOM** and address the **UI5 control** instead.
   - **xpath**: build an XML tree mirroring the **control hierarchy** (tag = control
     short type, attributes = its properties) and evaluate XPath over it, so you can
     express ancestry and predicates. → `Resolve Ui5 By Xpath`. Same return shape.
-  - **wc**: light-DOM scan of `ui5-*` custom elements, for **UI5 Web Components**
-    pages with no classic UI5 runtime (see below). → `Resolve Wc Control`.
-  - **dom**: generic light-DOM scan (CSS + text + computed ARIA role +
+  - **wc**: scan of `ui5-*` custom elements, light DOM **and open shadow
+    roots**, for **UI5 Web Components** pages with no classic UI5 runtime
+    (see below). → `Resolve Wc Control`.
+  - **dom**: generic scan (CSS + text + computed ARIA role +
     accessible name + attributes) for the **non-SAP regions** of a hybrid page
     (see below). → `Resolve Dom Element`.
 - Apps render views asynchronously, so resolution **polls** until a control appears
@@ -78,9 +79,14 @@ and capture logic are unit-tested instead.
 Pages built on **UI5 Web Components** (the SuccessFactors home page,
 ui5-webcomponents apps) have **no classic UI5 runtime at all**: no
 `window.sap`, an empty element registry: the role and xpath engines are
-structurally blind there. The `wc` engine scans the document's **light DOM**
-for `ui5-*` custom elements (application content stays in the light DOM via
-slots; only component internals live in shadow roots):
+structurally blind there. The `wc` engine looks for `ui5-*` custom elements in
+the **light DOM and in every open shadow root** (closed shadow roots stay out
+of reach, as they do for Playwright). That deep traversal dates from
+2026-08-26: the earlier description, "application content stays in the light
+DOM via slots, only component internals live in shadow roots", was disproved
+by a SAP Build Work Zone shell, which nests components INSIDE the shadow roots
+of other components (6 hosts in light DOM, 16 in depth, three `ui5-button`
+among them that the engine could not see):
 
 - `tag=Button` (short type) matches `ui5-button` **and scoped tags**
   `ui5-button-<suffix>` (UI5 WC scoping); a full tag (`tag=ui5-button`) works too;
@@ -132,7 +138,9 @@ transaction in another + a React/vanilla widget in a portlet) mixes technologies
 - **the `dom` engine** (`Resolve/Click/Fill Dom …`, `Get Dom Text`,
   `Get Dom Match Count`, `Dom Element Should Be Visible`): generic matching
   on CSS, text, ARIA role and attributes (same `valueMatches` rules as role/wc,
-  light-DOM CSS paths as wc) so the non-SAP regions enter the *same grammar*
+  same CSS paths as wc, open shadow roots included: a path that crosses a
+  boundary is resolved segment by segment, the way Playwright's CSS pierces)
+  so the non-SAP regions enter the *same grammar*
   (polling, fallback chain and healing telemetry included) instead of falling
   back to raw Browser selectors outside the library. `role=` is the
   **computed** ARIA role: the explicit `role` attribute *or* the implicit

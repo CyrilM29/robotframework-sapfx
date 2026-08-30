@@ -10,6 +10,8 @@ Concepts issus de playwright-praman (Apache-2.0, NOTICE), reimplementes sur
 nos moteurs. Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
 
+from urllib.parse import urljoin
+
 from robot.api import logger
 from robot.api.types import Secret
 from robot.utils import timestr_to_secs
@@ -19,8 +21,12 @@ from sapfx_common.polling import poll_until
 from sapfx_common.secrets import reveal_secret
 from sapfx_common.vocabulary import lookup_as_dict
 
+from .._ui5_js import (
+    USHELL_CONFIG_PROBE_JS,
+)
 from .._ui5_runtime import (
     build_intent_hash,
+    parse_location,
 )
 
 from ._base import FioriBase
@@ -54,6 +60,89 @@ class FlpKeywords(FioriBase):
         base = str(browser.get_url()).split("#", 1)[0]
         browser.go_to(base + hash_)
         logger.info("FLP navigation: %s" % hash_)
+
+    def get_page_location(self, url=None, base=None):
+        """Décompose l'adresse RÉELLEMENT atteinte par le navigateur en dict
+        JSON-safe ``{url, scheme, host, path, query, fragment, intent,
+        intent_params}`` : le « où suis-je » du canal web, l'inverse de
+        `Open Fiori App`. ::
+
+            ${ou}=    Get Page Location
+            Should Be Equal    ${ou}[intent]    ShoppingCart-display
+
+        ``intent`` n'est renseigné que si le fragment porte bien la forme
+        ``SemanticObject-action`` (un fragment d'ancre ordinaire laisse
+        ``None``, jamais une navigation FLP inventée), et ``intent_params``
+        rend ses paramètres décodés.
+
+        ``host`` est la partie qui compte pour un launchpad protégé : c'est
+        elle qui distingue un fournisseur d'identité du site lui-même. Sans ce
+        constat, une page de connexion servie par le site rendrait vert un
+        test censé prouver la redirection (leçon live 2026-08-26, campagnes
+        Work Zone). Lecture pure, aucune injection : cette adresse fait foi
+        là où l'état servi par un serveur MCP peut être en retard d'une
+        navigation par hash.
+
+        ``url=`` décompose CETTE adresse au lieu de celle du navigateur
+        (aucune page requise : la comparaison « l'hôte atteint diffère de
+        celui du site » se calcule alors sans ``Evaluate __import__``, que la
+        convention #12 proscrit dans la couche resources). ``base=`` résout
+        d'abord ``url`` contre cette base (une adresse RELATIVE relevée dans
+        la page redevient absolue avant décomposition) : ::
+
+            ${site}=    Get Page Location    url=${WORKZONE_SITE}
+            ${cible}=    Get Page Location    url=${href}    base=${WORKZONE_SITE}
+        """
+        if base is not None and url is None:
+            raise ValueError(
+                "Get Page Location: base= sans url= n'a pas de sens (base "
+                "sert à résoudre une adresse relative fournie via url=).")
+        if url is None:
+            return parse_location(self._browser().get_url())
+        target = urljoin(str(base), str(url)) if base is not None else str(url)
+        return parse_location(target)
+
+    def get_ushell_config(self, path=None):
+        """Lit la **configuration ushell** de la page
+        (``window['sap-ushell-config']``) en dict JSON-safe : la source la
+        plus locale-indépendante d'un launchpad, qui DÉCLARE ce que le shell
+        offre avant de le rendre (services, renderer, réglages de session).
+        Relevé live (2026-08-26, site SAP Build Work Zone) : c'est elle qui
+        dit que la recherche `searchCEPNew` est désactivée, que 24 services
+        sont déclarés et que la session expire à 19 minutes, autant de faits
+        qu'aucun contrôle rendu ne porte. ::
+
+            ${cfg}=    Get Ushell Config
+            ${to}=     Get Ushell Config    path=ushell.sessionTimeoutIntervalInMinutes
+
+        ``path`` (pointé) descend dans la configuration ; un chemin absent =
+        échec listant les clés disponibles au premier niveau, jamais un
+        ``None`` muet. Page sans configuration ushell (pas un launchpad, ou
+        portée de frame posée sur l'application au lieu du shell) = échec
+        nommant les deux causes. **Lecture pure** : comme
+        `Ui5 Runtime Is Present`, ce keyword n'injecte PAS le bundle
+        ``__SAPFX``, donc n'instrumente rien dans la page observée. Les
+        fonctions sont écartées de la sérialisation et un cycle d'objets est
+        coupé (``<cycle>``)."""
+        result = self._browser().evaluate_javascript(
+            self._eval_scope(), USHELL_CONFIG_PROBE_JS,
+            arg=str(path) if path else None)
+        if isinstance(result, dict) and result.get("__no_config"):
+            raise AssertionError(
+                "Aucune configuration ushell (`window['sap-ushell-config']`) "
+                "sur la portée courante : cette page n'est pas un launchpad, "
+                "ou la portée de frame est posée sur l'application au lieu du "
+                "shell (vérifier avec `Get Ui5 Frame Stack`, revenir au shell "
+                "avec `Pop Ui5 Frame`).")
+        if isinstance(result, dict) and "__missing_path" in result:
+            known = result.get("__known_keys") or []
+            raise AssertionError(
+                "Chemin '%s' absent de la configuration ushell. Clés de "
+                "premier niveau disponibles : %s. Explorer avec "
+                "`Get Ushell Config` sans argument."
+                % (result["__missing_path"],
+                   ", ".join(str(k) for k in known) or "aucune"))
+        return result
 
     def log_in_via_identity_provider(self, username, password: str | Secret,
                                      preset="sap-ias",

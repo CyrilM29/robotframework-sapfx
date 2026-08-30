@@ -1,5 +1,14 @@
 *** Settings ***
-Documentation       Page object du **shell d'un launchpad SAP Build Work Zone**
+Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulaire
+...                 métier du LABORATOIRE de ce dépôt (identifiants, chemins, noms
+...                 de tables et de modules relevés live sur SES cibles). Beaucoup
+...                 s'y réutilise tel quel sur un autre système (écrans et services
+...                 standard), mais rien n'y fait autorité : à VÉRIFIER sur votre
+...                 cible et à adapter à votre métier. Ce qui fait foi partout,
+...                 c'est `src/`, les bibliothèques, qui portent les capacités :
+...                 voir `resources/README.md`.
+...
+...                 Page object du **shell d'un launchpad SAP Build Work Zone**
 ...                 (cFLP hébergé sur SAP BTP, derrière un tenant SAP Cloud
 ...                 Identity Services). Le shell seulement : ce qui vit dans
 ...                 l'iframe de l'application appartient au page object de
@@ -37,6 +46,9 @@ Documentation       Page object du **shell d'un launchpad SAP Build Work Zone**
 Resource            ../fiori_keywords.resource
 Library             Collections
 Library             String
+# Primitive pure atteinte par un KEYWORD (décision DDIC 2026-08-17) :
+# `Secret Is Provided` teste la PRÉSENCE d'un identifiant sans jamais le lire.
+Library             sapfx_common.secrets
 
 
 *** Variables ***
@@ -75,9 +87,9 @@ ${WORKZONE_NO_APP_ERROR}            *Aucune iframe d'application*    # échec at
 # `SearchableContent` est le service ushell qui rend les applications RÉELLEMENT
 # accessibles à l'utilisateur connecté, avec leur intent de navigation. Lire le
 # catalogue par ce service plutôt que par les tuiles rendues distingue « ce que
-# l'utilisateur a le droit d'ouvrir » de « ce que cette page affiche ».
-${WORKZONE_CATALOGUE_JS}            async () => { const C = window.sap && sap.ushell && sap.ushell.Container; if (!C) return []; const s = await C.getServiceAsync('SearchableContent'); const apps = await s.getApps(); return apps.map(a => { const v = (a.visualizations || [])[0] || {}; const url = String(v.targetURL || ''); return {titre: a.label || a.title || v.title || '', intent: url.replace(/^#/, '').split('?')[0], cible: url}; }); }
-${WORKZONE_IFRAME_IDS_JS}           () => Array.from(document.querySelectorAll('iframe')).map(f => f.id)
+# l'utilisateur a le droit d'ouvrir » de « ce que cette page affiche ». La
+# lecture vit dans la bibliothèque (`List Flp Apps`, convention #12) : ce
+# fichier n'en garde que la traduction en vocabulaire français.
 
 # Signature d'une dépréciation émise par le shell lui-même : UI5 les journalise
 # en niveau `error`, ce qui rend tout comptage brut d'erreurs console inutile.
@@ -97,7 +109,7 @@ La Cible Et Les Identifiants Sont Fournis
     ...    msg=Cible absente : passer -v WORKZONE_SITE:<url du site Work Zone>.
     Should Not Be Empty    ${WORKZONE_USER}
     ...    msg=Utilisateur absent : passer -v WORKZONE_USER:<utilisateur du tenant>.
-    ${fourni}=    Evaluate    not isinstance($WORKZONE_PASSWORD, str) or bool($WORKZONE_PASSWORD)
+    ${fourni}=    Secret Is Provided    ${WORKZONE_PASSWORD}
     Should Be True    ${fourni}
     ...    msg=Mot de passe absent : passer -v "WORKZONE_PASSWORD: Secret:<motdepasse>".
 
@@ -163,6 +175,23 @@ Compter Les Hotes Web Components De La Barre Shell
     ${nb}=    Get Wc Match Count    tag=${WORKZONE_SHELLBAR_WC_TAG}
     RETURN    ${nb}
 
+Compter Les Hotes Web Components En Surface
+    [Documentation]    Nombre d'hôtes Web Components du light DOM de la portée
+    ...    courante, lu à la composition perçue. Relevé live (2026-08-26) : 6
+    ...    sur l'accueil du shell, là où le comptage PROFOND en voit 16 : la
+    ...    différence mesure ce que le shell imbrique dans des shadow roots.
+    ${composition}=    Get Page Composition
+    RETURN    ${composition}[wc_hosts_light]
+
+Compter Les Hotes Web Components En Profondeur
+    [Documentation]    Nombre d'hôtes Web Components de la portée courante en
+    ...    TRAVERSANT les shadow roots ouverts (le champ `wc_hosts` de la
+    ...    composition). Strictement supérieur au comptage de surface sur un
+    ...    shell Work Zone : le bouton de recherche, entre autres, vit dans le
+    ...    shadow root du `ui5-shellbar`.
+    ${composition}=    Get Page Composition
+    RETURN    ${composition}[wc_hosts]
+
 Compter Le Champ De Recherche Du Shell
     [Documentation]    Nombre de champs de recherche du shell résolus dans la
     ...    portée COURANTE. Sert de témoin d'étanchéité de la portée de frame :
@@ -183,8 +212,15 @@ Inventorier Les Applications Du Catalogue
     ...
     ...    Source de vérité choisie à dessein : le service dit ce que
     ...    l'utilisateur a le DROIT d'ouvrir, là où un balayage des tuiles ne
-    ...    dirait que ce que cette page affiche aujourd'hui.
-    ${apps}=    Evaluate JavaScript    ${None}    ${WORKZONE_CATALOGUE_JS}
+    ...    dirait que ce que cette page affiche aujourd'hui. Lecture par le
+    ...    keyword de bibliothèque `List Flp Apps` (convention #12).
+    ${bruts}=    List Flp Apps
+    ${apps}=    Create List
+    FOR    ${app}    IN    @{bruts}
+        ${entree}=    Create Dictionary    titre=${app}[title]
+        ...    intent=${app}[intent]    cible=${app}[target_url]
+        Append To List    ${apps}    ${entree}
+    END
     RETURN    ${apps}
 
 Ouvrir L Application Par Intent
@@ -275,8 +311,37 @@ Lire Les Identifiants D Iframe
     [Documentation]    Identifiants DOM des iframes actuellement présentes dans
     ...    le shell. Sert à CONSTATER que l'identifiant est généré, jamais à
     ...    s'en servir comme localisateur.
-    ${ids}=    Evaluate JavaScript    ${None}    ${WORKZONE_IFRAME_IDS_JS}
+    ...
+    ...    La lecture est FORCÉE à la portée du shell, puis la pile de frames
+    ...    est restaurée sur tous les chemins. `List Page Iframes` respecte la
+    ...    pile, comme tout keyword de la bibliothèque : appelé depuis
+    ...    l'intérieur de l'application, il inventorierait les iframes de
+    ...    CELLE-CI, qui n'en imbrique aucune, et rendrait une liste vide.
+    ...
+    ...    Le piège est que la sonde inline d'avant (`Evaluate JavaScript` au
+    ...    sélecteur `${None}`) s'évaluait sur la page quelle que soit la
+    ...    portée, sans le dire : les appelants en dépendaient sans le savoir.
+    ...    Relevé live le 2026-08-29, scénario 5 de la campagne Work Zone.
+    ${pile}=    Get Ui5 Frame Stack
+    TRY
+        Set Ui5 Frame    ${EMPTY}
+        ${iframes}=    List Page Iframes
+    FINALLY
+        Restaurer La Portee De Frame    ${pile}
+    END
+    ${ids}=    Evaluate    [f['id'] for f in $iframes]
     RETURN    ${ids}
+
+Restaurer La Portee De Frame
+    [Documentation]    Remet la pile de frames dans l'état relevé. Une portée
+    ...    laissée sur le shell ferait échouer la suite du scénario sur des
+    ...    contrôles pourtant présents, et le diagnostic porterait alors sur le
+    ...    mauvais symptôme.
+    [Arguments]    ${pile}
+    Set Ui5 Frame    ${EMPTY}
+    FOR    ${frame}    IN    @{pile}
+        Push Ui5 Frame    ${frame}
+    END
 
 Classer Les Erreurs De La Page Du Shell
     [Documentation]    Trie ce que la console du shell a émis, parce qu'un

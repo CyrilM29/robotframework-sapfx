@@ -38,17 +38,68 @@
     try { if (typeof c.getState === 'function') state = String(c.getState() || ''); } catch (e) {}
     try { type = c.getMetadata().getName(); } catch (e) {}
     return { id: String(c.getId()), controlType: type, kind: kind,
-             state: state, buttons: popupButtons(c).length };
+             state: state, buttons: popupButtons(c).length,
+             technology: 'ui5' };
+  }
+
+  // Popups OUVERTS côté Web Components : `InstanceManager` ne les connaît
+  // pas. Mesuré live (2026-08-26, shell Work Zone) : le menu utilisateur est
+  // un popover WC ouvert (propriété `open` vraie) et `Get Ui5 Open Popups`
+  // rendait []. Le témoin d'ouverture d'un popup WC est sa propriété/attribut
+  // `open` : les entrées d'un menu FERMÉ restent rendues dans le DOM (relevé
+  // sur le même shell), seul `open` distingue. Parcours PROFOND : ces popups
+  // vivent souvent dans le shadow root de leur ouvreur. Le cœur du tag est
+  // comparé une fois le préfixe (`ui5-`) et le suffixe de scoping
+  // (`-6bfd01e3`) neutralisés par la correspondance par préfixe de forme.
+  const WC_POPUP_KINDS = [
+    ['responsive-popover', 'popover'], ['popover', 'popover'],
+    ['dialog', 'dialog'], ['menu', 'popover'], ['toast', 'toast'],
+  ];
+  function wcPopupKind(tag) {
+    for (let p = 0; p < WC_PREFIXES.length; p++) {
+      if (tag.lastIndexOf(WC_PREFIXES[p], 0) !== 0) continue;
+      const core = tag.slice(WC_PREFIXES[p].length);
+      for (let k = 0; k < WC_POPUP_KINDS.length; k++) {
+        const key = WC_POPUP_KINDS[k][0];
+        if (core === key || core.lastIndexOf(key + '-', 0) === 0) {
+          return WC_POPUP_KINDS[k][1];
+        }
+      }
+      return null;
+    }
+    return null;
+  }
+  function wcOpenPopups() {
+    const out = [];
+    try {
+      const nodes = deepQueryAll();
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        const tag = el.tagName.toLowerCase();
+        if (tag.indexOf('-') === -1) continue;
+        const kind = wcPopupKind(tag);
+        if (!kind) continue;
+        const open = (el.open === true)
+          || (el.hasAttribute && el.hasAttribute('open'));
+        if (!open) continue;
+        out.push({ id: String(el.id || ''), controlType: tag, kind: kind,
+                   state: '', buttons: 0, technology: 'wc',
+                   css: wcCssPath(el) });
+      }
+    } catch (e) {}
+    return out;
   }
 
   function openPopups() {
-    if (!isUI5()) return null;
-    const IM = instanceManager();
-    if (!IM) return [];
+    const wc = wcOpenPopups();
+    if (!isUI5()) return wc.length ? wc : null;
     const out = [];
-    try { (IM.getOpenDialogs() || []).forEach((d) => out.push(popupEntry(d, 'dialog'))); } catch (e) {}
-    try { (IM.getOpenPopovers() || []).forEach((p) => out.push(popupEntry(p, 'popover'))); } catch (e) {}
-    return out;
+    const IM = instanceManager();
+    if (IM) {
+      try { (IM.getOpenDialogs() || []).forEach((d) => out.push(popupEntry(d, 'dialog'))); } catch (e) {}
+      try { (IM.getOpenPopovers() || []).forEach((p) => out.push(popupEntry(p, 'popover'))); } catch (e) {}
+    }
+    return out.concat(wc);
   }
 
   // Id DOM du bouton d'INDEX donné (base 0) du dialogue ouvert le plus récent.
@@ -150,11 +201,21 @@
   }
   // Lit une table sap.m.Table (getItems/getCells) ou sap.ui.table.Table (getRows, lignes
   // VISIBLES seulement, virtualisation) vers une liste d'objets {en-tête: valeur}.
+  // Rend un CONSTAT, pas seulement des lignes : le type du contrôle, la voie de lecture
+  // employée, le nombre de lignes candidates et combien ont été écartées faute de
+  // cellules. Sans ces compteurs, un contrôle qui porte bien des lignes mais ne les
+  // expose pas par `getCells` (sap.ui.documentation.LightTable, mesuré 2026-08-30) est
+  // indiscernable d'une table légitimement vide : l'appelant rendait alors [] en
+  // silence, vert et faux. C'est `tableReadVerdict` (Python) qui tranche.
   function readTable(controlId) {
     if (!isUI5()) return null;
     const t = byId(controlId);
     if (!t) return null;
-    const cols = (typeof t.getColumns === 'function') ? t.getColumns() : [];
+    let type = '';
+    try { type = String(t.getMetadata && t.getMetadata().getName ? t.getMetadata().getName() : ''); }
+    catch (e) {}
+    const hasColumns = (typeof t.getColumns === 'function');
+    const cols = hasColumns ? (t.getColumns() || []) : [];
     const headers = cols.map((col, i) => {
       let h = '';
       try {
@@ -163,18 +224,20 @@
       } catch (e) {}
       return h || ('col' + i);
     });
-    let items = [];
-    if (typeof t.getItems === 'function') items = t.getItems();
-    else if (typeof t.getRows === 'function') items = t.getRows();
+    let items = [], source = null;
+    if (typeof t.getItems === 'function') { items = t.getItems() || []; source = 'items'; }
+    else if (typeof t.getRows === 'function') { items = t.getRows() || []; source = 'rows'; }
     const out = [];
+    let skipped = 0;
     items.forEach((row) => {
-      if (typeof row.getCells !== 'function') return;   // ignore les en-têtes de groupe
+      if (typeof row.getCells !== 'function') { skipped++; return; }   // en-tête de groupe
       const cells = row.getCells();
       const obj = {};
       cells.forEach((cell, i) => { obj[headers[i] || ('col' + i)] = controlText(cell); });
       out.push(obj);
     });
-    return out;
+    return { type: type, source: source, hasColumns: hasColumns, headers: headers,
+             candidates: items.length, skipped: skipped, rows: out };
   }
 
   // ---- XPath structurel le plus court et unique sur l'arbre de contrôles ----

@@ -64,6 +64,16 @@ pilote un système authentique. **Procédure détaillée pas-à-pas : [ecc-valid
   client : cela se présente en `unreachable` ou `TimeoutError` et oriente vers
   la connectivité, où il n'y a rien à trouver. Mesuré : 2,2 s au premier appel
   du catalogue, 0,1 s au deuxième. Rejouez avant de diagnostiquer.
+- **Installer SAP GUI provisionne aussi le runtime RFC** (constaté le
+  2026-08-27, SAP GUI 8.00). Son composant « SAP NWRFC x64 Shared » dépose
+  `sapnwrfc.dll` et les bibliothèques `icu*50` dans `C:\Windows\System32` : la
+  roue précompilée de `pyrfc` se charge et un appel RFC réel atteint la trial
+  (`STFC_CONNECTION`, `RFC_READ_TABLE` sur T000) sans le SAP NW RFC SDK sous
+  licence, sans `SAPNWRFC_HOME` et sans entrée de `PATH`. Ce que cela ne lève
+  PAS, c'est la contrainte d'interpréteur : aucune roue `pyrfc` précompilée
+  au-delà de Python 3.12, et compiler depuis les sources exige précisément les
+  en-têtes du SDK que le client omet. Les raisons qui gardent au SDK sa place
+  sont dans le README du pack, « Canal RFC ».
 - Pointez ensuite `Open Sap Logon` / `Connect To Session` dessus et exécutez
   `tests/robot/ecc_smoke.robot`.
 

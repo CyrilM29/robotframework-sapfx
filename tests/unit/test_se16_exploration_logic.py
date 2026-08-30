@@ -48,24 +48,6 @@ def _extract_line(marker):
                          % (marker, _RESOURCE))
 
 
-def _extract_evaluate_expr(marker):
-    line = _extract_line(marker)
-    return line.split("Evaluate", 1)[1].strip()
-
-
-def _robot_escaped(text):
-    """Échappe une chaîne Python multi-lignes/tabulée pour une cellule Robot
-    plain-text : ``\\n``/``\\t`` littéraux (reconvertis en vrais retours à la
-    ligne/tabulations par l'échappement natif de Robot), et CHAQUE espace en
-    ``\\ `` : une tabulation, ou juste deux espaces réels consécutifs, dans une
-    cellule seraient lus comme un séparateur de colonnes et éclateraient la
-    valeur en plusieurs arguments au lieu d'une seule chaîne."""
-    return (text.replace("\\", "\\\\")
-                .replace("\n", "\\n")
-                .replace("\t", "\\t")
-                .replace(" ", "\\ "))
-
-
 def _run_snippet(tmp_path, lines):
     """Exécute un Test Case Robot minimal (une liste de lignes de corps) et
     retourne le code retour (0 = tout est passé, y compris les Should Be Equal)."""
@@ -103,38 +85,25 @@ def test_selection_screen_opening_is_delegated_to_the_library_keyword():
 
 # --- Count Entries On Current Selection Screen : séparateurs de milliers ------
 
-_COUNT_MARKER = "int(''.join(c for c in $raw if c.isdigit())"
+def test_se16_screen_primitives_live_in_the_library():
+    """Le comptage « Number of Entries » et le réglage d'affichage ALV sont
+    des primitives d'ÉCRAN SE16 : promues dans la bibliothèque (mixin
+    ``_se16.py``, convention #12), avec la normalisation locale-safe du
+    compteur (``sapfx_common.robot_args.displayed_count``, leçon anti-regex
+    comprise, couverte par ``test_robot_args.py``).
 
-
-@pytest.mark.parametrize("raw, expected", [
-    ("1,234", 1234),    # séparateur virgule (profil US)
-    ("1 234", 1234),    # séparateur espace (profil FR)
-    ("1.234", 1234),    # séparateur point (profil DE)
-    ("0", 0),
-    ("", 0),            # table vide -> compteur vide
-    ("42", 42),
-])
-def test_count_parser_strips_thousands_separators(tmp_path, raw, expected):
-    expr = _extract_evaluate_expr(_COUNT_MARKER)
-    rc = _run_snippet(tmp_path, [
-        "${raw}=    Set Variable    %s" % (raw if raw else "${EMPTY}"),
-        "${count}=    Evaluate    %s" % expr,
-        "Should Be Equal As Integers    ${count}    %s" % expected,
-    ])
-    assert rc == 0
-
-
-def test_count_parser_is_not_the_backslash_regex_that_silently_broke():
-    # Non-régression explicite du bug détecté en construisant ce test : un motif
-    # `\D`/`\d` écrit dans une cellule .resource traverse DEUX couches
-    # d'échappement (parsing du fichier, puis Evaluate) qui rongent le backslash
-    # et transforment silencieusement la regex en un motif sans rapport (`D` au
-    # lieu de `\D`) : aucune erreur de syntaxe, juste un mauvais résultat.
-    expr = _extract_evaluate_expr(_COUNT_MARKER)
-    assert "\\" not in expr, (
-        "L'expression de comptage réintroduit un backslash ; cf. le piège "
-        "d'échappement Robot documenté dans ecc_keywords.resource avant de "
-        "le retirer.")
+    Deux raisons de les avoir sorties de la resource, et ce test les garde :
+    trois messages d'échec de la bibliothèque PRESCRIVENT « Use ALV Grid In
+    Data Browser » à un utilisateur PyPI qui n'a pas ``resources/``, et le
+    comptage se dupliquait déjà dans trois suites autonomes. Le test échoue
+    si une copie inline revient ici."""
+    text = _resource_text()
+    for marker in ("isdigit", "tbar[1]/btn[31]", "txtG_DBCOUNT",
+                   "radRSEUMOD-TBALV_GRID"):
+        assert marker not in text, (
+            "Une copie d'une primitive d'écran SE16 (%r) est revenue dans "
+            "%s : elle appartient au mixin _se16.py de la bibliothèque."
+            % (marker, _RESOURCE))
 
 
 # --- List Repository Tables : garde-fou anti-troncature ------------------------

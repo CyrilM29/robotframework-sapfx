@@ -196,8 +196,10 @@ src/SapApiLibrary/          # canal API : OData v2/v4 + CSRF, RFC optionnel (std
 src/sapfx_common/           # primitives partagées : sondage/relance, sûreté COM,
                             #   scoring + télémétrie de réparation, diff de perception,
                             #   arbre d'objets, moteur sémantique, hash visuel
-resources/                  # mots-clés métier : ecc_keywords + fiori_keywords (en miroir)
-                            # + a4h_demo_data (garanties de données SFLIGHT/EPM)
+resources/                  # mots-clés métier, EXEMPLES à personnaliser par cible et par
+                            # métier (voir resources/README.fr.md) : les quatre vocabulaires
+                            # de canaux en miroir + page objects + garanties de données,
+                            # relevés sur les systèmes du laboratoire de ce dépôt
 tests/unit/                 # tests de logique hors SAP/hors navigateur (exécutables partout)
 tests/robot/                # ecc_smoke + ecc_data_smoke + ecc_exploration (nécessitent SAP),
                             # fiori_smoke (OpenUI5 Demo Kit), fiori_sflight_smoke
@@ -263,7 +265,12 @@ kit de démonstration public OpenUI5.
 ## Démarrage rapide
 
 Les tests parlent le langage métier ; les identifiants d'éléments SAP restent dans la
-couche resource (convention : **aucun id brut, aucun CSS/XPath dans les cas de test**) :
+couche resource (convention : **aucun id brut, aucun CSS/XPath dans les cas de test**).
+Cette couche est la vôtre : ce que livre `resources/`, ce sont des **exemples relevés
+sur les systèmes du laboratoire de ce dépôt**, réutilisables en bonne part mais jamais
+faisant autorité, à vérifier sur votre cible et à adapter à votre métier
+([resources/README.fr.md](resources/README.fr.md)). Ce qui tient partout, c'est `src/`,
+les bibliothèques.
 
 ```robotframework
 *** Settings ***

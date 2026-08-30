@@ -159,6 +159,27 @@ class _ApiCore:
         """Sonde tolérante pour les préflights : retourne (statut ou None,
         extrait du corps, erreur de connexion ou None) SANS jamais lever :
         c'est le classifieur (``sapfx_common.gateway_status``) qui juge."""
+        status, _, body, _, error, _ = self._probe_response(alias, path, query)
+        return status, body, error
+
+    def _probe_response(self, alias: str, path: str,
+                        query: Optional[dict] = None,
+                        max_chars: int = _BODY_EXCERPT,
+                        extra_headers: Optional[dict] = None,
+                        ) -> tuple[Optional[int], dict, str, bool,
+                                   Optional[str], str]:
+        """La sonde tolérante COMPLÈTE : retourne (statut ou None, en-têtes de
+        réponse, corps décodé tronqué à ``max_chars``, tronqué ?, erreur de
+        connexion ou None, URL effective) sans jamais lever. ``_probe`` en est
+        la vue réduite ; `Get Http Response` l'expose en keyword.
+
+        La télémétrie de session est alimentée ici aussi (compteur, durée,
+        dernier statut) : une sonde traverse le réseau autant qu'une lecture,
+        et une reconnaissance faite entièrement de sondes doit compter pour
+        ``Api Channel Should Show Activity``. Mesuré avant le correctif
+        (2026-08-26, site Work Zone BTP) : ~15 sondes réseau, ``requests: 2``.
+        Seul ``errors`` reste hors sonde : un refus est ici un RÉSULTAT
+        consigné, pas un échec du canal."""
         session = self._session(alias)
         url = self._build_url(session, path, query)
         merged = dict(session.headers)
@@ -166,22 +187,38 @@ class _ApiCore:
             try:
                 merged["Authorization"] = "Bearer %s" % self._ensure_oauth_token(session)
             except AssertionError as err:
-                return None, "", str(err)
+                return None, {}, "", False, str(err), url
+        merged.update(extra_headers or {})
         request = urllib.request.Request(url, headers=merged, method="GET")
+        telemetry = session.telemetry
+        telemetry["requests"] += 1
+        telemetry["last_url"] = url
+        started = time.monotonic()
+
+        def cut(raw_headers: Any, payload: bytes) -> tuple[str, bool]:
+            text = _decompress(raw_headers, payload).decode(
+                "utf-8", errors="replace")
+            return text[:max_chars], len(text) > max_chars
+
         try:
             response = self._transport(session, request)
         except urllib.error.HTTPError as err:
-            excerpt = _decompress(err.headers, err.read())[
-                :_BODY_EXCERPT].decode("utf-8", errors="replace")
-            return err.code, excerpt, None
+            telemetry["seconds"] += time.monotonic() - started
+            telemetry["last_status"] = err.code
+            body, truncated = cut(err.headers, err.read())
+            return err.code, dict(err.headers or {}), body, truncated, None, url
         except urllib.error.URLError as err:
-            return None, "", str(err.reason)
+            telemetry["seconds"] += time.monotonic() - started
+            return None, {}, "", False, str(err.reason), url
         except Exception as err:   # réponse malformée, timeout socket…
-            return None, "", str(err)
+            telemetry["seconds"] += time.monotonic() - started
+            return None, {}, "", False, str(err), url
         with response:
-            excerpt = _decompress(response.headers, response.read())[
-                :_BODY_EXCERPT].decode("utf-8", errors="replace")
-            return response.status, excerpt, None
+            body, truncated = cut(response.headers, response.read())
+            telemetry["seconds"] += time.monotonic() - started
+            telemetry["last_status"] = response.status
+            return (response.status, dict(response.headers), body, truncated,
+                    None, url)
 
     def _write_request(self, alias: str, method: str, path: str,
                        query: Optional[dict], body: Any,

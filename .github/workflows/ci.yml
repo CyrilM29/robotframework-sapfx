@@ -168,6 +168,13 @@ jobs:
   pack-floor:
     runs-on: windows-latest
     needs: test
+    # Déclarés au niveau du JOB, et pas de l'étape : une étape ne voit pas son
+    # propre bloc `env` dans sa condition `if`, et le contexte `secrets` n'y est
+    # pas lisible directement. Vides sur le dépôt public et sur un fork, ce qui
+    # est exactement le signal attendu pour sauter le provisionnement réel.
+    env:
+      NWRFC_SDK_URL: ${{ secrets.NWRFC_SDK_URL }}
+      NWRFC_SDK_TOKEN: ${{ secrets.NWRFC_SDK_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -194,6 +201,181 @@ jobs:
           # de Robot Framework épinglée charge vraiment les libs sur 3.10.
           & "$($PackDir.FullName)\.venv\Scripts\robot.exe" --dryrun `
             --outputdir "$env:RUNNER_TEMP\pack-floor-dry" "$($PackDir.FullName)\tests\robot"
+
+      # Le canal RFC ne peut pas être installé sur une CI publique : le SAP NW
+      # RFC SDK est sous licence SAP, donc absent du runner et non
+      # redistribuable. Ce qui S'ÉPROUVE sans lui, ce sont les branches de
+      # REFUS du script de provisionnement : ce sont les premières que
+      # rencontre un utilisateur, et un refus qui ne nomme pas la marche à
+      # suivre vaut un plantage.
+      - name: RFC provisioning script, refusal branches (no SDK on the runner)
+        shell: pwsh
+        run: |
+          $PackDir = (Get-ChildItem "$env:RUNNER_TEMP\pack-floor-install" -Directory `
+            -Filter "sapfx-pack-*-win" -ErrorAction Stop).FullName
+          $Rfc = Join-Path $PackDir "install-rfc.ps1"
+          if (-not (Test-Path $Rfc)) { throw "install-rfc.ps1 absent du pack livré" }
+
+          # 1. Diagnostic sur un poste non provisionné : code 1, jamais 0.
+          & $Rfc -CheckOnly -SdkHome "$env:RUNNER_TEMP\nwrfcsdk-absent" -SkipPyrfc
+          if ($LASTEXITCODE -ne 1) {
+            throw "-CheckOnly devait signaler l'absence (code 1), obtenu $LASTEXITCODE"
+          }
+
+          # 2. Aucune source d'archive : refus qui nomme SAP for Me, la note
+          #    2573790 et les deux options d'entrée.
+          #    `*>&1` et non `2>&1` : le script parle par Write-Host, donc par
+          #    le flux d'INFORMATION (6), pas par stderr. Capturé en `2>&1`,
+          #    le texte s'affiche bien dans le journal du runner mais la
+          #    variable reste VIDE, et l'assertion échoue sur un message qui
+          #    est pourtant là, sous les yeux, dans le log.
+          $Sortie = (& $Rfc -SdkHome "$env:RUNNER_TEMP\nwrfcsdk-vide" *>&1 | Out-String)
+          if ($LASTEXITCODE -eq 0) { throw "le script devait refuser sans archive" }
+          if ($Sortie -notmatch "2573790") {
+            throw "le refus doit nommer la note SAP. Sortie : $Sortie"
+          }
+          if ($Sortie -notmatch "SdkUrl") {
+            throw "le refus doit nommer l'option miroir. Sortie : $Sortie"
+          }
+
+          # 3. Une archive qui n'est PAS le SDK : rejetée sur l'absence de
+          #    lib/, pas décompressée en silence à la place du vrai SDK.
+          $Faux = "$env:RUNNER_TEMP\faux-sdk"
+          New-Item -ItemType Directory -Path "$Faux\contenu" -Force | Out-Null
+          Set-Content "$Faux\contenu\lisezmoi.txt" "ceci n'est pas le SDK"
+          Compress-Archive -Path "$Faux\contenu" -DestinationPath "$Faux.zip" -Force
+          $Sortie = (& $Rfc -SdkZip "$Faux.zip" `
+            -SdkHome "$env:RUNNER_TEMP\nwrfcsdk-faux" *>&1 | Out-String)
+          if ($LASTEXITCODE -eq 0) { throw "une archive sans dossier lib devait être rejetée" }
+          if ($Sortie -notmatch "lib") {
+            throw "le rejet doit nommer le dossier manquant. Sortie : $Sortie"
+          }
+          if (Test-Path "$env:RUNNER_TEMP\nwrfcsdk-faux") {
+            throw "une archive rejetée ne doit rien laisser dans le dossier cible"
+          }
+
+          # 4. Le mode sans archive (`-UseSapGuiRuntime`, qui s'appuie sur le
+          #    runtime que le client SAP GUI dépose dans System32) demandé sur
+          #    une machine SANS SAP GUI : refus qui nomme les deux issues, et
+          #    surtout pas une installation qui se déclare faite. Un runner
+          #    GitHub n'a pas SAP GUI, donc cette branche y est vérifiable.
+          $Sortie = (& $Rfc -UseSapGuiRuntime *>&1 | Out-String)
+          if ($LASTEXITCODE -eq 0) {
+            throw "-UseSapGuiRuntime devait refuser sans runtime dans System32"
+          }
+          if ($Sortie -notmatch "SAP GUI") {
+            throw "le refus doit nommer le client absent. Sortie : $Sortie"
+          }
+          if ($Sortie -notmatch "SdkZip") {
+            throw "le refus doit nommer la voie du SDK. Sortie : $Sortie"
+          }
+
+          # Les quatre branches ont tenu. Chacune s'éprouve sur un REFUS, donc
+          # le dernier appel laisse `$LASTEXITCODE` à 1, et GitHub termine une
+          # étape `pwsh` par `exit $LASTEXITCODE` : sans cette remise à zéro
+          # explicite, l'étape échoue précisément parce que tout ce qu'elle
+          # vérifie est conforme. La sortie des refus étant capturée, elle
+          # n'apparaît plus dans le journal : ce sont les `throw` ci-dessus qui
+          # la portent, le jour où l'un d'eux se déclenche.
+          Write-Host "Les quatre branches de refus du provisionnement RFC sont conformes."
+          exit 0
+
+      # La branche du préflight qu'un poste de développement ne peut PAS
+      # éprouver honnêtement : binding `pyrfc` PRÉSENT, runtime natif ABSENT.
+      # Sur une machine qui porte SAP GUI, `sapnwrfc.dll` est déposée dans
+      # System32 et le loader Windows l'y trouve toujours ; la seule façon d'y
+      # provoquer le cas serait de toucher System32, sur un poste dont SAP GUI
+      # dépend. Un runner GitHub n'a ni SAP GUI ni SDK : installer la seule
+      # roue précompilée l'amène EXACTEMENT dans cet état, sans rien simuler.
+      # Ce que l'étape verrouille : la cause est classée `runtime_absent` et
+      # non `module_absent` (les deux ont un remède DIFFÉRENT, et confondre
+      # l'un avec l'autre envoie réinstaller ce qui est déjà là), et la suite
+      # RFC se SAUTE au lieu de rougir là où rien n'est cassé.
+      - name: RFC preflight, binding present but native runtime missing
+        shell: pwsh
+        run: |
+          $PackDir = (Get-ChildItem "$env:RUNNER_TEMP\pack-floor-install" -Directory `
+            -Filter "sapfx-pack-*-win" -ErrorAction Stop).FullName
+          $Py = Join-Path $PackDir ".venv\Scripts\python.exe"
+
+          # Version ÉPINGLÉE : le projet PyRFC est archivé et toutes ses
+          # versions PyPI sont yanked, donc pip n'en choisit plus aucune seul.
+          & $Py -m pip install --quiet "pyrfc==3.3.1"
+          if ($LASTEXITCODE -ne 0) {
+            # La disponibilité d'une roue yanked d'un projet archivé n'est pas
+            # notre produit : on alerte sans rougir, mais le journal dit
+            # clairement que la branche n'a PAS été éprouvée, plutôt que de
+            # laisser une étape verte le sous-entendre.
+            Write-Host "::warning::roue pyrfc==3.3.1 non installable sur ce runner : la branche runtime_absent n'a pas pu etre eprouvee"
+            exit 0
+          }
+
+          # 1. La prémisse RÉELLE, mesurée à la première exécution de cette
+          #    étape (2026-08-29) : l'import ne PEUT PAS échouer, le __init__
+          #    de pyrfc 3.3.1 avale l'échec de chargement du runtime natif
+          #    (except Exception: print) et rend un module SANS Connection.
+          #    C'est ce constat qui a fait juger Get Rfc Channel Status sur le
+          #    CONTENU du module : on assert donc le binding importable mais
+          #    incomplet, l'état exact que ce runner fabrique.
+          & $Py -c "import pyrfc, sys; sys.exit(1 if hasattr(pyrfc, 'Connection') else 0)"
+          if ($LASTEXITCODE -ne 0) {
+            throw "pyrfc porte Connection sur un runner sans runtime NW RFC : l'hypothèse de l'étape est fausse, la relire avant de la corriger"
+          }
+
+          # 2. La cause doit être classée `runtime_absent`, avec le remède qui
+          #    va avec. On lit le VERDICT structuré, jamais le texte. Le même
+          #    avalement imprime son « DLL load failed » sur STDOUT avant
+          #    notre JSON : le verdict est la DERNIÈRE ligne du flux.
+          $Sonde = @(& $Py -c "from SapApiLibrary import SapApiLibrary; import json; print(json.dumps(SapApiLibrary().get_rfc_channel_status()))")
+          Write-Host "sortie du preflight : $($Sonde -join ' | ')"
+          $Verdict = [string]$Sonde[-1]
+          $Etat = $Verdict | ConvertFrom-Json
+          if ($Etat.available) { throw "le canal ne peut pas etre declare disponible sans runtime natif" }
+          if ($Etat.reason -ne "runtime_absent") {
+            throw "cause attendue runtime_absent, obtenue '$($Etat.reason)' : le binding est pourtant installe"
+          }
+          if ($Etat.remediation -notmatch "install-rfc") {
+            throw "le remede doit nommer le script de provisionnement. Verdict : $Verdict"
+          }
+
+          # 3. La suite RFC du dépôt doit se SAUTER proprement, code 0 : c'est
+          #    la propriété qui la rend neutre dans un run complet ailleurs.
+          $Res = "$env:RUNNER_TEMP\rfc-skip"
+          $Sortie = (& (Join-Path $PackDir ".venv\Scripts\robot.exe") `
+            --pythonpath "$env:GITHUB_WORKSPACE\src" --include rfc `
+            -v "RFC_PASSWORD: Secret:sans-objet-la-suite-se-saute" `
+            --outputdir $Res `
+            "$env:GITHUB_WORKSPACE\tests\robot\api\canal_rfc_a4h.robot" *>&1 | Out-String)
+          $Code = $LASTEXITCODE
+          Write-Host $Sortie
+          if ($Code -ne 0) { throw "la suite RFC doit SAUTER (code 0), obtenu $Code" }
+          if ($Sortie -notmatch "0 passed, 0 failed") {
+            throw "aucun test ne devait s'executer sans canal RFC"
+          }
+          if ($Sortie -notmatch "skipped") {
+            throw "les tests devaient etre marques sautes, pas simplement absents"
+          }
+
+          Write-Host "Branche runtime_absent conforme, et la suite RFC se saute proprement."
+          exit 0
+
+      # Provisionnement RÉEL, uniquement là où un miroir interne de l'archive
+      # sous licence est déclaré en secret. Absent (dépôt public, fork), la
+      # condition saute l'étape au lieu de la rendre verte à tort. NON
+      # BLOQUANT : la disponibilité d'un miroir tiers n'est pas notre produit,
+      # et un garde qui crie au loup finit désactivé.
+      - name: RFC provisioning against an internal mirror (optional)
+        if: env.NWRFC_SDK_URL != ''
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $PackDir = (Get-ChildItem "$env:RUNNER_TEMP\pack-floor-install" -Directory `
+            -Filter "sapfx-pack-*-win" -ErrorAction Stop).FullName
+          & "$PackDir\install-rfc.ps1" -SdkUrl $env:NWRFC_SDK_URL `
+            -SdkUrlToken $env:NWRFC_SDK_TOKEN -SdkHome "$env:RUNNER_TEMP\nwrfcsdk"
+          if ($LASTEXITCODE -ne 0) { throw "provisionnement RFC en échec" }
+          & "$PackDir\install-rfc.ps1" -CheckOnly -SdkHome "$env:RUNNER_TEMP\nwrfcsdk"
+          if ($LASTEXITCODE -ne 0) { throw "le diagnostic doit être vert juste après l'installation" }
 
   release-pack:
     runs-on: windows-latest

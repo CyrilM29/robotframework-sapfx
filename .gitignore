@@ -71,6 +71,14 @@ screen_watch/*.actual.*
 /.robotmcp_artifacts/
 /.robotmcp/
 
+# Traces de la bibliothèque NW RFC (canal RFC) : elle écrit `dev_rfc.log` dans
+# le RÉPERTOIRE COURANT dès qu'une connexion échoue, donc à la racine du dépôt
+# quand un test RFC est lancé d'ici (constaté le 2026-08-27, sur le premier
+# essai vers un système encore en démarrage). Même raison que `screen_watch` :
+# un arbre sali fait refuser `export_public_tree.py`.
+dev_rfc*.log
+dev_*.trc
+
 # IDE / OS
 .idea/
 # .vscode : la config d'équipe (settings, extensions, mcp) est versionnée ;

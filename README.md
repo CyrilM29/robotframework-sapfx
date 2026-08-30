@@ -189,8 +189,10 @@ src/SapApiLibrary/          # API channel: OData v2/v4 + CSRF, optional RFC (std
 src/sapfx_common/           # shared primitives: polling/retry, COM safety,
                             #   healing scoring + telemetry, perception diff,
                             #   object tree, semantic engine, visual hash
-resources/                  # business keywords: ecc_keywords + fiori_keywords (mirrored)
-                            # + a4h_demo_data (SFLIGHT/EPM demo-data guards)
+resources/                  # business keywords, EXAMPLES to customize per target and
+                            # business domain (see resources/README.md): the four
+                            # mirrored channel vocabularies + page objects + demo-data
+                            # guards, measured on this repo's lab systems
 tests/unit/                 # off-SAP/off-browser logic tests (run anywhere)
 tests/robot/                # ecc_smoke + ecc_data_smoke + ecc_exploration (need SAP),
                             # fiori_smoke (OpenUI5 Demo Kit), fiori_sflight_smoke
@@ -253,7 +255,12 @@ The Fiori side needs no SAP at all: it tests against the public OpenUI5 Demo Kit
 ## Quick start
 
 Tests speak business language; SAP element ids stay in the resource layer
-(convention: **no raw ids, no CSS/XPath in test cases**):
+(convention: **no raw ids, no CSS/XPath in test cases**). That layer is yours to
+write: what `resources/` ships are **examples measured on this repo's lab
+systems**, reusable in good part but never authoritative, to be verified on your
+target and adapted to your business domain
+([resources/README.md](resources/README.md)). What holds everywhere is `src/`,
+the libraries.
 
 ```robotframework
 *** Settings ***

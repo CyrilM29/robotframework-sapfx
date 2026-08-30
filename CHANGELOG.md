@@ -5,7 +5,606 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
-## [Unreleased]
+## [0.8.0] - 2026-08-30
+
+### Added
+- **Security configuration posture, and a campaign per target.** New
+  `sapfx_common/security_baseline.py` (pure: reading classification, control
+  verdicts, drift comparison, deterministic artifact hashed excluding the
+  timestamp, Markdown report) plus the `_rfc_security.py` mixin on
+  `SapApiLibrary`: `Read Profile Parameters`, `Profile Parameters Should Be
+  Defined`, `Read Standard Users Status`, `Build/Write/Read Security Posture`
+  and `Security Posture Should Not Have Drifted`. Business vocabulary in
+  `resources/security_keywords.resource` (parameter lots by theme, admin
+  table names, control factory), and two live-validated read-only suites,
+  `tests/robot/api/secu_configuration_a4h.robot` (15/15) and
+  `secu_configuration_abap2023.robot` (16/16), replayed green.
+  The reason there are two suites rather than one parameterized: the releases
+  are not hardened alike (measured 2026-08-29: minimum password length 6 vs
+  10, the four composition requirements 0 vs 1, automatic logout off vs one
+  hour), so a single suite would have had to assert either the weaker posture
+  (blind on the better target) or the stronger one (red forever on the other).
+  What the suites ASSERT is limited to controls whose deviation is an incident
+  under any policy (audit log active, gateway under ACL, RFC authority check
+  armed, hard-coded SAP\* neutralized, reference client write-protected); the
+  rest is measured, reported, and watched by the sentinel rather than turned
+  into a permanent red.
+  Trap encoded, paid live: `TH_GET_PARAMETER` does NOT refuse an unknown
+  parameter, it returns `RC=4` and an EMPTY string, so a control written on a
+  misspelled name is green and claims a lack of hardening it never measured.
+  The reading judges the return code before the value, `not_measurable` stays
+  distinct from `deviation` and is never a success, and a numeric comparator
+  fed a non-numeric value raises naming the control instead of inventing a
+  verdict. Second trap, found while proving the sentinel can fail: a committed
+  reference edited on Windows carries a UTF-8 BOM, so the artifact is read as
+  `utf-8-sig` and the sentinel no longer reds out on `Unexpected UTF-8 BOM`
+  instead of comparing.
+  Two further inventories whose raw reading misleads, each closed by its own
+  keyword (`sapfx_common/security_inventory.py`): `Get Audit Configuration`,
+  because `rsau/enable` answers « armed » and that is true and insufficient
+  (measured on both releases: ten filtering slots DECLARED, none active, so
+  the log records nothing an auditor believes it records, hence the
+  `armed_without_filter` verdict kept distinct from `filtering`); and
+  `Read Rfc Destination Inventory`, because a destination storing a logon to
+  another system is an elevation path and that fact lives in an aggregate of
+  single-letter markers rather than in a column. The latter never reads a
+  secret, it observes that one exists, and it ignores markers whose meaning is
+  not established rather than guessing them.
+  `sapfx_common/rfc_tables.in_list_clauses` was added along the way: the
+  default standard-account list already fills 69 of the 72 characters an
+  OPTIONS line allows, so a single extra account made the keyword fail on a
+  clause its caller never wrote.
+- **A third Libdoc guard, on the `typedocs`.** The existing guard compares
+  keyword NAMES, so it stays green while a spec's `usages` lists rot: adding a
+  keyword enriches those lists in the library without changing any documented
+  name, and the published pages silently lose their « used by » cross-links
+  for a whole cycle. Measured while adding the guard: six types listed only a
+  subset of their keywords. The checked contract is structural (names, type
+  category, accepted types, usages) and deliberately excludes `doc`, which a
+  project-specific type could one day carry in French for translation.
+- **Convention #12 swept through the business keyword layer, then locked
+  mechanically.** An audit of `resources/` found library-grade CAPABILITIES
+  living as inline JS and `Evaluate __import__` in page objects: ushell
+  service reads duplicated across the two launchpad page objects, a
+  re-implementation of the bundle's registry fallback chain, binding-context
+  reads (three copies), WebGUI menu/presence probes, and a cookie lambda
+  carrying the paid epoch-1969 lesson. Promoted into `SapFioriLibrary` as
+  **19 keywords**: launchpad services (`Get Flp User`, `List Flp Apps`,
+  `List Flp Catalogs`, `List Flp Groups`, `Get Flp Intent Support`,
+  `Flp Service Is Available`, `Flp Container Is Present` /
+  `... Should Be Present`; new mixin `_flp_services.py`, pure reads without
+  bundle injection like `Get Ushell Config`), the control record
+  (`Get Ui5 Control Info`: FULL metadata type + binding context of rendered
+  matches; `Get Ui5 Aggregation Info`: aggregation children rendered OR NOT,
+  the items of a closed `Select` popover that no role engine can see; new
+  bundle chapter `_ui5_bundle_info.js.tpl`), WebGUI perception
+  (`Webgui Is Present`, `Get Webgui Element Count` global or per `window=`,
+  `List Webgui Menus`, `List Webgui Menu Items`), and session state
+  (`Get Session Cookie Summary`: names/domains only, `future_expiration`
+  predicate encoding the Browser epoch-minus-one session-cookie trap, pure
+  logic in `sapfx_common/web_cookies.py`; `Get Page Languages`;
+  `List Page Iframes`; `Ui5 Runtime Is Ready` / `... Should Be Ready`, the
+  promoted predicate of the resource-layer `Wait For UI5 Ready`).
+  `Get Page Location` gained `url=`/`base=` (decompose a GIVEN address, no
+  browser touched), and `sapfx_common.robot_args.displayed_count` merges the
+  two copies of the displayed-count parser (ECC + WebGUI, anti-backslash
+  lesson kept). rf-mcp Fiori intent map and the translated Libdoc spec/pages
+  follow (81 keywords documented).
+- **`check_conventions.py` now enforces the detectable motif of
+  convention #12**, alongside #1/#2: `Evaluate JavaScript`,
+  `Wait For Function` and `__import__` are blocking in `resources/` (with the
+  exact-count `ALLOWED_12` allowlist on the em-dash-guard model: 4 assumed
+  probes, each documented in place: the release-specific 1.71 tile walk, the
+  malformed-fragment gesture, and the deliberately volatile tab marker) and
+  in generated suites; `modules=` is blocked in suites (the DDIC 2026-08-17
+  decision, previously prose-only); validation suites stay informative. The
+  two generated suites carrying `__import__('json')` and the three carrying
+  `modules=urllib.parse` were brought into line (Evaluate auto-import,
+  `Get Page Location url=`).
+- **Second convention #12 lot: the capabilities a linter cannot see.** The
+  guard only detects the JS/`__import__` motif, never a capability written in
+  plain Robot, so a judgement pass over the ECC, API and RFC layers found six
+  more, now promoted. `SapEccLibrary` gains the two SE16 SCREEN primitives
+  (`Use ALV Grid In Data Browser`, the remedy three of this library's own
+  failure messages already prescribe to a PyPI user who has no `resources/`;
+  and `Count Entries On Current Selection Screen`, which was already
+  duplicated across three self-contained suites and stays reliable on an
+  empty table where F8 returns nothing). `SapApiLibrary` gains
+  `Build Draft Entity Path` (the COMPOSITE key of a draft-enabled v4 service:
+  protocol knowledge, not one site's vocabulary) and `Classify Http Response`
+  (the structural verdict on a raw response: three families of 404 hide under
+  one status, and a 2xx with an HTML body is not data; pure logic added to
+  `sapfx_common.gateway_status` beside `looks_like_html`).
+  `sapfx_common.secrets` gains `secret_is_provided`, the predicate behind the
+  four channels' credential guards, which answers WITHOUT ever measuring the
+  value (a `Secret` refuses `len()`, and a naive guard hides the real missing
+  prerequisite behind its own error): five copies of that test lived in the
+  Robot layer. Finally `Fill Ui5 Input` / `Fill Dom Input` / `Fill Wc Input`
+  now accept a `Secret` and unwrap it at the browser boundary, so the two
+  inline `getattr(pwd, 'value', pwd)` disappear from the page objects, where
+  the cleartext value entered the suite's variable space.
+- **The family of operational-evidence reads that `Read Rfc Table` unlocks**
+  (backlog 2.2), four `SapApiLibrary` keywords live-validated against A4H the
+  day they were written: `Read Change Documents` (CDHDR headers with their
+  CDPOS items: the audit assertion "the change was properly journaled" no
+  OSS SAP tool offers), `Get Idoc Status` (EDIDC judged by CODE with an
+  explicit scale where an unmapped status is NEVER a success; optional EDIDS
+  history), `Read Application Log` (BALHDR with per-severity message COUNTS
+  converted from zero-padded NUMC: locale-safe by construction, since the
+  texts live compressed in BALDAT anyway) and `Get Job Log` (the complement
+  of `Wait For Background Job`, through the official XBP chain with
+  `BAPI_XMI_LOGOFF` guaranteed even on failure). Pure logic in
+  `sapfx_common/rfc_reads.py`; new mixin `_rfc_reads.py` (convention #13,
+  `_rfc.py` was already at 463 lines). Two traps were paid live and are
+  encoded in the keywords rather than rediscovered: a CDPOS projection
+  carrying both `VALUE_NEW` and `VALUE_OLD` exceeds `RFC_READ_TABLE`'s
+  512-byte row buffer (`DATA_BUFFER_EXCEEDED`, AD/E/559, a code that does
+  not name the cause), hence TWO projections merged on the item key; and
+  `BP_JOBLOG_READ` is not remote-enabled (`CALL_FUNCTION_NOT_REMOTE`),
+  hence XBP.
+- **`packaging/install-rfc.ps1`, provisioning for the optional RFC channel.**
+  The pack documented `pyrfc` in a single parenthesis, and the reason it is not
+  installed lived in a comment inside `requirements-deploy.txt`, a file nobody
+  opens. The script now does everything the licence allows a script to do:
+  unpack the SAP NW RFC SDK archive (tolerating both zip shapes), set
+  `SAPNWRFC_HOME` and `PATH` (User scope, or `-Machine` with an elevation
+  check), install the pinned `pyrfc` into the pack venv and run a REAL import
+  check. `-CheckOnly` diagnoses an existing setup without touching anything.
+  What stays manual is the download itself, and deliberately so: the SDK is
+  licensed by SAP, tied to an S-user, and not redistributable, so the entry
+  point is either a local archive (`-SdkZip`) or the company's internal mirror
+  (`-SdkUrl`, whose token is never logged). Three upstream facts, observed
+  2026-08-26, are encoded in the failure messages rather than left to be
+  rediscovered: SAP archived PyRFC on 2026-05-28, every PyPI release is yanked
+  (hence the exact pin, since pip no longer selects them on its own), and the
+  prebuilt Windows wheels stop at Python 3.12, so a workstation that needs RFC
+  creates its venv on 3.10 to 3.12, a choice made at install time and not
+  after. CI exercises the REFUSAL branches on a runner that has no SDK (the
+  diagnosis exits 1, the no-archive refusal names SAP Note 2573790 and
+  `-SdkUrl`, a non-SDK archive is rejected leaving nothing behind); real
+  provisioning is an optional non-blocking step, skipped until an internal
+  mirror is declared in the `NWRFC_SDK_URL` secret.
+  **Measured on 2026-08-27, after that script was written: the download is
+  often unnecessary.** On a workstation carrying SAP GUI for Windows 8.00, the
+  client's « SAP NWRFC x64 Shared » component has already put `sapnwrfc.dll`
+  and the `icu*50` libraries into `C:\Windows\System32`, so the prebuilt wheel
+  loads and a REAL call goes through (`STFC_CONNECTION` echoed its text,
+  `RFC_READ_TABLE` read T000, both through `Open Rfc Connection` / `Call Rfc`)
+  with no `SAPNWRFC_HOME` and no `PATH` entry. The pack README now has people
+  check that first, along with the three reasons the SDK keeps its place
+  (licence and support, since that DLL ships for the client and no CI runner
+  without SAP GUI has it; a patch level you did not choose; and source builds
+  on 3.13+, which need the very headers the client omits) and the one
+  constraint the shortcut does NOT lift, the 3.10 to 3.12 interpreter.
+  The script was reworked accordingly rather than merely documented around it.
+  It gained **`-UseSapGuiRuntime`**, the archive-free mode: it leans on the
+  runtime already in `System32`, touches no environment variable (there is
+  nothing to point at), installs the pinned binding and runs the real import
+  check. `-CheckOnly` no longer calls the SDK missing when a runtime is there,
+  it says which one answers and why the SDK still matters, so it stops exiting 1
+  on a workstation where the channel works. The refusals were rewritten in the
+  same spirit: with no archive and no `-SdkZip`, the message now offers the
+  short way out FIRST when this machine can take it, before naming SAP Note
+  2573790; `-UseSapGuiRuntime` on a machine without SAP GUI refuses and names
+  both exits; combining it with `-SdkZip`, `-SdkUrl` or `-SkipPyrfc` is refused
+  up front rather than half-honoured; and the import-failure message lists the
+  missing runtime as a third cause instead of assuming the SDK. « SDK trouve »
+  became « runtime NW RFC trouve », since that is what was actually verified.
+  All five branches were exercised for real on a workstation with SAP GUI
+  (diagnosis, both refusals, the nominal path twice for idempotence, and the
+  no-runtime refusal with a diverted `SystemRoot`); CI gained the fourth refusal
+  branch, which a runner without SAP GUI can genuinely prove.
+- **A campaign for the RFC/BAPI channel**
+  (`tests/robot/api/canal_rfc_a4h.robot` plus `resources/rfc_keywords.resource`,
+  the fourth mirror of the business vocabulary; generated from
+  `specs/canal-rfc-a4h.md`, validated live **11/11** against an ABAP Platform
+  trial). The RFC was the only one of the four channels with no suite of its
+  own, so it was exercised by nobody, and the gaps below had nowhere to show.
+  READ ONLY: the LUW is opened only to prove it can be closed. The suite SKIPS
+  cleanly (not red) where `pyrfc` or the native NW RFC runtime is missing, so
+  it stays neutral in a full `tests/robot/` run; both branches were exercised
+  (11 passed on 3.12, 11 skipped and exit 0 on 3.14).
+  Five keywords were added to `SapApiLibrary` because the channel had no way to
+  read or perceive anything: `Get Rfc Channel Status` and
+  `Rfc Channel Should Be Available` (preflight telling apart a missing binding
+  from a missing native runtime, two different remedies), `Get Rfc Connection
+  Attributes` (an open channel does not yet say WHAT it talks to),
+  `Read Rfc Table` (the screenless mirror of `Read Grid`, with the 72-character
+  clause guard biting before the network) and `Rfc Should Fail With Code`
+  (convention 3 applied to RFC: `Run Keyword And Expect Error` only ever sees
+  the localized text, never the stable code). Pure logic in
+  `sapfx_common.rfc_channel`.
+  **Reworked the same day, when a corrected measurement widened the scenario
+  on background jobs from two branches to five** (suite now **16/16** live).
+  The first exploration had read `TBTCO` capped at 200 rows and concluded the
+  target only carried finished jobs; it carries 4719 runs over four statuses,
+  so every outcome of `Wait For Background Job` can be exercised READ ONLY, on
+  the housekeeping jobs already there, without creating or cancelling a single
+  one. Two keywords make that possible without an `Evaluate` in a suite
+  (convention 12): **`Find Background Job Cases`** reads the job log whole and
+  returns it as a catalogue of wait cases (which jobs of THIS target would
+  produce `done`, `aborted`, `aborted_with_finished`, `pipeline`, `unmapped`),
+  and **`Get Background Job Status Model`** states what the library maps, hence
+  what it does not. Pure logic in `sapfx_common.rfc_tables`
+  (`group_job_statuses`, `job_wait_cases`). Three properties are deliberate.
+  The read cap defaults to 0, because a cap does not merely truncate, it
+  falsifies the classification, silently: the suite replays the 200-row read
+  next to the full one and the live run logged `{'F': 200}` against
+  `{'F': 4597, 'Z': 105, 'S': 7, 'A': 10}`. `aborted_with_finished` exists
+  because the cancelled branch only proves that `A` outranks `F` when played on
+  a job carrying both. And `pipeline` is kept apart from `unmapped`, which the
+  verdict merges into `waiting`: an uncharted status is the case where the
+  library keeps waiting instead of concluding success, and it is the one worth
+  locking. The meaning of the `Z` seen live is NOT asserted: its data element
+  sits on a `CHAR1` domain with no value list, so the library prints `(?)` and
+  the test only judges the fallback behaviour.
+- **Fixed: a structure built by a Robot suite never reached the server.**
+  `pyrfc` checks the EXACT type of a structure parameter and rejects a `dict`
+  subclass, while every dictionary a suite builds is a `DotDict`: passing a
+  structure to a function module was therefore impossible, with an error naming
+  the parameter but not the cause. `Call Rfc` now normalizes parameters to bare
+  types, recursively. Scalars are deliberately left untouched: converting
+  number-looking strings would corrupt the numeric character fields of the ABAP
+  dictionary, where `'0400'` is a connection number and not the integer 400, so
+  a numeric parameter still has to be passed as a real number (the rule is in
+  the keyword's documentation).
+- **A reconnaissance campaign for the API channel of a BTP target**
+  (`tests/robot/api/reconnaissance_canal_btp.robot` plus
+  `resources/page_objects/workzone_api.resource`, validated live 9/9 twice).
+  It is explicitly a reconnaissance, not an acceptance suite: the target
+  exposes no business data through that channel, and the plan forbids
+  inventing one. What it locks down is a map. A service key opens the channel
+  in OAuth2; the backend's refusals separate into families on structural
+  criteria (the GraphQL route DIALOGUES, navigation refuses on authorization,
+  the OData prefix exposes nothing); the dialoguing refusal is about the
+  request BODY, not the caller's identity, so reading it as an auth failure
+  sends you hunting for credentials that are fine; and the site's admin host
+  ignores a perfectly valid bearer token, because it wants an identity-provider
+  session. That last point is the transposable one: **a service key opens a
+  service's backend, not the administration interface sitting in front of it**,
+  which the first pass could only suspect. The `404` classification anchors on
+  the `x-cf-routererror` header rather than the body text (convention 3), and
+  every probe is paired with a deliberately absent path: without that witness
+  you cannot tell whether a 404 qualifies the resource or the whole host.
+- **`Get Page Location`** (SapFioriLibrary): breaks down the address the
+  browser actually reached into `{url, scheme, host, path, query, fragment,
+  intent, intent_params}`, the inverse of `Open Fiori App` (pure logic in
+  `_ui5_runtime.parse_location`). `intent` is filled only when the fragment
+  really carries the `SemanticObject-action` shape, never an invented FLP
+  navigation. `host` is what tells an identity provider apart from the site
+  itself: without that check, a login page served by the site would turn
+  green a test meant to prove the redirect. Promoted from a campaign page
+  object where it lived as an `Evaluate __import__` (convention 12 proscribes
+  exactly that), and the page object now only translates it into its own
+  vocabulary.
+- **`Get Ushell Config`** (SapFioriLibrary): reads `window['sap-ushell-config']`
+  as a JSON-safe dict, with a dotted `path` argument (missing path = failure
+  listing the available keys, never a silent None). The most
+  locale-independent source a launchpad has: it DECLARES what the shell
+  offers before rendering it. Observed live (2026-08-26, SAP Build Work Zone
+  site): it is what says the `searchCEPNew` search is disabled, that 24
+  services are declared, and that the session expires after 19 minutes,
+  none of which any rendered control carries. Pure read, like
+  `Ui5 Runtime Is Present`: it does NOT inject the `__SAPFX` bundle, so
+  observing instruments nothing.
+- **The wc and dom engines see through open shadow roots** (deep traversal,
+  shared `deepQueryAll`): a Work Zone shell nests Web Components INSIDE the
+  shadow roots of other Web Components (measured live 2026-08-26: 6 `ui5-*`
+  hosts in light DOM, 16 in depth, three `ui5-button` invisible to the wc
+  engine; the same CSS selector returned 0 through `Get Dom Match Count` and
+  1 through Browser's `Get Element Count`). Returned paths now cross shadow
+  boundaries with a DESCENDANT join (the form Playwright's CSS pierces), the
+  recorder's upward walks (`closestWcElement`, `interactiveDomTarget`) hop
+  boundaries too, and `Get Page Composition` counts hosts in depth
+  (`wc_hosts`) while keeping the surface measure (`wc_hosts_light`). Proven
+  offline by clicking an id-less button nested in a shadow root
+  (`fiori_wc_smoke.robot`, 12/12).
+- **`Get Ui5 Open Popups` sees Web Components popups** (`technology` field,
+  `ui5`|`wc`): the user menu of a Work Zone shell is a WC popover, and the
+  keyword returned `[]` with the menu open (measured live), while the menu's
+  entries stay rendered with it closed, exactly the trap the keyword exists
+  to lift. Open WC popups (`ui5-popover`/`ui5-dialog`/`ui5-menu`/`ui5-toast`,
+  scoped tags included, witness = their `open` property) are now listed, with
+  the host's resolvable `css` path; on a wc/hybrid page without a UI5
+  runtime they are returned instead of the former hard failure.
+- **`Get Http Response`** (SapApiLibrary): raw, tolerant HTTP read of a
+  session path (`{"status", "headers", "body", "truncated", "error", "url"}`,
+  never raises, truncation always flagged, per-request headers). Born from a
+  live API reconnaissance of a SAP Build Work Zone site (2026-08-26), where
+  reading the HTML body a BTP approuter serves required hijacking it from
+  `Get Odata`'s failure message: a workaround, not a method (convention 12).
+- **`headers` on `Open Api Session`**: session-level default headers, applied
+  last so they can override the built-in `Accept: application/json`. A BTP
+  approuter arbitrates between an HTML page and a JSON challenge on that very
+  header, and the session gave no way to set it. Values are never logged.
+- **Two identity-provider states in the Gateway preflight**
+  (`sapfx_common.gateway_status`, so `Get Gateway Status` /
+  `Gateway Should Be Active` / `Wait Until Api Available`):
+  `identity_provider_redirect` (3xx, or the same-origin guard's refusal to
+  carry authentication to another host, which previously came back as
+  `unreachable` with a "docker start" remediation, the exact opposite of the
+  truth on BTP) and `login_page` (HTTP 2xx whose body is an HTML document,
+  detected structurally, never by localized text). The founding case, measured
+  live: a Work Zone site answers **200 with a login bootstrap page on every
+  declared route** and never issues an authentication challenge, so
+  `Gateway Should Be Active` passed green on a target that had served no data
+  at all.
+- **The RFC channel gets a second campaign, and this one is about what two ABAP
+  releases show that one hides** (`tests/robot/api/canal_rfc_abap2023.robot`,
+  generated from `specs/canal-rfc-abap2023.md`, live **10/10** against ABAP
+  Platform 2023 on 2026-08-28). The existing campaign already passes on that
+  target by overriding variables, so portability was not the subject: what is
+  new is the DIVERGENCE, the measured EQUIVALENCE (one is worth the other, and
+  together they say where to put an assertion), and one trap that only a second
+  target reveals. The trap is the campaign's centre: **the system carries TWO
+  airline catalogues of different populations** (18 in the classic demo model,
+  16 in the modern travel model, the smaller strictly included in the larger).
+  A crossing that points one channel at the first and the other channel at the
+  second produces a perfectly reproducible two-row gap, blamed on a defect that
+  does not exist; the scenario is written backwards so that a silent trap
+  becomes a loud assertion. Also locked: identity proved by RELEASE, kernel and
+  software components rather than by the system id or the application host name
+  (identical on both containers of this workstation, so a campaign trusting
+  them would be green against the wrong system) and never by the published IP
+  address (measured volatile, it changed between two readings of the SAME
+  system one day apart); the field contract read ON the target with its
+  counter-proof played, not quoted; two crossings the previous campaign did not
+  make (travels and modern airlines, RFC against OData, 4136 = 4136 and
+  16 = 16, both computed in the same run and never engraved); two logon
+  refusals that, on this release, return the same code AND the same text word
+  for word, so the test asserts the INDISTINCTION instead of pretending to
+  separate them; and a communication refusal that names the port actually
+  contacted, which is how the local relay documented in the preconditions
+  stops being a story and becomes a measurement (base plus instance number,
+  3342 for instance 42).
+- **`Rfc Should Fail With Message Id`, and the message identifier in every RFC
+  refusal description** (`sapfx_common.rfc_channel.rfc_message_identity`, so
+  `Rfc Should Fail With Code` now returns it too). The technical code is stable
+  but coarse, and two very different causes share one: the classic case is a
+  misspelled field name on a full table, refused as `TABLE_WITHOUT_DATA`. The
+  ABAP message identifier (class, type, number) designates the exact refusal
+  and is just as language independent, so convention #3 gains a finer criterion
+  rather than a looser one. Measured live: `DA/E/131` for a missing table,
+  `AD/E/718` for a missing field, `FL/E/046` for a missing function module, and
+  **no identifier at all** for `RFC_INVALID_PARAMETER`, which is not a gap but
+  a proof: that refusal is raised client side and never reached the
+  application. A refusal carrying no identifier fails saying so, rather than
+  comparing itself to emptiness.
+- **The RFC channel surface becomes a deterministic, comparable artifact**
+  (`sapfx_common.rfc_surface`, keywords `Write Rfc Surface Artifact` /
+  `Read Rfc Surface Artifact` / `Compare Rfc Surface Artifacts`). The question
+  "which function modules here and not there" is not answered by a note in a
+  document: it is answered by an artifact produced on each target and compared
+  off-system, the pattern this repo already had for the DDIC inventory and for
+  the cross-channel campaign, and which the RFC channel lacked. Two properties
+  are deliberate and make a later comparison honest. An artifact carries the
+  IDENTITY of the target that produced it (release, kernel, components), since
+  without it comparing two artifacts means comparing two unknowns, and here the
+  system id would not save you: both containers share it. And an artifact
+  carries its SCOPE, so comparing two targets whose measure sets differ is
+  refused as inconclusive rather than averaged, because a measure missing on
+  one side is not worth zero. The hash excludes the timestamp, so two runs on
+  the same target reading the same figures produce the same hash.
+- **A navigation and deep UI5 interaction campaign on the OpenUI5 Demo Kit**
+  (`tests/robot/ui/fiori/navigation_interaction_demokit.robot`, generated from
+  `specs/openui5-demokit-navigation-interaction.md`, 12 scenarios, live
+  **12/12 on four runs**, 2026-08-30). It is the only campaign in the repo that
+  needs neither credentials nor a system to provision, so it is the one anybody
+  can replay: the target is public and the browser is **visible by default**
+  (`-v DEMOKIT_HEADLESS:True` for CI, also validated). Hash routing, tab keys
+  equal to routes, search suggestions that navigate, a deep link restoring
+  state without passing through the home page, browser back, a filtered API
+  tree walked by qualified name, a reversible display toggle, a documentation
+  table cross-checked against the LIVE control, a cascade of popovers then a
+  dialog cancelled by position, theme changed and restored, and a sample
+  iframe whose scope tightness is proven both ways. Read-only, with a teardown
+  that restores state even on failure. Page object shipped in
+  `resources/page_objects/openui5_demokit.resource`, and both files travel in
+  the Windows pack, which gains its first complete plan-to-suite example.
+  The campaign is also what surfaced the two library defects fixed below and
+  above: a live target pays for itself.
+- **`Get Ui5 Theme`**: the UI5 runtime theme as a JSON-safe
+  `{requested, applied}`. Two values, because they diverge and the difference
+  is what a test needs: `requested` is what the runtime was told to apply (the
+  `sap/ui/core/Theming` module, falling back to the legacy Core configuration
+  that UI5 2.x removes), `applied` is what the document actually carries
+  (technical `sapUiTheme-<key>` class). Measured live on the OpenUI5 Demo Kit
+  (2026-08-30): right after the click there is a window where `applied` is
+  EMPTY while the runtime swaps its stylesheets and `requested` already carries
+  the target, so a theme is waited for, never read once. It is the locale-safe
+  witness of a theme change (convention #3: the menu entry that selects it
+  carries a translated label, `sap_horizon_dark` does not). Pure read, no
+  bundle injection, frame scope respected; the campaign layer no longer parses
+  the class attribute itself (convention #12).
+
+### Fixed
+- **`Read Ui5 Table` returned an empty list on a table it could not read**,
+  which is the same answer as a genuinely empty table and therefore a green
+  test asserting nothing. Found live on the OpenUI5 Demo Kit (2026-08-30):
+  against the `sap.ui.documentation.LightTable` of a control's property table,
+  the selector resolves exactly one control, that control carries its rows, and
+  the read returned `[]` without a word. The bundle now returns a VERDICT (the
+  control type, the aggregation it read from, how many rows were candidates and
+  how many were skipped) and the keyword fails naming the type, the row count
+  and the fallback (`Get Ui5 Control Info`, `Get Ui5 Aggregation Info`,
+  `Get Ui5 Properties`) in the two cases that were silent: no `items` and no
+  `rows` aggregation at all, or rows that expose no cells. A genuinely empty
+  table still returns `[]`, and group-header rows are still skipped without
+  complaint, because both are legitimate results. Pure verdict in
+  `SapFioriLibrary._ui5_runtime.table_read_verdict`, unit-tested off-browser.
+- **Two page objects were relying on something untrue, both surfaced by a full
+  live replay of every suite against the four channels (2026-08-29).** Neither
+  was a library gap: in both cases the hardened library check was right and the
+  caller was wrong, which is why the fixes live in `resources/page_objects/`
+  and not in `src/`.
+  - *Work Zone*: `Lire Les Identifiants D Iframe` inherited the accidental
+    PAGE scope of the inline probe it replaced. `Evaluate JavaScript` with a
+    `${None}` selector evaluates on the page whatever the frame stack, while
+    `List Page Iframes` honours the stack like every other library keyword and
+    exactly as its own documentation states. Called after entering the
+    application iframe, which nests none, it returned an EMPTY list rather than
+    an error, and an empty list is a perfectly plausible result here (the same
+    campaign asserts that the home page carries no iframe), so the failure read
+    as "no iframe in the shell" and sent the diagnosis towards the launchpad.
+    The keyword now forces shell scope and restores the stack on every path.
+  - *ABAP launchpad 1.71*: `Ouvrir La Recherche Du Shell` assumed one click
+    opens the shell search. Measured at the DOM: the first click creates the
+    control WITHOUT rendering it (field absent from the DOM, button still
+    `visible=True`, control already in the registry declaring itself visible),
+    and only the second opens it (560x36, inner input 528x26, button flipped to
+    `visible=False`). Under the single click the scenario then typed into a
+    field that did not exist: the value read back stayed empty and Enter went
+    to whichever tile held the focus, opening an application instead of running
+    the search. Opening is now idempotent and retried, and the witness is the
+    field's SURFACE, never its presence in the registry. The scenario had
+    passed 19/19 on 2026-08-24, five days before the non-null-rectangle
+    hardening of `Ui5 Control Should Be Visible` (2026-08-26) that exposed it:
+    a campaign validated BEFORE a hardening has to be replayed AFTER it, or the
+    false green outlives the very fix aimed at it.
+- **`Get Rfc Channel Status` declared the channel available on a machine
+  without the native runtime**, caught by the `runtime_absent` CI preflight on
+  its FIRST real execution (2026-08-29). The measured premise everyone had
+  wrong: pyrfc 3.3.1's `__init__` swallows the native load failure
+  (`except Exception as ex: print(ex)`), so on a machine without
+  `sapnwrfc.dll` the import SUCCEEDS and yields a module without
+  `Connection`. Trusting the import meant the RFC suite would go red instead
+  of skipping, and `Open Rfc Connection` died with a bare `AttributeError`.
+  The verdict now reads the module's CONTENT (`rfc_channel.binding_status`,
+  classified `runtime_absent` with the same remediation), `Open Rfc
+  Connection` fails naming cause and remedy, and the CI step asserts the
+  real premise (importable but incomplete binding) instead of a failing
+  import. `install-rfc.ps1` was already safe: it imports `Connection` by
+  name.
+- **Three agent-facing ambiguities closed at the Robot/MCP boundary** (all
+  three from real agent incidents, 2026-08-27: through `execute_step` every
+  argument arrives as a string, and an agent only reads the message).
+  `Read Grid` / `Read Full Grid` now accept `columns` as a comma-separated
+  string and as a serialized list literal (`"['A', 'B']"`), both previously
+  treated as ONE unknown column name while every column sat in "Available";
+  a list passed in `max_rows`' positional slot now fails naming the argument,
+  the likely positional shift and the `columns=` remedy instead of a bare
+  `TypeError: int()`; the string-to-list normalization is shared pure logic
+  (`sapfx_common/robot_args.py`). `Wait For Ui5 Idle`'s failure now prints
+  the COMPUTED required settle in ms (a bare `settle=2000` is 2000 Robot
+  SECONDS, and the final state shown could look like it contradicted the
+  failure), and an "unreadable last state" now names its cause: the probe's
+  error, the current frame scope, and the two remedies (`Set/Push Ui5
+  Frame`, `Get Page Composition`), the BTP shape where two minutes of
+  failure carried no clue.
+- **`Ui5 Control Should Be Visible` no longer passes on a zero-rectangle
+  control**: rendered-registry presence was the only check, while the wc/dom
+  mirrors already required a non-zero rect. Measured live (2026-08-26, Work
+  Zone shell): a RENDERED search field keeps a 0x0 rectangle permanently
+  (implementation disabled by configuration) and the assertion passed on it.
+  The failure now distinguishes "no match" from "matches, all zero-rect"
+  (naming the ids).
+- **The dom engine now pierces shadow boundaries like Browser does**: the
+  first deep-traversal fix filtered candidates with `matches()`, which
+  evaluates ancestors in the element's own TREE, so a path CROSSING a shadow
+  boundary (exactly the form `wcCssPath` returns) could never match. Measured
+  live on the Work Zone shell: the same CSS string returned 1 through
+  Browser's `Get Element Count` and 0 through `Get Dom Match Count`. A
+  segment-by-segment piercing resolution now runs as a FALLBACK when the
+  normal path finds nothing, so a selector that already resolved keeps its
+  exact result. Counter-proof run with the fallback disabled: `0 != 1`, the
+  field symptom. The shadow-boundary primitives moved to their own bundle
+  chapter (`_ui5_bundle_shadow.js.tpl`, convention 13).
+- **`docs/fiori-architecture.md` and its French pair no longer describe the
+  wc engine as a light-DOM-only scan**: the claim "application content stays
+  in the light DOM via slots, only component internals live in shadow roots"
+  was disproved by the same shell, and the docs said so while the code had
+  already changed.
+- **Short wc tags now reach the MIXED spellings of UI5 Web Components**
+  (`ui5-shellbar-item`: glued family, dashed component): the 2026-08-24 fix
+  covered the two extreme forms (`ui5-shellbaritem`, `ui5-shell-bar-item`)
+  and `tag=ShellBarItem` still matched nothing on a real Work Zone shell
+  bar. All glue/dash combinations between words are now tried (bounded).
+  Web recorder artifacts regenerated; extension 0.10.0 → 0.10.1.
+- **Preflight probes now feed the channel telemetry** (SapApiLibrary
+  `_probe`): a probe traverses the network like any read, but bypassed the
+  `requests` counter, so `Api Channel Should Show Activity`, whose whole
+  point is proving the network was traversed, failed on a legitimate
+  reconnaissance made of probes. Measured live before the fix: ~15 network
+  probes, `requests: 2`. Probe refusals stay results, not channel errors.
+- **`Api Channel State Should Not Leak Credentials` no longer passes on an
+  empty state** (`resources/api_keywords.resource`): observed live validating
+  `{'api_sessions': []}`, where there is nothing to leak and therefore
+  nothing proven. An empty state now fails naming the most frequent cause
+  (under rf-mcp, resource and library can serve two namespace-partitioned
+  session registries).
+
+### Changed
+- **The `sapfx` skill becomes an orientation map plus seven references.** It had
+  drifted: it announced "three channels" where the repo has four (the RFC
+  channel owns a resource and two live suites), said nothing of the security
+  vocabulary, of the industrial layout (`tests/robot/{api,ui,cross}`,
+  `page_objects/`, `variables/`), of conventions 11 and 13, carried no command
+  line, no suite skeleton, no field trap, and no word on the rf-mcp pitfalls it
+  exists to drive. `SKILL.md` now holds only what is needed on every load (what
+  makes truth, the four channels, the perception loop, seven rules, the agent
+  cycle, a routing table), and `references/` carries `demarrage`, `canal-ecc`,
+  `canal-fiori`, `canal-api-rfc`, `conventions`, `pieges-terrain` and `rf-mcp`.
+  An eighth reference, `cycle-agents`, makes the agentic cycle checkable rather
+  than merely named: who writes where (and who never writes tests), the proof
+  each step owes (the planner writes only what it observed, the generator
+  EXECUTES every step live before writing it, the healer verifies the repair
+  live, the gates run in order), the four feedback loops closed mechanically
+  (provenance stamp, « Écarts constatés », the `PÉRIMÉE` marker, the heal
+  journal), and the healer's five failure classes with the layer each one
+  repairs. `tests/unit/test_skill_sapfx.py` keeps it honest: every keyword cited must
+  exist in `src/` or `resources/`, references and links must match both ways,
+  and the map stays a map. The guard bit on its first run (three condensed
+  keyword forms that named nothing), and the pack's leak scan caught a private
+  path mentioned in the conventions reference.
+- **`resources/` now says what it is: examples to customize, never a universal
+  SAP truth.** The layer carries the business vocabulary of ONE installation
+  (every id, service path, table and profile parameter in it measured live on
+  this repo's lab targets), while `src/`, the libraries and their capabilities,
+  is what holds on every SAP system. Nothing said so until now: the README, the
+  pack README, `llms.txt`, `docs/architecture` and the files themselves all
+  presented the layer as the one "tests should call", and these files ship as
+  is to the public repository and inside the Windows pack, where a reader
+  without the lab context reads them as a contract and writes tests against
+  another system's screens. Added `resources/README.md` (+ `.fr.md`): what was
+  measured and where, the three degrees of portability (often reusable as is /
+  to verify and adjust / lab specific), what stays reusable (the mirrored
+  four-channel vocabulary, convention 1, one page object per screen, the safety
+  properties, release divergences as variables never as a version `IF`), how to
+  adopt it on a real system, and where a fix goes (capability to `src/`, target
+  specifics here). Every `.resource` now opens with the
+  « EXEMPLE À PERSONNALISER » banner inside its Robot `Documentation` (so Libdoc
+  shows it), enforced by `tests/unit/test_resources_are_examples.py`, and the
+  point is restated in convention #1 of `CLAUDE.md`, its two mirrors, and the
+  `sapfx` skill.
+- **The business keyword layer consumes the promoted capabilities instead of
+  its inline JS** (convention #12 sweep): `fiori_keywords.resource` (WebGUI
+  log-off/popup/rendered probes, count parsing), `abap_flp.resource`
+  (identity, catalogs, groups, intent resolvability, SearchableContent,
+  settings-by-binding-context, ICF language select via Browser's
+  `Get Select Options`), the `workzone_launchpad/user_area/session/
+  shell_search` page objects and `fiori_travel_list.resource`. Return shapes
+  and the French vocabulary are preserved; the page objects keep only site
+  anchors and translations, plus the four probes assumed in `ALLOWED_12`.
+- **The healer's blind-eval scenario moved with the code it targeted**
+  (`scripts/agent_eval_harness.py`): `se16-count-button` drifted an id that
+  now lives in the library, where the healer never patches. The canonical
+  scenario is `se16-table-field` (`ctxtDATABROWSE-TABLENAME` ->
+  `ctxtDATABROWSE-TABNAME`), which stays in `resources/`, sits on the eval
+  suite's path and is closer to what really drifts. The guard that caught
+  this (`test_the_default_scenario_matches_the_real_repo_resource`, which
+  checks the target still exists exactly once in the real resource) did its
+  job: it is why the harness did not die silently.
+- **`comms/proofs.json` now carries the live CAMPAIGNS, not just one live
+  ratio**, and `scripts/check_comms_sync.py` accepts a `N/M scénarios`
+  citation that matches any declared campaign. A single live proof held as
+  long as there was a single target system. Since the launchpad campaign is
+  replayed on two SAP releases, requiring one ratio meant the second
+  validation could not be published at all, which pushes the figure to be
+  written where no guard watches it: exactly the hole this guard exists to
+  close. Each campaign still owes its target and its validation date, and a
+  ratio nothing in the repo backs is still refused. The two campaigns
+  declared: 22/22 on an ABAP Platform 2023 serving SAPUI5 1.120.15, and
+  20/20 on an ABAP Platform 1909 serving 1.71.47.
 
 ## [0.7.0] - 2026-08-25
 

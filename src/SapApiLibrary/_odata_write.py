@@ -139,6 +139,38 @@ class OdataWriteKeywords(_ApiCore):
             raise ValueError("Register Created Entity : chemin vide.")
         self._session(alias).created_entities.append(path)
 
+    def build_draft_entity_path(self, entity_set: str, key_field: str,
+                                key_value: str,
+                                active: str = "false") -> str:
+        """Chemin ADRESSABLE d'une entité d'un service OData v4
+        **draft-enabled** : ``<set>(<clé>=<valeur>,IsActiveEntity=<actif>)``.
+
+        Sur un service draft-enabled, la clé est COMPOSITE : l'identifiant
+        seul ne désigne rien, il faut lui adjoindre l'état actif ou brouillon.
+        C'est du savoir de PROTOCOLE, pas du vocabulaire d'un site : il vivait
+        dans la couche resources, promu ici (convention #12).
+
+        Deux pièges que ce keyword rend visibles (mesurés live sur cap-sflight,
+        2026-08-19) : un POST y crée un BROUILLON, que ni le ``$count`` ni une
+        lecture ordinaire ne rendent (les deux ne voient que les entités
+        ACTIVES), donc un compte inchangé ne prouve AUCUN nettoyage ; et l'URI
+        que le serveur annonce en ``Location`` (``…Travel.drafts('…')``) n'est
+        pas adressable, d'où le chemin construit ici et confié à
+        `Register Created Entity`. ::
+
+            ${chemin}=    Build Draft Entity Path    /processor/Travel
+            ...    TravelUUID    ${uuid}
+            Register Created Entity    ${chemin}
+        """
+        path = str(entity_set).strip().rstrip("/")
+        if not path:
+            raise ValueError("Build Draft Entity Path : entity_set vide.")
+        field = str(key_field).strip()
+        if not field:
+            raise ValueError("Build Draft Entity Path : key_field vide.")
+        return "%s(%s=%s,IsActiveEntity=%s)" % (
+            path, field, str(key_value).strip(), str(active).strip())
+
     def get_created_entities(self, alias: str = "default") -> list[str]:
         """Les entités actuellement suivies par la fabrique de données de la
         session (copie JSON-safe, ordre de création)."""

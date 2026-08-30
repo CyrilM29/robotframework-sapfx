@@ -1,0 +1,245 @@
+{
+  "hash": "bceacecc7016d9ef508fe3e599a1d5f452f2fd86ee0ee788948e88ba01726382",
+  "identity": {
+    "RFCCHARTYP": "4103",
+    "RFCDATABS": "A4H",
+    "RFCDBHOST": "vhcala4hci",
+    "RFCDBSYS": "HDB",
+    "RFCDEST": "vhcala4hci_A4H_00",
+    "RFCFLOTYP": "IE3",
+    "RFCHOST": "vhcala4h",
+    "RFCHOST2": "vhcala4hci",
+    "RFCINTTYP": "LIT",
+    "RFCIPADDR": "172.17.0.4",
+    "RFCIPV6ADDR": "172.17.0.4",
+    "RFCKERNRL": "793",
+    "RFCMACH": "  390",
+    "RFCOPSYS": "Linux",
+    "RFCPROTO": "011",
+    "RFCSAPRL": "758",
+    "RFCSYSID": "A4H",
+    "RFCTZONE": "     0"
+  },
+  "readings": [
+    {
+      "name": "auth/no_check_in_some_cases",
+      "status": "defined",
+      "value": "Y"
+    },
+    {
+      "name": "auth/object_disabling_active",
+      "status": "defined",
+      "value": "Y"
+    },
+    {
+      "name": "auth/rfc_authority_check",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "gw/acl_mode",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "gw/monitor",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "gw/reg_info",
+      "status": "defined",
+      "value": "/usr/sap/A4H/D00/data/reginfo"
+    },
+    {
+      "name": "gw/reg_no_conn_info",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "gw/rem_start",
+      "status": "defined",
+      "value": "DISABLED"
+    },
+    {
+      "name": "gw/sec_info",
+      "status": "defined",
+      "value": "/usr/sap/A4H/SYS/global/secinfo"
+    },
+    {
+      "name": "http/security_session_timeout",
+      "status": "defined",
+      "value": "1800"
+    },
+    {
+      "name": "icf/set_HTTPonly_flag_on_cookies",
+      "status": "defined",
+      "value": "3"
+    },
+    {
+      "name": "login/disable_multi_gui_login",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/failed_user_auto_unlock",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/fails_to_session_end",
+      "status": "defined",
+      "value": "3"
+    },
+    {
+      "name": "login/fails_to_user_lock",
+      "status": "defined",
+      "value": "5"
+    },
+    {
+      "name": "login/isolate_rfc_system_calls",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/min_password_diff",
+      "status": "defined",
+      "value": "3"
+    },
+    {
+      "name": "login/min_password_digits",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/min_password_letters",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/min_password_lng",
+      "status": "defined",
+      "value": "10"
+    },
+    {
+      "name": "login/min_password_lowercase",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/min_password_specials",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/min_password_uppercase",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/no_automatic_user_sapstar",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "login/password_compliance_to_current_policy",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/password_downwards_compatibility",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/password_expiration_time",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/password_hash_algorithm",
+      "status": "defined",
+      "value": "encoding=RFC2307, algorithm=iSSHA-1, iterations=15000, saltsize=128"
+    },
+    {
+      "name": "login/password_history_size",
+      "status": "defined",
+      "value": "15"
+    },
+    {
+      "name": "login/password_max_idle_initial",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/password_max_idle_productive",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "login/ticket_only_by_https",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "rdisp/gui_auto_logout",
+      "status": "defined",
+      "value": "3600"
+    },
+    {
+      "name": "rec/client",
+      "status": "defined",
+      "value": "OFF"
+    },
+    {
+      "name": "rfc/callback_security_method",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "rfc/reject_expired_passwd",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "rsau/enable",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "rsau/integrity",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "rsau/selection_slots",
+      "status": "defined",
+      "value": "10"
+    },
+    {
+      "name": "rsau/user_selection",
+      "status": "defined",
+      "value": "1"
+    },
+    {
+      "name": "snc/enable",
+      "status": "defined",
+      "value": "0"
+    },
+    {
+      "name": "system/secure_communication",
+      "status": "defined",
+      "value": "OFF"
+    }
+  ],
+  "summary": {
+    "compliant": 0,
+    "deviating_keys": [],
+    "deviation": 0,
+    "deviations_by_severity": {},
+    "not_measurable": 0,
+    "not_measurable_keys": [],
+    "total": 0
+  },
+  "verdicts": []
+}

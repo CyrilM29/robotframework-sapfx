@@ -76,6 +76,14 @@ exécute un smoke check d'import, et, avec `-WithMcp`, rend
 global n'est modifié (pas de changement de `PATH`, pas de site-packages
 système).
 
+**Si le canal RFC optionnel est visé, l'interpréteur se décide ici.** `pyrfc`
+n'a pas de roue précompilée au-delà de Python 3.12 : un venv créé en 3.13 ou
+3.14 ferme le canal jusqu'à sa re-création, donc lancer `install.cmd` avec un
+interpréteur **3.10 à 3.12** dans le `PATH`. Le reste du provisionnement, y
+compris le cas où SAP GUI fournit déjà le runtime RFC et rend le téléchargement
+du SDK inutile, est traité par le README du pack (« Canal RFC ») et par
+`install-rfc.ps1`.
+
 ## 4. Valider
 
 ```bat

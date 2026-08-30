@@ -397,10 +397,41 @@ _REF_SCRIPT = re.compile(r"scripts/([A-Za-z0-9_]+)\.py")
 _REF_HORS_SUJET = (
     ("regen_agent_definitions.py", ".github/chatmodes/",
      "bandeau « fichier GÉNÉRÉ, régénérer avec » : geste de mainteneur"),
+    ("regen_agent_definitions.py", ".claude/skills/sapfx/",
+     "la skill dit d'où viennent les chat modes VS Code (« générés, jamais "
+     "édités à la main ») : un CONSTAT sur le dépôt, pas une instruction au "
+     "poste, et le pack livre les agents sans livrer leur générateur"),
     ("build_release_pack.py", "README.",
      "les READMEs du pack disent que le pack est un artefact : corriger "
      "packaging/ et reconstruire, jamais éditer le pack en place"),
 )
+
+
+def _citations_de_scripts_absents():
+    """(fichier livré, script cité) pour chaque script cité SANS être livré.
+
+    La matière brute des deux gardes qui suivent : le premier vérifie que
+    chacune de ces citations est justifiée, le second que chaque justification
+    correspond encore à une citation réelle.
+    """
+    manifest = mod.build_manifest(_REPO_ROOT)
+    livres = {dest.as_posix() for _src, dest in manifest}
+    citations = set()
+    for src, dest in manifest:
+        if not str(src).lower().endswith(_TEXTE):
+            continue
+        texte = src.read_text(encoding="utf-8", errors="replace")
+        for nom in _REF_SCRIPT.findall(texte):
+            cible = "scripts/%s.py" % nom
+            if cible not in livres:
+                citations.add((dest.as_posix(), cible))
+    return citations
+
+
+def _couvre(entree, fichier_livre, script_cite):
+    script, prefixe, _pourquoi = entree
+    return (script_cite.endswith("/" + script)
+            and fichier_livre.startswith(prefixe))
 
 
 def test_tout_script_cite_par_un_fichier_livre_est_lui_meme_livre():
@@ -414,22 +445,32 @@ def test_tout_script_cite_par_un_fichier_livre_est_lui_meme_livre():
     filet de régression du studio). Ce garde vaut dans les deux sens : ajouter
     une référence oblige à trancher.
     """
-    manifest = mod.build_manifest(_REPO_ROOT)
-    livres = {dest.as_posix() for _src, dest in manifest}
-    manquants = set()
-    for src, dest in manifest:
-        if not str(src).lower().endswith(_TEXTE):
-            continue
-        texte = src.read_text(encoding="utf-8", errors="replace")
-        for nom in _REF_SCRIPT.findall(texte):
-            cible = "scripts/%s.py" % nom
-            if cible in livres:
-                continue
-            if any(cible.endswith("/" + script)
-                   and dest.as_posix().startswith(prefixe)
-                   for script, prefixe, _pourquoi in _REF_HORS_SUJET):
-                continue
-            manquants.add("%s -> %s" % (dest.as_posix(), cible))
+    manquants = {
+        "%s -> %s" % (fichier, cible)
+        for fichier, cible in _citations_de_scripts_absents()
+        if not any(_couvre(e, fichier, cible) for e in _REF_HORS_SUJET)
+    }
     assert not manquants, (
         "des fichiers livrés pilotent des scripts absents du pack : "
         + " ; ".join(sorted(manquants)))
+
+
+def test_les_references_hors_sujet_correspondent_encore_a_une_citation():
+    """Une justification qui ne couvre plus rien est une exception morte.
+
+    Le pendant de ``test_les_exceptions_tolerees_existent_encore`` du garde
+    d'identifiants, posé le 2026-08-30 en ajoutant la troisième entrée : sans
+    lui, une phrase reformulée ou un fichier retiré du manifeste laisse
+    derrière elle une échappatoire qui n'échappe plus à rien, et le périmètre
+    couvert n'est plus celui qu'on croit lire.
+    """
+    citations = _citations_de_scripts_absents()
+    orphelines = [
+        "%s dans %s" % (script, prefixe)
+        for script, prefixe, _pourquoi in _REF_HORS_SUJET
+        if not any(_couvre((script, prefixe, None), fichier, cible)
+                   for fichier, cible in citations)
+    ]
+    assert orphelines == [], (
+        "référence hors sujet sans citation correspondante (à retirer de "
+        "_REF_HORS_SUJET) : %s" % orphelines)

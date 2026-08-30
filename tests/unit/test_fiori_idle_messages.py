@@ -56,6 +56,38 @@ def test_wait_for_ui5_idle_timeout_nomme_le_diagnostic():
     assert "Log Fiori Diagnostics" in message and "'pending': 3" in message
 
 
+def test_wait_for_ui5_idle_timeout_affiche_le_calme_exige():
+    """L'incident : ``settle=2000`` cru en millisecondes vaut 2 000 SECONDES
+    (temps Robot), et l'état final affiché (calme confortable, pending=0)
+    semblait CONTREDIRE l'échec. Le calme exigé calculé, affiché en ms, rend
+    la mauvaise unité visible à la première lecture."""
+    lib = _idle_lib([{"pending": 0, "busy": False, "quiet_ms": 15000}])
+    with pytest.raises(AssertionError) as err:
+        lib.wait_for_ui5_idle(timeout="0.05s", settle="2000")
+    assert "calme continu exigé : 2000000 ms" in str(err.value)
+
+
+def test_wait_for_ui5_idle_illisible_nomme_la_cause_et_la_portee():
+    """Vu sur BTP (Work Zone, iframes) : deux minutes d'échec en « dernier
+    état : illisible » sans indice, la sonde échouant dans une portée de
+    frame sans bundle évaluable (il manquait un Push Ui5 Frame). Le message
+    nomme désormais l'erreur de la sonde, la portée de frame courante et les
+    deux remèdes."""
+    lib = SapFioriLibrary(ui5_timeout="0.05s", poll_interval="0.01s")
+
+    def boom(js, arg=None):
+        raise RuntimeError("Execution context was destroyed")
+
+    lib._evaluate = boom
+    with pytest.raises(AssertionError) as err:
+        lib.wait_for_ui5_idle()
+    message = str(err.value)
+    assert "Execution context was destroyed" in message
+    assert "portée de frame : aucune" in message
+    assert "Push Ui5 Frame" in message
+    assert "Get Page Composition" in message
+
+
 def test_wait_for_ui5_idle_tolere_les_erreurs_js_transitoires():
     lib = SapFioriLibrary(ui5_timeout="2s", poll_interval="0.01s")
     calls = {"n": 0}
