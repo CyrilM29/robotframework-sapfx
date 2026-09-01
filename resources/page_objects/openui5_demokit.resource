@@ -139,16 +139,35 @@ ${DEMOKIT_TAB_TYPE}                 sap.m.IconTabFilter
 @{DEMOKIT_EXPECTED_KEYS}            home    topic    api    controls
 
 # --- En-tête : recherche globale et menu Options ------------------------------
-${DEMOKIT_SEARCH_FIELD}             searchControl-searchField
-${DEMOKIT_SUGGESTION_TYPE}          sap.m.StandardListItem
-${DEMOKIT_SUGGESTION_GROUP_TYPE}    sap.m.GroupHeaderListItem
+# Depuis le SDK 1.152.0 (relevé 2026-09-01), le shell est rendu en UI5 Web
+# Components encapsulés dans des wrappers `sap.f.gen.ui5.webcomponents*` qui
+# restent AU REGISTRE : les moteurs role/xpath les adressent encore. La
+# recherche est un `ShellBarSearch` qui garde l'id stable `searchControl`
+# (son enfant `searchControl-searchField` n'existe plus), et ses entrées de
+# suggestion sont des `SearchItem`/`SearchItemGroup` dont le titre se lit sur
+# la propriété `text`. Les entrées ne sont PAS DOM-contenues dans le popover
+# WC (il vit dans un shadow root) : la portée de lecture est le contrôle de
+# recherche lui-même.
+${DEMOKIT_SEARCH_CONTROL}           searchControl
+${DEMOKIT_SUGGESTION_TYPE}          SearchItem
+${DEMOKIT_SUGGESTION_GROUP_TYPE}    SearchItemGroup
+${DEMOKIT_SUGGESTION_TITLE_PROP}    text
 # Les entrées de résultat portent un identifiant technique suivi de sa
 # catégorie entre parenthèses : `sap.m.Button (class): ...`. Le mot de la
 # catégorie n'est PAS traduit (mesuré interface en français).
 ${DEMOKIT_SUGGESTION_CLASS_SUFFIX}    ${SPACE}(class)
 ${DEMOKIT_MENU_BUTTON}              aboutMenuButton
 ${DEMOKIT_MENU_BUTTON_ICON}         sap-icon://action-settings
-${DEMOKIT_MENU_ITEM_TYPE}           sap.m.MenuItem
+# Le menu Options est un `ui5-menu` WC d'id stable `aboutMenu`. Ses entrées
+# (`MenuItem` WC au registre) n'ont PLUS de propriété `key` : la clé technique
+# vit dans l'id, de forme `menuItem-<clé>`, et TOUTES les entrées (sous-menu
+# fermé compris) sont au DOM, DOM-contenues dans le menu. La pile de popups
+# compte les couches d'implémentation WC : menu ouvert = 2 entrées (le menu +
+# son popover interne `ui5wc_N-menu-rp`), sous-menu = +1.
+${DEMOKIT_MENU}                     aboutMenu
+${DEMOKIT_MENU_ITEM_TYPE}           MenuItem
+${DEMOKIT_MENU_ITEM_PREFIX}         menuItem-
+${DEMOKIT_MENU_STACK_COST}          ${2}
 @{DEMOKIT_MENU_KEYS}                about    appearance    sitemap    settings
 @{DEMOKIT_APPEARANCE_KEYS}          light    dark
 
@@ -208,6 +227,14 @@ ${DEMOKIT_SHELL_ANCHOR}             apiMasterTab
 # scénario de diagnostic, ce qui est exactement l'effet voulu.
 @{DEMOKIT_MISSING_SDK_RESOURCES}    jquery.ui.button.css    jquery.ui.theme.css
 ...                                 sdk/samples/component-preload.js
+# INVENTAIRE des ressources du shell Web Components (SDK 1.152.0) dont le code
+# émet ses propres exceptions non rattrapées (relevé live 2026-09-01 :
+# `TypeError: e._close is not a function` dans `_closeOtherSubMenus`, déclenché
+# par la cascade du menu Options : un défaut du SDK, pas de la campagne). Même
+# contrat que l'inventaire ci-dessus : reconnu au NOM de la ressource dans la
+# pile d'origine, jamais au texte du message ; une ressource de plus sort en
+# anomalie NON CLASSÉE et fait échouer le diagnostic, c'est l'effet voulu.
+@{DEMOKIT_WC_SHELL_RESOURCES}       library-webcomponents-preload.js
 ${DEMOKIT_RUNTIME_WARNING_MARKER}    [FUTURE FATAL]
 ${DEMOKIT_MAX_LOG}                  ${300}
 @{DEMOKIT_ANOMALY_TYPES}            error    warning    assert
@@ -331,7 +358,7 @@ Ramener Le Demo Kit A Son Etat De Reference
     Run Keyword And Ignore Error    Sortir De Toute Iframe
     Run Keyword And Ignore Error    Fermer Les Pages Supplementaires
     Run Keyword And Ignore Error    Fermer Les Popups Ouverts
-    Run Keyword And Ignore Error    Vider Le Champ    ${DEMOKIT_SEARCH_FIELD}
+    Run Keyword And Ignore Error    Vider Le Champ    ${DEMOKIT_SEARCH_CONTROL}
     Run Keyword And Ignore Error    Vider Le Champ    ${DEMOKIT_API_FILTER}
     Run Keyword And Ignore Error    Restaurer Les Bascules D Affichage
     Run Keyword And Ignore Error    Restaurer Le Theme Initial
@@ -349,8 +376,10 @@ Clore La Campagne Demo Kit
 
 Le Demo Kit Doit Etre Percu
     [Documentation]    Verdict de perception d'ouverture : runtime présent,
-    ...    page mono-technologie UI5 (aucun hôte Web Component, aucun élément
-    ...    WebGUI, aucune frame), moteur `role` recommandé, et un plancher de
+    ...    page HYBRIDE UI5 + Web Components (le shell est en WC depuis le SDK
+    ...    1.152.0 : des hôtes WC ABSENTS signaleraient un nouveau changement
+    ...    de composition, dans l'autre sens), aucun élément WebGUI, aucune
+    ...    frame, moteurs `role` ET `wc` recommandés, et un plancher de
     ...    contrôles rendus. La VERSION et la LANGUE sont journalisées, jamais
     ...    assertées : la première bouge avec le SDK, la seconde a changé en
     ...    cours de run sur cette cible.
@@ -359,14 +388,16 @@ Le Demo Kit Doit Etre Percu
     ...    msg=Aucun runtime UI5 sur la page du Demo Kit : la cible n'est pas celle attendue.
     Should Not Be Empty    ${compo}[ui5_version]
     ...    msg=Le runtime UI5 ne déclare aucune version.
-    Should Be Equal As Integers    ${compo}[wc_hosts]    0
-    ...    msg=Des hôtes Web Components sont apparus sur cette page : la composition a changé.
+    Should Be True    ${compo}[wc_hosts] > 0
+    ...    msg=Plus aucun hôte Web Component sur cette page alors que le shell 1.152.0 est en WC : la composition a changé.
     Should Be Equal As Integers    ${compo}[webgui_elements]    0
     ...    msg=Des éléments WebGUI sont apparus sur cette page : la composition a changé.
     Should Be Empty    ${compo}[frames]
     ...    msg=L'accueil du Demo Kit ne doit porter aucune iframe.
     List Should Contain Value    ${compo}[engines]    role
     ...    msg=Le moteur role n'est plus recommandé sur cette page : ${compo}[engines]
+    List Should Contain Value    ${compo}[engines]    wc
+    ...    msg=Le moteur wc n'est plus recommandé sur cette page : ${compo}[engines]
     Should Be True    ${compo}[ui5_controls] >= ${DEMOKIT_MIN_CONTROLS}
     ...    msg=Seulement ${compo}[ui5_controls] contrôles rendus, sous le plancher ${DEMOKIT_MIN_CONTROLS} : la page n'est pas complètement construite.
     ${langues}=    Get Page Languages
@@ -432,42 +463,65 @@ La Section Active Doit Etre
 # =============================================================================
 
 Rechercher Dans Le Demo Kit
-    [Documentation]    Saisit `${terme}` dans le champ de recherche global et
-    ...    constate l'ouverture du popover de suggestions SUR LA PILE DE
-    ...    POPUPS. Retourne l'identifiant de ce popover, qui sert de PORTÉE aux
-    ...    lectures suivantes : il est généré, donc découvert ici et jamais
-    ...    écrit dans un fichier. La saisie passe par de vraies frappes : poser
-    ...    la valeur ne déclenche pas les suggestions.
+    [Documentation]    Saisit `${terme}` dans le contrôle de recherche global
+    ...    (`ShellBarSearch` WC, id stable, frappe percée jusqu'à l'input du
+    ...    shadow root) et constate l'ouverture du popover de suggestions SUR
+    ...    LA PILE DE POPUPS. Retourne l'identifiant complet du CONTRÔLE DE
+    ...    RECHERCHE, qui sert de PORTÉE aux lectures suivantes : depuis le
+    ...    shell WC (1.152.0), les entrées de suggestion ne sont pas
+    ...    DOM-contenues dans le popover, qui vit dans un shadow root. La
+    ...    saisie passe par de vraies frappes : poser la valeur ne déclenche
+    ...    pas les suggestions.
     [Arguments]    ${terme}
-    Saisir Dans Le Champ    ${DEMOKIT_SEARCH_FIELD}    ${terme}
+    Saisir Dans Le Champ    ${DEMOKIT_SEARCH_CONTROL}    ${terme}
     Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
     ...    La Pile De Popups Doit Avoir    ${1}
-    ${pile}=    Get Ui5 Open Popups
-    RETURN    ${pile}[-1][id]
+    ${identifiants}=    Get Ui5 Ids    idSuffix=${DEMOKIT_SEARCH_CONTROL}
+    RETURN    ${identifiants}[0]
 
 Lire Les Suggestions
-    [Documentation]    Titres des entrées de résultat rendues dans la portée du
-    ...    popover, dans l'ordre du registre. Les libellés de catégorie sont
-    ...    traduits ; les titres de résultat, eux, portent des identifiants
-    ...    techniques non traduits.
-    [Arguments]    ${popover}
-    ${titres}=    Get Ui5 Properties    title    controlType=${DEMOKIT_SUGGESTION_TYPE}
-    ...    containedIn=${popover}
+    [Documentation]    Titres des entrées de résultat rendues dans la portée
+    ...    donnée (le contrôle de recherche depuis le shell WC), dans l'ordre
+    ...    du registre. Le titre se lit sur la propriété `text` des
+    ...    `SearchItem` ; il porte des identifiants techniques non traduits.
+    [Arguments]    ${portee}
+    ${titres}=    Get Ui5 Properties    ${DEMOKIT_SUGGESTION_TITLE_PROP}
+    ...    controlType=${DEMOKIT_SUGGESTION_TYPE}    containedIn=${portee}
     RETURN    ${titres}
 
 Compter Les En Tetes De Groupe
-    [Documentation]    Nombre de lignes de catégorie du popover de suggestions.
-    [Arguments]    ${popover}
+    [Documentation]    Nombre de lignes de catégorie des suggestions, dans la
+    ...    portée donnée.
+    [Arguments]    ${portee}
     ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_SUGGESTION_GROUP_TYPE}
-    ...    containedIn=${popover}
+    ...    containedIn=${portee}
     RETURN    ${nb}
+
+Attendre Les Suggestions Groupees
+    [Documentation]    Attente ACTIVE de l'arrivée des résultats groupés dans
+    ...    la portée. Le popover s'ouvre dès la première frappe, mais les
+    ...    entrées et leurs en-têtes de groupe arrivent avec les RÉSULTATS, un
+    ...    instant plus tard (mesuré 2026-09-01 : lu à l'instant de
+    ...    l'ouverture, le compte de groupes vaut 0 ; relu après l'arrivée des
+    ...    résultats, 2). « Popover ouvert » ne veut pas dire « résultats là ».
+    [Arguments]    ${portee}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Les Suggestions Doivent Etre Groupees    ${portee}
+
+Les Suggestions Doivent Etre Groupees
+    [Documentation]    Assertion sondable : au moins un en-tête de groupe est
+    ...    rendu dans la portée des suggestions.
+    [Arguments]    ${portee}
+    ${nb}=    Compter Les En Tetes De Groupe    ${portee}
+    Should Be True    ${nb} >= 1
+    ...    msg=Le popover de suggestions ne porte aucun en-tête de groupe.
 
 Les Suggestions Doivent Proposer
     [Documentation]    Assertion locale-indépendante : au moins une entrée dont
     ...    le titre porte l'identifiant technique cherché. Aucun libellé
     ...    traduit n'entre dans le verdict.
-    [Arguments]    ${popover}    ${nom_qualifie}
-    ${titres}=    Lire Les Suggestions    ${popover}
+    [Arguments]    ${portee}    ${nom_qualifie}
+    ${titres}=    Lire Les Suggestions    ${portee}
     # Le filtre passe par `filter` et non par une compréhension : une variable
     # Robot référencée par `$nom` n'est pas visible depuis la portée d'une
     # compréhension (attrapé au premier run live).
@@ -483,9 +537,9 @@ Ouvrir La Suggestion De Classe
     ...    L'entrée est atteinte par son identifiant relevé À L'INSTANT dans la
     ...    même portée et dans le même ordre que les titres : un identifiant
     ...    généré ne s'écrit pas, il se découvre.
-    [Arguments]    ${popover}    ${nom_qualifie}
-    ${titres}=    Lire Les Suggestions    ${popover}
-    ${identifiants}=    Get Ui5 Ids    controlType=${DEMOKIT_SUGGESTION_TYPE}    containedIn=${popover}
+    [Arguments]    ${portee}    ${nom_qualifie}
+    ${titres}=    Lire Les Suggestions    ${portee}
+    ${identifiants}=    Get Ui5 Ids    controlType=${DEMOKIT_SUGGESTION_TYPE}    containedIn=${portee}
     ${prefixe}=    Set Variable    ${nom_qualifie}${DEMOKIT_SUGGESTION_CLASS_SUFFIX}
     ${rang}=    Set Variable    ${-1}
     FOR    ${indice}    ${titre}    IN ENUMERATE    @{titres}
@@ -830,37 +884,44 @@ Ouvrir Le Menu Options
     [Documentation]    Ouvre le menu Options par son bouton d'en-tête et
     ...    constate l'ouverture sur la PILE DE POPUPS. La présence des entrées
     ...    ne prouverait rien : menu refermé, une entrée compte encore une
-    ...    correspondance, avec un rectangle nul.
+    ...    correspondance, avec un rectangle nul. Depuis le shell WC (1.152.0),
+    ...    un menu ouvert pousse DEUX entrées sur la pile (le `ui5-menu` et son
+    ...    popover interne `ui5wc_N-menu-rp`) : le coût est porté par
+    ...    `${DEMOKIT_MENU_STACK_COST}`, jamais supposé égal à 1.
     ${profondeur}=    Lire La Profondeur De La Pile De Popups
-    ${attendue}=    Evaluate    $profondeur + 1
+    ${attendue}=    Evaluate    $profondeur + ${DEMOKIT_MENU_STACK_COST}
     Click Ui5 Control    idSuffix=${DEMOKIT_MENU_BUTTON}
     Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
     ...    La Pile De Popups Doit Avoir    ${attendue}
 
 Ouvrir L Entree De Menu
     [Documentation]    Clique l'entrée de menu portant la clé technique
-    ...    `${cle}`, dans la portée du popup ouvert le plus récent. La clé et
-    ...    l'icône sont les seules ancres : les libellés sont traduits et les
-    ...    identifiants sont générés (mesurés `__item10` à `__item18` sur une
-    ...    page, `__item16` à `__item24` sur une autre).
+    ...    `${cle}`. Depuis le shell WC, les entrées n'ont plus de propriété
+    ...    `key` : la clé vit dans l'identifiant, de forme STABLE
+    ...    `menuItem-<clé>`, qui devient l'ancre de clic. La garde de pile
+    ...    reste : entrée présente au DOM ne veut pas dire menu ouvert.
     [Arguments]    ${cle}
-    ${motif}=    Motif Exact    ${cle}
     ${pile}=    Get Ui5 Open Popups
     Should Not Be Empty    ${pile}
     ...    msg=Aucun popup ouvert : l'entrée de menu ${cle} n'est pas atteignable.
-    Click Ui5 Control    controlType=${DEMOKIT_MENU_ITEM_TYPE}
-    ...    containedIn=${pile}[-1][id]    properties={'key': '${motif}'}
+    Click Ui5 Control    idSuffix=${DEMOKIT_MENU_ITEM_PREFIX}${cle}
 
 Lister Les Cles Du Menu Ouvert
-    [Documentation]    Clés techniques des entrées rendues dans le popup ouvert
-    ...    le plus récent. La portée est indispensable : ouvert, un sous-menu
-    ...    fait cohabiter ses clés avec celles du menu racine dans un comptage
-    ...    global (mesuré 9 clés pour 4 plus 5).
+    [Documentation]    Clés techniques des entrées du menu ouvert, dérivées des
+    ...    suffixes d'identifiant `menuItem-<clé>` dans la portée du menu.
+    ...    Depuis le shell WC, TOUTES les entrées (sous-menu fermé compris)
+    ...    sont au DOM et DOM-contenues dans le menu : la lecture rend le menu
+    ...    ENTIER (9 clés mesurées), elle ne distingue plus le niveau ouvert,
+    ...    et les assertions des appelants sont des INCLUSIONS.
     ${pile}=    Get Ui5 Open Popups
     Should Not Be Empty    ${pile}
     ...    msg=Aucun popup ouvert : il n'y a pas de menu dont lire les clés.
-    ${cles}=    Get Ui5 Properties    key    controlType=${DEMOKIT_MENU_ITEM_TYPE}
-    ...    containedIn=${pile}[-1][id]
+    ${menus}=    Evaluate    [p['id'] for p in $pile if p['id'].endswith('${DEMOKIT_MENU}')]
+    Should Not Be Empty    ${menus}
+    ...    msg=Aucun menu Options dans la pile de popups : ${pile}
+    ${identifiants}=    Get Ui5 Ids    controlType=${DEMOKIT_MENU_ITEM_TYPE}
+    ...    containedIn=${menus}[0]
+    ${cles}=    Evaluate    [i.split('${DEMOKIT_MENU_ITEM_PREFIX}', 1)[1] for i in $identifiants if '${DEMOKIT_MENU_ITEM_PREFIX}' in i]
     RETURN    ${cles}
 
 Lire La Profondeur De La Pile De Popups
@@ -979,7 +1040,8 @@ Choisir Le Theme
     [Arguments]    ${cle}
     Ouvrir Le Menu Options
     Ouvrir L Entree De Menu    ${DEMOKIT_MENU_APPEARANCE_KEY}
-    Attendre La Profondeur De Pile    ${2}
+    ${cascade}=    Evaluate    ${DEMOKIT_MENU_STACK_COST} + 1
+    Attendre La Profondeur De Pile    ${cascade}
     Ouvrir L Entree De Menu    ${cle}
     Attendre La Profondeur De Pile    ${0}
 
@@ -1156,6 +1218,8 @@ Famille De L Anomalie
     IF    ${est_tiers}    RETURN    tiers_hors_application
     ${est_statique}=    Evaluate    any(map($blob.__contains__, $DEMOKIT_MISSING_SDK_RESOURCES))
     IF    ${est_statique}    RETURN    ressource_statique_du_sdk
+    ${est_shell_wc}=    Evaluate    any(map($blob.__contains__, $DEMOKIT_WC_SHELL_RESOURCES))
+    IF    ${est_shell_wc}    RETURN    defaut_du_shell_webcomponents
     ${est_runtime}=    Evaluate
     ...    $entree['type'] == 'assert' or $DEMOKIT_RUNTIME_WARNING_MARKER in $entree['texte']
     IF    ${est_runtime}    RETURN    avertissement_du_runtime_ui5

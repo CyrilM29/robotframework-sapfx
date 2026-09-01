@@ -1,5 +1,17 @@
 # Navigation et interaction poussée dans le Demo Kit OpenUI5
 
+> **Ré-exploré le 2026-09-01** (le marqueur PÉRIMÉE posé le même jour est
+> levé) : le shell du Demo Kit est passé aux **UI5 Web Components** entre le
+> 2026-08-25 (dernier passage vert de la CI ui5-compat) et le 2026-09-01, avec
+> le SDK 1.151.0 → **1.152.0**, sans aucun commit du dépôt entre les deux.
+> La page devient HYBRIDE : 68 hôtes WC (26 en light DOM), et le shell
+> (barre, recherche globale, menu Options) est rendu en composants web
+> encapsulés dans des contrôles wrappers `sap.f.gen.ui5.webcomponents*` qui
+> restent AU REGISTRE : les moteurs role/xpath continuent de les adresser.
+> Les sections « Données observées » et les scénarios 1, 3, 9 et 10 ont été
+> réécrits sur les mesures du jour ; le CONTENU des pages (arbre d'API,
+> tables de doc, filtres, iframe d'échantillon) est inchangé.
+
 - **Canal** : Fiori (web)
 - **Système / URL** : Demo Kit public **OpenUI5 SDK**, `https://sdk.openui5.org/`.
   Application SAPUI5 mono-page à routage par hash (`#/...`), runtime SAPUI5
@@ -33,9 +45,14 @@ SapFioriLibrary), Chromium **non headless**, viewport 1600x950.
 ### Composition et volumétrie
 
 `Get Page Composition` retourne partout `ui5_runtime=True`,
-`ui5_version='1.151.0'`, `wc_hosts=0`, `webgui_elements=0`, `frameworks=[]`,
-moteurs recommandés `['role', 'xpath', 'dom']`. Page mono-technologie UI5 : le
-moteur `role` suffit, sauf sur la page d'un échantillon (voir iframe).
+`ui5_version='1.152.0'` (relevé 2026-09-01 ; `1.151.0` le 2026-08-30),
+`webgui_elements=0`, `frameworks=[]`. Depuis le passage du shell aux Web
+Components (SDK 1.152.0), la page est HYBRIDE : `wc_hosts=68` (dont 26 en
+light DOM) sur l'accueil, moteurs recommandés `['role', 'xpath', 'wc',
+'dom']`. Les hôtes WC sont le SHELL (barre, recherche, menus) ; le CONTENU
+reste en UI5 classique. Les composants du shell sont encapsulés dans des
+wrappers `sap.f.gen.ui5.webcomponents*` présents AU REGISTRE : le moteur
+`role` les adresse encore, `wc_hosts=0` n'est plus jamais vrai.
 
 | Page | `ui5_controls` observés |
 |---|---|
@@ -115,17 +132,27 @@ du champ visible.
 
 ### Recherche globale et suggestions
 
-Saisie de `Button` dans `searchControl-searchField` : un popover de suggestions
-s'ouvre (`sap.m.ResponsivePopover`, id généré `__popover1-popover`, 600x570 px)
-contenant `2` `sap.m.GroupHeaderListItem`, `14` `sap.m.StandardListItem` et un
-`sap.m.Link` de texte `Tout (488)`.
+Depuis 1.152.0, la recherche globale est un
+`sap.f.gen.ui5.webcomponents_fiori.dist.ShellBarSearch` qui GARDE l'id stable
+**`sdk---app--searchControl`** (l'ancien enfant `searchControl-searchField`
+n'existe plus). La frappe atteint l'`<input>` interne à travers le shadow root
+(`<sélecteur> >> input`, le CSS Playwright perce) ; poser la valeur ne
+déclenche toujours pas les suggestions, il faut de vraies frappes.
 
-Les 14 entrées se répartissent en 4 lignes de catégorie (libellés localisés) et
-10 résultats dont les titres portent des **identifiants techniques non
-traduits** : `sap.m.Button (class): ...`, `sap.m.Button (samples): ...`,
-`sap.m.ButtonType (enum): ...`, `Button (property): sap.m.LinkAccessibleRole`.
-Le compte 488 et le nombre d'entrées dépendent de l'index du SDK : ne rien
-graver.
+Saisie de `Button` : un popover WC s'ouvre (`ui5-responsive-popover` d'id
+`ui5-search-list`, **une seule entrée** sur la pile de popups, `technology:
+'wc'`). Les entrées sont des contrôles AU REGISTRE :
+`sap.f.gen.ui5.webcomponents_fiori.dist.SearchItem` (15 relevées) et
+`SearchItemGroup` (2), à ids générés `__itemN`. Le titre se lit sur la
+propriété **`text`** (plus `title`) et porte toujours l'identifiant technique
+non traduit : `sap.m.Button (class): ...`, `sap.m.Button (samples): ...`.
+**La portée de lecture n'est plus le popover** (les entrées ne sont pas
+DOM-contenues dans `ui5-search-list`, qui vit dans un shadow root) : c'est le
+contrôle de recherche lui-même, `containedIn=sdk---app--searchControl` (15/15).
+Le nombre d'entrées dépend de l'index du SDK : ne rien graver.
+
+Le clic sur la suggestion dont le titre commence par `sap.m.Button (class)`
+navigue vers `#/api/sap.m.Button` (vérifié 2026-09-01).
 
 Le clic sur la suggestion dont le titre commence par `sap.m.Button (class)`
 navigue vers `#/api/sap.m.Button`, titre de document
@@ -173,22 +200,33 @@ générée (`__xmlview2--controlproperties`) : ancrer sur le suffixe.
 
 ### Menu Options : clés techniques et cascade de popovers
 
-`sdk---app--aboutMenuButton` ouvre un `sap.m.Menu` dont les entrées sont des
-`sap.m.MenuItem` à **id généré** mais à **`key` et `icon` techniques** :
+Depuis 1.152.0, `sdk---app--aboutMenuButton` (devenu un wrapper
+`ShellBarItem`, même id, même icône `sap-icon://action-settings`) ouvre un
+`ui5-menu` WC d'id stable **`sdk---app--aboutMenu`**, dont les entrées sont
+des `sap.f.gen.ui5.webcomponents.dist.MenuItem` au registre. Elles n'ont
+**plus de propriété `key`** : la clé technique vit désormais dans l'**id**,
+de forme stable `sdk---app--menuItem-<clé>` :
 
-| `key` | `icon` | rôle |
-|---|---|---|
-| `about` | `sap-icon://hint` | À propos |
-| `appearance` | `sap-icon://palette` | Aspect (sous-menu de thèmes) |
-| `sitemap` | `sap-icon://tree` | Plan du site |
-| `settings` | `sap-icon://hello-world` | Langue (ouvre le dialogue) |
+| suffixe d'id | rôle |
+|---|---|
+| `menuItem-about` | À propos |
+| `menuItem-appearance` | Aspect (sous-menu de thèmes) |
+| `menuItem-sitemap` | Plan du site |
+| `menuItem-settings` | Langue (ouvre le dialogue) |
 
-Le sous-menu `appearance` porte cinq entrées de clés `light`, `dark`, `hcb`,
-`hcw`, `auto`. Aucune n'a `selected=True`, y compris celle du thème courant :
-**la propriété `selected` d'une entrée de thème ne dit pas le thème appliqué.**
+Le sous-menu `appearance` porte cinq entrées `light`, `dark`, `hcb`, `hcw`,
+`auto`. **Toutes les entrées, sous-menu fermé compris, sont au DOM et
+DOM-contenues dans `sdk---app--aboutMenu`** (9 relevées d'un coup) : la
+lecture des clés ne distingue plus le niveau ouvert, les assertions passent
+en INCLUSION (les clés attendues ⊆ les clés lues).
 
-L'ouverture empile les popovers : `Get Ui5 Open Popups` rend 1 entrée après
-l'ouverture du menu, **2** après l'ouverture du sous-menu (cascade).
+**La pile de popups compte les couches d'implémentation WC** : ouvrir le menu
+pousse DEUX entrées (`sdk---app--aboutMenu`, `ui5-menu`, PLUS son popover
+interne `ui5wc_N-menu-rp`) ; ouvrir le sous-menu en ajoute UNE (le popover
+interne du sous-niveau, pas de second `ui5-menu`) : profondeurs 0 → 2 → 3.
+La touche Échap referme un NIVEAU LOGIQUE à la fois (3 → 2 → 0, mesuré) : la
+décroissance stricte du teardown tient. Le choix d'un thème referme toute la
+cascade (0).
 
 ### Dialogue des paramètres
 
@@ -231,7 +269,7 @@ Les libellés relevés ont suivi (« Référence de l'API » puis « API Referen
 Un même popover a même mélangé les deux langues : ses deux en-têtes de groupe
 valaient `Results by Category` et `Les 10 meilleurs résultats de Tout`.
 
-### Erreurs console : trois familles, aucune imputable à l'application
+### Erreurs console : quatre familles, aucune imputable à la campagne
 
 Relevé exhaustif sur la session (aucune n'est une régression à surveiller) :
 
@@ -248,6 +286,11 @@ Relevé exhaustif sur la session (aucune n'est une régression à surveiller) :
    `[FUTURE FATAL] Element sap.ui.core.mvc.XMLView#<vue>: encountered unknown
    setting 'style' for class sap.m.Link`, émis trois fois par vue de fiche
    d'API instanciée.
+4. **Défauts du shell Web Components** (depuis 1.152.0, relevé 2026-09-01) :
+   `TypeError: e._close is not a function` levé par
+   `sap/f/library-webcomponents-preload.js` (`_closeOtherSubMenus`) quand la
+   cascade du menu Options se referme : un défaut du SDK lui-même, reconnu au
+   NOM de la ressource dans la pile d'origine, jamais au texte du message.
 
 Le nombre croît avec la navigation (nouvelles occurrences à chaque fiche
 ouverte) : l'assertion porte sur l'appartenance aux familles déclarées, jamais
@@ -269,9 +312,10 @@ cette application ne passe pas par le MessageManager.
   4. Percevoir la composition de la page et relever la langue servie.
 - **Résultat attendu** :
   - `ui5_runtime` vrai, `ui5_version` non vide et **journalisée** (relevée
-    `1.151.0`, susceptible de bouger : jamais assertée en dur) ;
-  - aucune frame, aucun hôte Web Component, moteurs recommandés contenant
-    `role` ;
+    `1.152.0`, susceptible de bouger : jamais assertée en dur) ;
+  - aucune frame, aucun élément WebGUI, et des hôtes Web Components PRÉSENTS
+    (`wc_hosts > 0` : le shell du Demo Kit est en WC depuis 1.152.0, 68
+    relevés) ; moteurs recommandés contenant `role` ET `wc` ;
   - la bannière de consentement n'est plus présente (comptage `0`) ;
   - le nombre de contrôles rendus dépasse un plancher raisonné (`>= 100`,
      551 observés) ;
@@ -311,7 +355,8 @@ cette application ne passe pas par le MessageManager.
      global (par exemple le nom court d'un contrôle).
   2. Constater l'ouverture du popover de suggestions.
   3. Lire les en-têtes de groupe et les titres des entrées, dans la portée du
-     popover.
+     CONTRÔLE DE RECHERCHE (depuis 1.152.0, les entrées ne sont pas
+     DOM-contenues dans le popover WC, voir « Données observées »).
   4. Cliquer l'entrée dont le titre correspond à la fiche de classe du contrôle
      cherché (ancrage par expression régulière, voir vigilance).
   5. Attendre le repos et lire l'URL et le titre du document.
@@ -319,7 +364,7 @@ cette application ne passe pas par le MessageManager.
   - un popover est ouvert (constaté sur la **pile de popups du runtime**, pas
     sur la présence des entrées) ;
   - il contient au moins un en-tête de groupe et plus d'entrées que de
-    catégories (`> 4` ; 2 en-têtes et 14 entrées observés) ;
+    catégories (2 en-têtes et 15 entrées observés en 1.152.0) ;
   - au moins un titre d'entrée **contient le nom qualifié technique** du
     contrôle cherché (assertion locale-indépendante) ;
   - après le clic, le fragment d'URL vaut `#/api/<nom.qualifié>` et le titre du
@@ -471,12 +516,15 @@ cette application ne passe pas par le MessageManager.
   7. Constater le dialogue, lire les rôles de ses boutons.
   8. Annuler par **position**, puis constater la fermeture.
 - **Résultat attendu** :
-  - la pile de popups passe de 0 à 1 (menu), puis à 2 (sous-menu en cascade),
-    puis à 1 dialogue, puis à 0 ;
+  - la pile de popups passe de 0 à 2 (menu WC + son popover interne), puis à
+    3 (sous-menu en cascade), puis à 1 (le dialogue seul, le menu refermé),
+    puis à 0 (profondeurs 1.152.0, voir « Données observées ») ;
   - l'ouverture est **toujours constatée sur la pile de popups du runtime**,
     jamais sur la présence des entrées du menu (voir vigilance) ;
-  - les clés du menu contiennent `about`, `appearance`, `sitemap`, `settings` ;
-    celles du sous-menu contiennent `light` et `dark` ;
+  - les clés lues (dérivées des suffixes d'id `menuItem-<clé>`) CONTIENNENT
+    `about`, `appearance`, `sitemap`, `settings`, et aussi `light` et `dark`
+    (toutes les entrées, sous-menu fermé compris, sont au DOM : la lecture ne
+    distingue plus le niveau ouvert, l'assertion est une inclusion) ;
   - le dialogue est celui d'id stable des paramètres globaux, il porte
     exactement 2 boutons dont les rôles sont `Emphasized` puis `Default` ;
   - après annulation, aucun popup n'est ouvert **et** le thème et la langue
@@ -551,9 +599,9 @@ cette application ne passe pas par le MessageManager.
   - aucun message UI5 de type erreur (aucun message d'aucun type observé sur
     cette cible : elle n'utilise pas le gestionnaire de messages) ;
   - **toute** entrée console et toute erreur de page appartient à l'une des
-    trois familles déclarées dans « Données observées » (tiers hors
-    application, ressources statiques 404 du SDK, avertissements de dépréciation
-    du runtime) ;
+    quatre familles déclarées dans « Données observées » (tiers hors
+    application, ressources statiques 404 du SDK, avertissements de
+    dépréciation du runtime, défauts du shell Web Components depuis 1.152.0) ;
   - une entrée hors de ces familles fait **échouer** le scénario en la
     nommant : c'est le seul verdict utile, un comptage étant inexploitable
     puisqu'il croît avec la navigation ;
