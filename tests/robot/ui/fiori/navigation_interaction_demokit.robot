@@ -1,6 +1,6 @@
 *** Settings ***
 Documentation       Navigation et interaction poussée dans le Demo Kit OpenUI5
-...                 Spec: specs/openui5-demokit-navigation-interaction.md (sha256:f8416e84f94c, 2026-08-30)
+...                 Spec: specs/openui5-demokit-navigation-interaction.md (sha256:36e01b9bd257, 2026-09-01)
 ...                 Generated from specs/openui5-demokit-navigation-interaction.md
 ...                 by sap-generator: re-run the generator rather than
 ...                 hand-editing locators here.
@@ -8,7 +8,8 @@ Documentation       Navigation et interaction poussée dans le Demo Kit OpenUI5
 ...                 Campagne de **navigation** et d'**interaction avec des
 ...                 familles de contrôles UI5 distinctes** sur le Demo Kit
 ...                 public OpenUI5 (`sdk.openui5.org`, application mono-page à
-...                 routage par hash, runtime SAPUI5 relevé 1.151.0) : barre
+...                 routage par hash, runtime SAPUI5 relevé 1.152.0, dont le
+...                 shell est en Web Components depuis cette version) : barre
 ...                 d'onglets à clés techniques, recherche globale et son
 ...                 popover de suggestions, lien profond, retour arrière,
 ...                 arbre de la Référence de l'API filtré puis navigué,
@@ -68,11 +69,12 @@ Test Tags           fiori    openui5    demokit    live    readonly
 
 *** Test Cases ***
 Le Demo Kit s ouvre en navigateur visible et se laisse percevoir
-    [Documentation]    Scénario 1 du plan. Ce que ce test établit : la cible est
-    ...    une page mono-technologie UI5 sans frame ni composant web, le
-    ...    consentement tiers a bien été levé (sans quoi son overlay
-    ...    intercepterait les clics de toute la campagne), et la page est
-    ...    réellement construite.
+    [Documentation]    Scénario 1 du plan (réécrit à la ré-exploration du
+    ...    2026-09-01). Ce que ce test établit : la cible est une page HYBRIDE
+    ...    (runtime UI5 + shell en Web Components depuis le SDK 1.152.0, hôtes
+    ...    WC PRÉSENTS), sans frame ni élément WebGUI, le consentement tiers a
+    ...    bien été levé (sans quoi son overlay intercepterait les clics de
+    ...    toute la campagne), et la page est réellement construite.
     ...
     ...    La version du runtime et la langue servie sont JOURNALISÉES et
     ...    jamais assertées : la première bouge avec le SDK, la seconde a
@@ -109,6 +111,7 @@ La recherche globale propose des suggestions et l une d elles navigue
     ...    annoncé par le lien de repli dépend de l'index du SDK et n'est pas
     ...    asserté.
     ${popover}=    Rechercher Dans Le Demo Kit    Button
+    Attendre Les Suggestions Groupees    ${popover}
     ${groupes}=    Compter Les En Tetes De Groupe    ${popover}
     Should Be True    ${groupes} >= 1
     ...    msg=Le popover de suggestions ne porte aucun en-tête de groupe.
@@ -228,10 +231,14 @@ La table de proprietes se lit par ses en-tetes et s accorde avec le controle viv
     Log    ${{ len($documentees) }} propriétés documentées, incluses dans les ${{ len($vivantes) }} du contrôle vivant.
 
 Le menu Options ouvre une cascade de popovers puis un dialogue annulable
-    [Documentation]    Scénario 9 du plan. Toute ouverture et toute fermeture
-    ...    sont constatées sur la PILE DE POPUPS : la présence des entrées ne
-    ...    prouve rien, une entrée de menu fermé comptant encore une
-    ...    correspondance, avec un rectangle nul.
+    [Documentation]    Scénario 9 du plan (profondeurs réécrites à la
+    ...    ré-exploration du 2026-09-01 : le menu WC pousse DEUX entrées sur la
+    ...    pile, la cascade en fait TROIS, voir le plan). Toute ouverture et
+    ...    toute fermeture sont constatées sur la PILE DE POPUPS : la présence
+    ...    des entrées ne prouve rien, une entrée de menu fermé comptant encore
+    ...    une correspondance, avec un rectangle nul, et depuis le shell WC les
+    ...    clés lues couvrent le menu ENTIER (les assertions sont des
+    ...    inclusions).
     ...
     ...    Le dialogue est ouvert, LU, puis annulé par position : ses boutons
     ...    ont des identifiants générés et des libellés traduits, seul leur
@@ -245,7 +252,8 @@ Le menu Options ouvre une cascade de popovers puis un dialogue annulable
         ...    msg=Le menu Options ne porte plus l'entrée de clé ${attendue} : ${cles}
     END
     Ouvrir L Entree De Menu    ${DEMOKIT_MENU_APPEARANCE_KEY}
-    Attendre La Profondeur De Pile    ${2}
+    ${cascade}=    Evaluate    ${DEMOKIT_MENU_STACK_COST} + 1
+    Attendre La Profondeur De Pile    ${cascade}
     ${cles_aspect}=    Lister Les Cles Du Menu Ouvert
     FOR    ${attendue}    IN    @{DEMOKIT_APPEARANCE_KEYS}
         List Should Contain Value    ${cles_aspect}    ${attendue}

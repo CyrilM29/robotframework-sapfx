@@ -8,6 +8,12 @@ Documentation       Smoke test for the Fiori/web side against the public OpenUI5
 ...                 Locators are *locale-independent* (control type / @controlType),
 ...                 since the Demo Kit renders in the browser language.
 ...
+...                 The suite opens the API Reference page (`#/api`), not the home
+...                 page: since 2026-09 the Demo Kit shell renders in UI5 Web
+...                 Components (its search is a `ShellBarSearch` WC wrapper), so the
+...                 classic `sap.m.SearchField` these role/xpath tests target only
+...                 exists in the API Reference master tree filter.
+...
 ...                 Run (after `pip install -r requirements.txt` and `rfbrowser init`):
 ...                   robot -v HEADLESS:True tests/robot/fiori_smoke.robot
 ...
@@ -18,6 +24,11 @@ Documentation       Smoke test for the Fiori/web side against the public OpenUI5
 ...                 interactif, et échec explicite si aucune correspondance. Les
 ...                 locators sont indépendants de la langue (type de contrôle /
 ...                 @controlType), car le Demo Kit s'affiche dans la langue du navigateur.
+...                 La suite ouvre la Référence API (`#/api`) et non l'accueil :
+...                 depuis 2026-09 le shell du Demo Kit est rendu en UI5 Web
+...                 Components (sa recherche est un wrapper WC `ShellBarSearch`),
+...                 le `sap.m.SearchField` classique visé par ces tests role/xpath
+...                 ne vit plus que dans le filtre de l'arbre de la Référence API.
 
 Library             Browser
 Library             SapFioriLibrary    ui5_timeout=20s
@@ -27,7 +38,7 @@ Suite Teardown      Close Browser
 
 
 *** Variables ***
-${FIORI_BASE_URL}       https://sdk.openui5.org/
+${FIORI_BASE_URL}       https://sdk.openui5.org/#/api
 ${HEADLESS}             ${True}
 
 

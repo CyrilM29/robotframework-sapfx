@@ -5,6 +5,36 @@ versions refer to the `robotframework-sapfx` distribution (`pyproject.toml`;
 named `robotframework-sapecclibrary` up to 0.6.3: entries below keep the
 name that was current at the time).
 
+## [Unreleased]
+
+### Fixed
+- **Demo Kit target drift absorbed: the public OpenUI5 Demo Kit shell moved
+  to UI5 Web Components** between 2026-08-25 (last green ui5-compat CI run)
+  and 2026-09-01, with SDK 1.151.0 -> 1.152.0 and no repository commit in
+  between. Measured live via rf-mcp: 68 WC hosts where the plan recorded 0,
+  the global search replaced by a `ShellBarSearch` wrapper (the classic
+  `sap.m.SearchField` child is gone), Options-menu entries now WC `MenuItem`
+  wrappers without a `key` property (the technical key moved into the stable
+  `menuItem-<key>` id suffix), and the popup stack now counting WC
+  implementation layers (open menu = 2 entries, cascade = 3). Repairs, all
+  role/xpath-engine based (nothing re-routed through CSS):
+  - `tests/robot/fiori_smoke.robot` now opens the API Reference (`#/api`),
+    where the classic `sap.m.SearchField` still lives, UNIQUE; not one
+    locator changed. Re-validated live 7/7.
+  - `specs/openui5-demokit-navigation-interaction.md` re-explored (PERIMEE
+    marker lifted the same day it was set), observed-data sections and
+    scenarios 1/3/9 rewritten on the day's measurements.
+  - `resources/page_objects/openui5_demokit.resource`: search scoped to the
+    stable `searchControl` id (suggestions are registry `SearchItem` controls
+    read by their `text` property, contained in the SEARCH CONTROL, not in
+    the shadow-rooted WC popover), menu entries clicked by `menuItem-<key>`
+    id suffix, keys derived from id suffixes with subset assertions (the WC
+    menu keeps every nested entry in the DOM, closed submenu included), menu
+    stack cost carried by an explicit variable. Campaign re-validated live
+    12/12 headless. The composition sentinel that caught the drift
+    (`68 != 0`) now asserts the hybrid shell in the other direction
+    (`wc_hosts > 0`).
+
 ## [0.8.0] - 2026-08-30
 
 ### Added

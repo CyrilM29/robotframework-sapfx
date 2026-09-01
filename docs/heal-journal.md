@@ -33,6 +33,53 @@ Format d'une entrée (append-only, la plus récente en haut) :
 
 ---
 
+## 2026-09-01 : fiori_smoke.robot (+ navigation_interaction_demokit.robot marquée PÉRIMÉE)
+
+- **Classe** : changement fonctionnel (la CIBLE publique a changé : le shell du
+  Demo Kit OpenUI5 est passé aux UI5 Web Components entre le 2026-08-25,
+  dernier passage vert de la CI ui5-compat, et son run rouge du 2026-09-01 ;
+  aucun commit du dépôt entre les deux, même SHA)
+- **Réparation** : `tests/robot/fiori_smoke.robot` :
+  `${FIORI_BASE_URL}` = `https://sdk.openui5.org/` → `https://sdk.openui5.org/#/api`
+  (documentation de la suite étendue pour dire pourquoi). Aucun localisateur
+  modifié : les cinq assertions role/xpath sur `SearchField` restent au
+  caractère près. Exception assumée à « le healer répare resources/, jamais
+  les tests » : cette suite est une suite de VALIDATION de la bibliothèque,
+  auto-suffisante par conception, sans couche resources ; le point réparé est
+  son point d'entrée, pas une ancre métier.
+- **Preuve** : perception rf-mcp live (2026-09-01, Browser + SapFioriLibrary,
+  headless). Accueil : 0 `sap.m.SearchField` au registre, la recherche du
+  shell est `sap.f.gen.ui5.webcomponents_fiori.dist.ShellBarSearch`, 68 hôtes
+  WC sur la page. Référence API (`#/api`) : `sap.m.SearchField` UNIQUE
+  (`Get Ui5 Match Count` = 1, id `sdk---apiMaster--searchField`, contient bien
+  `searchField` comme l'assertion l'exige), forme courte = forme pleine =
+  `//SearchField` = `//*[@controlType='sap.m.SearchField']`,
+  `Fill Ui5 Input` atteint l'`<input>` interne (valeur relue « UI5 rocks »),
+  xpath le plus court `//SearchField[1]` re-résout le même contrôle. Suite
+  réparée rejouée par le vrai robot : 7/7.
+  La campagne `navigation_interaction_demokit.robot` (validée 12/12 le
+  2026-08-30) tombait à 8/12 sur la MÊME cause : plan marqué PÉRIMÉE puis
+  RÉ-EXPLORÉ le même jour (marqueur levé, sections réécrites sur les mesures :
+  wrappers WC au registre, clés de menu dans les suffixes d'id
+  `menuItem-<clé>`, suggestions `SearchItem` lues par `text` dans la portée du
+  contrôle de recherche, pile de popups comptant les couches WC, menu = 2 et
+  cascade = 3), page object et scénarios 1/3/9 réparés, 4e famille d'erreurs
+  console déclarée (défauts du shell WC : `_closeOtherSubMenus` du SDK), et
+  une COURSE attrapée au re-run (le popover s'ouvre à la première frappe, les
+  résultats groupés arrivent un instant plus tard : attente active). Campagne
+  re-validée 12/12 headless, spec re-stampée.
+
+**Leçon d'ancrage (pour sap-planner)** : le Demo Kit est une cible publique à
+dérive RAPIDE : quatre jours ont suffi entre une campagne validée 12/12 et la
+migration WC de son shell. Deux ancrages en sortent. (1) Le shell (barre,
+recherche globale, menus Options/thème) est désormais du domaine des moteurs
+`wc`, plus du registre classique : tout scénario qui le touche doit être
+re-perçu par `Get Page Composition` avant d'écrire, et une assertion « zéro
+hôte WC » est une sentinelle qui EXPIRE (elle a fait son travail ici en
+nommant la dérive : 68 != 0). (2) Le CONTENU des pages (arbre de la Référence
+API, tables de doc, filtres) reste en UI5 classique : les ancres role/xpath y
+survivent, c'est là que doit viser un smoke des moteurs du registre.
+
 ## 2026-08-17 : exploratory_campaign_a4h.robot
 
 - **Classe** : data drift (dérive d'ENVIRONNEMENT : depuis la re-création du
