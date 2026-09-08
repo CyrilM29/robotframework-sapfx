@@ -1,0 +1,1233 @@
+{
+  "a4h_non_regression_after_register_extraction": "results/reconnaissance_v10_after_extract : 21/21 apres extraction de capability_register.resource",
+  "correction_lot_2026_09_08": {
+    "covered_run": "results/reco_2023_covered_v1 : 10/10",
+    "delivered": [
+      "Open System Status resout l'avant-derniere entree et exige un dialogue (menu_path.dialog_entry_before_last)",
+      "_statusbar.py : Get Status Message Identity, Status Message Should Be (status_message.py)",
+      "_tabstrip.py : List Tabs, Get Selected Tab, Select Tab, Select Tab By Label (tab_strip.py)",
+      "_toolbar.py : List Toolbar Buttons, Click Application Toolbar Button",
+      "resolveurs de grille et d'arbre : sous-type du shell (LEAF_SHELL_SUBTYPES), descente des conteneurs, refus actionnable"
+    ],
+    "final_run": "results/reco_2023_covered_v3 : 10/10 après la revue du tour 2",
+    "portability_754_on_758": "results/reco_754_on_2023 : 19/21, les deux rouges = une constante de page object (position de menu de la 754)",
+    "proof_run": "results/reco_2023_after_fix : 3 passed, 7 failed (5 manques + temoin 7 + conformite du registre)",
+    "review": {
+      "round_1": "needs_human (sap-verifier, lecture seule) sur un seul ecart mecanique : bandeau EXEMPLE A PERSONNALISER absent du registre partage (garde test_resources_are_examples) ; huit points de fond confirmes ; quatre reserves non bloquantes traitees (preuve du scenario 3 marquee 'relevee par sonde', porte de release dans le Suite Setup, dependance au texte 'Status...' documentee, empreinte figeant les textes de preuve assumee) ; rejoue en v5"
+    }
+  },
+  "date": "2026-09-08",
+  "hash_note": "l'empreinte v5 differe de v3/v4/final parce que la PREUVE du scenario 3 a ete reformulee (identifiants marques comme releves par sonde) ; les neuf verdicts sont inchanges",
+  "hors_api_measure": {
+    "absent_properties": [
+      "Release",
+      "SapRelease",
+      "Kernel",
+      "SystemRelease"
+    ],
+    "connection_properties": {
+      "absent": [
+        "SessionInfo"
+      ],
+      "readable": [
+        "Description",
+        "ConnectionString",
+        "DisabledByServer"
+      ]
+    },
+    "false_friend": "SystemNumber vaut 1 sur cette cible et 0 sur l'autre : le port publié par le conteneur, pas l'instance interne (00 des deux côtés)",
+    "readable_properties": [
+      "ApplicationServer",
+      "Client",
+      "Codepage",
+      "Flushes",
+      "Group",
+      "GuiCodepage",
+      "I18NMode",
+      "InterpretationTime",
+      "IsLowSpeedConnection",
+      "Language",
+      "MessageServer",
+      "Program",
+      "ResponseTime",
+      "RoundTrips",
+      "ScreenNumber",
+      "SessionNumber",
+      "SystemName",
+      "SystemNumber",
+      "SystemSessionId",
+      "Transaction",
+      "User"
+    ],
+    "values_kept_out": "les valeurs (mandant, utilisateur, temps de réponse) ne sont pas consignées : seules les CLÉS fondent le verdict hors_api",
+    "what": "session.Info (GuiSessionInfo) sondé propriété par propriété par une suite jetable jouée par robot sur le thread principal, 2026-09-08 (dir() rend une liste VIDE sur ce proxy COM)"
+  },
+  "mission": "reconnaissance-couverture-sapgui-abap2023",
+  "probes_2026_09_08": {
+    "editor": "SE38 RSPARAM : GuiShell/AbapEditor, Get Value refuse, Get List Rendering Status n'exige aucun mode accessibilite",
+    "menus": "menu System = avant-dernier menu de tete sur SESSION_MANAGER/SE16/SU01/SM37/SE38/SE11 (porte sur les deux releases) ; 'Status...' en position 10 (11 sur la 754 : l'entree 'List' a disparu, 12 entrees au lieu de 13) ; Status = avant-derniere entree sur les deux releases ; GuiMenu.Name == Text (aucune ancre technique de menu)",
+    "probe_files": "scratchpad probe2023_a/b/c.robot (jetables, hors depot), sorties probe2023_out/",
+    "se16_grid": "cntlGRID1/shellcont/shell = GuiSplitterShell/Splitter, grille sous shellcont[1]/shell ; Read Grid et les actions de grille descendent et portent",
+    "session_info": "aucune propriete Release/SapRelease/Kernel/SystemRelease ; dir() vide sur le proxy COM ; SystemNumber=1 (le port publie, faux ami : l'instance interne est 00 des deux cotes)",
+    "statusbar": "wnd[0]/sbar expose MessageId (classe, complete a 20 car.) et MessageNumber : table inexistante MO/402, nom vide MO/410, tous deux type E ; message absent = champs vides ; MessageParameter est une methode",
+    "system_status_dialog": "identique a la 754 : SAPLSHSY/<tcode>/700, ancre txtSYST-MANDT, btn[17] kernel (KINFOSTRUC-KERNEL_RELEASE=793, PATCH_LEVEL=101), btnPRELINFO -> grille COMPONENT/RELEASE/EXTRELEASE/HIGH_PATCH/DESC_TEXT, SAP_BASIS 758 0002",
+    "tabstrip": "GuiTabStrip.SelectedTab (objet COM), GuiTab.Text localise, Changeable vrai pour le seul onglet actif ; 12 onglets SU01 sur la 758 (tabpUSAT nouveau) contre 11 sur la 754 ; aucun keyword d'onglet",
+    "toolbar": "wnd[0]/tbar[1] : 5 boutons percus (btn[8], btn[2], btn[14], btn[18], btn[31]) ; aucun keyword d'inventaire ; List Grid Toolbar Buttons refuse cette barre en le disant",
+    "tree_vs_grid": "SPRO : arbre IMG non enveloppe ; Read Tree Nodes sur le CONTENEUR = AttributeError <unknown>.GetAllNodeKeys ; Read Grid sur le conteneur = AttributeError ElementAt.RowCount ; Get Grid Column Ids sur le conteneur PASSE en rendant ['HierarchyHeader'] (le resolveur prend un arbre a colonnes pour une ALV)"
+  },
+  "register_sha_by_run": {
+    "results/reco_2023_covered_v1": "1c04b96278c2",
+    "results/reco_2023_covered_v2": "1c04b96278c2",
+    "results/reco_2023_covered_v3": "3b471c8eb15d",
+    "results/reco_2023_final": "4f3a27815200",
+    "results/reco_2023_v1": "7612682c7657",
+    "results/reco_2023_v2": "d9ee902c51f1",
+    "results/reco_2023_v3": "4f3a27815200",
+    "results/reco_2023_v4": "4f3a27815200",
+    "results/reco_2023_v5": "5a1932eaac79"
+  },
+  "review": {
+    "round_1": "needs_human (sap-verifier, lecture seule) sur un seul ecart mecanique : bandeau EXEMPLE A PERSONNALISER absent du registre partage (garde test_resources_are_examples) ; huit points de fond confirmes ; quatre reserves non bloquantes traitees (preuve du scenario 3 marquee 'relevee par sonde', porte de release dans le Suite Setup, dependance au texte 'Status...' documentee, empreinte figeant les textes de preuve assumee) ; rejoue en v5"
+  },
+  "review_round_2": {
+    "agent": "sap-verifier (lecture seule)",
+    "replay_after_remedies": "results/reco_2023_covered_v3 : 10/10",
+    "reservations_treated": {
+      "R1": "keywords de la forme manques et variable définie deux fois retirés du page object (dont un contournement dormant cliquant un id d'onglet gravé)",
+      "R2": "faits de cible (position 10, douze onglets, cinq boutons) assertés HORS verdict, après consignation",
+      "R3": "Open System Status rend l'id de l'entrée cliquée ; le scénario 2 le confronte position par position au relevé par texte",
+      "R4": "glob de l'échec de Status Message Should Be resserré sur l'identité attendue et l'identité lue",
+      "R5": "descente de Read Tree Nodes prouvée par l'égalité avec la lecture directe de l'arbre",
+      "R6": "assertion sur des noms de keywords inventés retirée ; sonde COM de session.Info conservée ici (hors_api_measure) et la preuve du scénario y renvoie",
+      "R7": "manques comblés datés au passé (plan, suite, page object)",
+      "R8": "refus du résolveur de grille en français, le sous-type nommé comme critère"
+    },
+    "scope": "forme couverte après le lot de correction du 2026-09-08 (soir)",
+    "verdict": "verified"
+  },
+  "runs": [
+    {
+      "failed": 21,
+      "name": "le registre de la 754 rejoue TEL QUEL contre la 2023 : 21/21 rouges sur le Suite Setup, Get System Identity refuse en nommant la disposition de la barre de menus (entree 11 = Log Off sur la 758)",
+      "passed": 0,
+      "register_sha256": "8b2b9c97782b4d33fa764f0b2137534fcc235aee92bb68f3e3e5510caa35ceb9",
+      "register_target": {},
+      "results_dir": "results/reco_2023_portabilite",
+      "start": "2026-09-08T09:28:43.956547",
+      "suite_setup_failure": "L'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de session.",
+      "tests": [
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "La perception distingue les sous-types de shell",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Un menu se sélectionne par chemin",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "La liste SE16 standard se lit en labels",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "L'identité du système prouve sa release et son kernel",
+          "status": "FAIL"
+        },
+        {
+          "message": "Parent suite setup failed:\nL'entrée wnd[0]/mbar/menu[4]/menu[11] n'a pas ouvert le dialogue « System: Status » (un autre modal s'est ouvert et a été refermé) : cette barre de menus ne suit pas la disposition standard. Ouvrir le statut par Select Menu Item avec le chemin de textes de la langue de ses",
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "FAIL"
+        }
+      ],
+      "verdicts": {}
+    },
+    {
+      "failed": 0,
+      "name": "premiere generation (sap-generator, chaque etape verifiee live)",
+      "passed": 10,
+      "register_sha256": "7612682c7657dd85710d30942f4af0b37fb52949c5819564505a69d1bf87e1a6",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_v1",
+      "start": "2026-09-08T11:36:32.252813",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "rejeu 2",
+      "passed": 10,
+      "register_sha256": "d9ee902c51f1fb3a3ed880c565c22a1354e83365236aa5415297d619178205be",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_v2",
+      "start": "2026-09-08T11:43:05.608578",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "rejeu 3, empreinte deterministe apres retrait de la telemetrie brute",
+      "passed": 10,
+      "register_sha256": "4f3a27815200752325d0135c2056a9c5a9bebce5d0ab13741b73faf4e8646447",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_v3",
+      "start": "2026-09-08T11:46:44.933391",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "rejeu 4",
+      "passed": 10,
+      "register_sha256": "4f3a27815200752325d0135c2056a9c5a9bebce5d0ab13741b73faf4e8646447",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_v4",
+      "start": "2026-09-08T11:47:04.781695",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "run final estampille",
+      "passed": 10,
+      "register_sha256": "4f3a27815200752325d0135c2056a9c5a9bebce5d0ab13741b73faf4e8646447",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_final",
+      "start": "2026-09-08T11:56:35.806371",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "revue independante traitee (v5) : bandeau du registre partage, porte de release dans le Suite Setup, preuve du scenario 3 marquee comme relevee par sonde",
+      "passed": 10,
+      "register_sha256": "5a1932eaac79f80773986e165d67d28f793e700667b86d53e56c277652d57477",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "release_gate_in_suite_setup": true,
+      "results_dir": "results/reco_2023_v5",
+      "start": "2026-09-08T12:19:00.694793",
+      "tests": [
+        {
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "gap",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "gap",
+        "tabstrip.select_and_read": "gap",
+        "toolbar.application_inventory": "gap",
+        "tree.container_refuses_actionably": "gap"
+      }
+    },
+    {
+      "failed": 7,
+      "name": "PREUVE que le registre mesure : rejoue TEL QUEL (forme 'manques') sur la bibliotheque corrigee, 5 des 6 manques rougissent en nommant 'capacite desormais couverte' (le scenario 2 mesurait un fait de cible contre une constante de page object), ET le temoin 7 rougit sur un durcissement excessif du resolveur de grille (Splitter refuse) : corrige avant la forme couverte",
+      "passed": 3,
+      "register_sha256": "1d4b0042f3272f9d6331a5aee4a0efd964ecdb48c921273f2edc4d605b4ccd3c",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_after_fix",
+      "start": "2026-09-08T13:01:41.634380",
+      "tests": [
+        {
+          "message": "Capacité 'identity.unavailable_on_release' : le keyword a PASSÉ (retour : {'client': '001', 'user': 'DEVELOPER', 'language': 'EN', 'transaction': 'SE16', 'product_version_text': '- See Details -', 'installation_name': 'DEMOSYSTEM', 'server_name': 'vhcala4hci_A4H_00', 'operating_system': 'Linux', 'ma",
+          "name": "L'identité du système est indisponible sur cette release",
+          "status": "FAIL"
+        },
+        {
+          "name": "La position de l'entrée System > Status diverge d'une release à l'autre",
+          "status": "PASS"
+        },
+        {
+          "message": "Capacité 'statusbar.message_identity' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Un refus applicatif ne s'identifie que par son texte localisé",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'tabstrip.select_and_read' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Un onglet ne se choisit ni ne se lit par keyword",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'toolbar.application_inventory' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "La barre d'application ne s'inventorie pas",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'tree.container_refuses_actionably' : le keyword a PASSÉ (retour : [{'key': '01  1      1', 'text': 'SAP Customizing Implementation Guide', 'level': None, 'folder': True, 'children': 8, 'columns': {'1': '', '2': '', '3': '', '4': '', '5': '', '6': '', '8': '', 'TEXT': 'SAP Customizing Imple",
+          "name": "Deux lecteurs de contrôle, deux qualités de refus",
+          "status": "FAIL"
+        },
+        {
+          "message": "ValueError: Element 'wnd[0]/usr/cntlGRID1/shellcont/shell' est un GuiShell/Splitter, pas une grille ALV : c'est un contrôle sans lecteur dédié. Percevoir avec Get Screen Signature (colonne type GuiShell/<SubType>).",
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "FAIL"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "message": "Le registre porte 9 capacités attendues, mais un autre nombre d'entrées : mettre à jour le plan et le registre.",
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "FAIL"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "menu.status_entry_position": "gap",
+        "statusbar.message_identity": "covered",
+        "tabstrip.select_and_read": "covered",
+        "toolbar.application_inventory": "covered"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "forme COUVERTE (lot du 2026-09-08 au soir) : 10/10, huit covered, un hors_api",
+      "passed": 10,
+      "register_sha256": "1c04b96278c29d9378674de23070747129fe7c310cc2164fd21497cc2a51bebc",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_covered_v1",
+      "start": "2026-09-08T13:33:28.816455",
+      "tests": [
+        {
+          "name": "L'identité du système se lit sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "L'entrée System > Status est résolue sur chaque écran",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif s'identifie par sa classe et son numéro",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet se choisit et se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application s'inventorie et se clique",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, un même refus actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "covered",
+        "menu.status_entry_position": "covered",
+        "statusbar.message_identity": "covered",
+        "tabstrip.select_and_read": "covered",
+        "toolbar.application_inventory": "covered",
+        "tree.container_refuses_actionably": "covered"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "non-regression : le registre de la 754 sur sa cible apres le lot de la seconde release",
+      "passed": 21,
+      "register_sha256": "ae16beb80a81c051cf15b8b75f8d0417bc22d9e0e19b031dbf779489d267bec3",
+      "register_target": {
+        "basis_release": "754",
+        "basis_sp_level": "0007",
+        "client": "001",
+        "database_system": "HDB",
+        "kernel_patch_level": "500",
+        "kernel_release": "777",
+        "product_version_text": "- See Details -",
+        "server_name": "vhcala4hci_A4H_00",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reconnaissance_v11_after_lot2",
+      "start": "2026-09-08T13:39:04.883224",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "La liste SE16 standard se lit en labels",
+          "status": "PASS"
+        },
+        {
+          "name": "L'identité du système prouve sa release et son kernel",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "identity.release_and_kernel": "covered",
+        "list.standard_se16_readable": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "failed": 2,
+      "name": "PORTABILITE : le registre de la 754 rejoue tel quel sur la 2023 APRES le lot : le Suite Setup passe (identite resolue), 19/21 ; les deux rouges tiennent a UNE constante de page object de la 754 (menu[4]/menu[11] attendu par le scenario 16, menu[4]/menu[10] sur la 758 ; le 21e est la conformite du registre qui en decoule) : aucun manque de bibliotheque, la convention #1 vue du cote de l'utilisateur",
+      "passed": 19,
+      "register_sha256": "e0355845dc48b496b0cb3107adf54f9355bdbf2ae1bbb347c10ba1b5e7f4479b",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "database_system": "HDB",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "product_version_text": "- See Details -",
+        "server_name": "vhcala4hci_A4H_00",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_754_on_2023",
+      "start": "2026-09-08T13:40:08.199971",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "message": "Capacité 'menu.select_by_path' : verdict observé 'gap', attendu par le plan 'covered' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Un menu se sélectionne par chemin",
+          "status": "FAIL"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "La liste SE16 standard se lit en labels",
+          "status": "PASS"
+        },
+        {
+          "name": "L'identité du système prouve sa release et son kernel",
+          "status": "PASS"
+        },
+        {
+          "message": "Capacité 'menu.select_by_path' : verdict 'gap' hors des verdicts du plan (covered) : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "FAIL"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "identity.release_and_kernel": "covered",
+        "list.standard_se16_readable": "covered",
+        "menu.select_by_path": "gap",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "forme COUVERTE rejouée après le renommage des deux variables `*_TAB_KEY` -> `*_TAB_ID` (garde des identifiants, convention #11) : le fichier committé est celui qui a été validé live, empreinte du registre IDENTIQUE à la v1 (déterminisme)",
+      "passed": 10,
+      "register_sha256": "1c04b96278c29d9378674de23070747129fe7c310cc2164fd21497cc2a51bebc",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_covered_v2",
+      "start": "2026-09-08T13:53:25.792818",
+      "tests": [
+        {
+          "name": "L'identité du système se lit sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "L'entrée System > Status est résolue sur chaque écran",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif s'identifie par sa classe et son numéro",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet se choisit et se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application s'inventorie et se clique",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, un même refus actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "covered",
+        "menu.status_entry_position": "covered",
+        "statusbar.message_identity": "covered",
+        "tabstrip.select_and_read": "covered",
+        "toolbar.application_inventory": "covered",
+        "tree.container_refuses_actionably": "covered"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "forme COUVERTE après la revue indépendante du tour 2 (huit réserves traitées : faits de cible hors verdict, Open System Status confronté au relevé par texte, égalité des nœuds, sonde session.Info dans les preuves, keywords orphelins retirés, message du résolveur de grille) : 10/10 ; l'empreinte CHANGE parce que les preuves des scénarios 2 et 9 portent désormais les entrées cliquées et le renvoi vers la sonde",
+      "passed": 10,
+      "register_sha256": "3b471c8eb15d5529feea72c4e058a324e6a3c82f5d8a2b4e173d84d121794ba7",
+      "register_target": {
+        "basis_release": "758",
+        "basis_sp_level": "0002",
+        "client": "001",
+        "kernel_patch_level": "101",
+        "kernel_release": "793",
+        "server_name": "vhcala4hci_A4H_00",
+        "status_menu_id": "wnd[0]/mbar/menu[5]/menu[10]",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reco_2023_covered_v3",
+      "start": "2026-09-08T14:11:59.635230",
+      "tests": [
+        {
+          "name": "L'identité du système se lit sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "L'entrée System > Status est résolue sur chaque écran",
+          "status": "PASS"
+        },
+        {
+          "name": "Un refus applicatif s'identifie par sa classe et son numéro",
+          "status": "PASS"
+        },
+        {
+          "name": "Un onglet se choisit et se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "La barre d'application s'inventorie et se clique",
+          "status": "PASS"
+        },
+        {
+          "name": "Deux lecteurs de contrôle, un même refus actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "La grille enveloppée dans un splitter se lit quand même",
+          "status": "PASS"
+        },
+        {
+          "name": "L'éditeur ABAP reste hors API sur cette release",
+          "status": "PASS"
+        },
+        {
+          "name": "La release n'est pas dans la session",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "editor.get_value_refuses": "covered",
+        "grid.splitter_wrapped": "covered",
+        "identity.not_in_session_info": "hors_api",
+        "identity.unavailable_on_release": "covered",
+        "menu.status_entry_position": "covered",
+        "statusbar.message_identity": "covered",
+        "tabstrip.select_and_read": "covered",
+        "toolbar.application_inventory": "covered",
+        "tree.container_refuses_actionably": "covered"
+      }
+    },
+    {
+      "failed": 0,
+      "name": "non-régression : le registre de la 754 sur sa cible APRÈS les remèdes de la revue du tour 2 (message du résolveur de grille, Open System Status rendant l'entrée cliquée)",
+      "passed": 21,
+      "register_sha256": "ae16beb80a81c051cf15b8b75f8d0417bc22d9e0e19b031dbf779489d267bec3",
+      "results_dir": "results/reconnaissance_v12_after_review2",
+      "start": "2026-09-08T14:13:45.303004"
+    }
+  ],
+  "target": {
+    "basis_release": "758",
+    "basis_sp_level": "0002",
+    "client": "001",
+    "connection": "/H/vhcala4hci/S/3201",
+    "container": "abap2023",
+    "kernel_patch_level": "101",
+    "kernel_release": "793",
+    "language": "EN",
+    "note": "meme SID et meme hote interne que le conteneur 1909 : seules release et kernel les distinguent",
+    "sap_gui": "8.00",
+    "system": "A4H",
+    "user": "DEVELOPER"
+  }
+}

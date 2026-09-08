@@ -135,6 +135,56 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     decide *where*), `Click Element At Offset` performs a hardware win32
     click at a position **relative to the element** (survives window moves;
     logged, never silent). Ids and labels stay the nominal path.
+  - `_trees`, `_combobox`, `_menus`, `_grid_actions`, `_windows` (2026-09-07,
+    the lot that closed the SAP GUI capability register): **trees**
+    (`Read Tree Nodes`, `Select Tree Node By Text`/`By Path`, opaque keys kept
+    as is, column trees read through their `TEXT` column), **combo boxes by
+    technical key** (`Select Combo Box Entry By Key`, `Get Combo Box Entries`)
+    plus the **user's formats** (`Get User Formats` from SU3, `Input Date`
+    and `Input Number` converting ISO/technical input to what the dynpro
+    accepts), the **menu bar by path** (`Select Menu Item`), **grid actions**
+    beyond reading (`Double Click Grid Cell`, context menu by function code,
+    toolbar inventory, `Sort Grid By Column`) and **modal windows**
+    (`Dismiss Modal Window`: several SAP dialogs refuse `sendVKey`, the
+    fallbacks press the right button and the disappearance is verified).
+    The perception itself shows `GuiShell/<SubType>`, refuses to serve a
+    ProgID as a value, and FAILS naming the cause when the session is
+    unreadable instead of returning an empty view; the STA rail re-attaches
+    the session per thread. Pure logic in `sapfx_common.tree_nodes`,
+    `menu_path`, `combo_box`, `user_formats`.
+  - `_identity` (same evening): **the system identity read on screen**
+    (`Get System Identity`, `System Identity Should Be`), the SAP GUI mirror
+    of the RFC channel's `Read System Identity`: "System: Status" opened BY
+    POSITION (the System menu is the second-to-last one, "Status..." its
+    entry 11 on the six screens measured) and verified structurally, then
+    the kernel popup and the "Installed Software" grid whose `SAP_BASIS` row
+    carries THE ABAP release. Two lab systems share a SID and a host; only
+    release and kernel tell them apart. Sections that could not be read are
+    NAMED (`unread`), never replaced by a plausible value. Pure logic in
+    `sapfx_common.system_identity`. The SE16 mixin gained the inverse of the
+    ALV setting (`Use Standard List In Data Browser`, a classic list rendered
+    as labels and read by `Read Abap List`) and `Get Data Browser Output`.
+  - `_statusbar`, `_tabstrip`, `_toolbar` (2026-09-08, the lot that closed the
+    capability register of a SECOND release, ABAP Platform 2023): the
+    **message identity** (`Get Status Message Identity`: class/type/number,
+    `MO/E/402`, empty when nothing is displayed; `Status Message Should Be`,
+    two type-E refusals of the same screen told apart without a localized
+    word), **tab strips by technical key** (`List Tabs`, `Get Selected Tab`,
+    `Select Tab`, `Select Tab By Label`, the selection read back; the tab set
+    differs between releases) and the **application toolbar inventory**
+    (`List Toolbar Buttons`, `Click Application Toolbar Button`, icon names as
+    locale-safe anchors). The same lot made `Open System Status` RESOLVE the
+    "Status..." entry (second-to-last of the second-to-last menu, a dialog
+    opener required: the hard-coded index 11 clicked "Log Off" on 758) and
+    made both control resolvers read the shell SubType: a column tree is no
+    longer taken for an ALV grid, a leaf shell is refused naming its reader, a
+    splitter is traversed, and neither reader leaks a raw COM error. Pure
+    logic in `sapfx_common.status_message`, `tab_strip`, `menu_path`.
+  - `sapfx_common.artifacts` (same evening, importable as a Robot library):
+    the **generic deterministic artifact**, sorted JSON with a DECLARED hash
+    scope, hash recomputed on read (an artifact edited afterwards is refused),
+    path-named differences on comparison; first consumer: the capability
+    register.
   - The perception mixin also hosts the **drift sentinel**
     (`Check Screen Against Watch` over the pure
     `sapfx_common.screen_watch`): watched screens are remembered (structured

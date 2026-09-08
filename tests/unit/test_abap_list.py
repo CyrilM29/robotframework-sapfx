@@ -113,6 +113,27 @@ def test_status_un_ecran_alv_avec_labels_ne_reclame_pas_l_accessibilite():
     assert status["accessibility_mode_needed"] is False
 
 
+def test_status_un_shell_de_sous_type_lisible_ne_reclame_jamais_l_accessibilite():
+    # Relevé live 2026-09-07 : la grille ALV de SE16 et l'éditeur de SE38
+    # passaient pour une liste illisible (« shell ET zéro label »), sur tout
+    # poste. Le sous-type tranche : GridView se lit avec Read Grid.
+    from sapfx_common.object_tree import ScreenElement
+    grid = ScreenElement(id="wnd[0]/usr/cntlGRID1/shellcont/shell", type="GuiShell",
+                         subtype="GridView", text="SAPGUI.GridViewCtrl.1")
+    status = _lib_with([grid]).get_list_rendering_status()
+    assert status["accessibility_mode_needed"] is False
+    assert status["shell_subtypes"] == ["GridView"]
+    assert "Read Grid" in status["hint"]
+    editor = ScreenElement(id="wnd[0]/usr/cntlEDITOR/shellcont/shell", type="GuiShell",
+                           subtype="AbapEditor", text="SAPGUI.AbapEditor.1")
+    assert _lib_with([editor]).get_list_rendering_status()["accessibility_mode_needed"] is False
+    # un shell d'un sous-type inconnu sans label reste la signature d'une liste
+    # rendue sans le mode accessibilité.
+    opaque = ScreenElement(id="wnd[0]/usr/cntlX/shellcont/shell", type="GuiShell",
+                           subtype="ListControl", text="")
+    assert _lib_with([opaque]).get_list_rendering_status()["accessibility_mode_needed"] is True
+
+
 def test_abap_list_should_be_readable_passe_ou_echoue_avec_la_cause():
     _lib_with([_lbl("l1", "Carrier", 10, 20)]).abap_list_should_be_readable()
     with pytest.raises(AssertionError, match="contrôle shell"):

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "mission_id": "reconnaissance-couverture-sapgui-abap2023-2026-09-08",
+  "target": "abap2023-758-client-001",
+  "invariant": "Le registre des capacites SapEccLibrary sur la release 758 est exact : chaque scenario reproduit UN manque ou constate une capacite qui PORTE sur l'ecran SAP GUI reel de cette release, consigne un verdict gap/covered/hors_api dans un registre deterministe qui nomme sa cible (release et kernel), et echoue dans les deux sens le jour ou l'observation diverge ; aucun manque n'est contourne dans la suite ni dans un page object (convention 12).",
+  "scope": [
+    "tests/robot/ui/ecc",
+    "resources/page_objects",
+    "specs/reconnaissance-couverture-sapgui-abap2023.md"
+  ],
+  "mode": "explore",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/reconnaissance-couverture-sapgui-abap2023.md",
+      "sha256": "5aaad4fa0f0f8030b8bf981cd4483ea8ee5d8cdea5159576027bf2dff9f5fa55"
+    },
+    {
+      "path": "specs/evidence/reconnaissance-couverture-sapgui-abap2023.2026-09-08.json",
+      "sha256": "12c7c48c8cdb5928b6a9090d639c91166115d9c5c0791a716861f23df6bbffdf"
+    }
+  ]
+}

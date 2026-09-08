@@ -1,5 +1,20 @@
 # GitHub Copilot instructions
 
+## Agent contract v1 (2026-09-06)
+
+Five roles include read-only `sap-verifier` (`/sap-verify` in Claude Code).
+Read `.claude/agent-contract.md` first: method from rf-test-agents, SAP-specific
+checks here. It overrides historical healer skips/spec edits/unbounded replay.
+Healer outcomes: `repaired_verified`, `application_defect`, `blocked`,
+`needs_human`, `not_verified`; procedural budget 2 candidates / 20 calls / 900s.
+One PreToolUse hook in `.claude/settings.json` serves both hosts: readers retain
+base permissions, other calls ask (`RF_AGENT_READ_ONLY=1` denies). Qualify host
+loading before relying on it. `agent_contract.py` checks handoff hashes/supplied
+facts; `agent_journal.py` records recovery milestones, never automatically retries.
+Offline tests are not measured LLM quality. Regenerate `.claude/agents/` into
+four legacy chatmodes and `.github/agents/sap-verifier.agent.md`. The pack carries
+the common scripts/contract and minimal hooks, never workstation permissions.
+
 This repo is a Robot Framework SAP test-automation ecosystem with two libraries
 sharing one business vocabulary. `CLAUDE.md` at the repo root is the canonical
 detailed guide; `AGENTS.md` is its condensed mirror. Keep all three files in sync
@@ -47,10 +62,16 @@ per file, update the index in the same operation, never secrets anywhere.
   session, the replay prerequisite of recorded suites), waits (incl. the
   dynamic `Set Default Timeout`/`Set Poll Interval`, previous value returned
   for a teardown restore), ALV grid (by column title, row addressing by
-  content, `Read Abap List`, classic dynpro **table controls** by column
+  content, `Read Abap List` (the standard SE16 list is a classic list rendered
+  as labels: `Use Standard List In Data Browser` / `Get Data Browser Output`),
+  classic dynpro **table controls** by column
   title with automatic scrolling (`Read Table Control` and friends: note
   `RowCount` counts RESERVED rows, not filled ones) and `Pick F4 Value`
-  for search helps), DDIC inventory (`Classify Ddic Objects` reads DD02L
+  for search helps), the system identity read on screen (`Get System
+  Identity`: System > Status opened by RESOLVED position, SAP_BASIS release and
+  kernel, since two lab systems share a SID), the status message identity
+  (`MO/E/402`), tab strips by technical key and the application toolbar
+  inventory (2023 register, 2026-09-08), DDIC inventory (`Classify Ddic Objects` reads DD02L
   through SE16 by batched multiple selection (the dialog is SCROLLED past its
   visible window, scroll verified): `TABCLASS` is an OUTPUT column,
   never a criterion; classification map read live from the TABCLASS domain;
@@ -103,8 +124,12 @@ per file, update the index in the same operation, never secrets anywhere.
   re-login), `Switch/List/Close/Close All Sap Sessions`) routes
   session/connection state per active alias (historic usage = `default`),
   with an STA safety rail: the owning COM thread is remembered per alias,
-  cross-thread access gets a defensive `CoInitialize` (rf-mcp marshalled
-  mode) and `SAPFX_STRICT_COM_THREAD=1` makes it an actionable error.
+  a cross-thread access re-attaches the session on that thread (engine from
+  the ROT + `FindById` of the session id, one proxy per thread, since
+  2026-09-07: the former defensive `CoInitialize` marshalled nothing and
+  rf-mcp batches got empty perceptions in PASS; perception keywords now fail
+  naming the cause) and `SAPFX_STRICT_COM_THREAD=1` makes any cross-thread
+  access an actionable error.
   Multi-session is cooperative multiplexing: one active session, explicit
   switch, never thread parallelism; closing an alias never closes a
   connection another alias still uses.
@@ -155,7 +180,9 @@ per file, update the index in the same operation, never secrets anywhere.
   registry (text is what the browser displays: it needs visibility and adds
   what the control draws), `Get Ui5 Control Info`/`Get Ui5 Aggregation Info`
   read the full metadata type, the binding context and aggregation children
-  rendered OR NOT (a closed Select's items are in no engine's DOM), the pure
+  rendered OR NOT (a closed Select's items are in no engine's DOM) with
+  `property_keys` announcing every property read, `Get Ui5 Control Metadata`
+  reads the DECLARED contract (types, defaults, borrowed provenance), the pure
   probes cover launchpad services (`Get Flp User`, `List Flp
   Apps/Catalogs/Groups`, `Get Flp Intent Support`, `Flp Service Is
   Available`), WebGUI presence/menus, `List Page Iframes`,
@@ -195,7 +222,10 @@ per file, update the index in the same operation, never secrets anywhere.
   (`Get Odata Metadata`, `List Odata Services`), Gateway preflight
   (`Gateway Should Be Active`, `Wait Until Api Available`, plus the tolerant
   `Classify Http Response`: three families of 404 under one status, a 2xx with
-  an HTML body is not data), `Build Draft Entity Path`, OAuth2/mTLS auth,
+  an HTML body is not data, and behind an API-management layer a 401 splits
+  into `auth_failed` (the layer refused the key) and `backend_auth_failed`
+  (it accepted it, the SAP system behind refused: never regenerate the key)),
+  `Build Draft Entity Path`, OAuth2/mTLS auth,
   telemetry, optional RFC via pyrfc with `Call Bapi` (RETURN checked by type)
   and `Wait For Background Job`. Prefer preparing and
   cross-checking data through it; drive the screen only for what is under test
@@ -332,7 +362,12 @@ per file, update the index in the same operation, never secrets anywhere.
   `.claude/skills/`, shipped in the pack), business test plans in `specs/`
   (French). All four query the **optional `qa-brain` MCP RAG** (shared QA
   memory: keywords, specs, lessons from real incidents) before their judgement
-  calls; live observation still decides, and an absent server never blocks. The
+  calls; live observation still decides, and an absent server never blocks.
+  The planner also adopts a **business persona** before exploring (domain
+  fiches in the private root `PERSONAS.md`: truth source, priority risks,
+  reigning assertion, reversibility; absent on a deployed pack, where the
+  agent derives the same grid marked (SAP général)), and every plan carries a
+  « Perception métier » section. The
   chat modes in `.github/chatmodes/` are **generated** from those definitions
   by `python scripts/regen_agent_definitions.py`: never edit a
   `*.chatmode.md` by hand; edit the `.claude/agents/` source and regenerate

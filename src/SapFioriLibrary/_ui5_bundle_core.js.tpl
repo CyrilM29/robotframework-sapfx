@@ -428,6 +428,23 @@
   // Retourne { values, unknown, available } : `unknown` signale une propriété
   // absente des métadonnées du contrôle, et `available` liste alors ce qui
   // existe, pour que l'appelant puisse échouer en nommant les bons noms.
+  // Une valeur franchit la frontière en JSON-safe : les TABLEAUX gardent leurs
+  // éléments primitifs (fieldGroupIds vaut ['a','b'], que String() écrasait en
+  // 'a,b' et [] en '', indiscernable d'une chaîne vide légitime) ; tout autre
+  // objet reste coercé en chaîne (types rares, cycles possibles).
+  function jsonSafeValue(v) {
+    if (v === undefined || v === null) return null;
+    const t = typeof v;
+    if (t === 'string' || t === 'number' || t === 'boolean') return v;
+    if (Array.isArray(v)) {
+      return v.map((e) => {
+        const te = typeof e;
+        if (e === null || te === 'string' || te === 'number' || te === 'boolean') return e;
+        return String(e);
+      });
+    }
+    return String(v);
+  }
   function readProperty(payload) {
     if (!isUI5()) return null;
     let req;
@@ -449,9 +466,7 @@
       if (!known) { out.unknown = true; return; }
       let v = null;
       try { v = c.getProperty(name); } catch (e) { v = null; }
-      if (v === undefined) v = null;
-      if (v !== null && typeof v === 'object') v = String(v);
-      out.values.push(v);
+      out.values.push(jsonSafeValue(v));
     });
     return out;
   }

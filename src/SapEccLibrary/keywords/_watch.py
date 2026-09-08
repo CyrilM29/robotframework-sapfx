@@ -254,9 +254,17 @@ class WatchKeywords:
         if max(distances, default=0) <= visual_threshold:
             return None
         ox, oy = self._window_origin()
+        try:
+            screen = self._screen_elements()
+        except Exception:                       # noqa: BLE001 (contexte best-effort)
+            # Les éléments recouvrants ne sont qu'un CONTEXTE du rapport de
+            # tuiles : une session illisible ne doit pas priver la sentinelle
+            # de son verdict visuel (la lecture, elle, échoue en le disant
+            # dans les keywords de perception).
+            screen = []
         elements = [
             (el.id, el.left - ox, el.top - oy, el.width, el.height)
-            for el in self._screen_elements()
+            for el in screen
             if el.left is not None and el.top is not None
             and el.width and el.height
         ]

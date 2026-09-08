@@ -10,8 +10,23 @@ Deux garanties de la maison : l'ambiguïté n'est **jamais** tranchée en silenc
 (échec avec la liste des candidats), et les keywords retournent des **chaînes**
 id (jamais l'objet COM : sûr à travers la frontière rf-mcp).
 """
-from sapfx_common.semantic import nearby_labels, resolve_semantic, scope_hint
+import re
+
+from pythoncom import com_error
+
+from sapfx_common.semantic import (
+    nearby_labels,
+    nearby_own_texts,
+    resolve_semantic,
+    scope_hint,
+)
 from sapfx_common.vocabulary import lookup_as_dict
+
+# Une date ISO (AAAA-MM-JJ) : la seule forme que `Pick Calendar Date` accepte,
+# convertie en AAAAMMJJ pour l'API du calendrier (SelectionInterval).
+_ISO_DATE = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
+_CHECK_TYPES = ("GuiCheckBox",)
+_RADIO_TYPES = ("GuiRadioButton",)
 
 # Cibles par défaut de chaque keyword (adressage par famille fonctionnelle).
 _INPUT_TYPES = ("GuiTextField", "GuiCTextField", "GuiPasswordField", "GuiComboBox")
@@ -161,6 +176,16 @@ class SemanticKeywords:
         self.wait_until_element_present("wnd[1]", timeout=timeout)
         elements = self._screen_elements()
         wanted = str(value).strip()
+        calendar = self._calendar_shell(elements)
+        if calendar is not None:
+            self.send_vkey(12, window=1)
+            self.wait_until_busy_done()
+            self.take_screenshot()
+            raise AssertionError(
+                "L'aide F4 de '%s' est un CALENDRIER (GuiShell/Calendar '%s'), "
+                "pas une liste de valeurs : choisir la date avec Pick Calendar "
+                "Date (date ISO AAAA-MM-JJ), ou la saisir avec Input Date."
+                % (field_id, calendar))
         grid = next((el for el in elements if el.type == "GuiGridView"), None)
         if grid is not None:
             picked = self._pick_f4_from_grid(grid.id, wanted, column)
@@ -187,7 +212,108 @@ class SemanticKeywords:
                 "active)." % (field_id, value))
         return self.get_value(field_id)
 
+    def pick_calendar_date(self, field_id, iso_date, timeout=None):
+        """Ouvre l'aide F4 d'un champ DATE (un calendrier, ``GuiShell`` de
+        sous-type ``Calendar``), y sélectionne ``iso_date`` (``AAAA-MM-JJ``) et
+        laisse le popup se refermer : le geste « F4 puis clic sur le jour ».
+        Retourne la valeur du champ après sélection (au format de
+        l'utilisateur). Vérifié live (SM37, 2026-09-07) : poser
+        ``SelectionInterval = "AAAAMMJJ,AAAAMMJJ"`` sélectionne ET referme.
+        Aide F4 qui n'est pas un calendrier = échec nommant `Pick F4 Value`."""
+        match = _ISO_DATE.match(str(iso_date))
+        if match is None:
+            raise ValueError(
+                "Date %r attendue en ISO 8601 (AAAA-MM-JJ) pour Pick Calendar Date."
+                % (iso_date,))
+        compact = "".join(match.groups())
+        field = self.session.findById(field_id)
+        field.SetFocus()
+        self.send_vkey(4)
+        self.wait_until_busy_done()
+        self.wait_until_element_present("wnd[1]", timeout=timeout)
+        elements = self._screen_elements()
+        calendar = self._calendar_shell(elements)
+        if calendar is None:
+            self.send_vkey(12, window=1)
+            self.wait_until_busy_done()
+            self.take_screenshot()
+            raise AssertionError(
+                "L'aide F4 de '%s' n'est pas un calendrier (aucun "
+                "GuiShell/Calendar dans wnd[1]) : utiliser Pick F4 Value."
+                % field_id)
+        try:
+            self.session.findById(calendar).SelectionInterval = "%s,%s" % (compact, compact)
+        except com_error as exc:
+            self.send_vkey(12, window=1)
+            self.wait_until_busy_done()
+            raise AssertionError(
+                "Le calendrier '%s' a refusé la date %s (%s)." % (calendar, iso_date, exc))
+        self.wait_until_busy_done()
+        if self.session.findById("wnd[1]", False) is not None:
+            self.send_vkey(12, window=1)
+            self.wait_until_busy_done()
+            self.take_screenshot()
+            raise AssertionError(
+                "Le calendrier de '%s' est resté ouvert après la sélection de %s."
+                % (field_id, iso_date))
+        return self.get_value(field_id)
+
+    def select_checkbox_by_label(self, label, exact=False, scope_radius=None):
+        """Coche la case désignée par son TEXTE PROPRE (« Sched. ») ou par un
+        libellé voisin (même grammaire que `Find Element By Label`, cibles
+        restreintes aux ``GuiCheckBox``). Retourne l'id résolu."""
+        eid = self._resolve_semantic_unique(label, _CHECK_TYPES, _as_bool(exact),
+                                            scope_radius=_as_radius(scope_radius)
+                                            ).element.id
+        self.select_checkbox(eid)
+        return eid
+
+    def unselect_checkbox_by_label(self, label, exact=False, scope_radius=None):
+        """Décoche la case désignée par son texte ou un libellé voisin."""
+        eid = self._resolve_semantic_unique(label, _CHECK_TYPES, _as_bool(exact),
+                                            scope_radius=_as_radius(scope_radius)
+                                            ).element.id
+        self.unselect_checkbox(eid)
+        return eid
+
+    def select_radio_button_by_label(self, label, exact=False, scope_radius=None):
+        """Sélectionne le bouton radio désigné par son texte propre
+        (« Professional User Transaction ») ou un libellé voisin. Retourne l'id."""
+        eid = self._resolve_semantic_unique(label, _RADIO_TYPES, _as_bool(exact),
+                                            scope_radius=_as_radius(scope_radius)
+                                            ).element.id
+        self.select_radio_button(eid)
+        return eid
+
+    def checkbox_by_label_should_be(self, label, expected, exact=False,
+                                    scope_radius=None):
+        """Échoue si la case désignée par son texte n'est pas dans l'état
+        ``expected`` (``checked`` / ``unchecked``, ou un booléen)."""
+        eid = self._resolve_semantic_unique(label, _CHECK_TYPES + _RADIO_TYPES,
+                                            _as_bool(exact),
+                                            scope_radius=_as_radius(scope_radius)
+                                            ).element.id
+        actual = self.get_value(eid)
+        if isinstance(expected, bool) or str(expected).strip().lower() in _TRUTHY + ("false", "0", "no", "off"):
+            wanted = "checked" if _as_bool(expected) else "unchecked"
+        else:
+            wanted = str(expected).strip().lower()
+        if actual != wanted:
+            self.take_screenshot()
+            raise AssertionError(
+                "La case '%s' (%s) est %s, attendu %s." % (label, eid, actual, wanted))
+        return eid
+
     # -- helpers (méthodes internes) ------------------------------------------
+
+    @staticmethod
+    def _calendar_shell(elements):
+        """L'id du ``GuiShell/Calendar`` de la fenêtre modale, ou ``None``."""
+        for element in elements:
+            if (element.type == "GuiShell" and element.subtype == "Calendar"
+                    and element.id.startswith("wnd[1]")):
+                return element.id
+        return None
 
     def _pick_f4_from_grid(self, grid_id, wanted, column):
         """Cherche ``wanted`` dans la grille de résultats F4 et la choisit par
@@ -270,7 +396,11 @@ class SemanticKeywords:
             if labels:
                 hint += "\nLibellés visibles à l'écran :\n%s" % "\n".join(
                     "  - %s" % text for text in labels)
-            elif not any(el.left is not None for el in elements):
+            own_texts = nearby_own_texts(elements)
+            if own_texts:
+                hint += ("\nTextes propres des cases, radios, boutons et "
+                         "onglets :\n%s" % "\n".join("  - %s" % t for t in own_texts))
+            if not labels and not any(el.left is not None for el in elements):
                 hint += ("\n(Aucune géométrie disponible sur cette session, "
                          "GetObjectTree absent et coordonnées illisibles : seuls "
                          "le texte propre et le tooltip peuvent matcher.)")

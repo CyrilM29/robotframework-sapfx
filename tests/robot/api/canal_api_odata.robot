@@ -64,6 +64,10 @@ ${BUSINESS_PARTNER_ENTITY}    A_BusinessPartner
 ${BUSINESS_PARTNER_FIELDS}    BusinessPartner
 ${PURCHASE_ORDER_ENTITY}    PurchaseOrder
 ${PURCHASE_ORDER_FIELDS}    PurchaseOrder
+# Les deux états qui prouvent que la couche de gestion d'API a HONORÉ la clé :
+# soit le système derrière a répondu, soit lui seul a refusé (donc la clé est
+# passée). Un `auth_failed` dirait au contraire qu'elle a été rejetée.
+@{SANDBOX_KEY_HONOURED}    ok    backend_auth_failed
 
 
 *** Test Cases ***
@@ -226,12 +230,26 @@ Une Cle D Api Authentifie Le Canal Sans Identifiants Basic
     ...
     ...    L'état servi aux agents doit dire « authentifiée » sans jamais porter
     ...    la clé : même contrat de non-fuite que le mot de passe.
+    ...
+    ...    Le scénario prouve aussi que la clé est HONORÉE sur le réseau, et
+    ...    plus seulement enregistrée dans la session. Sa première version
+    ...    s'arrêtait à l'état local : elle est restée verte le 2026-09-06
+    ...    alors que pas une lecture du bac à sable ne passait, ce qui est le
+    ...    « vert et faux » type. Les deux états acceptables disent tous deux
+    ...    que la couche de gestion d'API a laissé passer la clé (`ok`, ou
+    ...    `backend_auth_failed` quand le système derrière est en panne) ; un
+    ...    `auth_failed` signifierait qu'elle l'a refusée, et c'est le seul
+    ...    verdict que ce test doit interdire.
     [Tags]    sandbox
     Ouvrir Le Bac A Sable
     ${etat}=    List Api Sessions
     ${session}=    Evaluate    [s for s in $etat['api_sessions'] if s['alias'] == 'sandbox'][0]
     Should Be True    ${session}[authenticated]
     ...    msg=La session ne se déclare pas authentifiée alors qu'une clé a été fournie.
+    ${verdict}=    Get Gateway Status    alias=sandbox
+    ...    catalog_path=${BUSINESS_PARTNER_SERVICE}/$metadata
+    Should Contain    ${SANDBOX_KEY_HONOURED}    ${verdict}[status]
+    ...    msg=La couche de gestion d'API n'a pas honoré la clé (état ${verdict}[status]) : ${verdict}[detail]
     # Auto-import Robot du module `json` : ni __import__ ni modules= dans une
     # suite (décision DDIC 2026-08-17, tenue par check_conventions.py).
     ${json}=    Evaluate    json.dumps($etat)
@@ -244,6 +262,7 @@ Le Contrat Du Service S4 Publie Ses Entites Et Ses Cles
     ...    forme des APIs publiées par SAP, celle que rencontrera un client, et
     ...    non celle d'un référentiel de démonstration.
     [Tags]    sandbox
+    Preparer Le Bac A Sable    ${BUSINESS_PARTNER_SERVICE}
     ${entite}=    Business Service Should Expose Entity Set
     ...    ${BUSINESS_PARTNER_SERVICE}    ${BUSINESS_PARTNER_ENTITY}    alias=sandbox
     Should Not Be Empty    ${entite}[keys]    msg=Ensemble d'entités sans clé déclarée.
@@ -255,6 +274,7 @@ Le Comptage Et La Lecture Bornee Tiennent Sur Le Bac A Sable
     ...    volume attendu, seulement la cohérence entre ce qui est compté, ce qui
     ...    est demandé et ce qui est rendu.
     [Tags]    sandbox
+    Preparer Le Bac A Sable    ${BUSINESS_PARTNER_SERVICE}
     ${total}=    Count Business Entities    ${BUSINESS_PARTNERS}    alias=sandbox
     Should Be True    ${total} > 0
     ...    msg=Le bac à sable ne rend aucun partenaire : jeu de données vide ou clé sans portée.
@@ -275,6 +295,7 @@ Le Meme Vocabulaire Metier Vaut Pour L Odata V4 Du Bac A Sable
     ...    `odata4/sap/<api>/srvd_a2x/sap/<définition>/0001` varie par API, et
     ...    des candidats parfaitement plausibles répondent 404 ou 403.
     [Tags]    sandbox
+    Preparer Le Bac A Sable    ${PURCHASE_ORDER_SERVICE}
     ${entite}=    Business Service Should Expose Entity Set
     ...    ${PURCHASE_ORDER_SERVICE}    ${PURCHASE_ORDER_ENTITY}    alias=sandbox
     Should Not Be Empty    ${entite}[keys]    msg=Ensemble d'entités v4 sans clé déclarée.
@@ -291,8 +312,21 @@ Une Cle Invalide Est Refusee Explicitement
     [Documentation]    Symétrique du refus 401 des autres lanes. Une clé fausse
     ...    doit produire un refus nommé, pas une lecture vide qui passerait pour
     ...    un jeu de données absent.
+    ...
+    ...    Le refus est jugé sur la COUCHE qui l'émet, et non sur « une erreur
+    ...    quelconque est survenue ». Sa première version se contentait d'un
+    ...    `Run Keyword And Expect Error *` : le 2026-09-06 elle est restée
+    ...    verte pendant que la cible entière refusait tout, y compris avec la
+    ...    BONNE clé, donc elle ne prouvait plus rien de ce qu'elle annonce.
+    ...    Ici, `auth_failed` dit que la couche de gestion d'API a rejeté la
+    ...    clé elle-même ; une panne du système derrière sortirait en
+    ...    `backend_auth_failed` et ferait échouer ce test, comme il se doit.
     [Tags]    sandbox
     Open Api Sandbox Channel    api_key=cle-invalide-de-recette    alias=refus
+    ${verdict}=    Get Gateway Status    alias=refus
+    ...    catalog_path=${BUSINESS_PARTNER_SERVICE}/$metadata
+    Should Be Equal    ${verdict}[status]    auth_failed
+    ...    msg=Une clé invalide doit être refusée par la couche de gestion d'API elle-même : état ${verdict}[status].
     Run Keyword And Expect Error    *
     ...    Count Business Entities    ${BUSINESS_PARTNERS}    alias=refus
     Close Api Session    refus
@@ -304,6 +338,20 @@ Ouvrir Le Bac A Sable
     ...    ligne de commande (`Secret:`), jamais écrite dans la suite. Aucun
     ...    mandant : le bac à sable est un système unique.
     Open Api Sandbox Channel    alias=sandbox
+
+Preparer Le Bac A Sable
+    [Documentation]    Ouvre la lane et SAUTE le scénario quand le système du
+    ...    fournisseur ne répond pas derrière sa couche de gestion d'API (état
+    ...    `backend_auth_failed`). Sans cette garde, une panne chez SAP se
+    ...    présente comme trois scénarios métier rouges qui accusent notre
+    ...    canal : c'est exactement ce qui est arrivé le 2026-09-06, et le
+    ...    diagnostic a demandé de sonder la cible à la main.
+    ...
+    ...    L'ouverture est refaite ici pour que chaque scénario tienne SEUL
+    ...    (`--test`), sans dépendre de l'ordre d'exécution de la lane.
+    [Arguments]    ${service}
+    Ouvrir Le Bac A Sable
+    Skip Unless Api Backend Answers    ${service}/$metadata    alias=sandbox
 
 Ouvrir Le Canal A4H
     [Documentation]    Ouverture de la lane Gateway v2, identifiants fournis en

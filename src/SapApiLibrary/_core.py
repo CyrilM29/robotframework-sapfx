@@ -27,6 +27,7 @@ from ._http import (
     _QUERY_QUOTE,
     _ApiSession,
     _RequestError,
+    _SameOriginRedirectHandler,
     _csrf_rejected,
     _decompress,
     _has_query_param,
@@ -314,23 +315,47 @@ class _ApiCore:
             raise AssertionError(
                 "Réponse du token endpoint %s sans access_token (clés : %s)."
                 % (session.token_url, ", ".join(sorted(payload)) or "aucune"))
-        lifetime = float(payload.get("expires_in") or 300)
+        raw_lifetime = payload.get("expires_in")
+        lifetime = 300.0 if raw_lifetime in (None, "") else float(raw_lifetime)
         session.access_token = str(token)
-        session.token_expiry = time.monotonic() + max(30.0, lifetime * 0.9)
+        # L'échéance locale reste TOUJOURS sous la durée annoncée : la marge
+        # de renouvellement (10 %) se SOUSTRAIT de la durée, elle ne s'y
+        # substitue pas. L'ancien plancher de 30 s gardait un token annoncé
+        # 10 s pendant 30 s, donc rejoué expiré (401 assuré, masqué par le
+        # rejeu). Un ``expires_in`` de 0 est respecté (token renouvelé à
+        # chaque appel) ; seul un champ ABSENT vaut le défaut de 300 s.
+        session.token_expiry = time.monotonic() + max(0.0, lifetime * 0.9)
         return session.access_token
 
     @staticmethod
-    def _token_transport(session: _ApiSession, request: urllib.request.Request):
+    def _token_opener(session: _ApiSession, request: urllib.request.Request
+                      ) -> urllib.request.OpenerDirector:
+        """Opener du token endpoint, porteur de SA garde de redirection,
+        épinglée sur l'origine du token endpoint LUI-MÊME (indépendante de
+        l'hôte API). Le gestionnaire de redirection standard d'urllib
+        CONSERVE l'en-tête ``Authorization`` (ici le Basic
+        client_id:client_secret) en suivant une redirection vers un autre
+        hôte : sans cette garde, un token endpoint compromis ou mal
+        configuré rejouerait les identifiants du client vers l'hôte de son
+        choix. Le contexte TLS de la session (mTLS, verify_tls) est
+        réutilisé."""
+        handlers: list[urllib.request.BaseHandler] = [
+            _SameOriginRedirectHandler(request.full_url)]
+        if session.tls_context is not None:
+            handlers.append(
+                urllib.request.HTTPSHandler(context=session.tls_context))
+        return urllib.request.build_opener(*handlers)
+
+    @classmethod
+    def _token_transport(cls, session: _ApiSession,
+                         request: urllib.request.Request):
         """Frontière réseau du token endpoint (stubbable en test unitaire).
         Volontairement HORS de l'opener de session : le token endpoint
-        (IAS, XSUAA) vit légitimement sur un autre hôte que l'API, la garde
-        same-origin ne s'y applique pas ; le contexte TLS de la session
-        (mTLS, verify_tls) est réutilisé."""
-        if session.tls_context is not None:
-            opener = urllib.request.build_opener(
-                urllib.request.HTTPSHandler(context=session.tls_context))
-            return opener.open(request, timeout=session.timeout)
-        return urllib.request.urlopen(request, timeout=session.timeout)
+        (IAS, XSUAA) vit légitimement sur un autre hôte que l'API, donc la
+        garde same-origin de la SESSION ne s'y applique pas ; il porte la
+        SIENNE (voir ``_token_opener``)."""
+        opener = cls._token_opener(session, request)
+        return opener.open(request, timeout=session.timeout)
 
     @staticmethod
     def _transport(session: _ApiSession, request: urllib.request.Request):

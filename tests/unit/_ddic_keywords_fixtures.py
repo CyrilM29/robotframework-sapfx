@@ -76,6 +76,13 @@ class _FakeLabel:
         self.Text = text
 
 
+class _FakeRadio:
+    """Un radio du dialogue des paramètres SE16 : coché ou non."""
+
+    def __init__(self, selected):
+        self.Selected = selected
+
+
 class _FakeSession:
     """Résout les ids que le mixin interroge ; le reste est réputé absent.
 
@@ -89,11 +96,14 @@ class _FakeSession:
     """
 
     def __init__(self, screen="grid", popup=None, visible=7, locked=False,
-                 scroll_max=None):
+                 scroll_max=None, output_radio="radRSEUMOD-TBALV_GRID"):
         self.screen = screen
         self.popup = popup
         self.table = _FakeTable(visible, locked, scroll_max)
         self.dialogs_dismissed = 0
+        #: Le radio COCHÉ du dialogue des paramètres SE16 (suffixe d'id) ;
+        #: ``None`` = aucun (dialogue d'une autre forme).
+        self.output_radio = output_radio
 
     def dismiss_popup(self):
         self.popup = None
@@ -122,6 +132,9 @@ class _FakeSession:
             if element_id == "wnd[1]/usr":
                 items = ([_FakeCheckbox()] if self.popup == "checkbox" else [])
                 return _FakeChildren(items) and _Usr(items)
+            if self.popup == "alv" and "/rad" in element_id:
+                return _FakeRadio(self.output_radio is not None
+                                  and element_id.endswith(self.output_radio))
             return object()
         return object()
 
@@ -139,8 +152,10 @@ class _Recorder(DdicKeywords, Se16Keywords):
 
     def __init__(self, rows=(), screen="grid", popup=None, visible=7,
                  locked=False, status=("", ""), alv_mode=True,
-                 scroll_max=None, count_text="0"):
-        self.session = _FakeSession(screen, popup, visible, locked, scroll_max)
+                 scroll_max=None, count_text="0",
+                 output_radio="radRSEUMOD-TBALV_GRID"):
+        self.session = _FakeSession(screen, popup, visible, locked, scroll_max,
+                                    output_radio)
         self.calls = []
         #: Ce que le popup de comptage AFFICHE (séparateurs de milliers
         #: compris : ils dépendent du profil utilisateur).
@@ -187,6 +202,13 @@ class _Recorder(DdicKeywords, Se16Keywords):
 
     def select_radio_button(self, element_id):
         self.calls.append(("radio", element_id))
+
+    def dismiss_modal_window(self, window=1, confirm=False):
+        self.calls.append(("dismiss", window))
+        if self.session.popup is not None:
+            self.session.dismiss_popup()
+            return True
+        return False
 
     def send_vkey(self, vkey, window=0):
         self.calls.append(("vkey", vkey, window))

@@ -17,6 +17,13 @@ Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulai
 ...                 SapFioriLibrary), runtime SAPUI5 1.151.0, navigateur
 ...                 VISIBLE. Spec source :
 ...                 `specs/openui5-demokit-navigation-interaction.md`.
+...                 Étendu le 2026-09-05 (SDK 1.152.0, exploration headless)
+...                 pour la campagne d'exploration profonde
+...                 (`specs/openui5-demokit-exploration-profonde.md`) : arbre
+...                 des sujets de la Documentation, liens croisés du contenu,
+...                 fiche d'API en profondeur (membres, bascules borrowed,
+...                 chaîne d'héritage), galerie d'échantillons et vue du code
+...                 source, Demo Apps et Resources, sentinelle d'accumulation.
 ...
 ...                 Contrat de localisation, appris sur la cible réelle :
 ...
@@ -214,6 +221,84 @@ ${DEMOKIT_SAMPLE_FRAME_ID}          sampleFrame
 # absente dedans.
 ${DEMOKIT_SHELL_ANCHOR}             apiMasterTab
 
+# --- Section Documentation : arbre des sujets et vue de détail ----------------
+# (Campagne d'exploration profonde, relevé live 2026-09-05, SDK 1.152.0.)
+${DEMOKIT_TOPIC_TREE}               topicMaster--tree
+${DEMOKIT_TOPIC_FILTER}             topicMaster--searchField
+# DEUX vues portent le suffixe court `topicDetailPage` (l'écran d'accueil de la
+# section ET le sujet réel, mesuré 2 correspondances) : l'ancre est le suffixe
+# LONG incluant le nom de vue, qui rend exactement 1.
+${DEMOKIT_TOPIC_DETAIL_PAGE}        topicDetail--topicDetailPage
+# Le `target` d'un nœud de sujet est le « loio » stable du corpus : un GUID
+# hexadécimal de 32 caractères, jamais un nom qualifié. Motif SANS backslash
+# (l'échappement Robot défangerait un `\\w` en silence, leçon du dépôt).
+${DEMOKIT_GUID_MOTIF}               [0-9a-f]{32}
+# Deux loio relevés live, stables (identifiants de contenu, pas des ids DOM) :
+# la racine « Essentials » et son enfant « Data Binding », riche en liens
+# croisés vers l'API.
+${DEMOKIT_SUJET_ESSENTIALS}         ec699e0817fb46a0817b0fa276a249f8
+${DEMOKIT_SUJET_DATA_BINDING}       68b9644a253741e8a4b9e4279a35c247
+
+# --- Fiche d'API en profondeur : rubriques, membres, bascules borrowed --------
+${DEMOKIT_API_OBJECT_PAGE}          apiDetailObjectPage
+# La rubrique sélectionnée se lit sur le `selectedKey` de la barre d'ancrage
+# (IconTabHeader), par SUFFIXE : le préfixe de vue est généré (`__xmlview<N>--`).
+# `selectedSectionId` n'existe pas comme propriété sur cet ObjectPageLayout.
+${DEMOKIT_ANCHOR_BAR_TYPE}          sap.m.IconTabHeader
+# Les cases « Show borrowed ... » ont des ids GÉNÉRÉS (`__box9`...) : elles
+# s'ancrent par containment de rubrique (exactement 1 CheckBox par rubrique,
+# vérifié), jamais par id ni par libellé (localisé).
+${DEMOKIT_CHECKBOX_TYPE}            sap.m.CheckBox
+${DEMOKIT_BORROWED_LIST_TYPE}       sap.ui.documentation.BorrowedList
+${DEMOKIT_DOC_BORROWED_MARKER}         borrowedFrom
+${DEMOKIT_SECTION_AGGREGATIONS}     aggregations
+${DEMOKIT_SECTION_EVENTS}           events
+${DEMOKIT_SECTION_METHODS}          methods
+@{DEMOKIT_RUBRIQUES_ATTENDUES}      controlproperties    aggregations    events    methods
+# Les trois rubriques porteuses d'une case « Show borrowed ... ». État par
+# défaut RELEVÉ le 2026-09-05 : [False, True, False], la case des AGRÉGATIONS
+# est cochée d'origine (la table contient donc des entrées héritées sans qu'on
+# ait rien touché) : l'état se relève AVANT de lire, jamais supposé.
+@{DEMOKIT_RUBRIQUES_A_BASCULE}      controlproperties    aggregations    associations
+# Propriétés documentées que la fiche du contrôle vivant ne matérialise PAS :
+# la fiche est réduite aux valeurs PRIMITIVES (MCP-safe), et `fieldGroupIds`
+# est la seule propriété de `sap.m.Button` à valeur tableau (mesuré 2026-09-05 :
+# 70 instances rendues, 0 porteuse). Inventaire déclaré à compte exact : une
+# entrée devenue lisible sur le vivant fait ÉCHOUER le verdict (tolérance
+# morte), une propriété manquante de plus aussi.
+@{DEMOKIT_PROPS_HORS_FICHE}         fieldGroupIds
+
+# --- Galerie d'échantillons et vue du code source -----------------------------
+${DEMOKIT_ENTITY_TABLE}             entity--table
+${DEMOKIT_ENTITY_ROW_TYPE}          sap.m.ColumnListItem
+${DEMOKIT_SAMPLE_CODE_BUTTON}       sample--code
+# Boutons de la barre d'échantillon PERÇUS mais JAMAIS actionnés (lecture
+# seule) : ouverture d'onglet et mode adaptation runtime.
+@{DEMOKIT_SAMPLE_TOOLBAR_INTERDITS}    sample--newTab    sample--toggleRTA
+${DEMOKIT_CODE_FILE_EDITOR}         code--fileEditor
+${DEMOKIT_CODE_EDITOR}              code--fileEditor-editor
+# Le téléchargement écrit sur le disque : perçu, jamais cliqué.
+${DEMOKIT_CODE_DOWNLOAD}            code--downloadSampleButton
+${DEMOKIT_CODE_NEXT}                code--nextSample
+${DEMOKIT_CODE_PREV}                code--prevSample
+# Les fichiers de l'échantillon sont des onglets dont la `key` EST le nom de
+# fichier ; un 4e onglet technique à clé VIDE est rendu à côté (relevé live) :
+# la lecture filtre les clés vides.
+${DEMOKIT_FILE_TAB_TYPE}            sap.m.IconTabFilter
+${DEMOKIT_CODE_ROUTE_SUFFIX}        /code
+
+# --- Demo Apps et Resources ---------------------------------------------------
+${DEMOKIT_DEMOAPPS_MAIN}            demoApps--sapUiDemoKitDemoAppsMain
+${DEMOKIT_CARD_TYPE}                sap.f.Card
+# La vue Resources n'a pas de conteneur de page à id stable : la PORTÉE de
+# comptage est la vue elle-même (id complet, relevé live).
+${DEMOKIT_RESOURCES_VIEW}           sdk---resources
+# Hôtes externes DÉCLARÉS des cartes Demo Apps : un lien absolu vers un autre
+# hôte sort en intrus et fait échouer le verdict. Deux hôtes relevés live :
+# les dépôts GitHub et les pages GitHub Pages des exemples SAP-samples
+# (`sap-samples.github.io`, relevé au premier run complet).
+@{DEMOKIT_EXTERNAL_LINK_HOSTS}      github.com    sap-samples.github.io
+
 # --- Familles d'anomalies connues de la cible ---------------------------------
 # Classer, jamais compter : le nombre croît avec la navigation. Les marqueurs
 # sont des ORIGINES techniques, pas des textes de message (ceux du navigateur
@@ -225,8 +310,16 @@ ${DEMOKIT_SHELL_ANCHOR}             apiMasterTab
 # l'origine). C'est un inventaire déclaré et non un motif attrape-tout : une
 # ressource manquante de plus sort en anomalie NON CLASSÉE et fait échouer le
 # scénario de diagnostic, ce qui est exactement l'effet voulu.
+# L'entrée `component-preload.js` couvre la FAMILLE des préchargements de
+# composants, que le SDK ne sert jamais : celui de l'accueil
+# (`sdk/samples/component-preload.js`, entrée historique qu'elle subsume) et
+# celui de CHAQUE échantillon exécuté, qui manque sous DEUX formes (404 réseau
+# sur `test-resources/.../demokit/sample/<Nom>/Component-preload.js` et refus
+# du ModuleSystem nommant `.../sample/<Nom>/Component-preload.js`), relevées
+# live le 2026-09-05 sur Button ET ButtonWithBadge. L'entrée nomme le FICHIER :
+# toute autre ressource manquante sort toujours non classée.
 @{DEMOKIT_MISSING_SDK_RESOURCES}    jquery.ui.button.css    jquery.ui.theme.css
-...                                 sdk/samples/component-preload.js
+...                                 component-preload.js
 # INVENTAIRE des ressources du shell Web Components (SDK 1.152.0) dont le code
 # émet ses propres exceptions non rattrapées (relevé live 2026-09-01 :
 # `TypeError: e._close is not a function` dans `_closeOtherSubMenus`, déclenché
@@ -242,6 +335,7 @@ ${DEMOKIT_MAX_LOG}                  ${300}
 # --- État relevé au setup, restauré au teardown -------------------------------
 ${DEMOKIT_INITIAL_THEME}            ${EMPTY}
 &{DEMOKIT_INITIAL_TOGGLES}          # rempli par `Memoriser L Etat Initial Du Demo Kit`
+&{DEMOKIT_INITIAL_BORROWED}         # rempli par `Memoriser Les Bascules Borrowed` (fiche d'API seulement)
 
 
 *** Keywords ***
@@ -361,6 +455,7 @@ Ramener Le Demo Kit A Son Etat De Reference
     Run Keyword And Ignore Error    Vider Le Champ    ${DEMOKIT_SEARCH_CONTROL}
     Run Keyword And Ignore Error    Vider Le Champ    ${DEMOKIT_API_FILTER}
     Run Keyword And Ignore Error    Restaurer Les Bascules D Affichage
+    Run Keyword And Ignore Error    Restaurer Les Bascules Borrowed
     Run Keyword And Ignore Error    Restaurer Le Theme Initial
 
 Clore La Campagne Demo Kit
@@ -572,9 +667,16 @@ Ouvrir La Fiche D Api
     ...    l'application et rétablit le titre. Ce keyword choisit donc son geste
     ...    selon l'état courant, ce qui le rend indépendant du test qui l'a
     ...    précédé : c'est la condition de la rejouabilité.
+    ...
+    ...    Une SOUS-ROUTE DE MEMBRE de la même fiche compte comme « déjà
+    ...    affichée » (mesuré à la génération de la campagne profonde : depuis
+    ...    `/api/X%23events/press`, demander `/api/X` réinitialise le titre au
+    ...    titre générique de la section et n'en revient jamais, exactement le
+    ...    symptôme du cas à l'identique).
     [Arguments]    ${nom_qualifie}
     ${emplacement}=    Get Page Location
-    ${deja}=    Evaluate    $emplacement['fragment'] == '/api/' + $nom_qualifie
+    ${deja}=    Evaluate
+    ...    $emplacement['fragment'] == '/api/' + $nom_qualifie or $emplacement['fragment'].startswith('/api/' + $nom_qualifie + '%23') or $emplacement['fragment'].startswith('/api/' + $nom_qualifie + '#')
     IF    ${deja}
         Reload
         Attendre Le Runtime Du Demo Kit
@@ -1288,3 +1390,810 @@ Vider Le Champ
         ${selecteur}=    Resolve Ui5 Control    idSuffix=${champ}
         Fill Text    ${selecteur} >> input    ${EMPTY}
     END
+
+# =============================================================================
+# Section Documentation : arbre des sujets et liens croisés du contenu
+# =============================================================================
+
+Compter Les Noeuds De L Arbre Des Sujets
+    [Documentation]    Nombre de nœuds rendus DANS l'arbre des sujets de la
+    ...    Documentation. La portée n'est pas un détail : cette SPA garde les
+    ...    maîtres de toutes les sections visitées rendus côte à côte, et les
+    ...    nœuds de l'arbre de l'API sont du même type.
+    ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_TREE_ITEM_TYPE}
+    ...    containedIn=${DEMOKIT_TOPIC_TREE}
+    RETURN    ${nb}
+
+Attendre L Arbre Des Sujets
+    [Documentation]    Attente ACTIVE des nœuds de l'arbre des sujets : ils
+    ...    arrivent APRÈS les deux témoins de section, le champ de filtre
+    ...    étant déjà rendu (mesuré live : 0 nœud à l'instant des témoins,
+    ...    filtre présent, 9 nœuds un instant plus tard). Retourne le
+    ...    comptage.
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    L Arbre Des Sujets Doit Rendre Des Noeuds
+    ${nb}=    Compter Les Noeuds De L Arbre Des Sujets
+    RETURN    ${nb}
+
+L Arbre Des Sujets Doit Rendre Des Noeuds
+    [Documentation]    Assertion sondable : au moins un nœud de sujet rendu.
+    ${nb}=    Compter Les Noeuds De L Arbre Des Sujets
+    Should Be True    ${nb} > 0
+    ...    msg=L'arbre des sujets de la Documentation ne rend aucun nœud.
+
+Lister Les Identifiants De Sujets
+    [Documentation]    Les `target` des nœuds de sujets rendus : le « loio »
+    ...    stable de chaque sujet, un GUID hexadécimal et jamais un nom
+    ...    qualifié. Les titres des nœuds sont de la prose documentaire
+    ...    anglaise : ils se journalisent, ils ne s'ancrent pas.
+    ${cibles}=    Get Ui5 Properties    target    controlType=${DEMOKIT_TREE_ITEM_TYPE}
+    ...    containedIn=${DEMOKIT_TOPIC_TREE}
+    RETURN    ${cibles}
+
+Les Identifiants De Sujets Doivent Etre Des Guid
+    [Documentation]    Assertion STRUCTURELLE, indépendante de la langue et du
+    ...    contenu : chaque identifiant de sujet suit le motif du GUID
+    ...    hexadécimal de 32 caractères. L'échec NOMME les intrus.
+    [Arguments]    ${cibles}
+    Should Not Be Empty    ${cibles}
+    ...    msg=Aucun identifiant de sujet à vérifier : l'arbre des sujets est vide.
+    ${intrus}=    Evaluate
+    ...    [c for c in $cibles if not re.fullmatch('${DEMOKIT_GUID_MOTIF}', c)]
+    Should Be Empty    ${intrus}
+    ...    msg=Des identifiants de sujets ne sont pas des GUID hexadécimaux de 32 caractères : ${intrus}
+
+Le Champ De Filtre Des Sujets Doit Etre Rendu
+    [Documentation]    Le panneau des sujets porte exactement un champ de
+    ...    filtre.
+    ${nb}=    Get Ui5 Match Count    idSuffix=${DEMOKIT_TOPIC_FILTER}
+    Should Be Equal As Integers    ${nb}    1
+    ...    msg=Le champ de filtre du panneau des sujets rend ${nb} correspondance(s), attendu exactement 1.
+
+Ouvrir Le Sujet
+    [Documentation]    Clique le nœud d'arbre dont l'identifiant de sujet est
+    ...    EXACTEMENT `${guid}` (ancrage exact : l'appariement de propriétés se
+    ...    fait par sous-chaîne), puis attend le fragment ET la vue de détail
+    ...    RÉELLE. Le clic navigue ET déplie dans le même geste.
+    [Arguments]    ${guid}
+    ${motif}=    Motif Exact    ${guid}
+    ${vise}=    Get Ui5 Match Count    controlType=${DEMOKIT_TREE_ITEM_TYPE}
+    ...    containedIn=${DEMOKIT_TOPIC_TREE}    properties={'target': '${motif}'}
+    Should Be Equal As Integers    ${vise}    1
+    ...    msg=L'ancrage exact sur le sujet ${guid} rend ${vise} correspondance(s) : le nœud visé n'est pas identifiable sans ambiguïté.
+    Click Ui5 Control    controlType=${DEMOKIT_TREE_ITEM_TYPE}
+    ...    containedIn=${DEMOKIT_TOPIC_TREE}    properties={'target': '${motif}'}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Sujet Affiche Doit Etre    ${guid}
+
+Ouvrir Le Sujet Par Sa Route
+    [Documentation]    Navigue vers le sujet `${guid}` par sa route de hash,
+    ...    sans dépendre de l'état de dépliage de l'arbre : c'est ce qui rend
+    ...    le scénario indépendant du test qui l'a précédé. Même garde de
+    ...    rejouabilité que `Ouvrir La Fiche D Api` : demander l'URL courante à
+    ...    l'identique ne re-résout rien et réinitialise le titre, donc le
+    ...    sujet DÉJÀ affiché passe par un rechargement.
+    [Arguments]    ${guid}
+    ${emplacement}=    Get Page Location
+    ${deja}=    Evaluate    $emplacement['fragment'] == '/topic/' + $guid
+    IF    ${deja}
+        Reload
+        Attendre Le Runtime Du Demo Kit
+    ELSE
+        Go To    ${DEMOKIT_URL}#/topic/${guid}
+    END
+    Attendre Le Repos Du Demo Kit
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Sujet Affiche Doit Etre    ${guid}
+
+Le Sujet Affiche Doit Etre
+    [Documentation]    Les deux témoins d'arrivée sur un sujet : le fragment
+    ...    porte le GUID, et la vue de détail RÉELLE est rendue. Le suffixe
+    ...    court `topicDetailPage` ne suffit pas : l'écran d'accueil de la
+    ...    section le porte aussi (2 correspondances mesurées), seule l'ancre
+    ...    LONGUE incluant le nom de vue rend exactement 1.
+    [Arguments]    ${guid}
+    Le Fragment Doit Porter    /topic/${guid}
+    ${detail}=    Get Ui5 Match Count    idSuffix=${DEMOKIT_TOPIC_DETAIL_PAGE}
+    Should Be Equal As Integers    ${detail}    1
+    ...    msg=La vue de détail réelle du sujet n'est pas rendue (${detail} correspondance(s) sur l'ancre longue).
+
+Compter Les Liens Croises Vers L Api
+    [Documentation]    Nombre d'ancres relatives `api/...` DANS la portée du
+    ...    détail du sujet affiché. Les liens croisés du contenu documentaire
+    ...    sont des ancres DOM relatives SANS `#/` (mesuré : un sélecteur
+    ...    `href*="#/api/"` rend 0 en croyant qu'il n'y a pas de liens), et la
+    ...    portée est obligatoire : le contenu des sujets déjà lus reste au
+    ...    DOM.
+    ${detail}=    Resolve Ui5 Control    idSuffix=${DEMOKIT_TOPIC_DETAIL_PAGE}
+    ${nb}=    Get Element Count    ${detail} a[href^='api/']
+    RETURN    ${nb}
+
+Ouvrir Le Lien Croise Vers L Api
+    [Documentation]    Clique l'ancre relative `api/${nom_qualifie}` dans la
+    ...    portée du détail du sujet (moteur DOM : ce contenu HTML vit hors du
+    ...    registre UI5), puis attend l'arrivée sur la fiche ET le changement
+    ...    de section : la navigation croisée fait passer la clé active de
+    ...    `topic` à `api`, c'est le cœur du scénario.
+    [Arguments]    ${nom_qualifie}
+    ${detail}=    Resolve Ui5 Control    idSuffix=${DEMOKIT_TOPIC_DETAIL_PAGE}
+    Click    ${detail} a[href='api/${nom_qualifie}']
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    La Navigation Croisee Doit Etre Arrivee    ${nom_qualifie}
+
+La Navigation Croisee Doit Etre Arrivee
+    [Documentation]    Assertion sondable du lien croisé : la fiche d'API est
+    ...    affichée (couple fragment plus titre) ET la section active est la
+    ...    Référence de l'API.
+    [Arguments]    ${nom_qualifie}
+    La Fiche Affichee Doit Etre    ${nom_qualifie}
+    La Section Active Doit Etre    api
+
+# =============================================================================
+# Fiche d'API en profondeur : rubriques, membres, provenance
+# =============================================================================
+
+Lister Les Rubriques De La Fiche
+    [Documentation]    Suffixes des rubriques de la fiche d'API affichée,
+    ...    portés par la vue d'objet de la fiche (le préfixe de vue est GÉNÉRÉ,
+    ...    `__xmlview<N>--`, seul le suffixe est stable). La portée écarte les
+    ...    rubriques des autres sections que cette SPA garde rendues.
+    ${ids}=    Get Ui5 Ids    controlType=${DEMOKIT_SECTION_TYPE}
+    ...    containedIn=${DEMOKIT_API_OBJECT_PAGE}
+    Should Not Be Empty    ${ids}
+    ...    msg=La fiche d'API ne porte aucune rubrique de documentation.
+    ${suffixes}=    Evaluate    [i.rsplit('--', 1)[-1] for i in $ids]
+    RETURN    ${suffixes}
+
+Ouvrir Le Membre De La Fiche
+    [Documentation]    Clique le lien DOM du membre `${nom}` (rubrique
+    ...    `${type_membre}`) de la fiche `${classe}`, dans la PORTÉE de sa
+    ...    rubrique, puis attend le fragment et la rubrique sélectionnée. Le
+    ...    lien est une ancre relative `api/<classe>#<type>/<nom>` du contenu
+    ...    documentaire (hors registre UI5).
+    [Arguments]    ${classe}    ${type_membre}    ${nom}
+    ${section}=    Resolve Ui5 Control    controlType=${DEMOKIT_SECTION_TYPE}
+    ...    idSuffix=${type_membre}    containedIn=${DEMOKIT_API_OBJECT_PAGE}
+    Click    ${section} a[href='api/${classe}#${type_membre}/${nom}']
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Membre Doit Etre Atteint    ${classe}    ${type_membre}    ${nom}
+
+Le Membre Doit Etre Atteint
+    [Documentation]    Assertion sondable de sous-navigation : le fragment
+    ...    porte le membre (le témoin FORT, celui du routeur), et la barre
+    ...    d'ancrage a QUITTÉ la rubrique d'ouverture (le témoin du
+    ...    défilement). La barre est un scroll spy, pas un témoin de route :
+    ...    mesuré au premier run, elle peut se stabiliser sur la rubrique
+    ...    VOISINE (`--associations` pour un membre d'`events`, rubrique
+    ...    courte) alors que la navigation a parfaitement réussi. Sa valeur
+    ...    exacte se journalise, elle ne se grave pas.
+    [Arguments]    ${classe}    ${type_membre}    ${nom}
+    Le Fragment Doit Porter Le Membre    ${classe}    ${type_membre}    ${nom}
+    ${rubrique}=    Lire La Rubrique Selectionnee
+    ${suivie}=    Evaluate    not $rubrique.endswith('--overview')
+    Should Be True    ${suivie}
+    ...    msg=La barre d'ancrage déclare encore ${rubrique} : le défilement n'a pas suivi la navigation vers le membre.
+
+Le Fragment Doit Porter Le Membre
+    [Documentation]    Le fragment d'une route de membre encode le second
+    ...    dièse : cliquer `api/sap.m.Button#events/press` donne
+    ...    `/api/sap.m.Button%23events/press` (mesuré). Une égalité sur la
+    ...    forme à dièse échouerait sur une navigation réussie : l'assertion
+    ...    accepte les deux formes.
+    [Arguments]    ${classe}    ${type_membre}    ${nom}
+    ${emplacement}=    Get Page Location
+    ${porte}=    Evaluate
+    ...    ($classe + '#' + $type_membre + '/' + $nom in $emplacement['fragment']) or ($classe + '%23' + $type_membre + '/' + $nom in $emplacement['fragment'])
+    Should Be True    ${porte}
+    ...    msg=Le fragment est ${emplacement}[fragment], attendu portant ${classe} suivi de ${type_membre}/${nom} (second dièse éventuellement encodé %23).
+
+Lire La Rubrique Selectionnee
+    [Documentation]    La rubrique sélectionnée se lit sur le `selectedKey` de
+    ...    la barre d'ancrage de la fiche (le préfixe de vue est généré, seul
+    ...    le suffixe est stable) ; `selectedSectionId` n'est pas une propriété
+    ...    de l'ObjectPageLayout de cette version. ATTENTION à ce qu'elle
+    ...    prouve : la barre est un scroll spy, et sur une navigation de
+    ...    membre elle peut se stabiliser sur la rubrique VOISINE (mesuré au
+    ...    premier run) : la route se prouve au FRAGMENT, jamais ici.
+    ${cle}=    Get Ui5 Property    selectedKey    controlType=${DEMOKIT_ANCHOR_BAR_TYPE}
+    ...    containedIn=${DEMOKIT_API_OBJECT_PAGE}
+    RETURN    ${cle}
+
+Compter Les Lignes De La Rubrique
+    [Documentation]    Nombre de lignes de la table de documentation de la
+    ...    rubrique `${rubrique}` (agrégation `rows`, la propriété du contrôle
+    ...    étant les en-têtes).
+    [Arguments]    ${rubrique}
+    ${lignes}=    Get Ui5 Aggregation Info    ${DEMOKIT_DOC_ROW_AGGREGATION}
+    ...    controlType=${DEMOKIT_DOC_TABLE_TYPE}    containedIn=${rubrique}
+    ${nb}=    Get Length    ${lignes}
+    RETURN    ${nb}
+
+La Rubrique Doit Compter Plus De
+    [Documentation]    Assertion sondable : la table de la rubrique porte
+    ...    strictement plus de `${reference}` lignes.
+    [Arguments]    ${rubrique}    ${reference}
+    ${nb}=    Compter Les Lignes De La Rubrique    ${rubrique}
+    Should Be True    ${nb} > ${reference}
+    ...    msg=La table de la rubrique ${rubrique} porte ${nb} ligne(s), attendu strictement plus de ${reference}.
+
+Les Lignes De La Rubrique Ne Portent Pas De Contexte
+    [Documentation]    Assertion-DOCUMENTATION d'un fait mesuré : les lignes
+    ...    des tables des méthodes et des événements ne portent AUCUN contexte
+    ...    de liaison (`binding: None` sur les 44 lignes de `sap.m.Button`),
+    ...    contrairement aux propriétés et agrégations. La voie du contexte y
+    ...    rend des listes vides PLAUSIBLES, le profil « vert et faux » : ce
+    ...    keyword grave le fait pour que la voie de lecture erronée ne
+    ...    revienne pas. Les noms techniques se lisent sur les liens DOM de la
+    ...    rubrique (`Lire Les Membres Propres De La Rubrique`).
+    [Arguments]    ${rubrique}
+    ${lignes}=    Get Ui5 Aggregation Info    ${DEMOKIT_DOC_ROW_AGGREGATION}
+    ...    controlType=${DEMOKIT_DOC_TABLE_TYPE}    containedIn=${rubrique}
+    Should Not Be Empty    ${lignes}
+    ...    msg=La table de la rubrique ${rubrique} ne porte aucune ligne.
+    ${porteuses}=    Evaluate    [l for l in $lignes if l.get('binding')]
+    Should Be Empty    ${porteuses}
+    ...    msg=Des lignes de la rubrique ${rubrique} portent désormais un contexte de liaison : le fait documenté a changé, la voie de lecture est à revoir.
+
+Lire Les Membres Propres De La Rubrique
+    [Documentation]    Noms techniques des membres PROPRES de `${classe}` dans
+    ...    la rubrique `${type_membre}`, extraits des liens DOM relatifs
+    ...    `api/<classe>#<type>/<nom>` portés par la rubrique : le préfixe de
+    ...    classe filtre les membres propres des hérités (dont les liens
+    ...    pointent vers l'ancêtre). Dédoublonnés : un membre est lié plusieurs
+    ...    fois (nom de ligne, références du texte).
+    [Arguments]    ${classe}    ${type_membre}
+    ${section}=    Resolve Ui5 Control    controlType=${DEMOKIT_SECTION_TYPE}
+    ...    idSuffix=${type_membre}    containedIn=${DEMOKIT_API_OBJECT_PAGE}
+    ${ancres}=    Get Elements    ${section} a[href^='api/${classe}#${type_membre}/']
+    ${noms}=    Create List
+    FOR    ${ancre}    IN    @{ancres}
+        ${href}=    Get Attribute    ${ancre}    href
+        ${nom}=    Evaluate    $href.rsplit('/', 1)[-1]
+        Append To List    ${noms}    ${nom}
+    END
+    ${uniques}=    Evaluate    sorted(set($noms))
+    RETURN    ${uniques}
+
+Les Noms Doivent Etre Des Identifiants Javascript
+    [Documentation]    Assertion structurelle : chaque nom de membre est un
+    ...    identifiant JavaScript, éventuellement QUALIFIÉ par des points :
+    ...    les méthodes statiques sont documentées sous leur nom plein
+    ...    (`sap.m.Button.extend`, `sap.m.Button.getMetadata`, relevé au
+    ...    premier run). Motif SANS backslash (l'échappement Robot défangerait
+    ...    un `\\w` en silence, leçon du dépôt : la classe `[.]` remplace le
+    ...    point échappé).
+    [Arguments]    ${noms}
+    Should Not Be Empty    ${noms}
+    ...    msg=Aucun nom de membre à vérifier.
+    ${intrus}=    Evaluate
+    ...    [n for n in $noms if not re.fullmatch('[A-Za-z_][A-Za-z0-9_]*([.][A-Za-z_][A-Za-z0-9_]*)*', n)]
+    Should Be Empty    ${intrus}
+    ...    msg=Des noms de membres ne sont pas des identifiants JavaScript, même qualifiés : ${intrus}
+
+# =============================================================================
+# Bascules « borrowed » des rubriques de fiche
+# =============================================================================
+
+Lire La Bascule Borrowed De La Rubrique
+    [Documentation]    État de la case « Show borrowed ... » de la rubrique
+    ...    `${rubrique}`, ancrée par CONTAINMENT (exactement 1 CheckBox par
+    ...    rubrique, vérifié) : ses ids sont générés et son libellé est
+    ...    localisé, ni l'un ni l'autre ne s'ancrent.
+    [Arguments]    ${rubrique}
+    ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_CHECKBOX_TYPE}    containedIn=${rubrique}
+    Should Be Equal As Integers    ${nb}    1
+    ...    msg=La rubrique ${rubrique} porte ${nb} case(s) à cocher, attendu exactement 1 : l'ancrage par containment ne tient plus.
+    ${etat}=    Get Ui5 Property    selected    controlType=${DEMOKIT_CHECKBOX_TYPE}    containedIn=${rubrique}
+    RETURN    ${etat}
+
+Memoriser Les Bascules Borrowed
+    [Documentation]    Relève l'état des cases « borrowed » RENDUES et le
+    ...    publie en variable de suite, sans écraser un relevé précédent. Ces
+    ...    cases n'existent que sur une fiche d'API : le scénario qui y touche
+    ...    appelle ce keyword AVANT, sans quoi le teardown ne saurait rien
+    ...    restaurer, et il le ferait en silence. L'état par défaut n'est pas
+    ...    uniforme (la case des agrégations est cochée d'origine, relevé
+    ...    2026-09-05) : on restaure l'état RELEVÉ, jamais un état supposé.
+    ${etats}=    Create Dictionary    &{DEMOKIT_INITIAL_BORROWED}
+    FOR    ${rubrique}    IN    @{DEMOKIT_RUBRIQUES_A_BASCULE}
+        ${connue}=    Evaluate    $rubrique in $etats
+        IF    ${connue}    CONTINUE
+        ${present}=    Get Ui5 Match Count    controlType=${DEMOKIT_CHECKBOX_TYPE}    containedIn=${rubrique}
+        IF    ${present} == 1
+            ${valeur}=    Lire La Bascule Borrowed De La Rubrique    ${rubrique}
+            Set To Dictionary    ${etats}    ${rubrique}=${valeur}
+        END
+    END
+    Set Suite Variable    &{DEMOKIT_INITIAL_BORROWED}    &{etats}
+    RETURN    ${etats}
+
+Basculer Les Borrowed De La Rubrique
+    [Documentation]    Clique la case « borrowed » de la rubrique et constate
+    ...    l'INVERSION de sa propriété `selected` : la propriété est le seul
+    ...    témoin de la bascule, le nombre de lignes de la table en est une
+    ...    conséquence, pas une preuve.
+    [Arguments]    ${rubrique}
+    ${avant}=    Lire La Bascule Borrowed De La Rubrique    ${rubrique}
+    ${attendu}=    Evaluate    not $avant
+    Click Ui5 Control    controlType=${DEMOKIT_CHECKBOX_TYPE}    containedIn=${rubrique}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    La Bascule Borrowed Doit Valoir    ${rubrique}    ${attendu}
+    RETURN    ${attendu}
+
+La Bascule Borrowed Doit Valoir
+    [Documentation]    Assertion sondable sur la propriété de la case.
+    [Arguments]    ${rubrique}    ${attendu}
+    ${etat}=    Lire La Bascule Borrowed De La Rubrique    ${rubrique}
+    Should Be Equal    ${etat}    ${attendu}
+    ...    msg=La bascule borrowed de la rubrique ${rubrique} vaut ${etat}, attendue ${attendu}.
+
+Restaurer Les Bascules Borrowed
+    [Documentation]    Teardown : remet chaque case « borrowed » relevée dans
+    ...    son état d'origine, constaté sur la PROPRIÉTÉ. Ne fait rien pour une
+    ...    rubrique absente de la page courante.
+    FOR    ${rubrique}    ${attendu}    IN    &{DEMOKIT_INITIAL_BORROWED}
+        ${present}=    Get Ui5 Match Count    controlType=${DEMOKIT_CHECKBOX_TYPE}    containedIn=${rubrique}
+        IF    ${present} == 1
+            ${etat}=    Lire La Bascule Borrowed De La Rubrique    ${rubrique}
+            IF    $etat != $attendu
+                Basculer Les Borrowed De La Rubrique    ${rubrique}
+            END
+        END
+    END
+
+Lire Les Noms Documentes Avec Provenance
+    [Documentation]    Objets des contextes de liaison des lignes de la table
+    ...    de la rubrique `${rubrique}` : le nom technique (`name`) et, sur les
+    ...    entrées héritées, la clé `borrowedFrom`. Vérifie que CHAQUE ligne
+    ...    porte son contexte (le contraire serait le « vert et faux » inverse
+    ...    des tables de méthodes) et qu'aucun nom n'est vide.
+    [Arguments]    ${rubrique}
+    ${lignes}=    Get Ui5 Aggregation Info    ${DEMOKIT_DOC_ROW_AGGREGATION}
+    ...    controlType=${DEMOKIT_DOC_TABLE_TYPE}    containedIn=${rubrique}
+    Should Not Be Empty    ${lignes}
+    ...    msg=La table de la rubrique ${rubrique} ne porte aucune ligne.
+    ${objets}=    Evaluate    [l['binding']['object'] for l in $lignes if l.get('binding')]
+    ${nb_lignes}=    Get Length    ${lignes}
+    ${nb_objets}=    Get Length    ${objets}
+    Should Be Equal As Integers    ${nb_objets}    ${nb_lignes}
+    ...    msg=${nb_lignes} ligne(s) mais ${nb_objets} contexte(s) de liaison dans la rubrique ${rubrique} : des lignes sont illisibles par cette voie.
+    ${vides}=    Evaluate    [o for o in $objets if not o.get('name')]
+    Should Be Empty    ${vides}
+    ...    msg=Des lignes de la rubrique ${rubrique} n'exposent aucun nom technique : ${vides}
+    RETURN    ${objets}
+
+La Provenance Des Lignes Doit Etre Coherente
+    [Arguments]    ${objets_avant}    ${objets_apres}
+    [Documentation]    Verdict de provenance de la bascule : aucune ligne
+    ...    d'AVANT ne portait `borrowedFrom` (la case était décochée), les
+    ...    lignes PROPRES d'après sont exactement celles d'avant, et chaque
+    ...    ligne AJOUTÉE porte `borrowedFrom`. L'échec nomme les lignes en
+    ...    cause.
+    ${deja_empruntees}=    Evaluate
+    ...    sorted(o.get('name', '') for o in $objets_avant if o.get('${DEMOKIT_DOC_BORROWED_MARKER}'))
+    Should Be Empty    ${deja_empruntees}
+    ...    msg=Des lignes portaient ${DEMOKIT_DOC_BORROWED_MARKER} avant la bascule : ${deja_empruntees}
+    ${propres_apres}=    Evaluate
+    ...    sorted(o.get('name', '') for o in $objets_apres if not o.get('${DEMOKIT_DOC_BORROWED_MARKER}'))
+    ${noms_avant}=    Evaluate    sorted(o.get('name', '') for o in $objets_avant)
+    Should Be Equal    ${propres_apres}    ${noms_avant}
+    ...    msg=Les lignes propres après bascule (${propres_apres}) ne sont pas celles d'avant (${noms_avant}).
+    ${ajoutees_sans_provenance}=    Evaluate
+    ...    sorted(set(o.get('name', '') for o in $objets_apres) - set($noms_avant) - set(o.get('name', '') for o in $objets_apres if o.get('${DEMOKIT_DOC_BORROWED_MARKER}')))
+    Should Be Empty    ${ajoutees_sans_provenance}
+    ...    msg=Des lignes ajoutées par la bascule ne portent pas ${DEMOKIT_DOC_BORROWED_MARKER} : ${ajoutees_sans_provenance}
+
+La Doc Complete Doit Egaler Le Controle Vivant
+    [Documentation]    L'assertion reine : bascule « borrowed » activée,
+    ...    l'ensemble des noms documentés est ÉGAL à l'ensemble des propriétés
+    ...    d'une instance vivante du contrôle, MODULO l'inventaire déclaré
+    ...    `@{DEMOKIT_PROPS_HORS_FICHE}` (propriétés à valeur non primitive que
+    ...    la fiche du vivant, réduite aux primitives, ne matérialise pas :
+    ...    relevé à la génération, voir les écarts du plan). L'inventaire est à
+    ...    compte exact : une tolérance MORTE (propriété redevenue lisible sur
+    ...    le vivant) fait échouer, comme un écart de plus.
+    [Arguments]    ${objets}    ${vivantes}
+    ${documentes}=    Evaluate    sorted({o.get('name', '') for o in $objets})
+    ${tolerees}=    Evaluate    set($DEMOKIT_PROPS_HORS_FICHE)
+    ${manque_vivant}=    Evaluate    sorted(set($documentes) - set($vivantes) - $tolerees)
+    Should Be Empty    ${manque_vivant}
+    ...    msg=Des propriétés documentées n'existent pas sur le contrôle vivant : ${manque_vivant}
+    ${manque_doc}=    Evaluate    sorted(set($vivantes) - set($documentes))
+    Should Be Empty    ${manque_doc}
+    ...    msg=Des propriétés du contrôle vivant ne sont pas documentées, même bascule borrowed activée : ${manque_doc}
+    ${tolerance_morte}=    Evaluate    sorted($tolerees & set($vivantes))
+    Should Be Empty    ${tolerance_morte}
+    ...    msg=Des entrées de l'inventaire DEMOKIT_PROPS_HORS_FICHE sont désormais lisibles sur le contrôle vivant, l'inventaire est à purger : ${tolerance_morte}
+
+Lire La Chaine D Heritage Documentee
+    [Documentation]    Noms d'ancêtres portés par les listes d'éléments
+    ...    empruntés de la rubrique `${rubrique}` (contrôles dédiés du SDK,
+    ...    contextes `/borrowed/<rubrique>/<n>`), dans l'ordre du registre :
+    ...    la chaîne d'héritage complète, en clés techniques.
+    [Arguments]    ${rubrique}
+    ${fiches}=    Get Ui5 Control Info    controlType=${DEMOKIT_BORROWED_LIST_TYPE}
+    ...    containedIn=${rubrique}
+    Should Not Be Empty    ${fiches}
+    ...    msg=La rubrique ${rubrique} ne porte aucune liste d'éléments empruntés.
+    ${ancetres}=    Evaluate
+    ...    [((f.get('binding') or {}).get('object') or {}).get('name', '') for f in $fiches]
+    ${vides}=    Evaluate    [a for a in $ancetres if not a]
+    Should Be Empty    ${vides}
+    ...    msg=Des listes d'emprunts ne nomment aucun ancêtre dans la rubrique ${rubrique}.
+    RETURN    ${ancetres}
+
+La Chaine D Heritage Doit Porter
+    [Documentation]    Inclusion d'un ancêtre dans la chaîne documentée. La
+    ...    longueur et l'ordre de la chaîne suivent le SDK : ils se
+    ...    journalisent, ils ne se gravent pas.
+    [Arguments]    ${ancetres}    ${ancetre}
+    List Should Contain Value    ${ancetres}    ${ancetre}
+    ...    msg=La chaîne d'héritage documentée ne porte pas ${ancetre} : ${ancetres}
+
+Les Ancetres Doivent Etre Des Noms Qualifies
+    [Documentation]    Assertion structurelle : chaque ancêtre est un nom
+    ...    qualifié technique du namespace `sap.`.
+    [Arguments]    ${ancetres}
+    ${intrus}=    Evaluate    [a for a in $ancetres if not a.startswith('sap.')]
+    Should Be Empty    ${intrus}
+    ...    msg=Des ancêtres documentés ne sont pas des noms qualifiés sap.* : ${intrus}
+
+# =============================================================================
+# Galerie d'échantillons et vue du code source
+# =============================================================================
+
+Ouvrir La Galerie D Echantillons
+    [Documentation]    Navigue vers la galerie d'échantillons de l'entité
+    ...    `${nom_qualifie}` et attend ses témoins. Même garde de rejouabilité
+    ...    que `Ouvrir La Fiche D Api` : la galerie DÉJÀ affichée passe par un
+    ...    rechargement, sans quoi le titre du document est réinitialisé sans
+    ...    jamais revenir.
+    [Arguments]    ${nom_qualifie}
+    ${emplacement}=    Get Page Location
+    ${deja}=    Evaluate    $emplacement['fragment'] == '/entity/' + $nom_qualifie
+    IF    ${deja}
+        Reload
+        Attendre Le Runtime Du Demo Kit
+    ELSE
+        Go To    ${DEMOKIT_URL}#/entity/${nom_qualifie}
+    END
+    Attendre Le Repos Du Demo Kit
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    La Galerie Affichee Doit Etre    ${nom_qualifie}
+
+La Galerie Affichee Doit Etre
+    [Documentation]    Les témoins d'arrivée sur la galerie : fragment, titre
+    ...    du document commençant par le nom qualifié, et section active
+    ...    `controls` constatée sur le SEUL témoin du shell (la clé
+    ...    sélectionnée) : les routes de la section des échantillons ne
+    ...    portent PAS la clé (`/entity/...` sous `controls`, mesuré au
+    ...    premier run), le témoin de fragment du cas général y serait faux.
+    [Arguments]    ${nom_qualifie}
+    Le Fragment Doit Porter    /entity/${nom_qualifie}
+    ${titre}=    Get Title
+    Should Start With    ${titre}    ${nom_qualifie}
+    ...    msg=Le titre du document est « ${titre} », attendu commençant par ${nom_qualifie}.
+    La Cle De Section Active Doit Etre    controls
+
+La Cle De Section Active Doit Etre
+    [Documentation]    Le témoin SHELL seul : la clé sélectionnée du conteneur
+    ...    d'onglets. Pour les sections dont les routes portent la clé, le
+    ...    couple complet reste `La Section Active Doit Etre` ; celui-ci sert
+    ...    les routes qui ne la portent pas (galerie et échantillons sous
+    ...    `controls`).
+    [Arguments]    ${cle}
+    ${selection}=    Get Ui5 Property    selectedKey    idSuffix=${DEMOKIT_NAV_HEADER}
+    Should Be Equal    ${selection}    ${cle}
+    ...    msg=Le conteneur d'onglets déclare la section ${selection}, attendue ${cle}.
+
+Lire Les Echantillons De La Galerie
+    [Documentation]    Les échantillons de la galerie, lus par les DEUX voies
+    ...    en un seul verdict de cohérence : la table (une vraie `sap.m.Table`,
+    ...    contrairement aux tables de doc des fiches d'API) et les contextes
+    ...    de liaison des lignes, porteurs des clés techniques (`id` de
+    ...    l'échantillon, `entityId`, `library`, `key` : la route d'exécution).
+    ...    Retourne les contextes, dans l'ordre des lignes.
+    ${rendues}=    Read Ui5 Table    idSuffix=${DEMOKIT_ENTITY_TABLE}
+    ${fiches}=    Get Ui5 Control Info    controlType=${DEMOKIT_ENTITY_ROW_TYPE}
+    ...    containedIn=${DEMOKIT_ENTITY_TABLE}
+    ${contextes}=    Evaluate    [((f.get('binding') or {}).get('object') or {}) for f in $fiches]
+    Should Not Be Empty    ${contextes}
+    ...    msg=La galerie ne porte aucune ligne d'échantillon.
+    ${nb_rendues}=    Get Length    ${rendues}
+    ${nb_contextes}=    Get Length    ${contextes}
+    Should Be Equal As Integers    ${nb_contextes}    ${nb_rendues}
+    ...    msg=La table rend ${nb_rendues} ligne(s) mais ${nb_contextes} contexte(s) de liaison : les deux voies de lecture divergent.
+    RETURN    ${contextes}
+
+Les Echantillons Doivent Porter Leurs Cles
+    [Documentation]    Verdict structurel des clés techniques d'une liste
+    ...    d'échantillons : `id` préfixé par `<library>.sample.`, `entityId`
+    ...    ÉGAL à l'entité de la galerie, route d'exécution non vide. L'échec
+    ...    nomme les lignes en cause.
+    [Arguments]    ${contextes}    ${nom_qualifie}
+    ${intrus}=    Create List
+    FOR    ${contexte}    IN    @{contextes}
+        ${conforme}=    Evaluate
+        ...    $contexte.get('id', '').startswith($contexte.get('library', '') + '.sample.') and $contexte.get('entityId', '') == $nom_qualifie and bool($contexte.get('key'))
+        IF    not ${conforme}    Append To List    ${intrus}    ${contexte}
+    END
+    Should Be Empty    ${intrus}
+    ...    msg=Des échantillons ne portent pas leurs clés techniques (id préfixé par la bibliothèque, entityId égal à l'entité, route non vide) : ${intrus}
+
+Ouvrir L Echantillon Par Sa Ligne
+    [Documentation]    Clique la ligne de rang `${rang}` de la galerie (son
+    ...    identifiant est DÉCOUVERT à l'instant, jamais écrit) et attend la
+    ...    route d'exécution de l'échantillon `${id_echantillon}` (lu de la
+    ...    galerie, jamais en dur : la campagne survit à l'ajout d'un
+    ...    échantillon).
+    [Arguments]    ${rang}    ${id_echantillon}
+    ${identifiants}=    Get Ui5 Ids    controlType=${DEMOKIT_ENTITY_ROW_TYPE}
+    ...    containedIn=${DEMOKIT_ENTITY_TABLE}
+    Click Ui5 Control    id=${identifiants}[${rang}]
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Fragment D Echantillon Doit Etre    ${id_echantillon}
+    Attendre Le Repos Du Demo Kit
+
+Le Fragment D Echantillon Doit Etre
+    [Documentation]    Le fragment se termine par `/sample/<id>` : la borne
+    ...    finale évite qu'un identifiant préfixe d'un autre (Button,
+    ...    ButtonWithBadge) passe pour lui.
+    [Arguments]    ${id_echantillon}
+    ${emplacement}=    Get Page Location
+    Should End With    ${emplacement}[fragment]    /sample/${id_echantillon}
+    ...    msg=Le fragment est ${emplacement}[fragment], attendu se terminant par /sample/${id_echantillon}.
+
+La Barre D Echantillon Doit Etre Percue
+    [Documentation]    La barre d'outils de l'échantillon est rendue : le
+    ...    bouton de la vue code, et les boutons INTERDITS de cette campagne
+    ...    (ouverture d'onglet, mode adaptation runtime), PERÇUS pour prouver
+    ...    la barre, jamais actionnés (lecture seule).
+    ${nb}=    Get Ui5 Match Count    idSuffix=${DEMOKIT_SAMPLE_CODE_BUTTON}
+    Should Be Equal As Integers    ${nb}    1
+    ...    msg=Le bouton de la vue code n'est pas rendu (${nb} correspondance(s)).
+    FOR    ${interdit}    IN    @{DEMOKIT_SAMPLE_TOOLBAR_INTERDITS}
+        ${present}=    Get Ui5 Match Count    idSuffix=${interdit}
+        Should Be Equal As Integers    ${present}    1
+        ...    msg=Le bouton ${interdit} de la barre d'échantillon n'est pas rendu (${present} correspondance(s)).
+    END
+
+Ouvrir La Vue Du Code Source
+    [Documentation]    Ouvre la vue du code source par son bouton stable et
+    ...    attend la route `/code`. Le bouton de téléchargement y est PERÇU
+    ...    (id stable), jamais cliqué : il écrit sur le disque. Sa perception
+    ...    est une attente ACTIVE : la barre de la vue code est rendue APRÈS
+    ...    la route (mesuré au premier run : 0 correspondance juste après le
+    ...    fragment, 1 ensuite).
+    Click Ui5 Control    idSuffix=${DEMOKIT_SAMPLE_CODE_BUTTON}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Fragment Doit Se Terminer Par    ${DEMOKIT_CODE_ROUTE_SUFFIX}
+    Attendre Le Repos Du Demo Kit
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Bouton De Telechargement Doit Etre Rendu
+    # Les onglets de fichier arrivent APRÈS le bouton de téléchargement
+    # (mesuré live : bouton rendu, liste de clés encore vide, puis les trois
+    # fichiers) : la vue code n'est prête qu'avec ses onglets.
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Des Onglets De Fichier Doivent Etre Rendus
+
+Des Onglets De Fichier Doivent Etre Rendus
+    [Documentation]    Assertion sondable : au moins un onglet de fichier à
+    ...    clé NON VIDE est rendu dans la vue code (l'onglet technique à clé
+    ...    vide ne compte pas).
+    ${brutes}=    Get Ui5 Properties    key    controlType=${DEMOKIT_FILE_TAB_TYPE}
+    ...    containedIn=${DEMOKIT_CODE_FILE_EDITOR}
+    ${cles}=    Evaluate    [c for c in $brutes if c]
+    Should Not Be Empty    ${cles}
+    ...    msg=La vue code ne rend encore aucun onglet de fichier à clé non vide.
+
+Le Bouton De Telechargement Doit Etre Rendu
+    [Documentation]    Assertion sondable : le bouton de téléchargement de la
+    ...    vue code est rendu, exactement une fois. Perçu, jamais cliqué.
+    ${present}=    Get Ui5 Match Count    idSuffix=${DEMOKIT_CODE_DOWNLOAD}
+    Should Be Equal As Integers    ${present}    1
+    ...    msg=Le bouton de téléchargement de la vue code n'est pas rendu (${present} correspondance(s)).
+
+Le Fragment Doit Se Terminer Par
+    [Documentation]    Assertion sondable de fin de fragment d'URL.
+    [Arguments]    ${suffixe}
+    ${emplacement}=    Get Page Location
+    Should End With    ${emplacement}[fragment]    ${suffixe}
+    ...    msg=Le fragment est ${emplacement}[fragment], attendu se terminant par ${suffixe}.
+
+Lister Les Fichiers De L Echantillon
+    [Documentation]    Clés des onglets de fichier de la vue code : la `key`
+    ...    d'un onglet EST le nom de fichier. Un onglet technique à clé VIDE
+    ...    est rendu à côté des fichiers (relevé live) : les clés vides sont
+    ...    filtrées.
+    ${brutes}=    Get Ui5 Properties    key    controlType=${DEMOKIT_FILE_TAB_TYPE}
+    ...    containedIn=${DEMOKIT_CODE_FILE_EDITOR}
+    ${cles}=    Evaluate    [c for c in $brutes if c]
+    Should Not Be Empty    ${cles}
+    ...    msg=La vue code ne porte aucun onglet de fichier.
+    RETURN    ${cles}
+
+Lire Le Fichier Selectionne
+    [Documentation]    Clé du fichier actuellement affiché, lue sur le
+    ...    `selectedKey` du conteneur d'onglets de la vue code.
+    ${cle}=    Get Ui5 Property    selectedKey    controlType=${DEMOKIT_ANCHOR_BAR_TYPE}
+    ...    containedIn=${DEMOKIT_CODE_FILE_EDITOR}
+    RETURN    ${cle}
+
+Choisir Le Fichier
+    [Documentation]    Bascule vers le fichier `${cle}` par son onglet, et
+    ...    constate que le `selectedKey` a suivi. Geste purement local : le
+    ...    témoin est la propriété, jamais le réseau.
+    [Arguments]    ${cle}
+    ${motif}=    Motif Exact    ${cle}
+    Click Ui5 Control    controlType=${DEMOKIT_FILE_TAB_TYPE}
+    ...    containedIn=${DEMOKIT_CODE_FILE_EDITOR}    properties={'key': '${motif}'}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Fichier Selectionne Doit Etre    ${cle}
+
+Le Fichier Selectionne Doit Etre
+    [Documentation]    Assertion sondable sur la clé du fichier affiché.
+    [Arguments]    ${cle}
+    ${courante}=    Lire Le Fichier Selectionne
+    Should Be Equal    ${courante}    ${cle}
+    ...    msg=Le fichier sélectionné est ${courante}, attendu ${cle}.
+
+Lire Le Source De L Editeur
+    [Documentation]    Contenu de l'éditeur de code (propriété `value` du
+    ...    CodeEditor) : le SOURCE réel du fichier affiché.
+    ${source}=    Get Ui5 Property    value    idSuffix=${DEMOKIT_CODE_EDITOR}
+    RETURN    ${source}
+
+Le Source Doit Porter L Identifiant
+    [Documentation]    Le source affiché est non vide et porte l'identifiant
+    ...    technique de l'échantillon : la vue code montre bien LE code de CET
+    ...    échantillon.
+    [Arguments]    ${source}    ${id_echantillon}
+    Should Not Be Empty    ${source}
+    ...    msg=L'éditeur de code est vide.
+    Should Contain    ${source}    ${id_echantillon}
+    ...    msg=Le source affiché ne porte pas l'identifiant technique ${id_echantillon}.
+
+Passer A L Echantillon Suivant
+    [Documentation]    Actionne « échantillon suivant » depuis la vue code et
+    ...    attend le fragment de l'échantillon `${id_suivant}`, toujours
+    ...    terminé par `/code` : la vue ne change pas, seul l'échantillon
+    ...    change.
+    [Arguments]    ${id_suivant}
+    Click Ui5 Control    idSuffix=${DEMOKIT_CODE_NEXT}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Fragment De Code Doit Porter    ${id_suivant}
+    Attendre Le Repos Du Demo Kit
+
+Revenir A L Echantillon Precedent
+    [Documentation]    Actionne « échantillon précédent » depuis la vue code
+    ...    et attend le fragment de l'échantillon `${id_precedent}`, toujours
+    ...    terminé par `/code`.
+    [Arguments]    ${id_precedent}
+    Click Ui5 Control    idSuffix=${DEMOKIT_CODE_PREV}
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Le Fragment De Code Doit Porter    ${id_precedent}
+    Attendre Le Repos Du Demo Kit
+
+Le Fragment De Code Doit Porter
+    [Documentation]    Le fragment porte `/sample/<id>/` (la borne du
+    ...    séparateur évite qu'un identifiant préfixe d'un autre passe pour
+    ...    lui) ET se termine par `/code`.
+    [Arguments]    ${id_echantillon}
+    ${emplacement}=    Get Page Location
+    Should Contain    ${emplacement}[fragment]    /sample/${id_echantillon}/
+    ...    msg=Le fragment est ${emplacement}[fragment], attendu portant /sample/${id_echantillon}/.
+    Should End With    ${emplacement}[fragment]    ${DEMOKIT_CODE_ROUTE_SUFFIX}
+    ...    msg=Le fragment est ${emplacement}[fragment], attendu se terminant par ${DEMOKIT_CODE_ROUTE_SUFFIX} : la navigation a quitté la vue code.
+
+# =============================================================================
+# Demo Apps et Resources : perception seule
+# =============================================================================
+
+Compter Les Cartes Demo Apps
+    [Documentation]    Nombre de cartes d'applications rendues dans la zone
+    ...    PRINCIPALE de la page Demo Apps (comptage porté : cette SPA
+    ...    accumule les cartes des autres sections).
+    ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_CARD_TYPE}
+    ...    containedIn=${DEMOKIT_DEMOAPPS_MAIN}
+    RETURN    ${nb}
+
+Attendre Les Cartes Demo Apps
+    [Documentation]    Attente ACTIVE des cartes de la zone principale : elles
+    ...    arrivent APRÈS les deux témoins de section (mesuré au premier run :
+    ...    comptage 0 juste après l'activation de la section, 9 ensuite).
+    ...    Retourne le comptage.
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Des Cartes Doivent Etre Rendues Dans    ${DEMOKIT_DEMOAPPS_MAIN}
+    ${nb}=    Compter Les Cartes Demo Apps
+    RETURN    ${nb}
+
+Attendre Les Cartes De Resources
+    [Documentation]    Attente ACTIVE des cartes de la vue Resources, même
+    ...    motif d'arrivée différée que la zone Demo Apps. Retourne le
+    ...    comptage.
+    Wait Until Keyword Succeeds    ${DEMOKIT_TIMEOUT}    ${DEMOKIT_POLL}
+    ...    Des Cartes Doivent Etre Rendues Dans    ${DEMOKIT_RESOURCES_VIEW}
+    ${nb}=    Compter Les Cartes De Resources
+    RETURN    ${nb}
+
+Des Cartes Doivent Etre Rendues Dans
+    [Documentation]    Assertion sondable : au moins une carte rendue dans la
+    ...    portée donnée.
+    [Arguments]    ${portee}
+    ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_CARD_TYPE}
+    ...    containedIn=${portee}
+    Should Be True    ${nb} > 0
+    ...    msg=Aucune carte rendue dans la portée ${portee}.
+
+Lister Les Liens Demo Apps
+    [Documentation]    Les `href` de toutes les ancres de la zone principale
+    ...    de Demo Apps, valeurs d'ATTRIBUT brutes (un lien relatif reste
+    ...    relatif) : la matière du verdict de localité.
+    ${zone}=    Resolve Ui5 Control    idSuffix=${DEMOKIT_DEMOAPPS_MAIN}
+    ${ancres}=    Get Elements    ${zone} a[href]
+    ${liens}=    Create List
+    FOR    ${ancre}    IN    @{ancres}
+        ${href}=    Get Attribute    ${ancre}    href
+        Append To List    ${liens}    ${href}
+    END
+    RETURN    ${liens}
+
+Les Liens De Lancement Doivent Etre Locaux
+    [Documentation]    Classe chaque lien de Demo Apps : RELATIF same-origin
+    ...    (chemins `test-resources/...`, ancres sans cible) ou EXTERNE
+    ...    DÉCLARÉ (hôtes de `@{DEMOKIT_EXTERNAL_LINK_HOSTS}`). Un lien absolu
+    ...    vers un hôte non déclaré fait échouer en le nommant. Retourne le
+    ...    classement `{locaux, externes}` pour le journal.
+    [Arguments]    ${liens}
+    ${locaux}=    Create List
+    ${externes}=    Create List
+    ${intrus}=    Create List
+    FOR    ${lien}    IN    @{liens}
+        ${absolu}=    Evaluate    '://' in $lien
+        IF    not ${absolu}
+            Append To List    ${locaux}    ${lien}
+        ELSE
+            ${declare}=    Evaluate    any(map(lambda h, v=$lien: h in v, $DEMOKIT_EXTERNAL_LINK_HOSTS))
+            IF    ${declare}
+                Append To List    ${externes}    ${lien}
+            ELSE
+                Append To List    ${intrus}    ${lien}
+            END
+        END
+    END
+    Should Be Empty    ${intrus}
+    ...    msg=Des liens de Demo Apps ne sont ni relatifs same-origin ni externes déclarés : ${intrus}
+    Should Not Be Empty    ${locaux}
+    ...    msg=Aucun lien de lancement relatif same-origin dans la zone Demo Apps.
+    ${classement}=    Create Dictionary    locaux=${locaux}    externes=${externes}
+    RETURN    ${classement}
+
+Compter Les Cartes De Resources
+    [Documentation]    Nombre de cartes rendues DANS la vue Resources (la vue
+    ...    n'a pas de conteneur de page à id stable : la portée est la vue
+    ...    elle-même). Comptage porté, comme toute lecture de cette campagne.
+    ${nb}=    Get Ui5 Match Count    controlType=${DEMOKIT_CARD_TYPE}
+    ...    containedIn=${DEMOKIT_RESOURCES_VIEW}
+    RETURN    ${nb}
+
+# =============================================================================
+# Sentinelle d'accumulation
+# =============================================================================
+
+L Iframe D Echantillon Doit Avoir Survecu
+    [Documentation]    Le fait qui justifie toutes les lectures portées de
+    ...    cette campagne : l'iframe d'échantillon SURVIT à la navigation,
+    ...    invisible (comportement INVERSE du launchpad ABAP, qui détruit la
+    ...    sienne au retour à l'accueil). L'assertion vise nommément l'iframe
+    ...    d'échantillon dans la composition donnée : la vue code laisse une
+    ...    seconde survivante (`sampleFrameEdit`, relevé à la génération), qui
+    ...    se journalise sans se graver. Retourne la fiche de la frame.
+    [Arguments]    ${composition}
+    ${survivantes}=    Evaluate
+    ...    [f for f in $composition.get('frames', []) if '"${DEMOKIT_SAMPLE_FRAME_ID}"' in f.get('selector', '')]
+    Should Not Be Empty    ${survivantes}
+    ...    msg=L'iframe d'échantillon a disparu de la composition : le comportement d'accumulation de cette cible a changé.
+    ${visible}=    Evaluate    $survivantes[0].get('visible')
+    Should Be Equal    ${visible}    ${False}
+    ...    msg=L'iframe d'échantillon survivante est VISIBLE hors de sa page : ${survivantes}[0]
+    RETURN    ${survivantes}[0]

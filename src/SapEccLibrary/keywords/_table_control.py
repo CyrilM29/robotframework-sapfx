@@ -42,6 +42,12 @@ class TableControlKeywords:
         lignes non matérialisées lèvent côté COM. Ce keyword retourne donc
         les lignes RÉELLEMENT remplies et s'arrête à la première ligne dont
         aucune cellule n'existe : jamais de lignes fantômes dans le résultat.
+
+        Une colonne **GuiCheckBox** (la colonne « Key » des champs SE11) se
+        rend en drapeau ABAP : ``X`` cochée, chaîne vide sinon, la convention
+        de ``KEYFLAG`` dans DD03L, croisable telle quelle. Son ``Text`` est
+        toujours vide : sans cette lecture d'état, la colonne disparaissait
+        en silence (relevé live SE11, 2026-09-05).
         Pour une grille **ALV**, utiliser `Read Grid` (l'erreur redirige)."""
         table = self._table_control(table_id)
         titles = table_control.unique_titles(self._table_column_titles(table))
@@ -173,9 +179,16 @@ class TableControlKeywords:
         26 seulement sont remplies ; les lignes réservées n'ont aucune
         cellule. ``None`` distingue « cellule absente » (fin des données) de
         « cellule vide » (valeur légitime), ce dont dépendent l'arrêt de la
-        lecture et l'échec actionnable de `Get Table Control Cell`."""
+        lecture et l'échec actionnable de `Get Table Control Cell`.
+
+        Une cellule **GuiCheckBox** n'a pas de texte : son état se lit sur
+        ``Selected`` et se rend en drapeau ABAP (``X``/vide), directement
+        comparable à un champ drapeau du dictionnaire (KEYFLAG de DD03L)."""
         try:
-            return table.GetCell(local_row, column).Text
+            cell = table.GetCell(local_row, column)
+            if getattr(cell, "Type", "") == "GuiCheckBox":
+                return "X" if getattr(cell, "Selected", False) else ""
+            return cell.Text
         except com_error:
             return None
 

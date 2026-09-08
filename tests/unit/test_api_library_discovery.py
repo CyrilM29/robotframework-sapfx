@@ -1,11 +1,9 @@
-"""Tests hors reseau de SapApiLibrary : $metadata, catalogue, Gateway, OAuth2/mTLS, telemetrie, BAPI et jobs. Doublures dans _api_library_fixtures."""
+"""Tests hors reseau de SapApiLibrary : $metadata, catalogue, Gateway, telemetrie, BAPI et jobs. Doublures dans _api_library_fixtures ; OAuth2/mTLS dans test_api_library_oauth.py."""
 from SapApiLibrary import SapApiLibrary
-from robot.api.types import Secret
 import gzip
 import io
 import json
 import pytest
-import ssl
 import urllib.error
 
 from _api_library_fixtures import (  # noqa: F401
@@ -302,62 +300,6 @@ def test_wait_until_api_available_timeout_avec_diagnostic():
         lib.wait_until_api_available(timeout="0.05s", poll="0.01s")
     assert "indisponible" in str(err.value)
     assert "docker start" in str(err.value)
-
-
-def test_oauth_bearer_token_demande_une_fois_et_jamais_fuite():
-    lib = _lib_with([_json_response({"value": []}),
-                     _json_response({"value": []})])
-    token_requests = []
-
-    def fake_token_transport(session, request):
-        token_requests.append(request)
-        return _json_response({"access_token": "tok-1", "expires_in": 3600})
-
-    lib._token_transport = fake_token_transport
-    lib.open_api_session("https://api", token_url="https://ias/token",
-                         client_id="cid", client_secret=Secret("csec"))
-    lib.get_odata("/x")
-    lib.get_odata("/y")
-    assert len(token_requests) == 1   # token mis en cache
-    assert _sent_header(lib.requests_seen[0], "Authorization") == "Bearer tok-1"
-    token_request = token_requests[0]
-    assert (_sent_header(token_request, "Authorization") or "").startswith("Basic ")
-    assert b"grant_type=client_credentials" in token_request.data
-    state = lib.list_api_sessions()
-    assert state["api_sessions"][0]["oauth"] is True
-    assert "csec" not in json.dumps(state)
-
-
-def test_oauth_401_renouvelle_le_token_et_rejoue():
-    denied = urllib.error.HTTPError("https://api/x", 401, "Unauthorized",
-                                    None, io.BytesIO(b""))
-    lib = _lib_with([denied, _json_response({"value": []})])
-    issued = iter(["tok-old", "tok-new"])
-    lib._token_transport = lambda session, request: _json_response(
-        {"access_token": next(issued), "expires_in": 3600})
-    lib.open_api_session("https://api", token_url="https://ias/token",
-                         client_id="cid", client_secret="s")
-    lib.get_odata("/x")
-    assert _sent_header(lib.requests_seen[1], "Authorization") == "Bearer tok-new"
-
-
-def test_token_url_sans_client_id_refuse():
-    with pytest.raises(ValueError, match="client_id"):
-        SapApiLibrary().open_api_session("https://api",
-                                         token_url="https://ias/token")
-
-
-def test_client_cert_charge_le_contexte_mtls(monkeypatch):
-    loaded = []
-    monkeypatch.setattr(
-        ssl.SSLContext, "load_cert_chain",
-        lambda self, certfile, keyfile=None, password=None:
-        loaded.append((certfile, keyfile)))
-    lib = SapApiLibrary()
-    lib.open_api_session("https://api", client_cert="client.pem",
-                         client_key="client.key")
-    assert loaded == [("client.pem", "client.key")]
-    assert lib._session("default").tls_context is not None
 
 
 def test_telemetrie_compte_requetes_erreurs_et_statuts():

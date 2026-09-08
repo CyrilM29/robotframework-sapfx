@@ -53,7 +53,7 @@ class SapFioriLibrary(FrameKeywords, LocatorKeywords, EngineKeywords,
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 
-    __version__ = "0.8.0"
+    __version__ = "0.8.1"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 

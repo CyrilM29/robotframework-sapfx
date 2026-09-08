@@ -174,13 +174,23 @@ class DiscoveryKeywords(OdataReadKeywords):
         (redirection vers l'IdP, ou refus du garde same-origin) et
         ``login_page`` (HTTP 200 dont le corps est une page HTML de
         connexion : un « vert et faux » sans ce classement, car AUCUNE route
-        d'un tel site ne renvoie de défi d'authentification). Ne lève
-        jamais : le miroir API de `Get Scripting Status`."""
+        d'un tel site ne renvoie de défi d'authentification).
+
+        Sur une session ouverte par **clé d'API** (une couche de gestion
+        d'API devant le système), un 401 se dédouble : ``auth_failed`` quand
+        la couche refuse la clé, et ``backend_auth_failed`` quand elle
+        l'ACCEPTE et que le système ABAP derrière refuse (relevé live le
+        2026-09-06 sur le bac à sable SAP Business Accelerator Hub). Les
+        deux méritent des remèdes opposés, et le second interdit
+        explicitement de régénérer une clé saine. Ne lève jamais : le
+        miroir API de `Get Scripting Status`."""
         session = self._session(alias)
         path = catalog_path or gateway_status.CATALOG_SERVICE_PATH
-        code, excerpt, error = self._probe(alias, path,
-                                           {"format": "json", "top": "1"})
-        result = gateway_status.classify_gateway_probe(code, excerpt, error)
+        code, headers, excerpt, _, error, _ = self._probe_response(
+            alias, path, {"format": "json", "top": "1"})
+        result = gateway_status.classify_gateway_probe(
+            code, excerpt, error, headers=headers,
+            edge_credential=session.api_key_header is not None)
         result["catalog_path"] = path
         result["base_url"] = session.base_url
         return result
@@ -212,11 +222,15 @@ class DiscoveryKeywords(OdataReadKeywords):
         started = time.monotonic()
         last: dict[str, Any] = {"status": "unknown", "detail": "aucune sonde"}
 
+        session = self._session(alias)
+
         def probe() -> bool:
-            code, excerpt, error = self._probe(alias, target,
-                                               {"format": "json", "top": "1"})
+            code, headers, excerpt, _, error, _ = self._probe_response(
+                alias, target, {"format": "json", "top": "1"})
             last.clear()
-            last.update(gateway_status.classify_gateway_probe(code, excerpt, error))
+            last.update(gateway_status.classify_gateway_probe(
+                code, excerpt, error, headers=headers,
+                edge_credential=session.api_key_header is not None))
             return last["status"] == "ok"
 
         if not poll_until(probe, secs, max(0.1, step)):

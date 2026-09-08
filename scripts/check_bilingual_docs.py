@@ -6,9 +6,10 @@ Deux vérifications, toutes deux sans dépendance externe (juste `git` en PATH) 
 1. **Appariement structurel** : chaque `*.md` suivi par git (hors exceptions
    volontairement anglais-seul : CLAUDE.md, AGENTS.md, CHANGELOG.md,
    .github/copilot-instructions.md ; et hors arborescences volontairement
-   monolingues : définitions d'agents/commands et chat modes générés (des
-   prompts techniques, pas des docs) ainsi que `specs/`, rédigé en français,
-   la langue de travail de l'équipe) a son pendant `*.fr.md`, et réciproquement.
+   monolingues : définitions d'agents/commands, agents et chat modes générés
+   (des prompts techniques, pas des docs), fixtures d'évaluation des agents
+   (`tests/agent_eval/`), ainsi que `specs/`, rédigé en français, la langue de
+   travail de l'équipe) a son pendant `*.fr.md`, et réciproquement.
    Détecte une doc oubliée à sa création ou une traduction orpheline renommée.
 
 2. **Dérive de mise à jour** (avec ``--since <ref>``) : dans l'ensemble de
@@ -61,13 +62,19 @@ _FR_ONLY = {
 # travail de l'équipe ; les *supports* qu'elle produit peuvent, eux, être
 # bilingues (le deck existe en FR et en EN) ; memory/ est la mémoire projet
 # des assistants IA (fiches de travail anonymisées, rédigées en français, la
-# langue de travail, même logique que specs/).
+# langue de travail, même logique que specs/) ; .github/agents/ porte les
+# définitions d'agents au format actuel de VS Code, générées depuis .claude/
+# comme les chat modes ; tests/agent_eval/ porte les dossiers synthétiques de
+# qualification des agents (des fixtures d'évaluation rédigées en français,
+# lues par un agent sous test, jamais une doc destinée à l'utilisateur).
 _SINGLE_LANGUAGE_PREFIXES = (
     ".claude/",
+    ".github/agents/",
     ".github/chatmodes/",
     "comms/",
     "memory/",
     "specs/",
+    "tests/agent_eval/",
 )
 
 

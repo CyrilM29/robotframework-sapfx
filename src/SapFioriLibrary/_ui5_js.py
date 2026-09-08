@@ -171,6 +171,7 @@ DUMP_TREE_JS = build_call("dumpTree")
 IDLE_STATE_JS = build_call("idleState")
 GET_MESSAGES_JS = build_call("getMessages")
 CONTROL_INFO_JS = build_call("controlInfo")
+CONTROL_METADATA_JS = build_call("controlMetadata")
 
 # Sonde de runtime UI5 AUTONOME : la seule expression du module qui n'embarque
 # PAS le bundle. Toute fonction bâtie par `build_call` (ré)installe `__SAPFX`,

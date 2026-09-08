@@ -14,6 +14,8 @@ from pythoncom import com_error
 from robot.api import logger
 
 from sapfx_common.abap_list import reconstruct_rows
+from sapfx_common.com_safety import shell_subtype
+from sapfx_common.object_tree import LEAF_SHELL_SUBTYPES
 from sapfx_common.robot_args import as_name_list, as_optional_int
 
 # Le remède joint à l'erreur de conversion de `max_rows` : l'incident vécu est
@@ -208,10 +210,15 @@ class GridKeywords:
         forcer `Use ALV Grid In Data Browser` pour une simple assertion de
         contenu.
 
-        **Prérequis vérifié live (A4H, SAP GUI 8.00)** : sans le **mode
-        accessibilité** SAP GUI (Options → Interaction Design → Accessibility),
-        les écrans de liste modernes sont rendus dans un contrôle *shell*
-        opaque qui n'expose AUCUN label. L'échec le signale explicitement (même
+        **Ce qui est mesuré (A4H, SAP GUI 8.00, 2026-09-07)** : la liste SE16
+        STANDARD (`Use Standard List In Data Browser`, dynpro ``SAPMSSY0/120``)
+        est rendue en ``GuiLabel`` et se lit ici SANS le mode accessibilité
+        SAP GUI. Une sortie rendue dans un shell de sous-type connu (la
+        ``GridView`` de RSPARAM, prise un temps pour une liste opaque) se lit
+        par le keyword de son sous-type (`Read Grid`), et le cas « shell opaque
+        sans aucun label », celui que le mode accessibilité (Options →
+        Interaction Design → Accessibility) corrigerait, n'a pas été observé
+        sur le poste de laboratoire. L'échec le signale explicitement (même
         diagnostic que `Get List Rendering Status` / `Abap List Should Be
         Readable`, à appeler en préflight pour échouer plus tôt). Lecture seule."""
         rows = reconstruct_rows(self._screen_elements())
@@ -232,11 +239,46 @@ class GridKeywords:
     # SE16, à 4 en SM50 (qui insère un panneau HTML et un second splitter).
     _MAX_CONTAINER_DEPTH = 6
 
+    # Ce que lit un GuiShell d'un autre sous-type, pour un refus qui nomme le
+    # bon keyword au lieu de laisser fuir une AttributeError COM.
+    _SHELL_READERS = {
+        "Tree": "un arbre : lire par Read Tree Nodes",
+        "Calendar": "un calendrier : Pick Calendar Date",
+        "AbapEditor": "un éditeur ABAP : hors API",
+        "TextEdit": "un éditeur de texte : hors API",
+        "HTMLViewer": "un HTMLViewer : hors API",
+        "Picture": "une image : hors API",
+    }
+
+    @staticmethod
+    def _is_grid_view(obj):
+        """Vrai pour une ALV réelle : un ``GuiShell`` de sous-type ``GridView``.
+        Sans sous-type exposé (doublure, conteneur), ``ColumnOrder`` décide,
+        comme avant ; AVEC un sous-type, ``ColumnOrder`` ne suffit plus, un
+        arbre à colonnes en portant une aussi (mesuré le 2026-09-08 sur l'IMG
+        de SPRO : `Get Grid Column Ids` passait sur l'arbre en rendant
+        ``['HierarchyHeader']``)."""
+        subtype = shell_subtype(obj)
+        if subtype:
+            return subtype == "GridView"
+        return hasattr(obj, "ColumnOrder")
+
     def _grid(self, table_id):
         self.element_should_be_present(table_id)
         grid = self.session.findById(table_id)
-        if hasattr(grid, "ColumnOrder"):
+        if self._is_grid_view(grid):
             return grid
+        subtype = shell_subtype(grid)
+        if subtype in LEAF_SHELL_SUBTYPES:
+            # Un shell FEUILLE d'un autre sous-type ne contient pas de grille :
+            # refuser tout de suite en nommant ce que c'est et le keyword qui
+            # le lit. Un Splitter, lui, est un conteneur : on descend.
+            self.take_screenshot()
+            raise ValueError(
+                "Element '%s' est un GuiShell/%s, pas une grille ALV : c'est %s. "
+                "Percevoir avec Get Screen Signature (colonne type GuiShell/<SubType>)."
+                % (table_id, subtype,
+                   self._SHELL_READERS.get(subtype, "un contrôle sans lecteur dédié")))
         # Le chemin visé ne porte pas la grille elle-même. Les releases
         # récentes enveloppent l'ALV dans un ou plusieurs GuiSplitterShell
         # (relevé live le 2026-08-23 sur ABAP 2023), et la profondeur varie
@@ -258,10 +300,11 @@ class GridKeywords:
             return found
         self.take_screenshot()
         raise ValueError(
-            "Element '%s' is not an ALV GridView (no ColumnOrder), and no "
-            "GridView was found below it (%d niveaux explorés). Vérifier le "
-            "localisateur avec Get Screen Signature : l'écran rend-il bien une "
-            "grille ?" % (table_id, self._MAX_CONTAINER_DEPTH))
+            "L'élément '%s' n'est pas une grille ALV (GuiShell/GridView : le "
+            "sous-type décide) et aucune grille n'a été trouvée en dessous "
+            "(%d niveaux explorés). Vérifier le localisateur avec Get Screen "
+            "Signature : l'écran rend-il bien une grille ?"
+            % (table_id, self._MAX_CONTAINER_DEPTH))
 
     def _resolved_grid_id(self, table_id):
         """Identifiant de la grille RÉELLE derrière ``table_id``.
@@ -276,7 +319,7 @@ class GridKeywords:
             element = self.session.findById(table_id)
         except Exception:                                  # noqa: BLE001
             return table_id
-        if hasattr(element, "ColumnOrder"):
+        if self._is_grid_view(element) or shell_subtype(element) in LEAF_SHELL_SUBTYPES:
             return table_id
         found, found_id = self._grid_below(element, table_id)
         if found is None or not found_id or found_id == table_id:
@@ -355,7 +398,7 @@ class GridKeywords:
             if depth >= self._MAX_CONTAINER_DEPTH:
                 continue
             for child in self._children_of(current):
-                if hasattr(child, "ColumnOrder"):
+                if self._is_grid_view(child):
                     return child, str(getattr(child, "Id", "") or base_id)
                 queue.append((child, depth + 1))
         return None, None

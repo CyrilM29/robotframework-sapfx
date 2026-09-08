@@ -27,6 +27,21 @@ les outils que le contrat plugin ne permet pas.
   sérialisation a lieu sur un autre thread (`RPC_E_WRONG_THREAD`). Terminer un
   lot par `Element Should Be Present` plutôt que par
   `Wait Until Element Present`.
+- **`execute_batch` et `Evaluate` tournent sur un AUTRE thread que le keyword
+  qui a lié la session COM, et la bibliothèque le cache** (mesuré 2026-09-07) :
+  `Get Screen Signature` rend `# screen ?` sans élément, `Get Open Windows`
+  rend `[]`, `Wait Until Busy Done` rend « still busy » sur un écran au repos,
+  tout en PASS. Passer `use_context=true` sur CHAQUE `execute_step` de keyword
+  SapEccLibrary, ne jamais utiliser `execute_batch` pour du COM, ne jamais
+  toucher un objet COM depuis `Evaluate`, et devant un `# screen ?` :
+  `Attach To Open Session    0    0`. Pour des sondes COM (sous-types, arbres,
+  combos), jouer une suite par `robot` sur le thread principal. Depuis le
+  soir du 2026-09-07 la bibliothèque ÉCHOUE en nommant la cause
+  (`ScreenUnreadableError`) au lieu de rendre une vue vide, et son rail STA
+  ré-attache la session par thread (prouvé à travers rf-mcp : un batch sur
+  thread étranger rend la pile et la signature réelles) ; `use_context=true`
+  reste la consigne, parce qu'un serveur qui n'a pas rechargé la bibliothèque
+  sert encore l'ancienne classe.
 - **rf-mcp fige classe ET instance de bibliothèque** au premier import du
   process. Après modification du code de `src/`, redémarrer le serveur est la
   voie nominale ; les state providers ajoutent `stale_code_warning` quand un

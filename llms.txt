@@ -1,5 +1,13 @@
 # SAPFX: SAP test automation for Robot Framework
 
+Agent contract v1: [.claude/agent-contract.md](.claude/agent-contract.md).
+Five roles include read-only sap-verifier (Claude Code /sap-verify; Copilot
+.github/agents/sap-verifier.agent.md, generated). Explicit permissions,
+bounded healer verdicts, hashed handoffs and conservative recovery milestones.
+PreToolUse asks for non-read calls; qualify host loading before relying on it.
+Budgets/journaling remain agent-operated; offline tests do not prove LLM quality.
+Never add skips or replace baselines to turn an unverified heal green.
+
 > Open-source SAP test-automation ecosystem for Robot Framework, covering both
 > SAP paradigms end to end: SapEccLibrary (SAP GUI desktop client, ECC and
 > S/4HANA backend, via the SAP GUI Scripting COM API), SapFioriLibrary
@@ -124,13 +132,27 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
   disappearance asserted on the entity. Opt-in: it skips in Suite Setup without
   opening a channel unless the opt-in variable is passed
 - `src/SapEccLibrary/`: vendored upstream base + mixins (connection, waits,
-  grids, perception, diagnostics/preflights, healing, semantic labels,
-  embedded browser, pointer fallback, multi-session registry: named session
-  aliases with an STA thread-safety rail and isolated teardown)
+  grids and grid actions (double-click, context menu by function code, sort),
+  trees (SAP menu, IMG, SE80: read/expand/select by key, text or path), combo
+  boxes by technical key plus the user's date/decimal formats (`Input Date`,
+  `Input Number`), menu bar by path, modal windows, system identity read on
+  screen (`Get System Identity`: SAP_BASIS release and kernel from System >
+  Status, entry RESOLVED as second-to-last of the second-to-last menu on two
+  releases), status message identity (`MO/E/402`, `Status Message Should Be`),
+  tab strips by technical key, application toolbar inventory (icon names as
+  locale-safe anchors), SE16 output modes (ALV grid or standard list,
+  the classic list read as labels), perception (shell subtypes
+  shown, unreadable session fails naming the cause), diagnostics/preflights,
+  healing, semantic labels (checkboxes and radios by their own text, F4
+  calendar), embedded browser, pointer fallback, multi-session registry: named
+  session aliases with an STA rail that re-attaches per thread and isolated
+  teardown)
 - `src/SapFioriLibrary/`: UI5 resolution engines, launchpad intent
   navigation, identity-provider login flows, visual assertions
 - `src/sapfx_common/`: shared pure logic (polling, healing scores,
   perception diff, visual hash, semantic geometry, business vocabulary,
+  system identity, generic deterministic artifacts (`artifacts`: declared
+  hash scope, hash recomputed on read, importable as a Robot library),
   IDP presets), typed and unit-tested without SAP or a browser
 - `tests/robot/`: smoke suites runnable against public targets (OpenUI5 Demo
   Kit, local fixtures, UI5 legacy/legacy-free/2.x CDN builds) or a live A4H

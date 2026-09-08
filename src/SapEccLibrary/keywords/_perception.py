@@ -17,9 +17,20 @@ from dataclasses import replace as _dc_replace
 from pythoncom import com_error
 from robot.api import logger
 
+from sapfx_common.com_safety import describe_com_failure, is_wrong_thread_error
 from sapfx_common.object_tree import (OBJECT_TREE_PROPERTIES, ScreenElement,
                                       flatten_object_tree)
 from sapfx_common.perception_diff import diff_perception
+from sapfx_common.tree_nodes import is_progid
+
+
+class ScreenUnreadableError(RuntimeError):
+    """La session SAP GUI ne peut pas être LUE (transport COM en panne :
+    thread étranger, session fermée, proxy périmé). Distinct d'un écran vide :
+    une perception qui ne sait pas lire ÉCHOUE, elle ne rend jamais une vue
+    vide en PASS (relevé live sous rf-mcp le 2026-09-07 : ``# screen ?`` sans
+    élément, ``Get Open Windows = []``, tous en succès, et un agent qui en
+    déduit « aucune fenêtre ouverte »)."""
 
 # Préfixe de session SAP GUI (``/app/con[0]/ses[0]/``) à retirer des ids absolus.
 _SESSION_PREFIX = re.compile(r"^/app/con\[\d+\]/ses\[\d+\]/")
@@ -29,6 +40,22 @@ _EDITABLE_TYPES = ("GuiTextField", "GuiCTextField", "GuiPasswordField",
                    "GuiCheckBox", "GuiRadioButton", "GuiComboBox")
 
 _TRUTHY = ("1", "true", "yes", "on")
+
+# Le keyword qui sait LIRE chaque sous-type de shell : la matière du refus
+# actionnable de `Get Value` sur un shell.
+_SHELL_READERS = {
+    "GridView": "Lire la grille avec Read Grid / Get Cell Value.",
+    "Tree": "Lire l'arbre avec Read Tree Nodes / Get Selected Tree Node.",
+    "Calendar": "Choisir une date avec Pick Calendar Date.",
+    "AbapEditor": "Le source d'un éditeur ABAP est hors de l'API Scripting : "
+                  "aucune lecture possible (Click Element At Offset pour agir).",
+    "HTMLViewer": "Le contenu d'un HTMLViewer est hors de l'API Scripting.",
+    "Picture": "Une image n'a pas de valeur lisible.",
+    "Toolbar": "Lister les boutons avec List Grid Toolbar Buttons sur la grille "
+               "porteuse, ou Get Screen Signature.",
+}
+_SHELL_READERS_DEFAULT = ("Percevoir le contrôle avec Get Screen Signature "
+                          "(colonne type GuiShell/<SubType>).")
 
 
 def _safe(node, attr):
@@ -94,12 +121,17 @@ class PerceptionKeywords:
         nœud. Une ``AttributeError`` (API absente de cette version de SAP GUI)
         est mémorisée sur l'instance pour ne pas retenter à chaque perception ;
         une ``com_error``/JSON invalide (transitoire) replie ponctuellement et
-        sera retentée à l'appel suivant. Défensif : fenêtre indisponible ->
-        liste vide (jamais d'exception COM brute)."""
+        sera retentée à l'appel suivant. Une session ILLISIBLE (transport COM
+        en panne : thread étranger, proxy périmé) lève
+        :class:`ScreenUnreadableError` en nommant la cause : jamais une liste
+        vide en guise de perception. Une fenêtre active absente (session sans
+        fenêtre) rend une liste vide, c'est un écran vide légitime."""
         try:
             window = self.session.ActiveWindow
-        except (AttributeError, com_error):
-            window = None
+        except (AttributeError, com_error) as exc:
+            raise ScreenUnreadableError(
+                "La session SAP GUI est illisible (ActiveWindow) : %s"
+                % describe_com_failure(exc)) from exc
         if window is None:
             return []
         if not getattr(self, "_object_tree_unsupported", False):
@@ -107,10 +139,22 @@ class PerceptionKeywords:
                 payload = self.session.GetObjectTree(
                     _safe(window, "Id"), list(OBJECT_TREE_PROPERTIES))
                 elements = flatten_object_tree(payload)
-            except AttributeError:
+            except AttributeError as exc:
+                if is_wrong_thread_error(exc):
+                    # Un proxy sur le mauvais thread lève EXACTEMENT cette
+                    # AttributeError : ce n'est pas une API absente, et la
+                    # mémoriser comme telle privait définitivement la session
+                    # de sa géométrie (relevé live rf-mcp 2026-09-07).
+                    raise ScreenUnreadableError(
+                        "La session SAP GUI est illisible (GetObjectTree) : %s"
+                        % describe_com_failure(exc)) from exc
                 self._object_tree_unsupported = True
-            except (com_error, ValueError, TypeError):
-                pass   # transitoire : repli sur la marche, on retentera
+            except (com_error, ValueError, TypeError) as exc:
+                if is_wrong_thread_error(exc):
+                    raise ScreenUnreadableError(
+                        "La session SAP GUI est illisible (GetObjectTree) : %s"
+                        % describe_com_failure(exc)) from exc
+                # transitoire : repli sur la marche, on retentera
             else:
                 relative = [
                     _replace_id(el, _relative_id(el.id))
@@ -129,6 +173,8 @@ class PerceptionKeywords:
                 top=_safe_int(element, "ScreenTop"),
                 width=_safe_int(element, "Width"),
                 height=_safe_int(element, "Height"),
+                subtype=(str(_safe(element, "SubType") or "").strip()
+                         if _safe(element, "Type") == "GuiShell" else ""),
             )
             for element in _walk(window)
             for eid in [_relative_id(_safe(element, "Id"))]
@@ -138,14 +184,47 @@ class PerceptionKeywords:
     def _screen_header(self):
         """Ligne d'identité de l'écran actif (``# screen P/T/N``), partagée
         par la signature, la carte numérotée et le contrôle de fraîcheur des
-        références. Défensif : ``# screen ?`` si la session est illisible."""
+        références. Une session illisible lève :class:`ScreenUnreadableError`
+        (jamais ``# screen ?`` en succès) ; une info partiellement absente
+        rend des champs vides."""
         try:
             info = self.session.Info
             return "# screen %s/%s/%s" % (
                 _safe(info, "Program"), _safe(info, "Transaction"),
                 _safe(info, "ScreenNumber"))
+        except (AttributeError, com_error) as exc:
+            raise ScreenUnreadableError(
+                "La session SAP GUI est illisible (Info) : %s"
+                % describe_com_failure(exc)) from exc
+
+    def get_value(self, element_id):
+        """Comme `Get Value` de la base, avec un REFUS actionnable sur un
+        ``GuiShell`` dont la « valeur » serait son ProgID.
+
+        Le keyword hérité rend ``element.text`` pour tout shell ; or le
+        ``Text`` d'un arbre, d'une grille, d'un éditeur ABAP ou d'un
+        calendrier est le ProgID du contrôle (``SAP.TableTreeControl.1``,
+        ``SAPGUI.AbapEditor.1``), une valeur plausible qui n'a rien lu :
+        relevé live sur SE38 et l'accueil le 2026-09-07. Ici le sous-type
+        est nommé avec le keyword qui sait lire ce contrôle. Un shell dont le
+        texte est une vraie donnée (un ``TextEdit``) reste lu tel quel."""
+        value = super().get_value(element_id)
+        if isinstance(value, str) and is_progid(value):
+            subtype = self._shell_subtype(element_id)
+            raise ValueError(
+                "Get Value sur '%s' rendrait le ProgID '%s' du contrôle, pas une "
+                "donnée d'écran (GuiShell%s). %s"
+                % (element_id, value.strip(),
+                   "/%s" % subtype if subtype else "",
+                   _SHELL_READERS.get(subtype, _SHELL_READERS_DEFAULT)))
+        return value
+
+    def _shell_subtype(self, element_id):
+        """Sous-type d'un shell (``Tree``, ``GridView``...), ou ``""``."""
+        try:
+            return str(self.session.findById(element_id).SubType or "").strip()
         except (AttributeError, com_error):
-            return "# screen ?"
+            return ""
 
     def get_screen_signature(self, mode="full", include_geometry=False,
                              pair_renames=False):
@@ -202,7 +281,7 @@ class PerceptionKeywords:
         lines = [header]
         for element in elements:
             mark = "* " if element.type in _EDITABLE_TYPES else "  "
-            line = "%s%s\t%s\t%s" % (mark, element.id, element.type,
+            line = "%s%s\t%s\t%s" % (mark, element.id, element.display_type,
                                      (element.text or "").strip())
             if with_geometry and element.left is not None and element.top is not None:
                 line += "\t@%d,%d %sx%s" % (
@@ -338,14 +417,18 @@ class PerceptionKeywords:
         neutralise le champ OK-code. Vérifier ``modal`` ici (ou ``modal_open``
         dans l'état applicatif rf-mcp, qui appelle ce keyword) avant d'enchaîner.
         Lecture seule, indépendant de la locale (le titre est du contexte humain,
-        jamais une ancre d'assertion). Défensif : fenêtre illisible ignorée,
-        session indisponible -> liste vide."""
+        jamais une ancre d'assertion). Une fenêtre illisible est ignorée ; une
+        SESSION illisible lève :class:`ScreenUnreadableError` (une liste vide
+        en succès ferait conclure « aucune fenêtre ouverte » à un agent, relevé
+        live sous rf-mcp le 2026-09-07)."""
         windows = []
         try:
             children = self.session.Children
             count = children.Count
-        except (AttributeError, com_error):
-            return windows
+        except (AttributeError, com_error) as exc:
+            raise ScreenUnreadableError(
+                "La session SAP GUI est illisible (Children) : %s"
+                % describe_com_failure(exc)) from exc
         for index in range(count):
             try:
                 window = children.ElementAt(index)

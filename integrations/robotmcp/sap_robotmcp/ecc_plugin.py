@@ -247,8 +247,48 @@ class SapEccPlugin(StaticLibraryPlugin):
                 # tables de dynpro classiques (GuiTableControl, par titre)
                 "Read Table Control", "Get Table Control Cell",
                 "Set Table Control Cell", "Find Table Control Row",
-                # aide à la recherche (matchcode)
-                "Pick F4 Value",
+                # aide à la recherche (matchcode) + calendrier F4 (un champ date
+                # ouvre un GuiShell/Calendar, pas une liste : relevé 2026-09-07)
+                "Pick F4 Value", "Pick Calendar Date",
+                # _grid_actions.py : ce que le fork corrige des keywords hérités
+                # (double-clic = API des arbres, menu contextuel refusé par type)
+                "Double Click Grid Cell", "List Grid Context Menu",
+                "Select Grid Context Menu Item", "List Grid Toolbar Buttons",
+                "Sort Grid By Column",
+                # _trees.py : les arbres (menu SAP, IMG, SE80, SM59, SICF) par
+                # clé, texte ou chemin ; clés opaques rendues telles quelles
+                "Read Tree Nodes", "Read Tree Children", "Get Selected Tree Node",
+                "Select Tree Node", "Expand Tree Node", "Get Tree Node Key By Text",
+                "Select Tree Node By Text", "Select Tree Node By Path",
+                "Double Click Tree Node", "Find Tree Nodes",
+                # _combobox.py : combo par CLÉ (locale-safe) + formats de
+                # l'utilisateur (dates et nombres convertis, jamais ISO brut)
+                "Get Combo Box Entries", "Get Combo Box Key",
+                "Select Combo Box Entry By Key", "Get User Formats",
+                "Input Date", "Input Number",
+                # _menus.py : la barre de menus par chemin (textes ou positions)
+                "List Menu Items", "Resolve Menu Item", "Select Menu Item",
+                # _windows.py : refermer un modal quelle que soit sa forme
+                # (plusieurs dialogues refusent sendVKey), disparition VÉRIFIÉE
+                "Dismiss Modal Window", "Get Modal Buttons",
+                # _identity.py : l'identité du système lue à l'écran (System >
+                # Status, par POSITION, vérifié structurellement) : release
+                # SAP_BASIS et kernel, ce qui distingue deux systèmes au même SID
+                "Get System Identity", "Open System Status",
+                "System Identity Should Be",
+                # _statusbar.py : l'IDENTITÉ d'un message (classe/type/numéro,
+                # MO/E/402), pas seulement son type : deux refus du même écran
+                # deviennent discernables sans texte localisé (2026-09-08)
+                "Get Status Message Identity", "Status Message Should Be",
+                # _tabstrip.py : onglets par CLÉ technique (tabpLOGO -> LOGO),
+                # onglet actif relu ; le jeu d'onglets diverge entre releases
+                "List Tabs", "Get Selected Tab", "Select Tab", "Select Tab By Label",
+                # _toolbar.py : la barre d'application INVENTORIÉE (id, icône,
+                # tooltip), celle que les échecs de grille nommaient sans la lister
+                "List Toolbar Buttons", "Click Application Toolbar Button",
+                # _semantic.py : cases et radios par leur texte propre
+                "Select Checkbox By Label", "Unselect Checkbox By Label",
+                "Select Radio Button By Label", "Checkbox By Label Should Be",
                 # inventaire DDIC (classification DD02L par lots, artefact).
                 # `Reach Se16 Selection Screen` ouvre l'écran de sélection en UN
                 # seul endroit (statut type E, popup de choix des champs,
@@ -262,6 +302,11 @@ class SapEccPlugin(StaticLibraryPlugin):
                 # sans objet grille scriptable) et le comptage « Number of
                 # Entries », fiable sur table vide là où F8 ne rend rien.
                 "Use ALV Grid In Data Browser",
+                # ... et son inverse, la liste SE16 standard (liste ABAP
+                # classique en labels, lisible par Read Abap List), plus la
+                # lecture du réglage courant à mémoriser pour le restaurer.
+                "Use Standard List In Data Browser", "Set Data Browser Output",
+                "Get Data Browser Output",
                 "Count Entries On Current Selection Screen",
                 "Classify Ddic Objects", "Get Ddic Classification Map",
                 "Validate Ddic Scope", "Record Ddic Probe",

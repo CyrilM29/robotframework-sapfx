@@ -15,6 +15,8 @@ import os
 import subprocess
 import time
 
+import pythoncom
+import win32com.client
 from pythoncom import com_error
 from robot.api import logger
 from robot.utils import timestr_to_secs
@@ -46,6 +48,41 @@ class ConnectionKeywords:
         provider rf-mcp, qui a le même besoin sur son propre thread)."""
         ensure_com_initialized()
         return super().connect_to_session(explicit_wait)
+
+    def _acquire_scripting_engine(self):
+        """Le moteur de scripting SAP GUI acquis depuis la ROT pour le thread
+        COURANT (``GetScriptingEngine`` du SAPGUI enregistré), ou ``None``.
+
+        C'est la primitive du ré-attachement cross-thread du rail STA
+        (``SapEccLibrary._touch_com_thread``) : un proxy COM STA ne se partage
+        pas entre threads, mais chaque thread peut obtenir le SIEN par la ROT
+        puis ``FindById(id de session)``. Même parcours que `Connect To
+        Session` (code amont), sans toucher ``self.sapapp``."""
+        ensure_com_initialized()
+        try:
+            rot = pythoncom.GetRunningObjectTable()
+            enum = rot.EnumRunning()
+        except (AttributeError, com_error):
+            return None
+        engine = None
+        while True:
+            try:
+                monikers = enum.Next()
+            except (AttributeError, com_error):
+                break
+            if not monikers:
+                break
+            try:
+                name = monikers[0].GetDisplayName(pythoncom.CreateBindCtx(0), None)
+                if not name.endswith("SAPGUI"):
+                    continue
+                obj = rot.GetObject(monikers[0])
+                sapgui = win32com.client.Dispatch(
+                    obj.QueryInterface(pythoncom.IID_IDispatch))
+                engine = sapgui.GetScriptingEngine
+            except (AttributeError, com_error):
+                continue
+        return engine
 
     def attach_to_open_session(self, connection_index=0, session_index=0):
         """Rattache la bibliothèque à une session SAP GUI **déjà ouverte**,

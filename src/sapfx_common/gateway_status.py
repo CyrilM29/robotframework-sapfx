@@ -40,6 +40,70 @@ _IDP_REMEDIATION = (
     "d'instance du sous-compte), et prévoir le périmètre (scope) associé, "
     "sans quoi le token est obtenu mais refusé par la route visée.")
 
+_BACKEND_AUTH_REMEDIATION = (
+    "Ne pas régénérer la clé d'API : la couche de gestion d'API l'a ACCEPTÉE "
+    "(une clé invalide serait refusée par elle, avant d'atteindre le "
+    "système). C'est le système ABAP derrière qui ne reçoit pas d'utilisateur "
+    "authentifié, ce qui est hors de portée du client : l'injection "
+    "d'identifiants du fournisseur est en panne, le système de démonstration "
+    "est indisponible, ou l'API visée n'est plus servie par ce plan. "
+    "Vérifier une AUTRE API du même fournisseur avec la même clé : si elle "
+    "répond, la clé est saine et la panne est cantonnée à la cible.")
+
+#: En-tête par lequel un serveur d'applications SAP NetWeaver annonce
+#: l'identifiant du système qui a formé la réponse.
+SAP_SYSTEM_HEADER = "sap-system"
+
+#: En-tête par lequel ce même serveur dit si la requête portait un
+#: utilisateur authentifié.
+SAP_AUTHENTICATED_HEADER = "sap-authenticated"
+
+#: Marqueur du défi d'authentification d'un serveur d'applications ABAP.
+NETWEAVER_REALM_MARKER = "sap netweaver application server"
+
+
+def _header_value(headers: Any, name: str) -> Optional[str]:
+    """Valeur d'un en-tête, casse ignorée. Accepte tout mapping ; un simple
+    itérable de NOMS (la forme que tolère :func:`classify_http_response`) ne
+    porte aucune valeur, et rend donc ``None`` plutôt qu'une devinette."""
+    items = getattr(headers, "items", None)
+    if items is None:
+        return None
+    wanted = name.lower()
+    for key, value in items():
+        if str(key).lower() == wanted:
+            return str(value)
+    return None
+
+
+def refused_by_sap_backend(headers: Any = None) -> bool:
+    """Vrai quand la réponse a été formée par le serveur d'applications SAP
+    LUI-MÊME, et non par la couche de gestion d'API placée devant lui.
+
+    Le critère est STRUCTUREL, tenu par les en-têtes (convention #3) : la
+    page de refus d'un serveur ABAP est LOCALISÉE, et l'a prouvé en beau
+    (relevé live le 2026-09-06 : « Anmeldung fehlgeschlagen », en allemand,
+    sur une cible dont rien d'autre n'est en allemand). Trois marqueurs, dont
+    un seul suffit :
+
+    - ``sap-authenticated: false`` : le serveur dit lui-même que la requête
+      ne portait pas d'utilisateur authentifié ;
+    - un défi ``www-authenticate`` nommant le serveur d'applications ;
+    - l'en-tête ``sap-system``, l'identifiant du système ABAP qui a répondu.
+
+    Une réponse formée par la couche de gestion d'API n'en porte AUCUN : elle
+    répond dans son propre format (un document JSON portant son code d'erreur
+    à elle). C'est ce qui sépare « la clé est mauvaise » de « la clé est bonne
+    et le système derrière ne répond pas ».
+    """
+    authenticated = _header_value(headers, SAP_AUTHENTICATED_HEADER)
+    if authenticated is not None and authenticated.strip().lower() == "false":
+        return True
+    challenge = _header_value(headers, "www-authenticate") or ""
+    if NETWEAVER_REALM_MARKER in challenge.lower():
+        return True
+    return _header_value(headers, SAP_SYSTEM_HEADER) is not None
+
 
 def looks_like_html(body: str) -> bool:
     """Vrai quand le corps est une page HTML plutôt que des données.
@@ -119,7 +183,9 @@ def classify_http_response(http_status: Optional[int],
 
 
 def classify_gateway_probe(http_status: Optional[int], body: str = "",
-                           error: Optional[str] = None) -> dict[str, Any]:
+                           error: Optional[str] = None,
+                           headers: Any = None,
+                           edge_credential: bool = False) -> dict[str, Any]:
     """Classe le résultat d'une sonde HTTP du catalogue Gateway en dict
     JSON-safe ``{"status", "http_status", "detail", "remediation"}``.
 
@@ -129,6 +195,20 @@ def classify_gateway_probe(http_status: Optional[int], body: str = "",
     l'extrait de la réponse, utilisé pour reconnaître le marqueur
     ``/IWFND/CM_COS/003`` d'une Gateway désactivée, et pour distinguer des
     DONNÉES d'une page HTML de connexion servie en HTTP 200.
+
+    ``edge_credential`` dit que la session s'authentifie auprès d'une couche
+    de gestion d'API placée DEVANT le système (une clé d'API), et non auprès
+    du système lui-même. Sous cette condition seulement, un 401 portant les
+    marqueurs d'un serveur ABAP (:func:`refused_by_sap_backend`) devient
+    ``backend_auth_failed`` plutôt que ``auth_failed`` : la couche de gestion
+    a forcément accepté la clé, sans quoi elle aurait répondu elle-même, donc
+    le refus vient du système derrière et la remédiation « vérifier vos
+    identifiants » enverrait régénérer une clé parfaitement saine. Sans
+    couche devant (Basic sur un ABAP), les mêmes marqueurs signifient au
+    contraire que ce sont bien les identifiants du client qui sont refusés :
+    la distinction ne tient qu'à ce que le client SAIT de son propre mode
+    d'authentification, aucun en-tête de la réponse ne la porte (vérifié live
+    le 2026-09-06 sur le bac à sable SAP Business Accelerator Hub).
     """
     if http_status is None:
         if CROSS_ORIGIN_REDIRECT_MARKER in (error or ""):
@@ -173,6 +253,18 @@ def classify_gateway_probe(http_status: Optional[int], body: str = "",
         return {"status": "ok", "http_status": http_status,
                 "detail": "Catalogue Gateway joignable.", "remediation": None}
     if http_status == 401:
+        if edge_credential and refused_by_sap_backend(headers):
+            return {
+                "status": "backend_auth_failed",
+                "http_status": http_status,
+                "detail": ("HTTP 401 formé par le système SAP LUI-MÊME "
+                           "(en-têtes %s / %s), et non par la couche de "
+                           "gestion d'API devant lui : la clé d'API a donc "
+                           "été acceptée, et c'est le système derrière qui "
+                           "ne reçoit pas d'utilisateur authentifié."
+                           % (SAP_SYSTEM_HEADER, SAP_AUTHENTICATED_HEADER)),
+                "remediation": _BACKEND_AUTH_REMEDIATION,
+            }
         return {
             "status": "auth_failed",
             "http_status": http_status,

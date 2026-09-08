@@ -46,6 +46,46 @@ class TestUseAlvGridInDataBrowser:
         assert ordre.index("wait_present") < ordre.index("radio")
 
 
+class TestDataBrowserOutput:
+    """Les trois sorties du Data Browser : la liste standard (l'inverse du
+    réglage ALV, la cible du registre pour les listes classiques), le réglage
+    générique, et la LECTURE du réglage courant, refermée sans rien changer."""
+
+    def test_la_liste_standard_coche_son_radio_et_valide(self):
+        lib = _Recorder(screen="selection")
+        lib.use_standard_list_in_data_browser()
+        radios = _kinds(lib, "radio")
+        assert len(radios) == 1 and radios[0][1].endswith("radTB_DUMMY")
+        assert ("vkey", 0, 1) in lib.calls
+        assert lib.session.popup is None
+
+    def test_un_mode_inconnu_est_refuse_en_listant_les_trois(self):
+        import pytest
+        lib = _Recorder(screen="selection")
+        with pytest.raises(ValueError, match="alv_grid, alv_list, standard_list"):
+            lib.set_data_browser_output("html")
+        assert not _kinds(lib, "radio")           # rien n'a été touché
+
+    def test_la_lecture_rend_le_mode_coche_et_referme_sans_valider(self):
+        lib = _Recorder(screen="selection", output_radio="radTB_DUMMY")
+        assert lib.get_data_browser_output() == "standard_list"
+        assert not _kinds(lib, "radio")           # lecture seule
+        assert ("vkey", 0, 1) not in lib.calls     # jamais validé par Entrée
+        assert ("dismiss", 1) in lib.calls
+        assert lib.session.popup is None
+
+    def test_la_lecture_par_defaut_rend_la_grille_alv(self):
+        lib = _Recorder(screen="selection")
+        assert lib.get_data_browser_output() == "alv_grid"
+
+    def test_aucun_radio_coche_est_un_echec_jamais_un_mode_devine(self):
+        import pytest
+        lib = _Recorder(screen="selection", output_radio=None)
+        with pytest.raises(AssertionError, match="0 sortie\\(s\\) cochée"):
+            lib.get_data_browser_output()
+        assert lib.session.popup is None           # refermé même en échec
+
+
 class TestCountEntriesOnCurrentSelectionScreen:
     def test_le_compte_est_lu_dans_le_popup_puis_referme(self):
         lib = _Recorder(screen="selection", count_text="205")
