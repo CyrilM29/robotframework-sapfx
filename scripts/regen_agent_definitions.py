@@ -149,6 +149,13 @@ def iter_renders(root):
         name = meta.get("name", src.stem)
         source_rel = src.relative_to(root).as_posix()
         dest = root / ".github" / "chatmodes" / (name + ".chatmode.md")
+        if name.endswith("-verifier"):
+            if set(meta["tools"].split(", ")) - {
+                "Read", "Glob", "Grep", "mcp__qa-brain__qa_search",
+                "mcp__qa-brain__qa_ask", "mcp__qa-brain__qa_status",
+            }:
+                raise ValueError("Verifier tools must remain read-only")
+            dest = root / ".github" / "agents" / (name + ".agent.md")
         renders.append((dest, render_chatmode(source_rel, meta, body)))
     return renders
 

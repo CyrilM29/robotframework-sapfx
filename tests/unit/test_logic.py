@@ -265,7 +265,7 @@ def test_get_grid_column_ids_returns_technical_ids_in_display_order():
 def test_grid_raises_value_error_when_element_is_not_an_alv_grid():
     lib = _grid_lib()
     lib.session._objects["not_a_grid"] = object()   # pas de ColumnOrder
-    with pytest.raises(ValueError, match="not an ALV GridView"):
+    with pytest.raises(ValueError, match="n'est pas une grille ALV"):
         lib.get_grid_column_ids("not_a_grid")
 
 

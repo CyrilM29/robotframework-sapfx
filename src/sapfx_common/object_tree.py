@@ -25,9 +25,29 @@ from typing import Any, Iterator, Optional, Union
 # éditabilité et géométrie (ScreenLeft/ScreenTop = coordonnées absolues écran,
 # comparables entre nœuds de parents différents ; Left/Top en secours).
 OBJECT_TREE_PROPERTIES: tuple[str, ...] = (
-    "Id", "Type", "Text", "Tooltip", "Changeable",
+    "Id", "Type", "SubType", "Text", "Tooltip", "Changeable",
     "ScreenLeft", "ScreenTop", "Left", "Top", "Width", "Height",
 )
+
+# Sous-types de GuiShell relevés live (SAP GUI 8.00, A4H 1909, 2026-09-07) :
+# la perception les affiche en `GuiShell/<SubType>`, faute de quoi un arbre,
+# une grille, un éditeur et un calendrier sont indiscernables (tous
+# `GuiShell` avec un ProgID en guise de texte).
+SHELL_SUBTYPES_SEEN: tuple[str, ...] = (
+    "Tree", "GridView", "AbapEditor", "TextEdit", "Calendar", "Picture",
+    "HTMLViewer", "Toolbar", "Splitter",
+)
+
+
+# Les sous-types de GuiShell qui sont des FEUILLES : un contrôle à lire par son
+# propre keyword, sous lequel il n'y a rien à descendre. Tout autre sous-type
+# (``Splitter`` d'un GuiSplitterShell, un sous-type inconnu) est un CONTENEUR
+# possible, que les résolveurs de grille et d'arbre traversent (mesuré le
+# 2026-09-08 : refuser un ``Splitter`` cassait la lecture de la grille SE16 de
+# la release 758, enveloppée dans un splitter).
+LEAF_SHELL_SUBTYPES = frozenset({
+    "GridView", "Tree", "Calendar", "AbapEditor", "TextEdit", "HTMLViewer", "Picture",
+})
 
 
 @dataclass(frozen=True)
@@ -48,6 +68,19 @@ class ScreenElement:
     top: Optional[int] = None
     width: Optional[int] = None
     height: Optional[int] = None
+    # Sous-type d'un GuiShell (Tree, GridView, AbapEditor, Calendar...) ;
+    # vide pour tout autre contrôle.
+    subtype: str = ""
+
+    @property
+    def display_type(self) -> str:
+        """Le type tel que la perception l'affiche : ``GuiShell/Tree`` pour
+        un shell dont le sous-type est connu, le type nu sinon. C'est la
+        colonne « type » de la signature ; ``type`` reste ``GuiShell`` pour
+        tous les consommateurs qui raisonnent par type."""
+        if self.subtype:
+            return "%s/%s" % (self.type, self.subtype)
+        return self.type
 
     @property
     def right(self) -> Optional[int]:
@@ -120,6 +153,7 @@ def _element_from(props: dict) -> Optional[ScreenElement]:
         else _as_int(_get(props, "Top")),
         width=_as_int(_get(props, "Width")),
         height=_as_int(_get(props, "Height")),
+        subtype=_as_text(_get(props, "SubType")).strip(),
     )
 
 

@@ -140,6 +140,59 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     exécute un clic win32 matériel à une position **relative à l'élément**
     (survit aux déplacements de fenêtre ; journalisé, jamais silencieux).
     Les ids et libellés restent le chemin nominal.
+  - `_trees`, `_combobox`, `_menus`, `_grid_actions`, `_windows` (2026-09-07,
+    le lot qui a fermé le registre de capacités SAP GUI) : **arbres**
+    (`Read Tree Nodes`, `Select Tree Node By Text`/`By Path`, clés opaques
+    conservées telles quelles, arbres à colonnes lus par leur colonne
+    `TEXT`), **combo box par clé technique** (`Select Combo Box Entry By
+    Key`, `Get Combo Box Entries`) plus les **formats de l'utilisateur**
+    (`Get User Formats` depuis SU3, `Input Date` et `Input Number` qui
+    convertissent une entrée ISO/technique en ce que le dynpro accepte), la
+    **barre de menus par chemin** (`Select Menu Item`), les **actions de
+    grille** au-delà de la lecture (`Double Click Grid Cell`, menu contextuel
+    par code fonction, inventaire de la barre, `Sort Grid By Column`) et les
+    **fenêtres modales** (`Dismiss Modal Window` : plusieurs dialogues SAP
+    refusent `sendVKey`, les replis pressent le bon bouton et la disparition
+    est vérifiée). La perception elle-même affiche `GuiShell/<SubType>`,
+    refuse de servir un ProgID en guise de valeur, et ÉCHOUE en nommant la
+    cause quand la session est illisible au lieu de rendre une vue vide ; le
+    rail STA ré-attache la session par thread. Logique pure dans
+    `sapfx_common.tree_nodes`, `menu_path`, `combo_box`, `user_formats`.
+  - `_identity` (le même soir) : **l'identité du système lue à l'écran**
+    (`Get System Identity`, `System Identity Should Be`), le miroir SAP GUI
+    du `Read System Identity` du canal RFC : « System: Status » ouvert PAR
+    POSITION (le menu System est l'avant-dernier, « Status... » son entrée
+    11 sur les six écrans mesurés) et vérifié structurellement, puis le popup
+    du kernel et la grille « Installed Software » dont la ligne `SAP_BASIS`
+    porte LA release ABAP. Deux systèmes du laboratoire partagent SID et
+    hôte ; seuls release et kernel les distinguent. Les sections illisibles
+    sont NOMMÉES (`unread`), jamais remplacées par une valeur plausible.
+    Logique pure dans `sapfx_common.system_identity`. Le mixin SE16 gagne
+    l'inverse du réglage ALV (`Use Standard List In Data Browser`, une liste
+    classique rendue en labels et lue par `Read Abap List`) et `Get Data
+    Browser Output`.
+  - `_statusbar`, `_tabstrip`, `_toolbar` (2026-09-08, le lot qui a fermé le
+    registre de capacités d'une SECONDE release, ABAP Platform 2023) :
+    l'**identité d'un message** (`Get Status Message Identity` :
+    classe/type/numéro, `MO/E/402`, vide quand rien n'est affiché ; `Status
+    Message Should Be`, deux refus de type E du même écran distingués sans un
+    mot localisé), les **onglets par clé technique** (`List Tabs`, `Get
+    Selected Tab`, `Select Tab`, `Select Tab By Label`, sélection relue ; le
+    jeu d'onglets diverge entre releases) et l'**inventaire de la barre
+    d'application** (`List Toolbar Buttons`, `Click Application Toolbar
+    Button`, les noms d'icône comme ancres locale-safe). Le même lot fait
+    RÉSOUDRE l'entrée « Status... » par `Open System Status` (avant-dernière
+    entrée de l'avant-dernier menu, un dialogue exigé : l'indice 11 gravé
+    cliquait « Log Off » sur la 758) et fait lire le sous-type du shell aux
+    deux résolveurs de contrôle : un arbre à colonnes n'est plus pris pour une
+    ALV, un shell feuille est refusé en nommant son lecteur, un splitter est
+    traversé, et aucun lecteur ne laisse plus fuir une erreur COM brute.
+    Logique pure dans `sapfx_common.status_message`, `tab_strip`, `menu_path`.
+  - `sapfx_common.artifacts` (le même soir, importable comme bibliothèque
+    Robot) : l'**artefact déterministe générique**, JSON trié à périmètre
+    d'empreinte DÉCLARÉ, empreinte recalculée à la relecture (un artefact
+    édité après coup est refusé), différences nommées par chemin à la
+    comparaison ; premier consommateur : le registre de capacités.
   - Le mixin de perception héberge aussi la **sentinelle de dérive**
     (`Check Screen Against Watch` sur le pur `sapfx_common.screen_watch`) :
     les écrans surveillés sont mémorisés (signature structurée + empreinte

@@ -11,7 +11,25 @@ from sapfx_common.gateway_status import (
     classify_gateway_probe,
     format_gateway_failure,
     looks_like_html,
+    refused_by_sap_backend,
 )
+
+# En-têtes RÉELS d'un 401 formé par le serveur ABAP derrière la couche de
+# gestion d'API du bac à sable SAP Business Accelerator Hub (relevé live le
+# 2026-09-06). Le corps est une page HTML en ALLEMAND, ce qui est exactement
+# la raison pour laquelle le discriminant est ici et pas dans le texte.
+_BACKEND_401_HEADERS = {
+    "Content-Type": "text/html; charset=utf-8",
+    "sap-authenticated": "false",
+    "sap-system": "EJS",
+    "www-authenticate": 'Basic realm="SAP NetWeaver Application Server [EJS/100][alias]"',
+    "sap-server": "true",
+}
+
+# Réponse de la couche de gestion d'API elle-même quand elle refuse la clé :
+# son propre format, son propre code d'erreur, aucun marqueur ABAP.
+_EDGE_401_BODY = ('{"fault":{"faultstring":"Invalid ApiKey",'
+                  '"detail":{"errorcode":"oauth.v2.InvalidApiKey"}}}')
 
 
 def test_ok_et_unreachable():
@@ -104,3 +122,44 @@ def test_format_gateway_failure_concatene_detail_et_remediation():
         500, body="/IWFND/CM_COS/003"))
     assert "gateway_inactive" in message
     assert "/IWFND/IWF_ACTIVATE" in message
+
+
+def test_refused_by_sap_backend_lit_les_en_tetes_jamais_le_texte():
+    # Trois marqueurs, chacun suffisant, tous structurels.
+    assert refused_by_sap_backend(_BACKEND_401_HEADERS)
+    assert refused_by_sap_backend({"sap-authenticated": "false"})
+    assert refused_by_sap_backend({"WWW-Authenticate":
+                                   'Basic realm="SAP NetWeaver Application Server [X]"'})
+    assert refused_by_sap_backend({"Sap-System": "EJS"})   # casse indifférente
+    # La couche de gestion d'API n'en porte aucun.
+    assert not refused_by_sap_backend({"Content-Type": "application/json"})
+    assert not refused_by_sap_backend({})
+    assert not refused_by_sap_backend(None)
+    # Un serveur ABAP qui a bien authentifié n'est pas un refus de sa part.
+    assert not refused_by_sap_backend({"sap-authenticated": "true"})
+    # Un itérable de NOMS ne porte aucune valeur : pas de devinette.
+    assert not refused_by_sap_backend(["sap-authenticated"])
+
+
+def test_401_dedouble_selon_la_couche_qui_refuse():
+    # Le cas vécu le 2026-09-06 : clé d'API VALIDE (la couche de gestion la
+    # laisse passer), système ABAP derrière qui refuse. Diagnostiquer
+    # « vérifier vos identifiants » enverrait régénérer une clé saine.
+    derriere = classify_gateway_probe(401, body="<html>Anmeldung fehlgeschlagen",
+                                      headers=_BACKEND_401_HEADERS,
+                                      edge_credential=True)
+    assert derriere["status"] == "backend_auth_failed"
+    assert "ACCEPTÉE" in derriere["detail"] or "acceptée" in derriere["detail"]
+    assert "Ne pas régénérer" in derriere["remediation"]
+    # La couche de gestion refusant la clé reste un auth_failed ordinaire.
+    devant = classify_gateway_probe(401, body=_EDGE_401_BODY, headers={
+        "Content-Type": "application/json"}, edge_credential=True)
+    assert devant["status"] == "auth_failed"
+    # Sans couche devant (Basic sur un ABAP), les MÊMES marqueurs signifient
+    # que ce sont les identifiants du client qui sont refusés : la
+    # distinction ne tient qu'au mode d'authentification, jamais aux en-têtes.
+    direct = classify_gateway_probe(401, headers=_BACKEND_401_HEADERS,
+                                    edge_credential=False)
+    assert direct["status"] == "auth_failed"
+    # Compatibilité : l'appel historique à trois arguments est inchangé.
+    assert classify_gateway_probe(401, "", None)["status"] == "auth_failed"

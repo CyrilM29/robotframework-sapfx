@@ -12,4 +12,5 @@ If the arguments do not say so, first ask the user (in French) for:
   never invent credentials.
 
 Then launch the agent, wait for its result, and relay its French report
-(spec path, scenarios, observed data, missing business keywords) to the user.
+(spec path, persona(s) adopted and domain risks covered, scenarios, observed
+data, missing business keywords) to the user.

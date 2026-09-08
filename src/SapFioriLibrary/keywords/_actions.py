@@ -174,6 +174,12 @@ class ActionKeywords:
         lieu de rendre une liste de ``None``. Retourne une liste vide quand rien
         ne matche : c'est une lecture, pas une assertion (voir
         `Ui5 Control Should Be Visible` pour exiger une présence).
+
+        Une propriété à valeur TABLEAU (``fieldGroupIds``) rend un vrai tableau
+        JSON-safe, jamais sa coercition en chaîne (``[]`` devenait ``''``,
+        indiscernable d'une chaîne vide légitime) ; les autres valeurs objet
+        restent rendues en chaîne. L'inventaire DÉCLARÉ des propriétés (types,
+        défauts, provenance) se lit par `Get Ui5 Control Metadata`.
         """
         selector = build_control_selector(**selector_parts)
         payload = '{"property": %s, "selector": %s}' % (

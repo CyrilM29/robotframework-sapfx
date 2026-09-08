@@ -35,6 +35,14 @@ Chaque étape produit une preuve, sinon elle n'est pas faite.
 - **Le planner n'écrit que ce qu'il a OBSERVÉ.** Pas de « l'écran ressemble
   probablement à ». Chaque scénario porte ses données réelles, ses ids relevés
   et ses points de vigilance.
+- **Le planner pense d'abord en expert du domaine.** Avant d'explorer, il
+  endosse la persona métier de la mission (fiches de `PERSONAS.md` à la racine
+  du studio ; sur un pack déployé, il dérive la même grille lui-même, marquée
+  (SAP général)) et son plan porte une section « Perception métier » : où se
+  lit la vérité, quels risques métier se couvrent d'abord, l'assertion reine
+  du flux, et comment chaque scénario qui écrit se défait. La fiche oriente
+  l'exploration, le live tranche : rien n'entre dans le plan comme un fait
+  sans avoir été vérifié sur la cible.
 - **Le generator EXÉCUTE chaque étape live avant de l'écrire** (`execute_step`,
   keywords métier d'abord). Un keyword non défini dans une resource ou une
   bibliothèque n'existe pas : jamais de nom inventé.

@@ -184,6 +184,32 @@ Wait Until Api Channel Is Available
     [Arguments]    ${alias}=${API_ALIAS}    ${timeout}=2m
     Wait Until Api Available    alias=${alias}    timeout=${timeout}
 
+Skip Unless Api Backend Answers
+    [Documentation]    Saute le scénario (au lieu de le faire rougir) quand la
+    ...    couche de gestion d'API accepte bien notre clé mais que le système
+    ...    derrière elle ne répond pas. Le pendant, pour un canal derrière une
+    ...    couche de gestion, de `Skip Unless Rfc Channel Is Available`.
+    ...
+    ...    Pourquoi ce keyword existe : le 2026-09-06, le bac à sable SAP
+    ...    Business Accelerator Hub a refusé toutes les lectures S/4HANA avec
+    ...    un 401 formé par le système ABAP, alors que la MÊME clé lisait sans
+    ...    peine un autre bac à sable du même fournisseur. Trois scénarios
+    ...    métier sont passés au rouge pour une panne située chez le
+    ...    fournisseur, sur un canal parfaitement sain de notre côté, et le
+    ...    diagnostic a coûté une demi-heure. Une suite qui rougit là où rien
+    ...    n'est cassé de notre fait finit désactivée.
+    ...
+    ...    Le verdict vient de `Get Gateway Status` (état `backend_auth_failed`,
+    ...    déduit des en-têtes du serveur ABAP et non d'un texte localisé), donc
+    ...    une clé RÉELLEMENT invalide sort en `auth_failed` et ne saute pas :
+    ...    ce keyword ne peut pas masquer un défaut d'identifiants.
+    [Arguments]    ${probe_path}    ${alias}=${API_ALIAS}
+    ${etat}=    Get Gateway Status    alias=${alias}    catalog_path=${probe_path}
+    IF    '${etat}[status]' == 'backend_auth_failed'
+        Skip    Cible indisponible côté fournisseur, canal sain : ${etat}[detail]
+    END
+    RETURN    ${etat}
+
 List Available Business Services
     [Documentation]    Perception du canal : ce que le système expose vraiment,
     ...    au lieu de le supposer. L'équivalent API du `Get Screen Signature`

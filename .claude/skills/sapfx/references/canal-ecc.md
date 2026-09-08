@@ -37,15 +37,72 @@ JAMAIS modifié, tout comportement neuf est un mixin (convention #4).
   `Read Table Control`, `Get/Set Table Control Cell` (ligne ABSOLUE, scroll
   automatique), `Find Table Control Row`.
 - **Listes ABAP classiques** (SE38, SE16 sans ALV) : `Read Abap List`, qui
-  reconstruit géométriquement. Exige le mode accessibilité SAP GUI, à
-  provisionner sur le poste : `Get List Rendering Status` /
-  `Abap List Should Be Readable` le CONSTATENT.
+  reconstruit géométriquement. La liste SE16 STANDARD (`Use Standard List In
+  Data Browser`, l'inverse du réglage ALV ; `Get Data Browser Output` lit le
+  mode courant à restaurer en teardown) est rendue en labels et se lit sans
+  aucun réglage de poste (mesuré 2026-09-07). Le mode accessibilité SAP GUI
+  ne concerne qu'une liste rendue dans un shell opaque sans label, cas jamais
+  observé sur le poste de laboratoire : `Get List Rendering Status` /
+  `Abap List Should Be Readable` le CONSTATENT, en lisant le sous-type du
+  shell (une `GridView` se lit par `Read Grid`, jamais une alerte).
 - **Aide à la recherche** : `Pick F4 Value` (F4 ouvert, entrée choisie en grille
   ou en liste, popup refermé ; valeur introuvable = F12 puis échec listant un
   échantillon).
 - **Zones opaques** (intérieur d'un GuiShell, GuiChart, drag and drop) :
   `Click Element At Offset`, le geste matériel en DERNIER recours, position
   relative journalisée.
+- **Grilles ALV, au-delà de la lecture** (2026-09-07) : `Double Click Grid
+  Cell` (le détail d'une ligne), `List Grid Context Menu` / `Select Grid
+  Context Menu Item` par code fonction (`&FILTER`, `&FIND`, `&XXL` : stables,
+  textes localisés), `List Grid Toolbar Buttons`, `Sort Grid By Column`
+  (barre de la grille ou menu contextuel ; SE16 porte son tri dans la barre
+  d'application, l'échec le dit). `Doubleclick Element` et `Select Context
+  Menu Item` hérités sont surchargés sur une grille.
+- **Arbres** (menu SAP Easy Access, IMG de SPRO, SE80, SM59, SICF :
+  `GuiShell/Tree`) : `Read Tree Nodes` (clés opaques rendues TELLES QUELLES,
+  padding compris ; un arbre à colonnes porte son texte dans `TEXT`),
+  `Read Tree Children`, `Expand Tree Node`, `Select Tree Node`, `Select Tree
+  Node By Text`, `Select Tree Node By Path` (`A > B > C`), `Get Selected Tree
+  Node`, `Double Click Tree Node`, `Find Tree Nodes`.
+- **Combo box** : `Get Combo Box Entries`, `Get Combo Box Key`, `Select Combo
+  Box Entry By Key` (la voie locale-safe ; `Select From List By Label` hérité
+  est surchargé : combo en affichage et libellé inconnu sont refusés en le
+  disant).
+- **Formats de l'utilisateur** : `Get User Formats` (SU3 > Defaults, clés
+  `DATFM`/`DCPFM`, à appeler en Suite Setup) puis `Input Date` (ISO en
+  entrée) et `Input Number` (notation technique en entrée) : un dynpro
+  refuse une date ISO par un type E, et l'utilisateur du trial est en
+  `DD.MM.YYYY` / `1.234.567,89`.
+- **Calendrier F4** : `Pick Calendar Date    <champ>    AAAA-MM-JJ` (le F4
+  d'un champ date ouvre un `GuiShell/Calendar`, pas une liste ; `Pick F4
+  Value` le nomme).
+- **Menus** : `Select Menu Item    System > Status` (textes, localisés :
+  page object) ou `4 > 11` (positions) ; `List Menu Items`.
+- **Onglets** : `Select Tab    <tabstrip>    LOGO` par CLÉ technique (le
+  suffixe `tabp<CLÉ>`), `Get Selected Tab`, `List Tabs`, `Select Tab By Label`
+  (libellé localisé : page object). Le jeu d'onglets diverge d'une release à
+  l'autre : ne jamais graver une liste.
+- **Barre d'application** : `List Toolbar Buttons` (id, icône `ICON_*`,
+  tooltip), `Click Application Toolbar Button` par id, segment ou icône.
+- **Identité d'un message** : `Get Status Message Identity` rend
+  classe/type/numéro (`MO/E/402`) ; `Status Message Should Be    MO    402` :
+  deux refus de type E du même écran se distinguent sans texte localisé.
+- **Identité du système** : `Get System Identity` lit « System: Status »
+  (ouvert PAR POSITION RÉSOLUE : le menu System est l'avant-dernier,
+  « Status... » l'avant-dernière entrée de ce menu, un dialogue étant exigé
+  avant de cliquer ; vérifié structurellement), son popup du kernel et la grille
+  « Installed Software » : release SAP_BASIS, kernel, serveur
+  `hôte_SID_instance`, base. Deux systèmes de laboratoire partagent SID et
+  hôte, seuls release et kernel les distinguent ; `System Identity Should Be
+  basis_release=754    kernel_release=777` en garde de tête. Les sections
+  illisibles sont NOMMÉES dans `unread`, jamais remplacées par une valeur.
+- **Cases et radios par libellé** : `Select Checkbox By Label`, `Unselect
+  Checkbox By Label`, `Select Radio Button By Label`, `Checkbox By Label
+  Should Be`, sur le TEXTE PROPRE du contrôle (« Sched. », pas « Scheduled »).
+- **Perception** : la signature affiche `GuiShell/<SubType>` ; `Get Value` sur
+  un shell REFUSE de rendre son ProgID et nomme le lecteur ; une session
+  illisible ÉCHOUE (jamais `# screen ?` ni `[]` en PASS) ; la carte `@N` ne
+  liste plus les menus.
 
 ## Localisateurs humains et auto-réparation
 
@@ -120,7 +177,8 @@ Artifact`, `Read Ddic Table Fields`). Les primitives d'ÉCRAN SE16 vivent à cô
 endroit : statut type `E`, popup de choix des champs, dialogue de génération,
 attente de l'écran généré), `Fill Multiple Selection`,
 `Get Se16 Selection Criteria` (carte `I<n>` vers champ, DÉRIVÉE live et jamais
-écrite à la main), `Use ALV Grid In Data Browser` et
+écrite à la main), `Use ALV Grid In Data Browser` (et son inverse `Use
+Standard List In Data Browser`, `Set`/`Get Data Browser Output`) et
 `Count Entries On Current Selection Screen`.
 
 Trois garde-fous « jamais vert et faux » : grille absente hors écran de

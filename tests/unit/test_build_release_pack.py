@@ -395,6 +395,8 @@ _REF_SCRIPT = re.compile(r"scripts/([A-Za-z0-9_]+)\.py")
 #: Une par une, comme les autres échappatoires du dépôt : ajouter une référence
 #: oblige à trancher entre « embarquer » et « justifier ici ».
 _REF_HORS_SUJET = (
+    ("regen_agent_definitions.py", ".github/agents/",
+     "bandeau de source generee : regeneration reservee au mainteneur"),
     ("regen_agent_definitions.py", ".github/chatmodes/",
      "bandeau « fichier GÉNÉRÉ, régénérer avec » : geste de mainteneur"),
     ("regen_agent_definitions.py", ".claude/skills/sapfx/",

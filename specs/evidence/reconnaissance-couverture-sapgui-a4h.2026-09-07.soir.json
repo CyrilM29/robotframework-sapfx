@@ -1,0 +1,767 @@
+{
+  "date": "2026-09-07",
+  "hash_change_v7_to_v8": {
+    "conclusion": "les 18 preuves de v7 et de v8 sont identiques ; la difference d'empreinte tient a la canonisation JSON du module generique (v7 re-hache != v7 enregistre) et aux deux cles ajoutees (v8 enregistre != v8 sans les deux cles) ; verifiable en rejouant ce calcul",
+    "identical_content_v7_vs_v8_minus_new_keys": true,
+    "v7_capabilities_rehashed_by_sapfx_common_artifacts": "ac772a6298425fb309ddb0215b7cb5aec16a3a8447e3fd9fc97c6e395e7475b5",
+    "v7_recorded_sha256": "e78277c2997f57648f47c7e83eacdc1924b55c63ae14d022505b26ff5be67568",
+    "v8_capabilities_without_the_two_new_keys_rehashed": "ac772a6298425fb309ddb0215b7cb5aec16a3a8447e3fd9fc97c6e395e7475b5",
+    "v8_recorded_sha256": "2348591c233e3452db0c4cd61c26523e1327eed0bebf70a147a7142eee69cd5c"
+  },
+  "mission": "reconnaissance-couverture-sapgui-a4h",
+  "phase": "soir : lot de correction livre dans src/, registre rejoue, forme couverte, revue independante",
+  "probes_soir": {
+    "se16_standard_list": "radio radTB_DUMMY 'Standard SE16 list' ; T000 executee = SAPMSSY0/SE16/120, 42 GuiLabel, shell_rendered False, accessibility_mode_needed False, Read Abap List = 5 lignes (en-tete, noms de champs, mandants 000 et 001) ; grille ALV restauree et relue ; registre Windows sans cle Accessibility sous SAP Frontend Server",
+    "system_status": "menu System = avant-dernier menu de la barre et 'Status...' = entree 11 sur SESSION_MANAGER, SE16, SU01, SM37, SE38, SE11 (SAPLSHSY/<tcode>/700) ; champs a ids techniques txtSYST-*, txtSERVERNAME=vhcala4hci_A4H_00 ; popup Kernel information (btn[17], SAPLSHSY/701) : KERNEL_RELEASE=777, KERNEL_PATCH_LEVEL=500, SUPPORTED_SAP_VERS='753, 754, 777', IP_ADDRESS volatile ; dialogue Installed Software (btnPRELINFO, SAPLOCS_UI_CONTROLS/300, modal informatif) : grille COMPONENT/RELEASE/EXTRELEASE/HIGH_PATCH, SAP_BASIS 754 0007 SAPK-75407INSAPBASIS"
+  },
+  "rail_sta_via_rf_mcp": {
+    "artifact": "aucun artefact de resultats inspectable : releve de session rf-mcp consigne par l'auteur (les pas sont enregistres par le serveur, mais la session porte le mot de passe en argument de Open SAP And Log In et n'est donc pas exportee) ; la revue independante classe cette seule sous-affirmation not_verified",
+    "closed_with": "Close SAP (use_context=true), PASS",
+    "morning_symptom": "les memes appels rendaient [] et '# screen ?' en PASS depuis un thread etranger",
+    "probe": [
+      {
+        "result": "[{'id': 'wnd[0]', 'type': 'GuiMainWindow', 'title': 'SAP Easy Access  -  User Menu for John Doe', 'modal': False}]",
+        "step": "Get Open Windows",
+        "use_context": false
+      },
+      {
+        "result": "4/4 PASS ; 1 fenetre ; signature de 165 lignes, en-tete '# screen SAPLSMTR_NAVIGATION/SESSION_MANAGER/100' ; thread du batch 51264, thread d'un Evaluate ulterieur 6416 (distincts)",
+        "step": "execute_batch: Get Open Windows + Get Screen Signature mode=full + Evaluate + Element Should Be Present wnd[0]"
+      }
+    ],
+    "session": "recon-rail (serveur rf-mcp NON redemarre : modules recharges par importlib, instance hot-swappee, Attach To Open Session 0 0 en contexte)"
+  },
+  "review": {
+    "round_3": "verified (sap-verifier, lecture seule, sur v6) ; quatre reserves non bloquantes : (a) identite de release non mesuree (backlog 2.25), (b) restauration de la date non relue (corrigee, rejouee en v7), (c) cles d'onglet SU01 en libelles anglais dans la carte du page object (acceptee : noms de carte, rien n'est asserte contre l'ecran), (d) preuve du rail STA via rf-mcp sans artefact (not_verified pour cette seule sous-affirmation)",
+    "round_4": "verified (sap-verifier, lecture seule, sur v8) ; quatre reserves non bloquantes traitees : missing_fields distinct de unread dans Get System Identity, restauration de la date en [Teardown] aux scenarios 7 et 9 (v9), docstrings Read Abap List / Get List Rendering Status reprises et Libdoc refaite, cause du changement d'empreinte rendue verifiable (hash_change_v7_to_v8)"
+  },
+  "runs": [
+    {
+      "expected": "les scenarios de manque rougissent en nommant la mise a jour du plan et du registre",
+      "failed": 18,
+      "name": "rejeu du registre (forme manques) sur la bibliotheque corrigee",
+      "passed": 1,
+      "register_sha256": "7ed7076f5f069f7cf1f47b6c7f7506eb708dc25634e30f84034306ea4ebc60ee",
+      "results_dir": "results/reconnaissance_after_fix",
+      "start": "2026-09-07T17:43:20.640728",
+      "tests": [
+        {
+          "message": "Capacité 'perception.shell_subtype' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "La perception ne distingue pas les sous-types de shell",
+          "status": "FAIL"
+        },
+        {
+          "message": "ValueError: Get Value sur 'wnd[0]/usr/cntlIMAGE_CONTAINER/shellcont/shell/shellcont[0]/shell' rendrait le ProgID 'SAP.TableTreeControl.1' du contrôle, pas une donnée d'écran (GuiShell/Tree). Lire l'arbre avec Read Tree Nodes / Get Selected Tree Node.",
+          "name": "L'arbre du menu SAP n'a pas de keyword de lecture",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'tree.select_node' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Sélectionner un nœud d'arbre reste fragile",
+          "status": "FAIL"
+        },
+        {
+          "message": "ValueError: Get Value sur 'wnd[0]/usr/cntlTREE_CONTROL_CONTAINER/shellcont/shell' rendrait le ProgID 'SAP.TableTreeControl.1' du contrôle, pas une donnée d'écran (GuiShell/Tree). Lire l'arbre avec Read Tree Nodes / Get Selected Tree Node.",
+          "name": "L'arbre à colonnes de l'IMG est illisible par keyword",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'combobox.display_mode' : échec observé 'ValueError: La combo 'wnd[0]/usr/tabsTABSTRIP1/tabpLOGO/ssubMAINAREA:SAPLSUID_MAINTENANCE:1101/cmbSUID_ST_NODE_LOGONDATA-USTYP' est en AFFICHAGE (Changeable=False) : rien à sélectionner sur cet écran (mode Display), passer en mode modification d'abord.' au lieu du motif 'AttributeError: Property '<unknown>.value' can not be set.' : capacité modifié",
+          "name": "Une combo box en affichage échoue sans le dire",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'combobox.select_by_key' : échec observé 'com_error: (-2147352567, 'Une exception s’est produite.', (613, 'SAP Frontend Server', 'The method got an invalid argument.', None, 0, 0), None)' au lieu du motif 'AttributeError: Property '<unknown>.value' can not be set.' : capacité modifiée (couverte ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Une combo box modifiable se sélectionne par libellé, jamais par clé",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'date.input_user_format' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "La saisie d'une date dépend du format de l'utilisateur",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'user.formats' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Le format de l'utilisateur se lit dans SU01 mais aucun keyword ne l'exploite",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'f4.calendar' : échec observé 'L'aide F4 de 'wnd[0]/usr/ctxtBTCH2170-FROM_DATE' est un CALENDRIER (GuiShell/Calendar 'wnd[1]/usr/cntlCONTAINER/shellcont/shell'), pas une liste de valeurs : choisir la date avec Pick Calendar Date (date ISO AAAA-MM-JJ), ou la saisir avec Input Date.' au lieu du motif 'Aucune entrée '01.09.2026' dans l'aide F4 de '*'. Valeurs visibles (extrait) : aucune lisi",
+          "name": "L'aide F4 d'une date ouvre un calendrier que Pick F4 Value ne sait pas piloter",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'grid.double_click_cell' : le keyword a PASSÉ (retour : None) là où le plan attend l'échec 'AttributeError: <unknown>.doubleClickItem' : capacité désormais couverte : mettre à jour le plan et le registre.\n\nAlso teardown failed:\nSeveral failures occurred:\n\n1) ValueError: Cannot send Vkey to given window, is window wnd[1] actually open?\n\n2) ValueError: Cannot send Vkey to given window, is w",
+          "name": "Le double-clic d'une cellule de grille appelle l'API des arbres",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'grid.context_menu' : le keyword a PASSÉ (retour : None) là où le plan attend l'échec 'ValueError: Cannot use keyword 'select context menu item' for element type 'GuiShell'' : capacité désormais couverte : mettre à jour le plan et le registre.",
+          "name": "Le menu contextuel d'une grille est refusé par type",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'grid.toolbar_inventory' : échec observé 'ValueError: Cannot find Button_id '&SORT_DSC'. La grille n'a pas de barre d'outils propre : ses fonctions vivent dans la barre d'application (Click Button By Label par tooltip, ou le menu contextuel : List Grid Context Menu).' au lieu du motif 'ValueError: Cannot find Button_id '&SORT_DSC'.' : capacité modifiée (couverte ou perdue) : mettre à jour",
+          "name": "Un bouton de barre d'outils absent est refusé sans inventaire",
+          "status": "FAIL"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "message": "Capacité 'editor.get_value_refuses' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Get Value sur un éditeur ABAP rend le ProgID",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'checkbox.by_own_label' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Une case à cocher ne se trouve pas par son propre libellé",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'menu.select_by_path' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Un menu se sélectionne par position, jamais par chemin",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'screen_map.menus_first' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "La carte numérotée commence par les menus",
+          "status": "FAIL"
+        },
+        {
+          "message": "Capacité 'perception.list_status_on_grid' : verdict observé 'covered', attendu par le plan 'gap' : capacité désormais couverte (ou perdue) : mettre à jour le plan et le registre.",
+          "name": "Le préflight de liste prend une grille ALV pour une liste illisible",
+          "status": "FAIL"
+        },
+        {
+          "message": "Le registre porte 18 capacités attendues, mais un autre nombre d'entrées : mettre à jour le plan et le registre.",
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "FAIL"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "expected": "19/19, registre a 18 covered",
+      "failed": 0,
+      "name": "forme couverte, premiere validation (v5)",
+      "passed": 19,
+      "register_sha256": "c77d76a2c16cc0a6108fe8bf8bb5e45701478c3a61cb76690259ee4c2a3b655e",
+      "results_dir": "results/reconnaissance_v5",
+      "start": "2026-09-07T18:08:50.426649",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "expected": "19/19, registre a 18 covered, target renseigne",
+      "failed": 0,
+      "name": "forme couverte apres la revue independante (v6) : cle de combo telle quelle, case basculee vers l'etat oppose, date confrontee a la forme locale relevee, identite de cible dans le registre",
+      "passed": 19,
+      "register_sha256": "e78277c2997f57648f47c7e83eacdc1924b55c63ae14d022505b26ff5be67568",
+      "register_target": {
+        "client": "001",
+        "system": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reconnaissance_v6",
+      "start": "2026-09-07T18:50:37.415541",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "date_restoration_verified": [
+        {
+          "status": "PASS",
+          "test": "La saisie d'une date se convertit au format de l'utilisateur"
+        },
+        {
+          "status": "PASS",
+          "test": "Le calendrier F4 d'une date se pilote"
+        }
+      ],
+      "expected": "19/19, registre a 18 covered, empreinte des capacites identique a v6 (aucune preuve ne change)",
+      "failed": 0,
+      "name": "forme couverte apres la troisieme revue (v7) : restauration de la date VERIFIEE (type de message vide et valeur relue) aux scenarios 7 et 9",
+      "passed": 19,
+      "register_sha256": "e78277c2997f57648f47c7e83eacdc1924b55c63ae14d022505b26ff5be67568",
+      "register_target": {
+        "client": "001",
+        "system": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reconnaissance_v7",
+      "start": "2026-09-07T22:45:17.876865",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "expected": "21/21 ; l'empreinte des capacites change par rapport a v5-v7 (canonisation JSON du module generique + deux cles de plus), le perimetre hache reste 'capabilities'",
+      "failed": 0,
+      "name": "registre etendu a 20 cles (v8) : liste SE16 standard lue en labels (scenario 19), identite du systeme avec release SAP_BASIS et kernel (scenario 20), registre ecrit et relu par sapfx_common.artifacts (scenario 21)",
+      "new_key_proofs": {
+        "identity.release_and_kernel": "A4H/001 SAP_BASIS 754 SP 0007, kernel 777 PL 500, non lu : [], aucun modal résiduel : True",
+        "list.standard_se16_readable": "Liste standard : 42 labels, shell=False, accessibilité=False, 5 ligne(s) lue(s)"
+      },
+      "passed": 21,
+      "register_hash_scope": {
+        "excluded_keys": [
+          "generated_at",
+          "hash_scope",
+          "sha256"
+        ],
+        "hashed_keys": [
+          "capabilities"
+        ]
+      },
+      "register_sha256": "2348591c233e3452db0c4cd61c26523e1327eed0bebf70a147a7142eee69cd5c",
+      "register_target": {
+        "basis_release": "754",
+        "basis_sp_level": "0007",
+        "client": "001",
+        "database_system": "HDB",
+        "kernel_patch_level": "500",
+        "kernel_release": "777",
+        "product_version_text": "- See Details -",
+        "server_name": "vhcala4hci_A4H_00",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reconnaissance_v8",
+      "start": "2026-09-07T23:30:02.239829",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "La liste SE16 standard se lit en labels",
+          "status": "PASS"
+        },
+        {
+          "name": "L'identité du système prouve sa release et son kernel",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ],
+      "verdicts": {
+        "checkbox.by_own_label": "covered",
+        "combobox.display_mode": "covered",
+        "combobox.select_by_key": "covered",
+        "date.input_user_format": "covered",
+        "editor.get_value_refuses": "covered",
+        "f4.calendar": "covered",
+        "grid.context_menu": "covered",
+        "grid.double_click_cell": "covered",
+        "grid.in_tabstrip_subscreen": "covered",
+        "grid.toolbar_inventory": "covered",
+        "identity.release_and_kernel": "covered",
+        "list.standard_se16_readable": "covered",
+        "menu.select_by_path": "covered",
+        "perception.list_status_on_grid": "covered",
+        "perception.shell_subtype": "covered",
+        "screen_map.menus_first": "covered",
+        "tree.column_tree_read": "covered",
+        "tree.read_nodes": "covered",
+        "tree.select_node": "covered",
+        "user.formats": "covered"
+      }
+    },
+    {
+      "date_restoration_teardowns": [
+        {
+          "status": "PASS",
+          "test": "La saisie d'une date se convertit au format de l'utilisateur"
+        },
+        {
+          "status": "PASS",
+          "test": "Le calendrier F4 d'une date se pilote"
+        }
+      ],
+      "expected": "21/21, empreinte des capacites identique a v8",
+      "failed": 0,
+      "name": "quatrieme revue traitee (v9) : restauration de la date en [Teardown] aux scenarios 7 et 9, missing_fields dans Get System Identity ; aucun verdict ni preuve ne change",
+      "passed": 21,
+      "register_sha256": "2348591c233e3452db0c4cd61c26523e1327eed0bebf70a147a7142eee69cd5c",
+      "register_target": {
+        "basis_release": "754",
+        "basis_sp_level": "0007",
+        "client": "001",
+        "database_system": "HDB",
+        "kernel_patch_level": "500",
+        "kernel_release": "777",
+        "product_version_text": "- See Details -",
+        "server_name": "vhcala4hci_A4H_00",
+        "system_id": "A4H",
+        "user": "DEVELOPER"
+      },
+      "results_dir": "results/reconnaissance_v9",
+      "same_capabilities_hash_as_v8": true,
+      "start": "2026-09-08T09:06:09.895079",
+      "tests": [
+        {
+          "name": "La perception distingue les sous-types de shell",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre du menu SAP se lit par keyword",
+          "status": "PASS"
+        },
+        {
+          "name": "Sélectionner un nœud d'arbre est vérifié",
+          "status": "PASS"
+        },
+        {
+          "name": "L'arbre à colonnes de l'IMG se lit",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box en affichage est refusée en le disant",
+          "status": "PASS"
+        },
+        {
+          "name": "Une combo box modifiable se sélectionne par clé",
+          "status": "PASS"
+        },
+        {
+          "name": "La saisie d'une date se convertit au format de l'utilisateur",
+          "status": "PASS"
+        },
+        {
+          "name": "Les formats de l'utilisateur se lisent par clé technique",
+          "status": "PASS"
+        },
+        {
+          "name": "Le calendrier F4 d'une date se pilote",
+          "status": "PASS"
+        },
+        {
+          "name": "Le double-clic d'une cellule ouvre le détail",
+          "status": "PASS"
+        },
+        {
+          "name": "Le menu contextuel d'une grille se pilote par code fonction",
+          "status": "PASS"
+        },
+        {
+          "name": "Un bouton de barre d'outils absent est refusé avec inventaire",
+          "status": "PASS"
+        },
+        {
+          "name": "Une grille dans un sous-écran de tabstrip se lit (témoin couvert)",
+          "status": "PASS"
+        },
+        {
+          "name": "Get Value sur un éditeur ABAP refuse",
+          "status": "PASS"
+        },
+        {
+          "name": "Une case à cocher se coche par son texte propre",
+          "status": "PASS"
+        },
+        {
+          "name": "Un menu se sélectionne par chemin",
+          "status": "PASS"
+        },
+        {
+          "name": "La carte numérotée commence par la zone actionnable",
+          "status": "PASS"
+        },
+        {
+          "name": "Le préflight de liste reconnaît une grille ALV",
+          "status": "PASS"
+        },
+        {
+          "name": "La liste SE16 standard se lit en labels",
+          "status": "PASS"
+        },
+        {
+          "name": "L'identité du système prouve sa release et son kernel",
+          "status": "PASS"
+        },
+        {
+          "name": "Le registre est écrit, déterministe, et conforme au plan",
+          "status": "PASS"
+        }
+      ]
+    }
+  ],
+  "target": {
+    "client": "001",
+    "language": "EN",
+    "release": "ABAP Platform 1909 (754)",
+    "sap_gui": "8.00",
+    "system": "A4H",
+    "user": "DEVELOPER"
+  }
+}

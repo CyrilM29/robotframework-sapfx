@@ -49,9 +49,19 @@ _SE16_MAX_HITS = "wnd[0]/usr/txtMAX_SEL"
 _SE16_COUNT_BUTTON = "wnd[0]/tbar[1]/btn[31]"
 _SE16_COUNT_RESULT = "wnd[1]/usr/txtG_DBCOUNT"
 _SE16_SETTINGS_MENU = "wnd[0]/mbar/menu[3]/menu[0]"
-_SE16_ALV_GRID_RADIO = ("wnd[1]/usr/tabsG_TABSTRIP/tabp0400/"
-                        "ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/"
-                        "radRSEUMOD-TBALV_GRID")
+_SE16_OUTPUT_TAB = ("wnd[1]/usr/tabsG_TABSTRIP/tabp0400/"
+                    "ssubTOOLAREA:SAPLWB_CUSTOMIZING:0400/")
+_SE16_ALV_GRID_RADIO = _SE16_OUTPUT_TAB + "radRSEUMOD-TBALV_GRID"
+# Les trois sorties du Data Browser (dialogue « User-Specific Settings »,
+# onglet Data Browser, relevé live 2026-09-07) : la grille ALV (le seul objet
+# grille scriptable), la liste ALV, et la « Standard SE16 list », une liste
+# ABAP classique rendue en GuiLabel (dynpro SAPMSSY0/120), lisible par
+# `Read Abap List` sans mode accessibilité (42 labels mesurés sur T000).
+_SE16_OUTPUT_RADIOS = {
+    "alv_grid": _SE16_ALV_GRID_RADIO,
+    "alv_list": _SE16_OUTPUT_TAB + "radRSEUMOD-TBALV_STAN",
+    "standard_list": _SE16_OUTPUT_TAB + "radTB_DUMMY",
+}
 _DD02L_MULTI_BUTTON = "wnd[0]/usr/btn%_I1_%_APP_%-VALU_PUSH"
 _MULTI_TABLE = ("wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/"
                 "ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE")
@@ -161,15 +171,77 @@ class Se16Keywords:
         idempotent : à appeler UNE fois en Suite Setup. Repart de l'écran
         initial SE16, donc utilisable à tout moment. Lecture seule au sens
         métier : ne modifie aucune donnée, seulement une préférence
-        d'affichage du compte de service."""
+        d'affichage du compte de service. Son inverse : `Use Standard List
+        In Data Browser` ; le réglage courant se lit par `Get Data Browser
+        Output`."""
+        self.set_data_browser_output("alv_grid")
+
+    def use_standard_list_in_data_browser(self):
+        """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
+        **liste SE16 standard** (Settings → User Parameters → Standard SE16
+        list), l'inverse de `Use ALV Grid In Data Browser`.
+
+        Cette sortie est une liste ABAP CLASSIQUE (dynpro ``SAPMSSY0/120``)
+        rendue en ``GuiLabel`` : aucun objet grille, mais `Read Abap List` la
+        reconstruit (mesuré live le 2026-09-07 sur A4H / SAP GUI 8.00 : 42
+        labels sur T000, ``accessibility_mode_needed`` faux, aucun réglage de
+        poste requis). C'est la cible du registre de capacités pour la lecture
+        des listes classiques, et la voie de secours d'un compte qui ne peut
+        pas activer la grille ALV. Persistant par utilisateur : restaurer la
+        grille ALV en teardown quand une campagne l'a basculé."""
+        self.set_data_browser_output("standard_list")
+
+    def set_data_browser_output(self, mode):
+        """Pose la sortie du Data Browser : ``alv_grid``, ``alv_list`` ou
+        ``standard_list`` (les trois radios du dialogue « User-Specific
+        Settings »). Mode inconnu = refus listant les trois. Persistant par
+        utilisateur, idempotent, validé par Entrée sur le dialogue. Retourne
+        le mode posé."""
+        wanted = str(mode or "").strip().lower()
+        radio = _SE16_OUTPUT_RADIOS.get(wanted)
+        if radio is None:
+            raise ValueError(
+                "Sortie du Data Browser %r inconnue : attendu %s."
+                % (mode, ", ".join(_SE16_OUTPUT_RADIOS)))
+        self.run_transaction("SE16")
+        self.wait_until_busy_done()
+        self.click_element(_SE16_SETTINGS_MENU)
+        self.wait_until_busy_done()
+        self.wait_until_element_present(radio)
+        self.select_radio_button(radio)
+        self.send_vkey(0, window=1)
+        self.wait_until_busy_done()
+        return wanted
+
+    def get_data_browser_output(self):
+        """Lit la sortie COURANTE du Data Browser de l'utilisateur
+        (``alv_grid`` / ``alv_list`` / ``standard_list``) dans le dialogue
+        « User-Specific Settings », refermé SANS rien changer (`Dismiss Modal
+        Window`). C'est la valeur à mémoriser en Suite Setup pour la restaurer
+        en teardown. Aucun radio coché, ou plusieurs = échec (le dialogue n'a
+        pas la forme attendue), jamais un mode deviné."""
         self.run_transaction("SE16")
         self.wait_until_busy_done()
         self.click_element(_SE16_SETTINGS_MENU)
         self.wait_until_busy_done()
         self.wait_until_element_present(_SE16_ALV_GRID_RADIO)
-        self.select_radio_button(_SE16_ALV_GRID_RADIO)
-        self.send_vkey(0, window=1)
-        self.wait_until_busy_done()
+        selected = [mode for mode, radio in _SE16_OUTPUT_RADIOS.items()
+                    if self._radio_selected(radio)]
+        self.dismiss_modal_window(1)
+        if len(selected) != 1:
+            self.take_screenshot()
+            raise AssertionError(
+                "Le dialogue des paramètres SE16 porte %d sortie(s) cochée(s) (%s) : "
+                "forme inattendue, lire le dialogue par Get Screen Signature."
+                % (len(selected), ", ".join(selected) or "aucune"))
+        return selected[0]
+
+    def _radio_selected(self, radio_id):
+        try:
+            radio = self.session.findById(radio_id, False)
+        except (AttributeError, com_error):
+            return False
+        return bool(getattr(radio, "Selected", False)) if radio is not None else False
 
     def count_entries_on_current_selection_screen(self):
         """Compte les entrées répondant à l'écran de sélection SE16 COURANT,

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "mission_id": "reconnaissance-couverture-sapgui-a4h-2026-09-07",
+  "target": "a4h-1909-client-001",
+  "invariant": "Le registre des capacites SapEccLibrary est exact : chaque scenario reproduit UN manque (ou un temoin couvert) sur l'ecran SAP GUI reel et consigne un verdict gap/covered/poste/hors_api ; un scenario echoue en nommant la mise a jour du registre le jour ou la bibliotheque comble le manque ; aucun manque n'est contourne dans la suite ni dans un page object (convention 12).",
+  "scope": [
+    "tests/robot/ui/ecc",
+    "resources/page_objects",
+    "specs/reconnaissance-couverture-sapgui-a4h.md"
+  ],
+  "mode": "explore",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/reconnaissance-couverture-sapgui-a4h.md",
+      "sha256": "c728eafcb423b2a6dbd9c80ee255d3d179e97327a28c717cdbb8bfea547f63e1"
+    },
+    {
+      "path": "specs/evidence/reconnaissance-couverture-sapgui-a4h.2026-09-07.json",
+      "sha256": "bd910c0c203f048497263c9bce46991eaea5c2adb9ec59c8573808678b8caf81"
+    },
+    {
+      "path": "specs/evidence/reconnaissance-couverture-sapgui-a4h.2026-09-07.soir.json",
+      "sha256": "f071fa030a8e9472e309c78eab69adc322558b67b394ced6463b9381d0d97bd9"
+    }
+  ]
+}

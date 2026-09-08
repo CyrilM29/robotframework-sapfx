@@ -15,6 +15,7 @@ aux démos et au débogage. Les boucles de sondage/relance elles-mêmes vivent d
 """
 from robot.utils import secs_to_timestr, timestr_to_secs
 
+from sapfx_common.com_safety import describe_com_failure
 from sapfx_common.polling import poll_until, retry_call
 
 
@@ -34,14 +35,29 @@ class WaitKeywords:
         Sauvegarde, ouverture d'une transaction) avant de faire des assertions sur
         l'écran résultant.
         """
+        last_error = {}
+
         def idle():
             try:
-                return not self.session.Busy
-            except Exception:  # session momentanément indisponible pendant l'aller-retour
+                busy = self.session.Busy
+            except Exception as exc:  # noqa: BLE001
+                # session momentanément indisponible pendant l'aller-retour :
+                # on retente, MAIS on garde la dernière cause pour le message
+                # d'échec (relevé live 2026-09-07 : une panne COM cross-thread
+                # sortait en « still busy » sur un écran au repos).
+                last_error["exc"] = exc
                 return False
+            last_error.pop("exc", None)
+            return not busy
 
         if not poll_until(idle, self._timeout_secs(timeout), step=self.poll_interval):
             self.take_screenshot()
+            cause = last_error.get("exc")
+            if cause is not None:
+                raise AssertionError(
+                    "SAP session could not be probed for %s seconds: the Busy "
+                    "probe kept failing, so the screen may be idle. Last error: %s"
+                    % (self._timeout_secs(timeout), describe_com_failure(cause)))
             raise AssertionError(
                 "SAP session was still busy after %s seconds." % self._timeout_secs(timeout)
             )

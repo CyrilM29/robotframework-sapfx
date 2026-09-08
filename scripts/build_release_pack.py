@@ -100,12 +100,19 @@ PACK_TREES = [
     # tout chemin que l'export public exclut.
     (".claude/skills/sapfx", ".claude/skills/sapfx"),
     (".github/chatmodes", ".github/chatmodes"),
+    (".github/agents", ".github/agents"),
 ]
 
 # Fichiers copiés un à un (relatif dépôt -> relatif pack). Les fichiers de
 # packaging/ atterrissent à la racine du pack ; recorder.cmd vient de packaging/
 # (variante venv-first), pas de la racine du dépôt (variante PATH).
 PACK_FILES = [
+    (".claude/agent-contract.md", ".claude/agent-contract.md"),
+    ("packaging/agent-settings.json", ".claude/settings.json"),
+    ("scripts/hook_agent_permissions.py", "scripts/hook_agent_permissions.py"),
+    ("scripts/agent_contract.py", "scripts/agent_contract.py"),
+    ("scripts/agent_journal.py", "scripts/agent_journal.py"),
+    ("tests/agent_eval/cases.json", "tests/agent_eval/cases.json"),
     ("LICENSE", "LICENSE"),
     ("NOTICE", "NOTICE"),
     ("tests/robot/ecc_smoke.robot", "tests/robot/ecc_smoke.robot"),

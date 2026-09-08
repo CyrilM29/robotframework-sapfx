@@ -124,20 +124,21 @@ Confirm Popup
     END
 
 Cancel Popup
-    [Documentation]    Annule une fenêtre modale si elle est présente. Dialogue de
-    ...                question SAP (SPOP) : clique le 2e bouton (``btnSPOP-OPTION2``,
-    ...                Non/Annuler) ; sinon envoie F12 à la modale (``window=1``). Ne fait
-    ...                rien si aucun popup n'est ouvert.
-    ${present}=    Popup Is Present
-    IF    ${present}
-        ${spop}=    Run Keyword And Return Status    Element Should Be Present    wnd[1]/usr/btnSPOP-OPTION2
-        IF    ${spop}
-            Click Element    wnd[1]/usr/btnSPOP-OPTION2
-        ELSE
-            Send Vkey    12    window=1
-        END
-        Wait Until Busy Done
-    END
+    [Documentation]    Annule une fenêtre modale si elle est présente, par
+    ...                `Dismiss Modal Window` (bibliothèque) : F12 à la modale, puis
+    ...                le bouton Annuler de sa barre, puis le bouton SPOP « Non »,
+    ...                et la disparition de la fenêtre est VÉRIFIÉE. Certains
+    ...                dialogues refusent ``sendVKey`` (SPOP, « Details » d'une
+    ...                grille SE16, relevé live 2026-09-07) : c'est pour eux que les
+    ...                replis existent. Dernier repli, pour un modal INFORMATIF
+    ...                (ni bouton Annuler ni question SPOP, seulement « Close
+    ...                window » en ``btn[0]``, le cas du « Details » SE16) : ce
+    ...                ``btn[0]`` est pressé, parce qu'il n'engage rien ; la
+    ...                détection est structurelle (voir la limite documentée dans
+    ...                `_windows.py`). Fenêtre toujours ouverte après toutes les
+    ...                voies = échec listant ses boutons. Ne fait rien si aucun
+    ...                popup n'est ouvert.
+    Dismiss Modal Window    window=1
 
 Click Popup Button
     [Documentation]    Clique le bouton de barre d'outils ``${button_index}`` de la

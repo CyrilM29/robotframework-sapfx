@@ -33,6 +33,14 @@ from sapfx_common.client_security import (
 )
 
 
+# Sous-types de GuiShell qui ne sont PAS une liste ABAP : chacun se lit par
+# son propre keyword (ou est hors API), aucun ne réclame le mode accessibilité.
+_NON_LIST_SHELLS = frozenset({
+    "GridView", "Tree", "AbapEditor", "TextEdit", "Calendar", "Picture",
+    "HTMLViewer", "Toolbar", "Splitter",
+})
+
+
 def _truthy(value):
     """Interprétation Robot-friendly d'un booléen : les arguments non annotés
     arrivent en chaîne (« False » est truthy en Python, piège classique)."""
@@ -161,9 +169,14 @@ class DiagnosticsKeywords:
           (``GuiShell``/``GuiContainerShell``/``GuiCustomControl``) ;
         - ``list_readable`` : vrai si le contenu est lisible en labels ;
         - ``accessibility_mode_needed`` : vrai quand le contenu est **enfermé
-          dans un shell sans aucun label**, la signature exacte d'une liste
-          ABAP rendue sans le mode accessibilité (constaté live sur A4H / SAP
-          GUI 8.00 : la sortie RSPARAM n'expose alors AUCUN label) ;
+          dans un shell de sous-type inconnu sans aucun label**, la signature
+          attendue d'une liste ABAP rendue sans le mode accessibilité. NB
+          mesuré le 2026-09-07 : la sortie RSPARAM qui avait fondé cette
+          règle est une ``GuiShell/GridView`` (lisible par `Read Grid`), et
+          la liste SE16 STANDARD, vraie liste classique, est rendue en
+          labels sans ce mode ; le cas « shell opaque sans label » n'a pas
+          été observé sur le poste de laboratoire, la branche reste éprouvée
+          en unitaire ;
         - ``hint`` : la marche à suivre, ou ``None`` si rien à corriger.
 
         Le mode accessibilité est un réglage **du poste** (Options SAP GUI →
@@ -174,14 +187,27 @@ class DiagnosticsKeywords:
 
         NB : une grille ALV est *légitimement* rendue dans un shell ; sur un
         écran ALV, ``shell_rendered`` est vrai sans que rien ne soit à
-        corriger (les labels y sont inutiles : lire via `Read Grid`)."""
+        corriger (les labels y sont inutiles : lire via `Read Grid`). Depuis le
+        2026-09-07 le keyword LIT le sous-type des shells : un écran dont les
+        shells sont tous d'un sous-type lisible autrement (``GridView``,
+        ``Tree``, ``AbapEditor``, ``Calendar``...) ne réclame JAMAIS le mode
+        accessibilité (``shell_subtypes`` les liste, ``hint`` nomme le keyword
+        qui lit). Avant, « shell ET zéro label » alertait sur une grille ALV et
+        sur un éditeur (relevé live SE16/T000 et SE38, fausse alerte sur tout
+        poste) : ``accessibility_mode_needed`` n'est vrai que pour un shell
+        d'un sous-type inconnu ou vide, la seule signature d'une liste ABAP
+        rendue sans le mode accessibilité."""
         elements = self._screen_elements()
         labels = sum(1 for el in elements
                      if el.type == "GuiLabel" and el.left is not None
                      and (el.text or "").strip())
         shell_types = ("GuiShell", "GuiContainerShell", "GuiCustomControl")
         shell = any(el.type in shell_types for el in elements)
-        needed = bool(shell and labels == 0)
+        subtypes = sorted({el.subtype for el in elements
+                           if el.type == "GuiShell" and el.subtype})
+        opaque = [el for el in elements
+                  if el.type == "GuiShell" and el.subtype not in _NON_LIST_SHELLS]
+        needed = bool(shell and labels == 0 and (opaque or not subtypes))
         hint = None
         if needed:
             hint = ("Le contenu de cet écran est rendu dans un contrôle shell et "
@@ -191,9 +217,16 @@ class DiagnosticsKeywords:
                     "Accessibility) PUIS rouvrir la session ; sinon exporter la "
                     "liste (System → List → Save → Local File). Une grille ALV, "
                     "elle, se lit avec Read Grid sans rien changer.")
+        elif shell and labels == 0:
+            hint = ("Aucun label, mais les shells de cet écran ont un sous-type "
+                    "lisible (%s) : rien à corriger sur le poste, lire avec le "
+                    "keyword du sous-type (GridView : Read Grid ; Tree : Read "
+                    "Tree Nodes ; Calendar : Pick Calendar Date ; AbapEditor : "
+                    "hors API)." % ", ".join(subtypes))
         return {
             "readable_labels": labels,
             "shell_rendered": shell,
+            "shell_subtypes": subtypes,
             "list_readable": labels > 0,
             "accessibility_mode_needed": needed,
             "hint": hint,

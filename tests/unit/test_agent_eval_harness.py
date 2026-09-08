@@ -161,14 +161,15 @@ def test_verify_ignore_les_artefacts_de_run(fake_repo):
     assert ok is True, messages
 
 
-def test_verify_passes_with_a_note_when_repaired_differently(fake_repo):
+def test_verify_refuses_unreviewed_changes_in_repaired_target(fake_repo):
     mod.inject("se16-table-field", root=fake_repo)
     path = os.path.join(fake_repo, "resources", "ecc_keywords.resource")
     with open(path, "w", encoding="utf-8") as f:
         f.write(_RESOURCE + "# note du healer\n")
     ok, messages = mod.verify("se16-table-field", root=fake_repo)
-    assert ok is True
+    assert ok is False
     assert any("diffère de" in m for m in messages)
+    assert os.path.exists(os.path.join(fake_repo, mod.STATE_DIR, "se16-table-field.json"))
 
 
 def test_restore_puts_the_original_back(fake_repo):

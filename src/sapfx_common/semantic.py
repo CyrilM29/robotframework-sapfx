@@ -283,6 +283,29 @@ def nearby_labels(elements: Sequence[ScreenElement], limit: int = 12) -> list[st
     return seen
 
 
+# Contrôles dont le TEXTE PROPRE est un libellé cliquable : une case, un radio,
+# un bouton, un onglet se désignent par ce texte (« Sched. », « Display »).
+_OWN_TEXT_TYPES = frozenset({"GuiCheckBox", "GuiRadioButton", "GuiButton", "GuiTab"})
+
+
+def nearby_own_texts(elements: Sequence[ScreenElement], limit: int = 12) -> list[str]:
+    """Les textes PROPRES des cases, radios, boutons et onglets visibles
+    (dédupliqués, ordre du document) : le complément de :func:`nearby_labels`
+    dans un message d'échec. Relevé live (SM37, 2026-09-07) : la case que
+    l'utilisateur lit « Scheduled » porte le texte ``Sched.`` et l'ancienne
+    liste, limitée aux GuiLabel, ne le montrait pas."""
+    seen: list[str] = []
+    for element in elements:
+        if element.type not in _OWN_TEXT_TYPES:
+            continue
+        text = (element.text or "").strip()
+        if text and text not in seen:
+            seen.append(text)
+        if len(seen) >= max(0, int(limit)):
+            break
+    return seen
+
+
 # -- perception sémantique : la vue « formulaire » d'un écran ------------------
 
 # Types actionnables SANS être modifiables : ce qu'un humain clique. Les
@@ -290,15 +313,26 @@ def nearby_labels(elements: Sequence[ScreenElement], limit: int = 12) -> list[st
 # (les menus dupliquent le texte des boutons de toolbar : constaté live A4H).
 _ACTIONABLE_TYPES = frozenset({"GuiButton", "GuiTab"})
 
+# Types que le vrai SAP GUI marque ``Changeable`` sans qu'ils soient des
+# champs de saisie NI des cibles d'un formulaire : les entrées de menu (126
+# sur l'accueil A4H, toutes ``Changeable=True``, relevé 2026-09-07 : elles
+# ouvraient la carte ``@N`` et la vue formulaire, la première cible de la zone
+# utilisateur arrivant au-delà de ``@100``) et les conteneurs de shell.
+_NEVER_EDITABLE_TYPES = frozenset({
+    "GuiMenu", "GuiMenubar", "GuiShell", "GuiCustomControl",
+    "GuiSplitterShell", "GuiDockShell",
+})
+
 
 def is_editable_field(element: ScreenElement) -> bool:
     """Vrai si l'élément est un champ de SAISIE au sens humain : modifiable ET
     ni structurel ni actionnable-par-clic. Le vrai SAP GUI marque ``Changeable``
-    des choses qui n'en sont pas (GuiUserArea, boutons de toolbar, constaté
-    live sur A4H) : ``changeable`` seul ne suffit jamais."""
+    des choses qui n'en sont pas (GuiUserArea, boutons de toolbar, entrées de
+    menu, shells, constaté live sur A4H) : ``changeable`` seul ne suffit jamais."""
     return (element.changeable
             and element.type not in _STRUCTURAL_TYPES
-            and element.type not in _ACTIONABLE_TYPES)
+            and element.type not in _ACTIONABLE_TYPES
+            and element.type not in _NEVER_EDITABLE_TYPES)
 
 
 def actionable_targets(elements: Sequence[ScreenElement]) -> list[ScreenElement]:

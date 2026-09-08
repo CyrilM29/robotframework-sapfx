@@ -1,5 +1,21 @@
 # AGENTS.md
 
+## Agent contract v1 (2026-09-06)
+
+Five roles include read-only `sap-verifier` (`/sap-verify`). Read
+`.claude/agent-contract.md` first: common method from rf-test-agents, SAP checks
+here. It supersedes historical healer skip/spec-edit/unbounded-replay guidance.
+Healer outcomes: `repaired_verified`, `application_defect`, `blocked`,
+`needs_human`, `not_verified`; procedural budget 2 candidates / 20 calls / 900s.
+The PreToolUse hook in `.claude/settings.json` serves Claude Code and Copilot:
+readers preserve base permissions, other calls ask (`RF_AGENT_READ_ONLY=1`
+denies). Host loading still needs qualification. Handoff hashes/facts and
+recovery milestones live in scripts/agent_contract.py and agent_journal.py;
+no automatic retry or measured LLM quality follows from their offline tests.
+Regenerate canonical `.claude/agents/` into four legacy chatmodes plus
+`.github/agents/sap-verifier.agent.md`. The pack ships the scripts/contract
+and minimal hook settings, never the workstation's permissions.
+
 Condensed guide for AI coding assistants. **`CLAUDE.md` is the canonical, detailed
 version**: read it if present in your context; this file mirrors its key rules and
 must be kept in sync with it (same commit when conventions or layout change).
@@ -67,7 +83,29 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   title (`Read Table Control`, `Get/Set Table Control Cell`,
   `Find Table Control Row`: automatic windowed scrolling; `RowCount`
   counts RESERVED rows, so only the truly filled ones are returned) and
-  `Pick F4 Value` for search helps), DDIC inventory (`Classify Ddic Objects`:
+  `Pick F4 Value` for search helps, and since 2026-09-07 the lot that closed
+  the SAP GUI capability register: trees (`Read Tree Nodes`, `Select Tree
+  Node By Text`/`By Path`, opaque keys kept as is), combo boxes by technical
+  key (`Select Combo Box Entry By Key`), the user's date/decimal formats
+  (`Get User Formats`, `Input Date`, `Input Number`), the F4 calendar
+  (`Pick Calendar Date`), grid actions (`Double Click Grid Cell`, context
+  menu by function code, `Sort Grid By Column`), the menu bar by path
+  (`Select Menu Item`), checkboxes/radios by their own text and modal windows
+  (`Dismiss Modal Window`); the perception shows `GuiShell/<SubType>`, refuses
+  to serve a ProgID as a value and FAILS naming the cause when the session is
+  unreadable; the same evening added the system identity read on screen
+  (`Get System Identity`: System > Status opened BY POSITION and verified,
+  SAP_BASIS release and kernel, since two lab systems share a SID and a host)
+  and the standard SE16 list (`Use Standard List In Data Browser`, a classic
+  ABAP list rendered as labels and read by `Read Abap List`); the 2023 register
+  (2026-09-08) added the message identity (`Get Status Message Identity`,
+  `MO/E/402`, `Status Message Should Be`), tab strips by technical key
+  (`Select Tab`, `Get Selected Tab`, `List Tabs`), the application toolbar
+  inventory (`List Toolbar Buttons`, `Click Application Toolbar Button`), the
+  resolved "Status..." entry (second-to-last, dialog required: the hard-coded
+  index clicked "Log Off" on 758) and control resolvers that read the shell
+  SubType (a column tree is no longer taken for an ALV)), DDIC inventory
+  (`Classify Ddic Objects`:
   DD02L read through SE16, `TABCLASS` is an OUTPUT column, never a selection
   criterion; `Fill Multiple Selection` for arbitrary name lists, SCROLLING the
   standard dialog window by window with the reached position READ BACK (a
@@ -140,9 +178,13 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   the active connection, no re-login so no multi-logon popup),
   `Switch/List/Close/Close All Sap Sessions`: session/connection state is
   routed per active alias (historic usage = the `default` alias), with the
-  STA safety rail (owning COM thread remembered per alias; cross-thread
-  access gets a defensive CoInitialize, the marshalled mode rf-mcp state
-  providers rely on, and `SAPFX_STRICT_COM_THREAD=1` turns it into an
+  STA safety rail (owning COM thread remembered per alias; since 2026-09-07 a
+  cross-thread access RE-ATTACHES the session on that thread, scripting engine
+  re-acquired from the ROT then `FindById` of the session id, one proxy cached
+  per thread: a defensive CoInitialize never marshalled anything and rf-mcp's
+  `execute_batch`/`Evaluate` were getting EMPTY perceptions in PASS; perception
+  keywords now fail naming the cause when the session is unreadable, and
+  `SAPFX_STRICT_COM_THREAD=1` still turns any cross-thread access into an
   actionable error). Multi-session is cooperative MULTIPLEXING (one active
   session, explicit switch), never thread parallelism; closing an alias
   never closes a connection another alias still uses.
@@ -202,7 +244,10 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   `Get Ui5 Control Info` / `Get Ui5 Aggregation Info` read the FULL metadata
   type, the binding context (the technical key of items whose id is
   generated) and aggregation children rendered OR NOT (a closed Select's
-  items exist in no engine's DOM); the promoted pure probes cover launchpad
+  items exist in no engine's DOM), with `property_keys` announcing every
+  property read (an array-valued one no longer vanishes silently);
+  `Get Ui5 Control Metadata` reads the DECLARED contract (types, defaults,
+  borrowed provenance, inheritance chain), the doc-vs-living-control read; the promoted pure probes cover launchpad
   services (`Get Flp User`, `List Flp Apps/Catalogs/Groups`,
   `Get Flp Intent Support`, `Flp Service Is Available`), WebGUI presence and
   menus (`Webgui Is Present`, `Get Webgui Element Count`,
@@ -239,7 +284,10 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   (`Gateway Should Be Active` names the `/IWFND/IWF_ACTIVATE` remediation,
   `Wait Until Api Available`; `Classify Http Response` is its tolerant
   counterpart, sorting a raw response structurally: three families of 404
-  hide under one status, and a 2xx with an HTML body is not data),
+  hide under one status, and a 2xx with an HTML body is not data; behind an
+  API-management layer a 401 splits too, `backend_auth_failed` meaning the
+  layer ACCEPTED the API key and the SAP system behind refused, so the key
+  must not be regenerated),
   `Build Draft Entity Path` (the COMPOSITE key of a draft-enabled v4
   service), OAuth2 client-credentials + mTLS auth,
   per-alias telemetry (`Get Api Telemetry`), and optional RFC via pyrfc with
@@ -510,6 +558,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   incidents) BEFORE their judgement calls (which anchor holds, which layer a
   keyword belongs to, which failure class, which risk), live observation
   still deciding and an absent server never blocking;
+  the planner additionally adopts a **business persona** before exploring
+  (domain fiches in the private root `PERSONAS.md`: truth source, risks to
+  cover first, reigning assertion, reversibility; on a deployed pack the file
+  is absent and the agent derives the same grid, marked (SAP général)), and
+  every plan carries a « Perception métier » section;
   `.github/chatmodes/` holds their VS Code / Copilot
   declination, **generated** by `python scripts/regen_agent_definitions.py`
   (never edit chat modes by hand; `--check` guards drift in CI/pytest);

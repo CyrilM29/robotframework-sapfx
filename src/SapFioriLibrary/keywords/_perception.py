@@ -20,6 +20,7 @@ from sapfx_common.polling import poll_until
 
 from .._ui5_js import (
     CONTROL_INFO_JS,
+    CONTROL_METADATA_JS,
     DUMP_TREE_JS,
     RESOLVE_ROLE_JS,
 )
@@ -221,7 +222,7 @@ class PerceptionKeywords:
     def get_ui5_control_info(self, model=None, **selector_parts):
         """Fiche JSON-safe de CHAQUE contrôle **rendu** qui matche le
         sélecteur (mêmes clés que `Resolve Ui5 Control`) : liste de dicts
-        ``{id, type, rendered, properties, binding}``.
+        ``{id, type, rendered, properties, property_keys, binding}``.
 
         ``type`` est le nom PLEIN de métadonnées (``sap.m.Avatar``) : la
         lecture qui prouve la TECHNOLOGIE d'un contrôle, là où l'arbre de
@@ -232,7 +233,12 @@ class PerceptionKeywords:
         modèle (rubriques de paramètres d'un shell, thèmes : relevés live
         2026-08-24/26 sur deux launchpads). ``object`` est réduit aux entrées
         primitives de premier niveau (les valeurs profondes portent des
-        contrôles et des cycles) ; ``object_keys`` liste tout ce qui existe. ::
+        contrôles et des cycles) ; ``object_keys`` liste tout ce qui existe.
+        Même contrat côté propriétés : ``properties`` ne porte que les valeurs
+        primitives, et ``property_keys`` liste TOUTES les propriétés lues,
+        y compris celles dont la valeur est un tableau (``fieldGroupIds``) :
+        la réduction s'annonce, elle ne se devine pas. Pour l'inventaire
+        DÉCLARÉ (types, défauts, provenance), voir `Get Ui5 Control Metadata`. ::
 
             ${fiches}=    Get Ui5 Control Info    idSuffix=userActionsMenuHeaderButton
             Should Be Equal    ${fiches}[0][type]    sap.m.Avatar
@@ -277,6 +283,45 @@ class PerceptionKeywords:
                 "vérifier son type avec `Get Ui5 Control Info` (les listes "
                 "portent `items`, les tables `rows`/`items` selon la "
                 "famille)." % result["__no_aggregation"])
+        return list(result or [])
+
+    def get_ui5_control_metadata(self, **selector_parts):
+        """Inventaire de **MÉTADONNÉES** de chaque contrôle qui matche le
+        sélecteur (mêmes clés que `Resolve Ui5 Control`) : le contrat DÉCLARÉ
+        par la classe, indépendant des valeurs courantes. Liste de dicts
+        ``{id, type, lineage, properties, aggregations, associations,
+        events}``.
+
+        Le complément de `Get Ui5 Control Info`, pas son doublon : la fiche
+        porte les VALEURS (réduites aux primitives), cet inventaire porte la
+        DÉCLARATION. Chaque membre est décrit par ``{borrowed, origin}``
+        (provenance : ``borrowed=False`` = déclaré par la classe elle-même,
+        ``origin`` = la classe qui le déclare), plus ``type`` et ``default``
+        (JSON-safe, un tableau reste un tableau) pour les propriétés, ``type``
+        et ``multiple`` pour agrégations et associations. ``lineage`` est la
+        chaîne d'héritage complète (de la classe au socle).
+
+        C'est la lecture qui permet de confronter une documentation d'API au
+        contrôle VIVANT : relevé 2026-09-05 sur le Demo Kit, la fiche réduite
+        aux primitives rendait 17 clés là où la doc de ``sap.m.Button`` en
+        documente 18 (``fieldGroupIds``, valeur tableau), et la notion
+        « borrowed » de la doc correspond exactement à ``borrowed`` ici. ::
+
+            ${inventaires}=    Get Ui5 Control Metadata    controlType=Button
+            Length Should Be    ${inventaires}[0][properties]    18
+            Should Be Equal    ${inventaires}[0][properties][text][type]    string
+
+        Lecture, pas assertion : aucune correspondance rend une liste vide.
+        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`)."""
+        payload = {"selector": json.loads(
+            selector_to_json(build_control_selector(**selector_parts)))}
+        result = self._evaluate(CONTROL_METADATA_JS, arg=json.dumps(payload))
+        if result is None:
+            raise AssertionError(
+                "Aucun runtime UI5 sur la portée courante : impossible de "
+                "lire l'inventaire de métadonnées. Sonder d'abord avec `Ui5 "
+                "Runtime Is Present`, et vérifier la portée de frame avec "
+                "`Get Ui5 Frame Stack`.")
         return list(result or [])
 
     # -- assertion visuelle (parité du canal ECC) -------------------------------

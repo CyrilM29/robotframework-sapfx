@@ -27,27 +27,39 @@ from sapfx_common.session_context import current_execution_namespace
 
 from ._vendor.sapgui_base import SapGuiBase
 from .keywords import (
+    ComboBoxKeywords,
     ConnectionKeywords,
     DdicKeywords,
     DiagnosticsKeywords,
     EmbeddedBrowserKeywords,
+    GridActionKeywords,
     GridKeywords,
     HealingKeywords,
+    MenuKeywords,
     PerceptionKeywords,
     PointerKeywords,
     ScreenshotKeywords,
     Se16Keywords,
     SemanticKeywords,
     SessionKeywords,
+    StatusBarKeywords,
+    SystemIdentityKeywords,
     TableControlKeywords,
+    TabStripKeywords,
+    ToolbarKeywords,
+    TreeKeywords,
     VisualKeywords,
     WaitKeywords,
     WatchKeywords,
+    WindowKeywords,
 )
 
 
-class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
-                    TableControlKeywords, PerceptionKeywords,
+class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
+                    GridKeywords, TableControlKeywords, TreeKeywords,
+                    ComboBoxKeywords, MenuKeywords, WindowKeywords,
+                    SystemIdentityKeywords, StatusBarKeywords, TabStripKeywords,
+                    ToolbarKeywords, PerceptionKeywords,
                     ScreenshotKeywords, VisualKeywords, WatchKeywords,
                     DiagnosticsKeywords, HealingKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
@@ -81,7 +93,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.8.0"
+    __version__ = "0.8.1"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -117,15 +129,23 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
 
     def _touch_com_thread(self, slot):
         """Rail de sûreté **STA** : la session appartient au thread COM qui l'a
-        bindée. Un accès depuis un AUTRE thread initialise COM défensivement
-        (marshaling, le mode dont dépendent les state providers rf-mcp,
-        validé live) et se journalise une fois ; ``SAPFX_STRICT_COM_THREAD=1``
-        en fait une erreur actionnable, au lieu du ``RPC_E_WRONG_THREAD``
-        cryptique de COM, ou pire d'un plantage différé."""
+        bindée, et un proxy COM STA utilisé depuis un AUTRE thread lève
+        ``RPC_E_WRONG_THREAD`` (ou une ``AttributeError`` de proxy pywin32),
+        que les couches défensives transformaient en perceptions VIDES en PASS
+        (relevé live sous rf-mcp le 2026-09-07). Depuis cette date, un accès
+        depuis un thread étranger **ré-attache** la session sur ce thread :
+        moteur de scripting ré-acquis via la ROT puis ``FindById`` de l'id de
+        session mémorisé au bind (``/app/con[0]/ses[0]``), proxy mis en cache
+        par thread (vérifié live : la transaction se lit depuis le second
+        thread là où l'accès direct échoue). Retourne le proxy à utiliser, ou
+        ``None`` pour garder l'objet du slot (thread propriétaire, ou
+        ré-attachement impossible : l'ancien ``CoInitialize`` défensif reste,
+        et l'appel échouera en nommant la cause). ``SAPFX_STRICT_COM_THREAD=1``
+        refuse tout accès cross-thread par une erreur actionnable."""
         ident = threading.get_ident()
         owner = slot.get("com_thread")
         if owner is None or owner == ident:
-            return
+            return None
         if os.environ.get("SAPFX_STRICT_COM_THREAD") == "1":
             raise RuntimeError(
                 "SAP session '%s' is COM-bound to thread %s but accessed from "
@@ -134,14 +154,46 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
                 "a session from the thread that bound it: multiplex sessions "
                 "with `Switch Sap Session`, never with threads."
                 % (self._active_alias(), owner, ident))
+        proxies = slot.setdefault("thread_proxies", {})
+        if ident in proxies:
+            return proxies[ident]
         seen = slot.setdefault("threads_seen", set())
-        if ident not in seen:
-            seen.add(ident)
-            ensure_com_initialized()
+        first_time = ident not in seen
+        seen.add(ident)
+        ensure_com_initialized()
+        proxy = self._reattach_on_this_thread(slot)
+        if proxy is not None:
+            proxies[ident] = proxy
             logger.debug(
-                "SAP session '%s': first access from thread %s (COM-bound on "
-                "thread %s); COM initialised defensively for marshalled "
-                "cross-thread access." % (self._active_alias(), ident, owner))
+                "SAP session '%s': re-attached on thread %s (COM-bound on "
+                "thread %s) via the scripting engine and %r."
+                % (self._active_alias(), ident, owner, slot.get("session_id")))
+            return proxy
+        if first_time:
+            logger.warn(
+                "SAP session '%s': accessed from thread %s (COM-bound on thread "
+                "%s) and NOT re-attachable (no session id or scripting engine "
+                "unreachable): COM initialised defensively, the next access "
+                "may fail naming the cross-thread cause."
+                % (self._active_alias(), ident, owner))
+        return None
+
+    def _reattach_on_this_thread(self, slot):
+        """Proxy de la session pour le thread COURANT : moteur ré-acquis via
+        la ROT (`_acquire_scripting_engine`, mixin connexion) puis
+        ``FindById(session_id)``. ``None`` si l'un des deux manque ou échoue :
+        jamais une exception depuis un accesseur de propriété."""
+        session_id = slot.get("session_id")
+        acquire = getattr(self, "_acquire_scripting_engine", None)
+        if not session_id or acquire is None:
+            return None
+        try:
+            engine = acquire()
+            if engine is None:
+                return None
+            return engine.FindById(session_id)
+        except Exception:                       # noqa: BLE001 (best-effort)
+            return None
 
     @property
     def sapapp(self):
@@ -156,18 +208,27 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
         slot = self._active_slot()
         value = slot.get("session", -1)
         if value is not None and not isinstance(value, int):
-            self._touch_com_thread(slot)
+            proxy = self._touch_com_thread(slot)
+            if proxy is not None:
+                return proxy
         return value
 
     @session.setter
     def session(self, value):
         slot = self._active_slot()
         slot["session"] = value
+        slot.pop("thread_proxies", None)
         if value is not None and not isinstance(value, int):
             # binde le thread COM propriétaire ; un re-bind volontaire (Connect
-            # To Session depuis un autre thread) reprend la propriété.
+            # To Session depuis un autre thread) reprend la propriété. L'id de
+            # session (``/app/con[0]/ses[0]``) est mémorisé pour le
+            # ré-attachement depuis un autre thread ; illisible -> None.
             slot["com_thread"] = threading.get_ident()
             slot.pop("threads_seen", None)
+            try:
+                slot["session_id"] = str(value.Id or "") or None
+            except Exception:                   # noqa: BLE001 (doublure/panne)
+                slot["session_id"] = None
 
     @property
     def connection(self):

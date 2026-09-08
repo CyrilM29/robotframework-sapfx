@@ -152,8 +152,22 @@ jobs:
       - name: Robot Framework keyword-resolution dry run
         run: robot --pythonpath src --dryrun --outputdir results/dry tests/robot/
 
-      - name: Offline Browser smoke (real Chromium)
+      # Les trois suites hors ligne (fixtures locales, ni SAP ni réseau), pas
+      # seulement le moteur WC : la suite hybride exerce les frontières
+      # fragiles (frames imbriquées, moteurs multiples, pile de portées) et
+      # la suite bundle le remplacement versionné de __SAPFX avec ses hooks
+      # réseau, exactement les comportements qu'un dryrun ne voit pas
+      # (recommandation de la revue externe du 2026-09-06). Trois ÉTAPES et
+      # pas un script : sous pwsh, seul le dernier code de sortie d'un
+      # `run:` multi-lignes ferait foi, un échec intermédiaire serait masqué.
+      - name: Offline Browser smoke (real Chromium, WC engine)
         run: robot --pythonpath src --outputdir results/fiori-wc tests/robot/fiori_wc_smoke.robot
+
+      - name: Offline Browser smoke (hybrid pages, frames + engines)
+        run: robot --pythonpath src --outputdir results/fiori-hybrid tests/robot/fiori_hybrid_smoke.robot
+
+      - name: Offline Browser smoke (versioned __SAPFX bundle replacement)
+        run: robot --pythonpath src --outputdir results/fiori-bundle tests/robot/fiori_bundle_version_smoke.robot
 
   # Qualifie ce que l'utilisateur télécharge : build du ZIP, extraction hors du
   # checkout, installation par le vrai script, documentation des trois libs,

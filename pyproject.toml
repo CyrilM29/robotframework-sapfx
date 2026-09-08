@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robotframework-sapfx"
-version = "0.8.0"
+version = "0.8.1"
 description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -135,7 +135,9 @@ python_version = "3.10"
 # et par ses tests unitaires.
 files = ["src", "integrations/robotmcp/sap_robotmcp",
          "tools/recorder", "tools/recorder_web",
-         "scripts/healing_drift_report.py", "scripts/check_spec_sync.py"]
+         "scripts/healing_drift_report.py", "scripts/check_spec_sync.py",
+         "scripts/agent_contract.py", "scripts/agent_journal.py",
+         "scripts/hook_agent_permissions.py"]
 exclude = ["^src/SapEccLibrary/_vendor/"]
 ignore_missing_imports = true
 

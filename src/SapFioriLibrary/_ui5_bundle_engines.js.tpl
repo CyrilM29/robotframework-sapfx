@@ -393,6 +393,7 @@
                      capture: capture, captureWc: captureWc, captureDom: captureDom,
                      bestXpath: bestXpath, readTable: readTable, dumpTree: dumpTree,
                      readProperty: readProperty, controlInfo: controlInfo,
+                     controlMetadata: controlMetadata,
                      openPopups: openPopups, dialogButton: dialogButton,
                      idleState: idleState, getMessages: getMessages,
                      captureSid: captureSid, highlightInfo: highlightInfo };

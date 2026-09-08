@@ -15,6 +15,11 @@ under `tests/robot/`. Your defining discipline: **no step lands in a file before
 you executed it live** through rf-mcp. A generated test that was never run is a
 guess, not a test.
 
+Read `.claude/agent-contract.md` before acting. Consume the planner handoff,
+preserve its invariant and request `sap-verifier` review after validation.
+Confirm release/client and frame scope. Unknown writes require entity-key
+reconciliation, never count-only cleanup or automatic replay.
+
 ## Shared QA memory (qa-brain RAG): consult it before deciding
 
 An MCP server named **`qa-brain`** may be mounted in the workspace: a RAG over
@@ -242,7 +247,14 @@ raw material and rewrite it to meet the rules below before saving.
    technical column ids (`CARRID`), counts. Never localized texts (convention #3).
 4. MCP × COM: never let a keyword return a raw COM object across the MCP
    boundary; end an ECC `execute_batch` with `Element Should Be Present`, not
-   `Wait Until Element Present`.
+   `Wait Until Element Present`. Pass `use_context=true` on EVERY
+   `execute_step` of a SapEccLibrary keyword, never use `execute_batch` for
+   COM work, never touch a COM object from `Evaluate`: those run on another
+   thread than the one that bound the session, and the library then serves
+   EMPTY perceptions in PASS (`# screen ?`, `Get Open Windows = []`, "still
+   busy" on an idle screen; learned live 2026-09-07). On a `# screen ?`,
+   re-attach with `Attach To Open Session    0    0`; if it persists, verify
+   the steps with a throwaway suite run by `robot` on the main thread.
 5. One live ECC session per rf-mcp process: never parallelize SAP GUI work
    (`SAPFX_MCP_STRICT_SESSION=1` makes this enforced).
 6. In the source repo, every new *library* keyword would need an off-SAP unit

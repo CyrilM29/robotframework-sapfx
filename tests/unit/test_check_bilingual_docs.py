@@ -46,13 +46,15 @@ def test_pairing_ignores_english_only_exceptions():
 
 
 def test_pairing_ignores_single_language_trees():
-    # Prompts d'agents (Claude Code + chat modes générés), plans specs/ et base
-    # de communication comms/ (français natif) : hors du contrat bilingue, dans
-    # les deux sens.
+    # Prompts d'agents (Claude Code + agents/chat modes générés), fixtures
+    # d'évaluation des agents, plans specs/ et base de communication comms/
+    # (français natif) : hors du contrat bilingue, dans les deux sens.
     files = [
         ".claude/agents/sap-planner.md",
         ".claude/commands/sap-plan.md",
+        ".github/agents/sap-verifier.agent.md",
         ".github/chatmodes/sap-planner.chatmode.md",
+        "tests/agent_eval/verifier-fixtures.md",
         "specs/README.md",
         "specs/sflight-consultation-se16.md",
         "comms/README.md",

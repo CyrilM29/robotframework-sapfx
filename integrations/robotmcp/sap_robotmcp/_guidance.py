@@ -125,7 +125,37 @@ ECC_HINTS = [
     "Aide à la recherche d'un champ : Pick F4 Value ouvre le matchcode, "
     "choisit l'entrée (grille de résultats double-cliquée, ou liste par F2) "
     "et referme ; valeur introuvable = popup refermé + échec listant un "
-    "échantillon des valeurs visibles.",
+    "échantillon des valeurs visibles. Sur un champ DATE, le F4 ouvre un "
+    "calendrier (GuiShell/Calendar) : Pick Calendar Date (date ISO), ou "
+    "Input Date qui convertit l'ISO au format de l'utilisateur.",
+    "Dates et nombres : un dynpro n'accepte que le FORMAT de l'utilisateur "
+    "(SU3 > Defaults : DD.MM.YYYY, notation 1.234.567,89 sur le trial), une "
+    "saisie ISO est refusée en type E. Get User Formats (Suite Setup) puis "
+    "Input Date / Input Number : la suite reste locale-safe.",
+    "Combo box (GuiComboBox) : sélectionner par CLÉ technique avec Select "
+    "Combo Box Entry By Key (le libellé est localisé), lire Get Combo Box "
+    "Entries / Get Combo Box Key ; un combo en affichage (Changeable=False) "
+    "est refusé en le disant.",
+    "Arbres (menu SAP Easy Access, IMG de SPRO, SE80, SM59, SICF : "
+    "GuiShell/Tree) : Read Tree Nodes (clés opaques rendues TELLES QUELLES, "
+    "padding compris), Select Tree Node By Text / By Path (« A > B > C »), "
+    "Expand Tree Node, Get Selected Tree Node ; un arbre à colonnes (IMG) "
+    "porte son texte dans la colonne TEXT.",
+    "Barre de menus : Select Menu Item « System > Status » (textes, localisés : "
+    "page object) ou « 4 > 11 » (positions) ; List Menu Items pour voir la "
+    "barre réelle.",
+    "Grille ALV, au-delà de la lecture : Double Click Grid Cell (détail d'une "
+    "ligne), Select Grid Context Menu Item par code fonction (&FILTER, &FIND, "
+    "&XXL : List Grid Context Menu pour les voir), List Grid Toolbar Buttons, "
+    "Sort Grid By Column (barre de la grille ou menu contextuel ; SE16 porte "
+    "son tri dans la barre d'application : Click Button By Label).",
+    "Cases à cocher et radios : Select Checkbox By Label / Select Radio Button "
+    "By Label sur leur TEXTE PROPRE (« Sched. » et non « Scheduled » sur SM37 : "
+    "l'échec liste les textes propres visibles).",
+    "La perception affiche le sous-type des shells (GuiShell/Tree, GridView, "
+    "AbapEditor, Calendar, Picture, HTMLViewer) ; Get Value sur un shell REFUSE "
+    "de rendre son ProgID et nomme le keyword qui lit ; la carte @N ne liste "
+    "plus les entrées de menu.",
     "SE16 : la sortie par défaut est la liste ABAP classique, SANS objet grille "
     "scriptable : appeler d'abord `Use ALV Grid In Data Browser` (resource ECC, "
     "persistant par utilisateur) ; SE16N n'existe pas sur l'ABAP Platform Trial.",
@@ -184,13 +214,30 @@ ECC_HINTS = [
     "Transaction peut déjà porter le tcode alors qu'un MODAL d'erreur est resté "
     "ouvert et neutralise l'OK-code (vu live sur SESSION_MANAGER). Get Open "
     "Windows liste les fenêtres ouvertes (modal_open dans l'état applicatif) ; "
-    "refermer via Cancel Popup.",
+    "refermer via Dismiss Modal Window (touche, bouton Annuler, bouton SPOP, "
+    "puis le seul btn[0] d'un modal informatif ; disparition VÉRIFIÉE, échec "
+    "listant les boutons réels : plusieurs dialogues refusent sendVKey), que "
+    "Cancel Popup de la resource enveloppe.",
     "Multi-session par ALIAS : Open Sap Session (nouvelle connexion) / "
     "Create Gui Session (2e fenêtre de la MÊME connexion : zéro re-login, la "
     "voie recommandée pour « écrire dans une session, vérifier dans l'autre ») / "
     "Switch Sap Session / List Sap Sessions / Close Sap Session. C'est du "
     "MULTIPLEXAGE (une session active à la fois, bascule explicite), jamais du "
     "parallélisme de threads.",
+    "Un refus applicatif s'asserte par son IDENTITÉ, pas par son texte : "
+    "Get Status Message Identity rend classe/type/numéro (MO/E/402), "
+    "Status Message Should Be    MO    402 ; deux refus de type E du même "
+    "écran deviennent discernables sans un mot localisé (convention #3).",
+    "Onglets d'un tabstrip : Select Tab par CLÉ technique (LOGO pour "
+    "tabpLOGO), Get Selected Tab / List Tabs ; le jeu d'onglets diverge d'une "
+    "release à l'autre, ne jamais graver une liste. Barre d'application : "
+    "List Toolbar Buttons (id, icône, tooltip) puis Click Application Toolbar "
+    "Button par id ou par nom d'icône (locale-safe).",
+    "Vers QUEL système parle-t-on ? Get System Identity lit System > Status "
+    "(ouvert par POSITION, vérifié structurellement) : release SAP_BASIS, "
+    "kernel, serveur d'application, base ; deux systèmes de laboratoire "
+    "partagent SID et hôte, seuls release et kernel les distinguent. "
+    "System Identity Should Be    basis_release=754 en garde de tête.",
     "Session SAP GUI déjà ouverte (replay, reprise) ? Attach To Open Session "
     "rattache moteur + connexion + session par INDEX ; Connect To Session seul "
     "n'obtient que le moteur. TOUJOURS refermer les sessions ouvertes en fin de "

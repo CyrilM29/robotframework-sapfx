@@ -139,7 +139,11 @@ def test_get_open_windows_defensif_sans_session_lisible():
 
     lib = SapEccLibrary(screenshots_on_error=False)
     lib.session = BrokenSession()
-    assert lib.get_open_windows() == []
+    # Depuis le 2026-09-07 : une session illisible ÉCHOUE en nommant la cause,
+    # elle ne rend plus une liste vide (qu'un agent lirait « aucune fenêtre »).
+    from SapEccLibrary.keywords._perception import ScreenUnreadableError
+    with pytest.raises(ScreenUnreadableError, match="illisible"):
+        lib.get_open_windows()
 
 
 def test_get_open_windows_ignore_une_fenetre_illisible():

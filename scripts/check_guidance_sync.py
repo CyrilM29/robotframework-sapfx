@@ -124,6 +124,16 @@ _MAP_MARKERS = {
         "Write Ddic Inventory Artifact", "Reach Se16 Selection Screen",
         # _embedded_browser.py (pont WebView2/CDP)
         "Switch To Embedded Browser Page",
+        # 2026-09-07, le lot issu du registre de capacités : _trees.py,
+        # _combobox.py, _menus.py, _grid_actions.py, calendrier et cases par
+        # libellé dans _semantic.py
+        "Read Tree Nodes", "Select Tree Node By Path",
+        "Select Combo Box Entry By Key", "Get User Formats", "Input Date",
+        "Select Menu Item", "Double Click Grid Cell",
+        "Select Grid Context Menu Item", "Pick Calendar Date",
+        "Select Checkbox By Label", "Dismiss Modal Window",
+        "Get System Identity", "Use Standard List In Data Browser",
+        "Get Status Message Identity", "Select Tab", "List Toolbar Buttons",
     ],
     "fiori_plugin.py": [
         # pile de frames + moteur dom + diagnostic (sessions hybrides)

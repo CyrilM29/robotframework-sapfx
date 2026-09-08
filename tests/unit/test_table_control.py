@@ -81,6 +81,18 @@ class FakeCell:
         self.Changeable = changeable
 
 
+class FakeCheckboxCell:
+    """Cellule GuiCheckBox : Text toujours vide, l'état vit sur Selected
+    (la colonne « Key » des champs SE11, relevée live 2026-09-05)."""
+
+    Type = "GuiCheckBox"
+
+    def __init__(self, selected):
+        self.Selected = selected
+        self.Text = ""
+        self.Changeable = False
+
+
 class FakeColumn:
     def __init__(self, title):
         self.Title = title
@@ -188,6 +200,23 @@ def test_read_table_control_defile_et_lit_tout():
     assert len(lib.busy_waits) >= 2
     # position de départ restaurée
     assert table.VerticalScrollbar.Position == 0
+
+
+def test_les_colonnes_checkbox_se_lisent_en_drapeau_abap():
+    """La colonne Key du GuiTableControl des champs SE11 est une GuiCheckBox
+    au Text VIDE : sans lecture de Selected, la colonne disparaissait en
+    silence du résultat (écart de capacité relevé par le planner le
+    2026-09-05). Rendu en drapeau ABAP X/vide, croisable avec KEYFLAG."""
+    table = _table()
+    table._cells[0][1] = FakeCheckboxCell(True)
+    table._cells[1][1] = FakeCheckboxCell(False)
+    lib = _lib(table)
+    rows = lib.read_table_control("tbl")
+    assert rows[0]["Qty"] == "X"
+    assert rows[1]["Qty"] == ""
+    # la meme lecture d'etat vaut pour l'acces cellule a cellule
+    assert lib.get_table_control_cell("tbl", 0, "Qty") == "X"
+    assert lib.get_table_control_cell("tbl", 1, "Qty") == ""
 
 
 def test_read_table_control_titres_normalises():

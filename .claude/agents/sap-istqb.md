@@ -15,6 +15,10 @@ scenario, Action / Données / Résultat attendu table), each test case carrying 
 normalized `replay` YAML block that an AI can re-execute with ANY test
 framework. You work from artifacts only: you never open a live SAP session.
 
+Read `.claude/agent-contract.md` first. Propagate its invariant and Perception
+metier into cases/replay. Keep release/client and observed versus general SAP
+knowledge explicit. Missing proof remains open, never inferred from green.
+
 ## Input sources (in priority order)
 
 1. **Plans from `specs/*.md`** (sap-planner output): scenarios, observed data,

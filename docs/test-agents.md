@@ -10,13 +10,14 @@ business vocabulary of `resources/`, and honour the repo's conventions
 (locators in the resources layer, no fixed waits, locale-independent
 assertions).
 
-## The four agents
+## The five agents
 
 | Agent | Input | Output |
 |---|---|---|
 | **sap-planner** | A business goal + a reachable system (ECC tcode or Fiori URL) | A Markdown test plan in `specs/`, grounded in live observations (perceive → act loop) |
 | **sap-generator** | A plan from `specs/` | A runnable suite in `tests/robot/`, every step executed live through rf-mcp before being written; missing business keywords added to the resources layer |
-| **sap-healer** | A failing suite/test | The failure reproduced, classified (locator drift / timing / data / functional change) and repaired **in the resources layer**, verified live, re-run to green, never silently |
+| **sap-healer** | An explicitly authorized failing suite/test | Bounded diagnosis/repair and an evidence-based terminal verdict; never weakens tests or adds skips |
+| **sap-verifier** | Original invariant, before/after artifacts and replay evidence | Independent read-only review in conversation, never repairs or executes tests |
 | **sap-istqb** | Planner specs and/or recorder outputs (recordings, `.spec.md`/`.istqb.md` drafts) | An **ISTQB test plan + test cases** document under `specs/istqb/` (offline, artifacts only): ISO 29119-3 sections, one test case per scenario with an Action / Données / Résultat attendu table and a normalized `replay` YAML block, human-readable AND replayable by an AI with any test framework; what no source supports stays marked « à compléter » |
 
 The planner also has a **coverage-discovery mode** for the question that comes
@@ -29,8 +30,47 @@ normal exploration loop. On a fresh trial without collector history it says so
 honestly and falls back to asking for the critical-transaction list.
 
 The canonical definitions live in `.claude/agents/sap-*.md`. Slash commands
-`/sap-plan`, `/sap-generate`, `/sap-heal` and `/sap-istqb`
+`/sap-plan`, `/sap-generate`, `/sap-heal`, `/sap-istqb` and `/sap-verify`
 (`.claude/commands/`) wrap them for Claude Code.
+
+## Authorization and recovery
+
+The [versioned mission contract](../.claude/agent-contract.md) defines the
+handoff (target, scope, invariant, budgets, hashed evidence) and supersedes
+older advice about healing until green or editing the spec to hide failure.
+Healer outcomes: `repaired_verified`, `application_defect`, `blocked`,
+`needs_human`, `not_verified`. Default procedural limit: two candidate repairs,
+twenty tool calls or fifteen minutes. Verifier review is separate from replay.
+
+The PreToolUse hook in `.claude/settings.json` is shared by Claude Code and
+Copilot (no duplicate `.github/hooks` declaration). Known read tools retain
+base permissions; every other call asks for confirmation. Host environment
+`RF_AGENT_READ_ONLY=1` denies effects/unknown tools. Restart the host and qualify
+hook loading with a harmless read and a denied edit before sensitive use.
+Tests exercise the script and configured command, not the host's loading UI.
+The hook is not a SAP authorization service or an automatic budget counter.
+
+`scripts/agent_contract.py` checks structure, evidence hashes and supplied
+verdict facts, not their independent truth. `scripts/agent_journal.py` records
+planned/sent/confirmed milestones. A sent action without confirmed outcome
+requires reconciliation, never automatic replay. SAP reconciliation identifies
+release/client, frame and entity key: SID alone or a restored count is not proof.
+The journal is agent-operated, not an exactly-once execution engine.
+
+Negative cases under `tests/agent_eval/` include wrong target, prompt injection,
+weakened assertions, skips, baseline replacement, unknown writes and exhausted
+budgets. Offline oracle tests do not measure model behavior; actual trials
+require isolated fixtures, repeated attempts and separately retained evidence.
+Reports keep compact evidence links, measured calls/duration and `not_measured`
+for unavailable tokens/cost; no raw credentials or sensitive payloads.
+
+Claude Code uses `/sap-verify`; Copilot selects `sap-verifier` from its agent
+picker after reload. Its generated `.github/agents/sap-verifier.agent.md` uses
+the current agent format; the four existing `.github/chatmodes/` stay compatible.
+The pack includes the common contract/scripts and minimal hook configuration,
+without copying the development workstation's permission allowlist.
+
+## Recorder inputs
 
 Both recorders emit the same ISTQB template as a draft (`--export-istqb` on
 the desktop, the « plan ISTQB » export-menu entry on the web): sap-istqb's

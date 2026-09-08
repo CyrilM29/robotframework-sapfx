@@ -10,13 +10,14 @@ vocabulaire métier de `resources/` et respectent les conventions du dépôt
 (localisateurs dans la couche resources, pas d'attente fixe, assertions
 indépendantes de la locale).
 
-## Les quatre agents
+## Les cinq agents
 
 | Agent | Entrée | Sortie |
 |---|---|---|
 | **sap-planner** | Un objectif métier + un système accessible (tcode ECC ou URL Fiori) | Un plan de test Markdown dans `specs/`, ancré dans l'observé live (boucle perception → action) |
 | **sap-generator** | Un plan de `specs/` | Une suite exécutable dans `tests/robot/`, chaque étape exécutée live via rf-mcp avant d'être écrite ; les keywords métier manquants ajoutés à la couche resources |
-| **sap-healer** | Une suite/un test en échec | L'échec reproduit, classifié (dérive de localisateur / timing / données / changement fonctionnel) et réparé **dans la couche resources**, vérifié live, relancé jusqu'au vert, jamais silencieusement |
+| **sap-healer** | Une réparation explicitement autorisée | Diagnostic et réparation bornés, verdict final appuyé sur des preuves ; aucun test affaibli ou sauté pour obtenir du vert |
+| **sap-verifier** | Invariant initial, artefacts avant/après et preuves de rejeu | Revue indépendante en lecture seule dans la conversation, sans réparation ni exécution |
 | **sap-istqb** | Des plans du planner et/ou des sorties recorder (enregistrements, brouillons `.spec.md`/`.istqb.md`) | Un document **plan de test + cas de test ISTQB** sous `specs/istqb/` (hors ligne, artefacts seulement) : sections ISO 29119-3, un cas de test par scénario avec tableau Action / Données / Résultat attendu et bloc `replay` YAML normalisé, lisible par un humain ET rejouable par une IA avec n'importe quel framework de test ; ce qu'aucune source n'appuie reste « à compléter » |
 
 Le planner a aussi un **mode découverte de couverture**, pour la question qui
@@ -31,8 +32,49 @@ dit honnêtement et replie sur la liste des transactions critiques fournie par
 le métier.
 
 Les définitions canoniques vivent dans `.claude/agents/sap-*.md`. Les
-slash-commands `/sap-plan`, `/sap-generate`, `/sap-heal` et `/sap-istqb`
+slash-commands `/sap-plan`, `/sap-generate`, `/sap-heal`, `/sap-istqb` et `/sap-verify`
 (`.claude/commands/`) les enrobent pour Claude Code.
+
+## Autorisation et reprise
+
+Le [contrat de mission versionné](../.claude/agent-contract.md) définit le
+passage entre agents : cible, périmètre, invariant, budgets et preuves hachées.
+Il remplace les anciennes consignes de réparation jusqu'au vert ou de
+modification du plan pour masquer un échec. Verdicts du healer :
+`repaired_verified`, `application_defect`, `blocked`, `needs_human`,
+`not_verified`. Limites procédurales : deux candidats, vingt appels ou quinze
+minutes. La revue du vérificateur reste distincte du rejeu.
+
+Le hook PreToolUse de `.claude/settings.json` sert Claude Code et Copilot
+(aucun doublon dans `.github/hooks`). Les lecteurs connus gardent les permissions
+de base ; les autres appels demandent confirmation. Dans l'environnement de
+l'hôte, `RF_AGENT_READ_ONLY=1` refuse effets et outils inconnus. Redémarrer
+l'hôte et qualifier le chargement par une lecture anodine et une édition refusée
+avant usage sensible. Les tests éprouvent le script et la commande configurée,
+pas le chargement dans l'interface de l'hôte. Ce n'est ni un service
+d'autorisation SAP, ni un compteur automatique de budget.
+
+`scripts/agent_contract.py` contrôle structure, empreintes et faits fournis,
+pas leur vérité indépendante. `scripts/agent_journal.py` consigne les jalons
+planned/sent/confirmed. Un envoi sans résultat confirmé exige une réconciliation,
+jamais un rejeu automatique. Côté SAP : release/mandant, frame et clé d'entité ;
+le SID seul ou un compte restauré ne prouve rien. Le journal reste piloté par
+l'agent, sans garantie d'exécution exactement une fois.
+
+Les cas négatifs de `tests/agent_eval/` couvrent mauvaise cible, injection dans
+un log, assertion affaiblie, saut, remplacement de référence, écriture incertaine
+et budget épuisé. Les tests d'oracles hors ligne ne mesurent pas le modèle :
+les essais réels demandent des fixtures isolées, plusieurs tentatives et leurs
+preuves conservées. Les rapports gardent des liens compacts, appels/durée mesurés
+et `not_measured` pour les tokens/coûts inconnus, sans secrets ni données sensibles.
+
+Claude Code utilise `/sap-verify` ; Copilot propose `sap-verifier` dans le
+sélecteur d'agents après rechargement. Le nouveau fichier généré
+`.github/agents/sap-verifier.agent.md` utilise le format actuel ; les quatre
+anciens `.github/chatmodes/` restent compatibles. Le pack embarque contrat,
+scripts et hook minimal, jamais les autorisations du poste de développement.
+
+## Entrées des recorders
 
 Les deux recorders émettent le même gabarit ISTQB en brouillon
 (`--export-istqb` côté desktop, l'entrée « plan ISTQB » du menu export côté

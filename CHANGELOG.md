@@ -7,7 +7,376 @@ name that was current at the time).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-08
+
+### Added
+- **SAP GUI coverage reconnaissance: a capability register of what
+  `SapEccLibrary` cannot do yet** (`tests/robot/ui/ecc/reconnaissance_couverture_sapgui.robot`,
+  generated from `specs/reconnaissance-couverture-sapgui-a4h.md` through the
+  plan -> generate -> verify cycle, live 19/19 on A4H 1909, page object
+  `resources/page_objects/sapgui_capability_probes.resource`). Ten Basis
+  transactions, every SAP GUI control family confronted first with what the
+  Scripting API exposes on the live control, then with what the library does
+  with it. Each scenario reproduces ONE gap (or a covered witness) and records
+  a `gap`/`covered`/`poste`/`hors_api` verdict in a deterministic JSON
+  register; it fails the day the library closes the gap, naming the register
+  update. Eighteen gaps with their verified API path: shell `SubType`
+  missing from perception, trees without read/expand/select keywords and an
+  intermittent inherited `Select Node`, combo boxes without select-by-KEY nor
+  `Entries`, date entry bound to the user's format (no `Input Date` /
+  `Get User Formats`), F4 calendar unsupported by `Pick F4 Value`,
+  `Doubleclick Element` calling the tree API on a grid, `Select Context Menu
+  Item` refusing a grid by type, toolbar failures without inventory,
+  `Get Value` on a shell returning its ProgID in PASS, checkbox/radio own text
+  not indexed by the semantic engine, no menu keyword, a `@N` map whose
+  first hundred references are menu entries, and `Get List Rendering Status`
+  raising the accessibility-mode alarm on an ALV grid and on an editor (it
+  tests "shell and zero label" without reading the shell subtype; found by
+  the independent `sap-verifier` review, which rejected a "workstation
+  limit" scenario that measured nothing of the workstation). First spec to
+  carry the agent contract v1 handoff sidecar and an evidence file
+  (`specs/evidence/`).
+- **Field note, rf-mcp x COM**: `execute_batch` and `Evaluate` run on a
+  different thread than the keyword that bound the SAP GUI session, and the
+  library hides it (empty `# screen ?` signature and `[]` window stack in
+  PASS, "still busy" on an idle screen, `GetObjectTree` latch tripped by a
+  proxy `AttributeError`). Session remedy documented (`use_context=true` on
+  every `execute_step`, never `execute_batch` for COM); the library fix is
+  the head of the correction backlog.
+- **The capability register closed the same day: 31 new ECC keywords and
+  five new mixins** (`_trees.py`, `_combobox.py`, `_menus.py`,
+  `_grid_actions.py`, `_windows.py`; pure logic in `sapfx_common`
+  `tree_nodes`, `combo_box`, `user_formats`, `menu_path`). Trees
+  (`Read Tree Nodes`, `Read Tree Children`, `Get Selected Tree Node`,
+  `Select Tree Node`, `Expand Tree Node`, `Get Tree Node Key By Text`,
+  `Select Tree Node By Text`/`By Path`, `Double Click Tree Node`,
+  `Find Tree Nodes`: opaque keys kept as is, column trees read through
+  `TEXT`), combo boxes by technical key (`Get Combo Box Entries`,
+  `Get Combo Box Key`, `Select Combo Box Entry By Key`: a combo can carry two
+  distinct keys `""` and `" "`, never normalized on write), the user's
+  formats (`Get User Formats` from SU3, `Input Date` ISO in / user format
+  out, `Input Number`), the F4 calendar (`Pick Calendar Date`), grid actions
+  (`Double Click Grid Cell`, `List Grid Context Menu`,
+  `Select Grid Context Menu Item` by function code, `List Grid Toolbar
+  Buttons`, `Sort Grid By Column`), the menu bar (`List Menu Items`,
+  `Resolve Menu Item`, `Select Menu Item` by texts or positions), checkboxes
+  and radios by their own text (`Select/Unselect Checkbox By Label`,
+  `Select Radio Button By Label`, `Checkbox By Label Should Be`) and modal
+  windows (`Dismiss Modal Window`, `Get Modal Buttons`: several SAP dialogs
+  refuse `sendVKey`, the fallbacks press the right button and verify the
+  window is gone; `Cancel Popup` of the resource layer now delegates to it).
+  Perception: the signature shows `GuiShell/<SubType>` (`ScreenElement.subtype`,
+  `display_type`), `Get List Rendering Status` reads shell subtypes (no more
+  accessibility alarm on an ALV grid or an editor), `Get Screen Map` and the
+  semantic view no longer list menu entries, failure messages of the label
+  engine list the own texts of checkboxes/radios/buttons. Behaviour changes,
+  all deliberate: `Get Value` on a shell whose text is its ProgID now FAILS
+  naming the reader keyword; `Get Screen Signature`, `Get Open Windows` and
+  the `GetObjectTree` path raise `ScreenUnreadableError` (with the session
+  remedy) instead of returning an empty view when the COM session is
+  unreadable; `Wait Until Busy Done` names the last probe exception instead
+  of "still busy"; the `GetObjectTree` latch is no longer tripped by a
+  cross-thread proxy `AttributeError`; the STA rail re-attaches the session
+  per foreign thread (engine from the ROT, `FindById` of the session id);
+  the inherited `Select Node`, `Doubleclick Element`, `Select Context Menu
+  Item`, `Select From List By Label` and `Click Toolbar Button` are
+  overridden on the controls where they failed (trees, grids, combos), with
+  actionable failures. The register suite replayed on the corrected library
+  went red 18/19 naming the register update, then was carried to its covered
+  form and validated 19/19 live; English Libdoc spec updated and the ECC page
+  rebuilt. The independent review of the covered form returned `needs_human`
+  on three assertions that measured less than they claimed, all hardened and
+  replayed 19/19: `Get Combo Box Key` now returns the key VERBATIM (it
+  stripped whitespace, which made restoring the blank key `" "` unverifiable),
+  the checkbox scenario toggles to the state OPPOSITE to the initial one, the
+  date scenarios compare with the MEASURED local form and the calendar
+  scenario no longer types an `Input Date` to produce its own expected value.
+  The register artifact now carries the target identity (system, client,
+  user from `List Sap Sessions`, outside the hash), and the STA rail was
+  proven through rf-mcp itself without restarting the server (library
+  reloaded and hot-swapped, then an `execute_batch` on a foreign thread
+  returned the real window stack and screen signature where the morning
+  session returned `[]` and `# screen ?` in PASS); the `Dismiss Modal Window`
+  / `Get Modal Buttons` keywords joined the rf-mcp intent map. 1957 unit
+  tests.
+- **The register's three remaining backlog items, closed the same evening:
+  system identity, Data Browser output modes, generic deterministic
+  artifact.** `Get System Identity` (new mixin `_identity.py`, pure logic in
+  `sapfx_common.system_identity`) reads "System: Status" opened BY POSITION
+  (the System menu is the second-to-last menu of the bar and "Status..." its
+  entry 11 on the six screens measured: SESSION_MANAGER, SE16, SU01, SM37,
+  SE38, SE11), verified structurally (`txtSYST-MANDT`), then the kernel popup
+  (`KINFOSTRUC-KERNEL_RELEASE` / `PATCH_LEVEL`) and the "Installed Software"
+  grid whose `SAP_BASIS` row carries THE ABAP release (absent from the other
+  two dialogs); every modal is closed and verified gone, sections that could
+  not be read are NAMED in `unread`, never replaced by a plausible value,
+  `anchor` isolates the comparable keys (the IP address is volatile), and
+  `System Identity Should Be    basis_release=754    kernel_release=777` is
+  the head guard of a campaign. It answers the independent review's
+  reservation: two lab systems share a SID and a host, only release and
+  kernel tell them apart. `Use Standard List In Data Browser`,
+  `Set Data Browser Output` and `Get Data Browser Output` join
+  `Use ALV Grid In Data Browser`: the standard SE16 list is a REAL classic
+  ABAP list, rendered as 42 `GuiLabel` (dynpro `SAPMSSY0/120`) and read by
+  `Read Abap List` without any accessibility mode (measured on T000; the
+  workstation registry carries no `Accessibility` key), so the "opaque shell
+  without labels" case that motivated the preflight has never been observed
+  on this workstation and the historical RSPARAM note pointed at a GridView.
+  `sapfx_common.artifacts` (`Write` / `Read` / `Compare Deterministic
+  Artifact`, `Artifact Hash`, importable as a Robot library): sorted JSON with
+  a DECLARED hash scope (`hash_scope`), the hash recomputed on read (an
+  artifact edited afterwards is refused), path-named differences and two
+  different scopes refused as non-probative; the capability register is its
+  first consumer (no more `Evaluate json` in the page object; the four
+  historical artifact writers keep their serialization because committed
+  artifacts depend on it). The register grows to 21 scenarios and 20 keys
+  (standard SE16 list read as labels, ALV grid restored AND read back in
+  teardown; identity with release and kernel, SID matched to the session, no
+  residual modal), validated live 21/21; its `target` carries the identity.
+  1980 unit tests.
+- **A second release measures what one cannot: the capability register on
+  ABAP Platform 2023 (release 758).** Replaying the 754 register against the
+  other lab container failed 21/21 on its Suite Setup, and the message was
+  right: `Get System Identity` REFUSED naming the menu layout instead of
+  serving a wrong identity, because "Status..." is entry 10 on 758 (the
+  "List" entry is gone), not the entry 11 measured on six 754 screens; worse,
+  entry 11 on 758 is "Log Off", which the keyword clicks before it notices,
+  the session surviving only because `Dismiss Modal Window` declines the
+  confirmation. Three probe passes then established five gaps and three
+  witnesses, recorded in `specs/reconnaissance-couverture-sapgui-abap2023.md`
+  and reproduced by `tests/robot/ui/ecc/reconnaissance_couverture_sapgui_2023.robot`
+  (10 scenarios, 9 register keys, validated live 10/10 on four consecutive
+  runs, generated by sap-generator with every step verified live): the status
+  bar exposes `MessageId`/`MessageNumber` (`MO/402` vs `MO/410`, both type E)
+  that no keyword serves, tab strips have no keyword at all (12 SU01 tabs on
+  758 vs 11 on 754), the application toolbar cannot be inventoried although
+  three library messages point at it, and the grid resolver mistakes a
+  column tree for an ALV (`Get Grid Column Ids` PASSES on the IMG tree,
+  returning `HierarchyHeader`) while both readers leak raw COM
+  `AttributeError`s on a container. Measured equivalences: the 758 wraps the
+  SE16 grid in a `GuiSplitterShell` and every grid keyword still ports, the
+  ABAP editor stays out of API, and `session.Info` carries no release nor
+  kernel (`SystemNumber` is a false friend: it reflects the published port).
+  The verdict vocabulary and the deterministic register moved to a shared
+  `resources/page_objects/capability_register.resource` imported by both
+  campaigns; the 754 register was replayed after the extraction. Correction
+  lot in the product backlog (§ 2 sexies): the library is not patched by a
+  reconnaissance campaign, its scenarios turn red the day it is.
+- **The second-release lot, delivered the same evening.** `Open System
+  Status` RESOLVES the "Status..." entry instead of counting it: second-to-last
+  entry of the second-to-last menu ("Log Off" closes the list on both
+  releases: 754 = entry 11 of 13, 758 = entry 10 of 12), and the candidate must
+  open a dialog (ellipsis, not localized) or the keyword refuses BEFORE any
+  click; pure `dialog_entry_before_last` in `sapfx_common.menu_path`, one unit
+  test per layout. New mixins: `_statusbar.py` (`Get Status Message Identity`
+  returning `{type, class, number, identity, text, parameters}` with
+  `identity` = `MO/E/402` and EMPTY when no message is shown, `Status Message
+  Should Be    MO    402    E`; the `MessageId` field padding is stripped, unlike
+  a combo box key, and the docstring says why), `_tabstrip.py` (`List Tabs`,
+  `Get Selected Tab`, `Select Tab` by technical key with the selection READ
+  BACK, `Select Tab By Label`; `SelectedTab.Id` is absolute and is brought back
+  to the perception's relative form) and `_toolbar.py` (`List Toolbar Buttons`
+  with the `ICON_*` name as the locale-safe anchor, `Click Application Toolbar
+  Button` by id, segment or icon, failure listing the inventory; the grid's
+  `Click Toolbar Button` failure now LISTS the application toolbar it used to
+  name). Pure logic in `sapfx_common.status_message` and `tab_strip`. The
+  grid resolver requires a `GuiShell/GridView` (the SubType decides; a column
+  tree also carries `ColumnOrder`, and `Get Grid Column Ids` PASSED on the
+  IMG tree), refuses a LEAF shell of another subtype naming its reader and
+  still traverses a `Splitter`; the tree resolver now descends containers and
+  fails naming the depth explored instead of leaking a raw COM
+  `AttributeError` (`LEAF_SHELL_SUBTYPES` in `sapfx_common.object_tree`,
+  `shell_subtype` in `com_safety`). The 758 register replayed unchanged turned
+  red on five of its six gaps naming "capability now covered", and on witness 7
+  because a first version of the hardening refused the SE16 splitter: caught by
+  the register, fixed before the covered form. The independent review of the
+  covered form (`verified`, eight non-blocking reservations, all treated and
+  replayed live) moved the target facts (menu position 10, twelve SU01 tabs,
+  five toolbar buttons) OUT of the capability verdicts, made `Open System
+  Status` return the id of the menu entry it clicked (the trace of the
+  resolution, confronted with a text-anchored reading of the menu) and
+  reworded the grid resolver's refusal around the SubType. 2148 unit tests.
+- **Five-agent method for Claude Code and GitHub Copilot**, maintained first
+  in rf-test-agents: independent read-only `sap-verifier`, bounded healer
+  verdicts, confirmed-call PreToolUse gate, hashed mission handoff validation,
+  conservative recovery journal and negative evaluation catalogue. Existing
+  Copilot modes are regenerated; verifier uses `.agent.md`. Common scripts,
+  contract and minimal hook configuration ship in the pack. The SAP evaluation
+  harness now refuses extra changes in the repaired target. Offline component
+  tests do not qualify live host loading or LLM behavior; budgets and journal
+  integration remain agent-operated, not automatic execution enforcement.
+  Host loading was qualified on 2026-09-06 for the Claude Code CLI only:
+  native `PreToolUse` events show the `ask` and `deny` branches on a canary
+  edit, the file left unchanged. Under Copilot in VS Code the strict-deny
+  probe let a canary edit through in a fresh conversation, so hook loading
+  there stays unqualified until the "GitHub Copilot Chat Hooks" output
+  channel settles it. The synthetic verifier reviews approved none of the 55
+  negative dossiers (three Copilot and two Claude sessions; one Claude
+  session timed out and is excluded from the count).
+- **SE11 dictionary campaign: the screen crossed with the dictionary tables**
+  (`tests/robot/ui/ecc/se11_dictionnaire_croisement.robot`, generated from
+  `specs/se11-dictionnaire-affichage-croisement-se16.md` through the full
+  plan -> generate cycle, validated live 7/7 vs A4H on 2026-09-05, plus a new
+  `resources/page_objects/se11_dictionary_display.resource` page object): the
+  same dictionary truth read two ways, the SE11 display screens on one side
+  and DD02L/DD03L/DD07L via SE16 on the other. Reigning assertion: the Fields
+  tab equals DD03L field by field (26 = 26, order, data elements, lengths);
+  key checkboxes equal `KEYFLAG`; delivery class equals `CONTFLAG` and
+  belongs to DD07L; domain fixed values equal DD07L; in-screen navigation to
+  a data element and back; and the error branches measured live: a
+  nonexistent object answers with a message of type `S` (not `E`) leaving
+  the initial screen unchanged, and a structure asked for as a table is
+  silently redirected to another dynpro where SE16 rejects it as `E`.
+  Read-only throughout.
+- **Demo Kit deep-exploration campaign**
+  (`tests/robot/ui/fiori/exploration_profonde_demokit.robot`, generated from
+  `specs/openui5-demokit-exploration-profonde.md` through the full
+  plan -> generate agent cycle, validated live 12/12 on 2026-09-05 against
+  SDK 1.152.0 and replayed 12/12 after the same-day capability lot): the
+  complement of the navigation campaign. Documentation topics tree (32-hex
+  GUID targets), doc-to-API cross links (documentary anchors are RELATIVE,
+  without `#/`: a selector assuming `#/api/` silently matches nothing), API
+  member sub-navigation (second hash encoded `%23`; the anchor bar is a
+  scroll spy, the route is proven on the fragment), method/event tables read
+  by their technical links (`binding: None` rows), the reigning assertion
+  full-doc = living control (equality modulo declared inventory: the
+  primitive-reduced sheet returned 17 keys for 18 documented, the gap that
+  triggered `Get Ui5 Control Metadata` below), inheritance chain rebuilt
+  from the BorrowedLists, samples gallery read as a real table, code view,
+  bounded prev/next, Demo Apps/Resources perception-only, and the
+  accumulation sentinel: the sample iframe SURVIVES navigation invisibly
+  (the SPA accumulates, 511 -> 5442 controls), so every read is scoped to
+  its container. Read-only, borrowed toggles restored by teardown; ~40
+  business keywords added to the shared Demo Kit page object.
+- **SapFioriLibrary: `Get Ui5 Control Metadata`, the declared contract of a
+  control** (new `controlMetadata` bundle function + keyword): properties,
+  aggregations, associations and events as DECLARED by the class metadata,
+  each with its origin class and a `borrowed` flag (own vs inherited, the
+  exact notion the Demo Kit documentation calls "borrowed"), `type` and
+  JSON-safe `default` for properties, `type`/`multiple` for aggregations and
+  associations, plus the full inheritance `lineage`. Independent of current
+  values and of their primitivity: it closes the gap measured live on the
+  Demo Kit deep-exploration campaign (2026-09-05), where the reduced control
+  info sheet returned 17 keys against 18 documented properties of
+  `sap.m.Button` (`fieldGroupIds`, array-valued, silently absent), forcing
+  the campaign's reigning assertion into an "equality modulo declared
+  inventory" workaround. Off-browser unit tests, rf-mcp Fiori keyword map
+  updated.
+
+- **A 401 now says WHO refused: the API-management layer in front, or the
+  SAP system behind it.** New pure predicate
+  `sapfx_common.gateway_status.refused_by_sap_backend()` (structural, read on
+  the headers `sap-authenticated: false` / `sap-system` / a `www-authenticate`
+  naming the NetWeaver application server, never on the refusal page's text,
+  which was measured in GERMAN on an otherwise non-German target), and a new
+  `backend_auth_failed` state served by `Get Gateway Status` when a session
+  authenticated by **API key** is refused by the backend: the edge necessarily
+  accepted the key (an invalid one is rejected by the edge itself, with its
+  own JSON error), so the refusal comes from the system behind, and the
+  remediation says so, explicitly forbidding the regeneration of a perfectly
+  healthy key. Without an edge in front (Basic on an ABAP system) the same
+  headers keep their old meaning, `auth_failed`: the distinction rests on what
+  the client knows of its OWN authentication mode, since no response header
+  carries it. Business guard `Skip Unless Api Backend Answers` in
+  `resources/api_keywords.resource` (the API-channel mirror of
+  `Skip Unless Rfc Channel Is Available`). Found live on 2026-09-06 against
+  the SAP Business Accelerator Hub sandbox, whose S/4HANA backend refused
+  every read while the SAME key read another of the provider's sandboxes
+  without trouble; the old single `auth_failed` bucket advised checking the
+  credentials, which is the exact wrong trip.
+
+### Changed
+- **The sap-planner now adopts a business persona before exploring.** The
+  domain fiches of the private root `PERSONAS.md` gained three normalized
+  test-perception rubrics each (risks to cover first, reigning assertion,
+  reversibility), and the planner's definition instructs it to identify the
+  mission's domain, let the matching fiche answer four questions (where the
+  business truth is read, which risks come first, what the reigning assertion
+  is, how the test undoes what it writes) and carry a « Perception métier »
+  section in every plan it produces; persona knowledge stays (SAP général)
+  and never replaces live observation. On a deployed pack (no `PERSONAS.md`)
+  the agent derives the same grid itself and marks it as such. Wired through
+  the `/sap-plan` command, the `sapfx` skill's cycle reference and the
+  regenerated VS Code chat mode; follow-ups (consume the section in
+  generator/istqb/healer, back-port the mechanism to rf-test-agents) are
+  tracked in the product backlog.
+- **CI now runs all three offline Browser smokes on every push**, not just
+  the WC-engine one: `fiori_hybrid_smoke.robot` (nested frames, multiple
+  engines, scope stack) and `fiori_bundle_version_smoke.robot` (versioned
+  `__SAPFX` bundle replacement with its network hooks) join the Windows job,
+  as three separate steps (under pwsh a multi-line `run:` only reports the
+  LAST exit code, so a mid-script red would be masked). Recommended by the
+  same external review as the OAuth fixes below: the dry run resolves
+  keywords but exercises none of these fragile boundaries.
+
 ### Fixed
+- **CI went red on the agent contract commit: the bilingual-docs guard took
+  two new single-language files for untranslated docs.** The generated
+  `.github/agents/sap-verifier.agent.md` (same nature as the generated
+  `.github/chatmodes/`) and the French-only evaluation fixtures under
+  `tests/agent_eval/` (dossiers read by an agent under test, never user
+  documentation) now sit in the guard's single-language prefixes, with both
+  paths added to the unit test that pins those exemptions. The failure was
+  reproducible offline: `test_main_returns_nonzero_only_on_real_repo_pairing_problems`
+  runs the guard against the real tree and was red before the push.
+- **The sandbox lane could not tell a provider outage from a defect of ours,
+  in both directions** (`tests/robot/api/canal_api_odata.robot`). Its
+  key-authentication scenario stopped at the session's LOCAL state, so it
+  stayed green on 2026-09-06 while not one read of the sandbox went through
+  (the textbook green-and-false); it now proves over the network that the
+  edge HONOURED the key, accepting `ok` or `backend_auth_failed` and
+  refusing only `auth_failed`. Its invalid-key scenario asserted through
+  `Run Keyword And Expect Error *`, so it passed while the whole target
+  refused everything, including with the RIGHT key; it now judges the LAYER
+  that refuses (`auth_failed`, the edge). The three business scenarios skip
+  with a named reason when the provider's backend is down, instead of
+  reddening a healthy channel. Counter-proof played: with a deliberately
+  invalid key the guard does NOT skip (4 red), so it cannot mask a
+  credential defect.
+- **Security (high): the OAuth2 token-endpoint transport no longer forwards
+  the client credentials across a redirect to another host**
+  (`SapApiLibrary._token_transport`). It used urllib's standard redirect
+  handler, which PRESERVES the `Authorization` header (here the Basic
+  `client_id:client_secret`) when following a redirect, so a compromised or
+  misconfigured token endpoint could replay the credentials to any host of
+  its choosing. The token opener now carries its own
+  `_SameOriginRedirectHandler` pinned to the token endpoint's OWN origin,
+  independent of the API host (the session's same-origin guard, pinned to
+  `base_url`, deliberately never applied here: an IAS/XSUAA endpoint
+  legitimately lives on another host than the API). A scheme downgrade
+  (`https` -> `http` on the same host) is blocked too; the session's TLS
+  context (mTLS, `verify_tls`) is still reused. Reported by an external
+  review, reproduced off-network with fake data; the non-forwarding property
+  is now unit-tested against the REAL opener (the existing OAuth tests stub
+  the transport, which is exactly why the defect escaped them).
+- **Security (medium): the OAuth2 token cache can no longer outlive the
+  announced token validity**. The expiry was computed as
+  `max(30s, 0.9 * expires_in)`, so a token announced valid 10 s was kept
+  30 s and replayed expired (guaranteed 401, masked by the single retry).
+  The local deadline now always stays UNDER the announced lifetime (the 10%
+  renewal margin subtracts from it, never substitutes for it), an
+  `expires_in` of `0` is honoured (token re-requested on every call) instead
+  of being coerced to the 300 s default by a truthiness test, and only an
+  ABSENT field keeps that default. Short, zero and absent lifetimes are
+  unit-tested. OAuth2/mTLS tests moved to their own
+  `tests/unit/test_api_library_oauth.py` (convention #13).
+- **`Read Table Control` renders GuiCheckBox columns as the ABAP flag**
+  (`X` checked, empty otherwise, the DD03L `KEYFLAG` convention, directly
+  cross-checkable) instead of silently returning their always-empty `Text`:
+  the SE11 field list's "Key" column vanished from every read. Gap found
+  live by the sap-planner while scoping the SE11 deep-exploration campaign
+  (2026-09-05); same state read serves `Get Table Control Cell`.
+- **`Get Ui5 Control Info` no longer drops non-primitive property values
+  without a trace**: the sheet's `properties` stay reduced to primitives,
+  but a new `property_keys` entry lists EVERY property read, mirroring the
+  `object_keys` contract the binding context already had. The asymmetry was
+  exactly what made the 17-vs-18 finding above undiagnosable from the sheet
+  alone.
+- **`Get Ui5 Property`/`Get Ui5 Properties` return array-valued properties
+  as real JSON-safe arrays** instead of a string coercion: `String([])`
+  yielded `''` (indistinguishable from a legitimately empty string) and
+  `String(['a','b'])` yielded `'a,b'` (structure lost). Non-array object
+  values keep the string coercion (rare types, possible cycles).
 - **Demo Kit target drift absorbed: the public OpenUI5 Demo Kit shell moved
   to UI5 Web Components** between 2026-08-25 (last green ui5-compat CI run)
   and 2026-09-01, with SDK 1.151.0 -> 1.152.0 and no repository commit in

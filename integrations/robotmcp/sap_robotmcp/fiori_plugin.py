@@ -274,8 +274,11 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 "Ui5 Runtime Is Ready", "Ui5 Runtime Should Be Ready",
                 # fiche de contrôle : type PLEIN, contexte de liaison (la clé
                 # d'un item à id généré), enfants d'agrégation RENDUS OU NON
-                # (les items d'un Select popover fermé n'existent pas au DOM)
+                # (les items d'un Select popover fermé n'existent pas au DOM) ;
+                # l'inventaire de MÉTADONNÉES est le contrat DÉCLARÉ (types,
+                # défauts, provenance borrowed), indépendant des valeurs
                 "Get Ui5 Control Info", "Get Ui5 Aggregation Info",
+                "Get Ui5 Control Metadata",
                 # services launchpad (ushell) : catalogue de DROITS, pas rendu
                 "Flp Container Is Present", "Flp Container Should Be Present",
                 "Flp Service Is Available", "Get Flp User", "List Flp Apps",

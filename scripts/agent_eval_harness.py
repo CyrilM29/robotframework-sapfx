@@ -205,8 +205,9 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
                 "OK : %s restauré à l'identique (la réparation d'UNE ligne "
                 "attendue)." % scenario["file"])
         else:
+            ok = False
             messages.append(
-                "OK (avec note) : la dérive est réparée mais %s diffère de "
+                "ECHEC : la dérive est réparée mais %s diffère de "
                 "l'original ; examiner le diff (commentaire ajouté ? "
                 "réparation par ancre de libellé ?)." % scenario["file"])
     # Comparaison des DEUX sens : un fichier modifié ou disparu, mais aussi un
@@ -229,7 +230,7 @@ def verify(name: str, root: str | None = None) -> Tuple[bool, List[str]]:
             "ECHEC : fichiers protégés modifiés (le healer ne touche NI les "
             "tests NI les autres resources) : %s" % ", ".join(drifted))
     if ok:
-        messages.append("VERDICT : PASS, comportement healer conforme.")
+        messages.append("VERDICT : PASS, patch conforme au scenario ; replay non evalue.")
         os.remove(state_path)
         os.remove(backup_path)
     else:
