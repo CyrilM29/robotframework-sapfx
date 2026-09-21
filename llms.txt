@@ -30,7 +30,15 @@ fake Browser); ambiguity is always surfaced with candidates, never resolved
 by silent first match; capabilities live in the LIBRARIES, never as inline
 JS or `Evaluate __import__` in the Robot layer (`resources/` carries the
 business vocabulary only, enforced by `scripts/check_conventions.py` with an
-exact-count allowlist), and that vocabulary ships as an EXAMPLE measured on
+exact-count allowlist); a table reading is always confronted with the total
+the source DECLARES before anything is written from it, because all four
+channels materialise their table lazily and three of them leave no trace (a
+WebGUI grid sends one page of 200 rows renumbered from 1 against 2000
+declared, a `sap.m.Table` stops at 30 of 4133, `RFC_READ_TABLE` returns
+exactly its `ROWCOUNT`, all perfectly clean), so one
+shared refusal rule lives in `sapfx_common.table_extract` rather than one per
+channel, the RFC being the limit case since it declares no total at all and
+its count must come from a module other than the one that reads; and that vocabulary ships as an EXAMPLE measured on
 this repo's lab targets, to be verified and customized per target and per
 business domain, `src/` being what makes truth everywhere; and no code file
 grows past 500 lines, split along a
@@ -114,9 +122,11 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
 - `tests/robot/ui/fiori/`: live launchpad campaigns, all read-only by default:
   a SAP Build Work Zone cFLP behind a real IAS tenant (iframe scope,
   catalogue by service) and the ABAP FLP explored on two releases
-  (`exploration_flp_abap_a4h.robot` 19/19, `exploration_flp_abap_2023.robot`
-  21/21, the second existing to break single-release assumptions and the
-  shared page object replayed on both to prove it), plus
+  (`exploration_flp_abap_a4h.robot` 20/20, `exploration_flp_abap_2023.robot`
+  22/22, the second existing to break single-release assumptions and the
+  shared page object replayed on both to prove it; each carries one opt-in
+  reversible write scenario, pin then unpin an app, skipped without
+  `ABAP_FLP_WRITE_OPT_IN`), plus
   `navigation_interaction_demokit.robot` (12/12), the one campaign that needs
   no credentials and no system to provision: hash routing, deep links, API
   tree, doc tables, popover cascades, theme and sample iframe on the public
@@ -131,6 +141,25 @@ All docs are bilingual: each `*.md` has a French `*.fr.md` twin.
   written through the screen and observed through the API, then deleted and its
   disappearance asserted on the entity. Opt-in: it skips in Suite Setup without
   opening a channel unless the opt-in variable is passed
+- `tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot`: the same EPM
+  product read through OData, WebGUI SE16 and `RFC_READ_TABLE`, the three
+  prices compared with each other after numeric normalisation in the user's
+  decimal notation read on the system (spec
+  `specs/cycle-vie-produit-epm-api-webgui-rfc.md`, live 7/7 on both lab
+  releases). Read-only by measurement: the product service's write path is
+  broken on both trial images (draft activation and deletion refused, verified
+  after a restart, an image restore and on the second release). Target proven
+  per channel (release, Gateway catalogue size, address reached), negative
+  result preceded by a positive witness, every guard seen refusing
+- `tests/robot/cross/commande_achat_epm_procure_to_pay.robot`: Procure-to-Pay
+  EPM, a goods receipt posted through the business object's own OData action
+  and the `SNWD_STOCK` increment checked through SE16; explicit opt-in, since
+  a goods receipt has no inverse in this demo model
+- `tests/robot/ui/ecc/commande_vente_epm_order_to_cash.robot`: Order-to-Cash
+  EPM through SAP GUI (`SEPM_SO`), the order number taken from the message
+  PARAMETER, confronted with `SNWD_SO` in SE16, deleted in teardown
+- `tests/robot/ui/ecc/smoke_test_t000_se16.robot`: the smallest suite, T000
+  read in full through SE16 with completeness proven, not merely counted
 - `src/SapEccLibrary/`: vendored upstream base + mixins (connection, waits,
   grids and grid actions (double-click, context menu by function code, sort),
   trees (SAP menu, IMG, SE80: read/expand/select by key, text or path), combo

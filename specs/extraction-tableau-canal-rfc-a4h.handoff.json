@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "mission_id": "extraction-tableau-canal-rfc-a4h",
+  "target": "a4h-sapbasis754-kernel777-client001",
+  "invariant": "Un releve tabulaire n'est ecrit dans aucun fichier tant que ses lignes lues n'egalent pas un total mesure par une source INDEPENDANTE du module qui lit, et chaque fichier ecrit est ensuite relu puis confronte ligne a ligne au releve lu sur la cible.",
+  "scope": [
+    "specs/extraction-tableau-canal-rfc-a4h.md",
+    "specs/evidence/extraction-tableau-canal-rfc-a4h.2026-09-16.json",
+    "resources/rfc_keywords.resource",
+    "resources/table_export_keywords.resource",
+    "tests/robot/api/extraction_tableau_rfc_a4h.robot",
+    "tests/unit/test_rfc_extract.py",
+    "src/sapfx_common/rfc_extract.py",
+    "src/sapfx_common/table_extract.py",
+    "src/SapApiLibrary/_rfc_extract.py"
+  ],
+  "mode": "read_only",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/extraction-tableau-canal-rfc-a4h.md",
+      "sha256": "c62c49388f5412874ff240c9fd243fa76d25e90beece933e77663569e8b83c3c"
+    },
+    {
+      "path": "specs/evidence/extraction-tableau-canal-rfc-a4h.2026-09-16.json",
+      "sha256": "4da7524432dba7f8b695fab77591642c592ec7f0bdf09beba697ab35d6f3fead"
+    }
+  ]
+}

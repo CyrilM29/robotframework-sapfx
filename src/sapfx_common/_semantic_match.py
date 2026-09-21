@@ -18,7 +18,8 @@ from typing import Iterable, Optional, Sequence
 
 from .object_tree import ScreenElement
 
-# alignement 5, voisinage horizontal ~20-30, vertical ~25).
+# alignement 5, voisinage horizontal ~20-30, vertical ~25). Ces valeurs sont
+# des pixels à l'ÉCHELLE DE RÉFÉRENCE (rendu 100 %) : voir geometry_scale.
 ALIGN_TOLERANCE = 5
 MAX_HORIZONTAL_GAP = 30
 MAX_VERTICAL_GAP = 25
@@ -27,6 +28,56 @@ MAX_VERTICAL_GAP = 25
 # plus généreux que les tolérances d'ancrage direct ci-dessus car le repère
 # est ici la région visuelle autour du libellé, pas son voisin immédiat.
 SCOPE_RADIUS = 100
+
+# Hauteur (px) d'un champ texte rendu à 100 % : 24 sur TOUS les champs et
+# libellés d'un écran de sélection SE16 (SAP GUI 8.00, 96 DPI, relevé live
+# A4H 2026-09-21). C'est l'étalon dont geometry_scale dérive l'échelle de
+# rendu, parce que la géométrie que rend l'API Scripting est en pixels
+# PHYSIQUES : une session RDP depuis un poste à écran dense, ou un facteur
+# d'échelle Windows, multiplient TOUTES les distances (mesuré : capture
+# 4676x2550 pour un bureau 1920x1080, facteur ~2,4). Or l'écart libellé ->
+# champ d'un écran de sélection fait 25 px à 100 % pour un plafond de 30 :
+# à 125 % déjà, plus AUCUN libellé ne se rattache, et `Get Se16 Selection
+# Criteria` rend « aucun critère » sur un écran parfaitement rendu (vécu le
+# 2026-09-18, deux campagnes EPM). Les tolérances suivent donc l'échelle.
+REFERENCE_FIELD_HEIGHT = 24
+
+# Plafond de l'échelle dérivée : au-delà, la mesure n'est plus une échelle
+# de rendu mais un écran sans champ texte ordinaire (zones énormes).
+MAX_GEOMETRY_SCALE = 8.0
+
+# Types dont la hauteur reflète la métrique de police du rendu : un champ
+# texte, un libellé, une case. Jamais un conteneur, un shell ou un bouton
+# d'image, dont la hauteur est une mise en page, pas une métrique.
+_METRIC_TYPES = frozenset({
+    "GuiTextField", "GuiCTextField", "GuiPasswordField", "GuiLabel",
+    "GuiComboBox", "GuiCheckBox", "GuiRadioButton",
+})
+
+
+def geometry_scale(elements: Iterable[ScreenElement]) -> float:
+    """Échelle de rendu de l'écran, dérivée de sa propre géométrie.
+
+    Médiane des hauteurs des champs/libellés (:data:`_METRIC_TYPES`) divisée
+    par :data:`REFERENCE_FIELD_HEIGHT`, bornée à ``[1.0, MAX_GEOMETRY_SCALE]``.
+    Jamais en dessous de 1 : les tolérances par défaut sont calibrées à
+    100 % et un rendu plus PETIT (thème ancien à champs de 20 px, doublures
+    de tests) n'a pas à les resserrer ; un rendu plus GRAND (DPI, RDP, zoom)
+    doit les élargir dans la même proportion. ``1.0`` sans hauteur mesurable
+    (écran sans géométrie) : le comportement historique, à l'identique."""
+    heights = sorted(
+        int(el.height) for el in elements
+        if el.type in _METRIC_TYPES and el.height is not None and el.height > 0)
+    if not heights:
+        return 1.0
+    median = heights[len(heights) // 2]
+    scale = median / float(REFERENCE_FIELD_HEIGHT)
+    return min(MAX_GEOMETRY_SCALE, max(1.0, scale))
+
+
+def scaled(value: int, scale: float) -> int:
+    """``value`` (px à l'échelle de référence) porté à l'échelle ``scale``."""
+    return int(round(value * scale))
 
 # Séparateur de l'opérateur de portée « ancre >> reste » (espaces obligatoires,
 # même convention que le séparateur `` @ `` de l'intersection).

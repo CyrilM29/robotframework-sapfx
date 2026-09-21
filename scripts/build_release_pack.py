@@ -8,8 +8,10 @@ Produit dans ``dist/`` un dossier de staging puis un zip autonome
   et le wheel des plugins rf-mcp (`sap-robotmcp`), construits par
   ``pip wheel --no-deps`` ;
 - les recorders (``tools/recorder``, ``tools/recorder_web`` + extension MV3),
-    les keywords métier (``resources/``), sept suites d'exemple (smokes,
-  exploration autonome, sentinelle de dérive, flagship écran↔API) ;
+    les keywords métier (``resources/``), onze suites d'exemple (smokes,
+  exploration autonome, sentinelle de dérive, flagship écran↔API, canal API,
+  Demo Kit, et les extractions d'un tableau vers cinq formats depuis l'écran
+  et depuis le WebGUI, celle-ci doublée de sa contre-partie hors ligne) ;
 - les scripts de maintenance (``scripts/`` : bot télémétrie→patch
   ``healing_drift_report.py``, garde spec↔suite ``check_spec_sync.py``, garde
   des conventions #1/#2 ``check_conventions.py`` + son socle ``_common.py``,
@@ -155,6 +157,50 @@ PACK_FILES = [
      "tests/robot/ui/fiori/navigation_interaction_demokit.robot"),
     ("specs/openui5-demokit-navigation-interaction.md",
      "specs/openui5-demokit-navigation-interaction.md"),
+    # Extraction d'un tableau SAP vers cinq formats de fichier : la SEULE suite
+    # du pack qui exerce `resources/security_screen_keywords.resource` (livré en
+    # bloc avec le reste de `resources/`) et les cinq modules de restitution du
+    # wheel, qui partaient sinon sans aucun exemple ni validation au dryrun,
+    # exactement le trou comblé plus haut pour le canal API et le Demo Kit.
+    # C'est aussi la réponse au besoin le plus fréquent d'un poste de recette :
+    # sortir un écran SAP en fichier exploitable. Elle demande une session SAP
+    # GUI ouverte et AUCUN secret ; la release attendue se surcharge, et le
+    # refus du Suite Setup donne lui-même la ligne de commande à employer.
+    ("tests/robot/ui/ecc/extraction_parametres_profil.robot",
+     "tests/robot/ui/ecc/extraction_parametres_profil.robot"),
+    # La MÊME extraction depuis le canal WebGUI (SAP GUI for HTML), pour la
+    # même raison : c'est la seule suite du pack qui exerce les keywords de
+    # lecture de grille WebGUI de `resources/fiori_keywords.resource`, livrés
+    # en bloc avec le reste. Elle porte surtout la leçon qu'un poste de
+    # recette doit connaître avant de sortir un écran en fichier : une grille
+    # WebGUI n'envoie qu'une PAGE de lignes, renumérotée à partir de 1, et
+    # rien dans les lignes rendues ne le montre. Son 8e scénario PROVOQUE le
+    # cas et vérifie que la garde le refuse.
+    ("tests/robot/ui/fiori/extraction_grille_webgui.robot",
+     "tests/robot/ui/fiori/extraction_grille_webgui.robot"),
+    # Et sa contre-partie HORS LIGNE : ni SAP ni reseau, donc le seul controle
+    # d'installation qui verifie reellement le lecteur de grille WebGUI sur un
+    # poste qui n'a encore acces a rien. Elle porte aussi les modes de panne
+    # silencieux du canal, a commencer par le decalage de colonnes.
+    ("tests/robot/webgui_grid_fixture_smoke.robot",
+     "tests/robot/webgui_grid_fixture_smoke.robot"),
+    ("tests/robot/fixtures/webgui_grid_fixture.html",
+     "tests/robot/fixtures/webgui_grid_fixture.html"),
+    # La vitrine CROSS-CANAL du pack : le même produit EPM lu par OData, par
+    # SE16 dans le WebGUI et par RFC_READ_TABLE, les trois prix confrontés
+    # ENTRE EUX, la cible prouvée canal par canal AVANT toute lecture. Même
+    # raison d'être que les entrées ci-dessus : c'est la seule suite qui exerce
+    # `resources/page_objects/sepmra_prod_man.resource` et le filtrage
+    # `Display WebGui Table Contents With Filter` de `fiori_keywords.resource`,
+    # livrés en bloc avec `resources/`. Le canal RFC qu'elle exige est optionnel
+    # dans le pack : sans `pyrfc` elle se SAUTE proprement. Son plan voyage
+    # avec elle (marqueur de `check_spec_sync.py`), et ce plan documente
+    # pourquoi la campagne ne fait que LIRE : le chemin d'écriture du service
+    # produit est cassé sur les deux images trial, vérifié après restauration.
+    ("tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot",
+     "tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot"),
+    ("specs/cycle-vie-produit-epm-api-webgui-rfc.md",
+     "specs/cycle-vie-produit-epm-api-webgui-rfc.md"),
     # Outillage de maintenance, stdlib pure, exécutable depuis la racine du
     # pack : bot télémétrie de healing -> patch resources/ proposé, et garde
     # spec <-> suite générée (source de vérité) pour les suites des agents.

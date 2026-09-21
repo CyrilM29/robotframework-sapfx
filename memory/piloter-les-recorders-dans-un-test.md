@@ -32,6 +32,30 @@ qui automatise un outil interactif.
    fichier, et l'on croit à un export dupliqué : armer la seconde APRÈS
    l'arrivée du premier.
 
+**Complété le 2026-09-12**, en refaisant l'exercice de bout en bout (bureau
+contre A4H, web contre la même application Fiori Elements). Deux pièges de
+plus, propres au recorder BUREAU, et tous deux invisibles hors usage réel :
+
+- **Cinquième piège : `--screenshots` bascule le moteur `auto` en polling.**
+  La capture d'écran est un concept du diff de signature, donc le drapeau
+  privilégie ce moteur, ce que l'aide de l'option ne dit pas. On croit
+  enregistrer avec les événements de l'API et on obtient le repli, avec sa
+  qualité de transcription. Pour un enregistrement scripté, exiger
+  `--engine native`.
+
+- **Sixième piège : le polling ne transcrit presque rien d'un parcours joué à
+  VITESSE MACHINE.** Il sonde toutes les 0,4 s : la saisie et sa validation
+  tombent entre deux sondages, et il n'émet qu'une soumission nue là où le
+  natif rend les cinq étapes exactes (transaction, saisie, Entrée, bouton,
+  F12). Ce n'est pas un défaut, c'est sa conception : il vise un rythme
+  humain et sert de repli quand les événements de l'API manquent. Un test qui
+  juge la qualité de transcription doit donc nommer le moteur qu'il mesure.
+
+Les points 2 et 4 ci-dessus ont été repayés ce jour-là faute d'avoir relu
+cette fiche avant de construire le harnais : l'attente d'un seul
+téléchargement pour l'export resource-first a décalé les fichiers suivants
+d'un cran, et le diagnostic a coûté un run entier.
+
 Rappel connexe, payé une fois de plus ici : la bibliothèque Browser referme les
 pages ouvertes DANS un test, donc la page d'un tel harnais s'ouvre en
 `Suite Setup` (voir [[une-seule-release-ne-montre-pas-ses-hypotheses]] pour la

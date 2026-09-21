@@ -47,6 +47,10 @@ screen_watch/*.actual.*
 # Images clés des démos vidéo (livrables comm, extraites des prises validées) :
 # régénérables par script, non committés ; les .webm sont les intermédiaires
 # Playwright des prises (le livrable est le MP4 composé).
+# Atelier du film promo de 90 s : seules les SOURCES (scripts de tournage, de
+# rendu et de montage) sont committées. Les rushes, les séquences d'images, les
+# plans intermédiaires et le montage final sont RÉGÉNÉRABLES par `edit.py` et
+# pèsent deux cents mégaoctets : le livrable committé est le MP4 déposé dans
 
 # Captures interactives des recorders (artefacts utilisateur)
 /tools/recorder/captures/

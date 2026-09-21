@@ -170,6 +170,27 @@ def test_call_odata_function_get_et_post():
     assert lib2.requests_seen[1].get_method() == "POST"
 
 
+def test_call_odata_function_post_csrf_fetch_path_distinct_de_l_action():
+    """Une fonction non liée dont les paramètres sont OBLIGATOIRES ne peut pas
+    être sondée par un GET nu sur son propre chemin (le défaut) : le serveur
+    refuserait ce GET (paramètre manquant) et l'action ne serait jamais
+    tentée. ``csrf_fetch_path`` détourne la sonde vers un chemin sûr, comme
+    `Post Odata Batch` le fait déjà pour ``$batch``."""
+    lib = _lib_with([
+        _json_response({}, headers={"x-csrf-token": "TOK"}),
+        _json_response({"d": {"PurchaseOrderOverallStatus": "D"}}),
+    ])
+    lib.open_api_session("http://h")
+    reponse = lib.call_odata_function(
+        "/SEPMRA_PO_MAN/SEPMRA_C_PO_PurOrdGoodsreceipt", method="POST",
+        csrf_fetch_path="/SEPMRA_PO_MAN/", **{"PurchaseOrder": "'300001960'"})
+    assert reponse["d"]["PurchaseOrderOverallStatus"] == "D"
+    fetch, action = lib.requests_seen
+    assert fetch.full_url.endswith("/SEPMRA_PO_MAN/")
+    assert action.get_method() == "POST"
+    assert "PurchaseOrder=%27300001960%27" in action.full_url
+
+
 def test_get_odata_entities_suit_la_pagination_v2():
     page1 = {"d": {"results": [{"Id": "1"}],
                    "__next": "http://h/svc/A?$skiptoken=2"}}

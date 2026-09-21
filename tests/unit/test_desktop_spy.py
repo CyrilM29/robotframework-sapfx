@@ -83,6 +83,24 @@ def test_walk_is_defensive_when_children_count_raises():
     assert rows == [(0, "wnd[0]", "GuiMainWindow", "")]  # le nœud, sans planter
 
 
+def test_walk_is_defensive_when_the_children_property_itself_raises():
+    # Régression live (A4H, SE16, 2026-09-12) : pendant un aller-retour serveur,
+    # SAP GUI répond E_PENDING à la lecture de `Children` elle-même, AVANT tout
+    # `Count`. Le mode record sonde en continu, donc il traverse cet état ; sans
+    # garde, la boucle d'enregistrement mourait en com_error brute et perdait
+    # l'enregistrement en cours.
+    class NodePendingChildren(FakeNode):
+        @property
+        def Children(self):
+            raise spy.com_error(
+                -2147483638, "Les données nécessaires pour terminer cette "
+                             "opération ne sont pas encore disponibles.")
+
+    bad = NodePendingChildren("wnd[0]", "GuiMainWindow")
+    assert list(spy.walk(bad)) == [(0, "wnd[0]", "GuiMainWindow", "")]
+    assert list(spy._walk_objects(bad)) == [bad]   # le nœud lui-même, sans planter
+
+
 def test_safe_swallows_com_error_and_missing_attribute():
     class Bad:
         @property

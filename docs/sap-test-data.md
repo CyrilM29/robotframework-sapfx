@@ -44,6 +44,28 @@ already activated**: `SEPMRA_SHOP`, `SEPMRA_PROD_MAN`, `SEPMRA_SO_MAN`,
 one system, the basis of `tests/robot/flagship_cross_paradigm.robot` (SE16
 count == OData `$count`, live-validated) via `SapApiLibrary`.
 
+**EPM's write path is broken on both trial images** (measured 2026-09-21 while
+building the three-channel product campaign). A `POST` on
+`SEPMRA_PROD_MAN/SEPMRA_C_PD_Product` creates a draft, but its activation and
+its deletion are refused: on A4H with `CM_EPM_REF_APPS/002` ("Object node type
+DemoObject does not exist"); on ABAP Platform 2023 the activation collides
+with a product-number counter out of sync with orphan drafts
+(`/BOBF/FRW_COMMON/141`) and the deletion fails exactly as on A4H. Verified
+after a container restart, after restoring the A4H container from a backup
+that predates any test data, and cross-checked on the second release: the
+defect is baked into the demo content, not a runtime state. Two more facts of
+the same table: `SNWD_PD` is not maintainable by any screen (`MAINFLAG` empty
+in `DD02L`, so SE16 refuses entry mode on the desktop and on the WebGUI
+alike), and no change document exists for it (`TCDOB` and `CDPOS` empty: the
+application is built on BOPF and traces elsewhere). Consequence for
+campaigns: read the EPM catalogue, never create in it, and filter
+`IsActiveEntity eq true` on that entity set, because the undeletable orphan
+drafts accumulate and a bare read returns them all.
+`tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` reads one
+existing product (discovered on the target: `HT-1000`, often quoted, is
+absent from this catalogue) through OData, WebGUI SE16 and `RFC_READ_TABLE`,
+and compares the three prices with each other.
+
 ## 2. Public Fiori / UI5 test targets
 
 - **OpenUI5 Demo Kit: alive** (our current smoke target): <https://sdk.openui5.org/>;

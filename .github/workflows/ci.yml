@@ -63,6 +63,15 @@ jobs:
         if: matrix.python-version == '3.12'
         run: python scripts/check_spec_sync.py
 
+      # Le sidecar de mission atteste qu'une campagne a produit CES
+      # artefacts-là. Ce garde ne tournait NULLE PART jusqu'au 2026-09-16, et
+      # le jour où il a tourné, trois sidecars sur six étaient invalides, pour
+      # trois causes différentes. Une garde qui n'est lancée nulle part n'est
+      # pas une garde souple, c'est une garde absente.
+      - name: Agent handoff sidecars (schema + evidence hashes)
+        if: matrix.python-version == '3.12'
+        run: python scripts/agent_contract.py handoff --all
+
       # Conventions #1/#2 tenues par les artefacts (et pas seulement énoncées
       # dans CLAUDE.md) : locators bruts dans une suite GÉNÉRÉE, Sleep partout.
       - name: Conventions guard (raw locators in generated suites, no Sleep)
@@ -168,6 +177,14 @@ jobs:
 
       - name: Offline Browser smoke (versioned __SAPFX bundle replacement)
         run: robot --pythonpath src --outputdir results/fiori-bundle tests/robot/fiori_bundle_version_smoke.robot
+
+      # Le lecteur de grille WebGUI : sa logique probante vit en JavaScript
+      # (lsdata, ColumnIDs, adressage des cellules par SID) et n'etait exercee
+      # que par une suite live contre un conteneur, donc par personne en CI.
+      # La fixture reproduit les modes de panne SILENCIEUX, dont le decalage
+      # de colonnes, qu'aucune relecture de fichier ne peut demasquer.
+      - name: Offline Browser smoke (WebGUI ALV grid reader)
+        run: robot --pythonpath src --outputdir results/webgui-grid tests/robot/webgui_grid_fixture_smoke.robot
 
   # Qualifie ce que l'utilisateur télécharge : build du ZIP, extraction hors du
   # checkout, installation par le vrai script, documentation des trois libs,

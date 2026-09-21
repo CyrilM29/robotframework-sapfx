@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "mission_id": "commande-achat-epm-procure-to-pay-2026-09-18",
+  "target": "a4h-1909-client-001",
+  "invariant": "La reception de marchandise d'un poste de commande d'achat EPM (service SEPMRA_PO_MAN, fonction Goodsreceipt) incremente le stock physique du produit concerne (SNWD_STOCK, somme des lignes jointes par SNWD_PD.NODE_KEY) exactement de la quantite du poste recu, verifiee par un canal independant (SAP GUI SE16) de celui qui a ecrit (API OData v2). Aucune application Fiori de gestion des commandes d'achat n'existe sur cette cible (62 intents catalogues, aucun ne resout pour la creation ou la reception) ; la commande est decouverte parmi les commandes deja confirmees (statut F), jamais creee, la creation de poste via SEPMRA_C_PO_PurOrdItem ayant echoue cote serveur sur trois protocoles distincts.",
+  "scope": [
+    "tests/robot/cross",
+    "resources/page_objects/epm_procure_to_pay.resource",
+    "specs/commande-achat-epm-procure-to-pay.md",
+    "src/SapApiLibrary/_odata_read.py",
+    "tests/unit/test_api_library_odata.py",
+    "docs/libdoc/SapApiLibrary.html",
+    "CHANGELOG.md"
+  ],
+  "mode": "full",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/commande-achat-epm-procure-to-pay.md",
+      "sha256": "856f01b6b30253cbd262c16d9895106c135116b88319130f0b37ffb6514cea0d"
+    }
+  ]
+}

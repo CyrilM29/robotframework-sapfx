@@ -37,7 +37,7 @@ from sapfx_common import (
 )
 
 from ._http import _as_bool
-from ._rfc_reads import RfcReadKeywords
+from ._rfc_extract import RfcExtractKeywords
 
 #: Les comptes livrés par SAP dont l'état est un contrôle de sécurité en soi.
 #: Universels (ils ne dépendent d'aucun site), donc un défaut de bibliothèque
@@ -46,7 +46,7 @@ STANDARD_USERS = ("SAP*", "DDIC", "EARLYWATCH", "TMSADM", "SAPCPIC",
                   "SAPSUPPORT")
 
 
-class RfcSecurityKeywords(RfcReadKeywords):
+class RfcSecurityKeywords(RfcExtractKeywords):
     """Mixin de :class:`SapApiLibrary` : la posture de sécurité par RFC."""
 
     def read_profile_parameters(self, parameters: Any,

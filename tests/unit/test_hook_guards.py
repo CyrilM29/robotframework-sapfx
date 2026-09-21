@@ -7,7 +7,7 @@ en ``UnicodeEncodeError`` sur ``stdout``, sur la flèche de son propre message.
 Un hook qui plante au lieu d'informer est pire que pas de hook : les deux
 régressions sont verrouillées ici.
 
-La décision est testée sur un lanceur de gardes factice (les quatre branches,
+La décision est testée sur un lanceur de gardes factice (les cinq branches,
 sans dépôt jetable ni garde réellement en échec) ; l'encodage l'est en
 sous-processus, seul endroit où l'encodage des flux standard est observable.
 """
@@ -45,7 +45,7 @@ def _runner(failing=(), stdout="rapport"):
     return run, calls
 
 
-# --- les quatre branches de decide() ------------------------------------------
+# --- les cinq branches de decide() ------------------------------------------
 
 def test_fichier_hors_perimetre_ne_lance_que_les_gardes_de_redaction_et_de_taille():
     run, calls = _runner()
@@ -111,6 +111,49 @@ def test_derive_spec_suite_informe_sans_bloquer():
     assert "suite PERIMEE" in payload["hookSpecificOutput"]["additionalContext"]
     # La flèche du message : c'est elle qui faisait planter le hook.
     assert "\u2194" in payload["systemMessage"]
+
+
+def test_sidecar_de_mission_perime_informe_sans_bloquer():
+    """Cinquième branche : le sidecar d'une mission dont une preuve a dérivé.
+
+    Informative à dessein : pendant un tour de génération le plan bouge avant
+    que le sidecar ne soit ré-émis, et bloquer arrêterait le cycle en plein
+    milieu pour une dérive attendue. Le verrou dur est le test unitaire des
+    sidecars, qui juge un arbre au repos.
+    """
+    run, calls = _runner(failing=("agent_contract.py",),
+                         stdout="Evidence hash mismatch on specs/plan.md")
+    code, err, out = hook.decide("e:/depot/specs/plan.md", run)
+    assert code == 0 and err == ""
+    payload = json.loads(out)
+    assert "Evidence hash mismatch" in payload["hookSpecificOutput"]["additionalContext"]
+    assert "--refresh" in payload["systemMessage"]
+    assert ("agent_contract.py", "handoff", "--all") in calls
+
+
+def test_le_garde_des_sidecars_ne_tourne_pas_hors_du_cycle_agentique():
+    """Ce que le hook NE lance PAS compte autant : il tourne à chaque édition.
+
+    Un fichier hors du cycle ne doit pas payer un balayage de tous les
+    sidecars du dépôt.
+    """
+    run, calls = _runner()
+    hook.decide("e:/depot/src/SapApiLibrary/_rfc_extract.py", run)
+    assert not [c for c in calls if c[0] == "agent_contract.py"]
+
+
+def test_une_derive_spec_sync_masque_le_garde_des_sidecars():
+    """Les deux branches informatives sont exclusives, et c'est voulu.
+
+    Deux messages d'information pour une seule édition noieraient le premier,
+    qui est aussi le plus actionnable : le sidecar se ré-émet APRÈS que le
+    couple plan/suite est redevenu cohérent, pas avant.
+    """
+    run, calls = _runner(failing=("check_spec_sync.py", "agent_contract.py"))
+    code, _, out = hook.decide("e:/depot/specs/plan.md", run)
+    assert code == 0
+    assert "check_spec_sync" in json.loads(out)["systemMessage"]
+    assert not [c for c in calls if c[0] == "agent_contract.py"]
 
 
 def test_sans_chemin_de_fichier_les_gardes_de_redaction_sont_sautes():

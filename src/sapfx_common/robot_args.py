@@ -15,7 +15,7 @@ dictionnaire ABAP) : ici la casse est préservée, l'appelant décide.
 from __future__ import annotations
 
 import ast
-from typing import Any
+from typing import Any, Mapping
 
 
 def as_name_list(value: Any, argument: str = "columns") -> list[str]:
@@ -24,11 +24,20 @@ def as_name_list(value: Any, argument: str = "columns") -> list[str]:
     découpage sans ambiguïté, un identifiant technique SAP ne contient pas de
     virgule), ou une chaîne liste-littérale (``"['A', 'B']"``, la forme
     qu'émet un agent qui sérialise sa liste Python). Entrées dépouillées,
-    vides ignorées, ``None`` -> ``[]``."""
+    vides ignorées, ``None`` -> ``[]``.
+
+    Un **mapping** rend ses CLÉS, dans l'ordre : c'est la forme que produit
+    `Get Grid Column Titles` (``{id technique: titre affiché}``), et la passer
+    telle quelle est le geste naturel de l'appelant. Sans ce cas, le dict
+    partait en ``str()`` puis en découpage par virgules, et les fragments
+    obtenus faisaient échouer l'appel sur un message qui n'aurait désigné ni la
+    cause ni le remède."""
     if value is None:
         return []
     items: Any
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, Mapping):
+        items = list(value.keys())
+    elif isinstance(value, (list, tuple)):
         items = value
     else:
         text = str(value).strip()

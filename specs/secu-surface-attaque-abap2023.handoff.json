@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "mission_id": "secu-surface-attaque-abap2023-2026-09-14",
+  "target": "abap-2023-758-client-001",
+  "invariant": "La surface d'attaque REELLE de la cible est mesuree et non deduite : comptes utilisables (distincts des comptes non verrouilles), services web actifs (distincts des services declares, jointure PROUVEE), commandes systeme acceptant des arguments, couverture d'audit croisant configuration et contenu, relations de confiance inventoriees meme vides. Une lecture qui echoue ne vaut jamais zero. Lecture seule.",
+  "scope": [
+    "tests/robot/api/secu_surface_attaque_abap2023.robot",
+    "resources/security_keywords.resource",
+    "src/sapfx_common/security_surface.py",
+    "src/SapApiLibrary/_rfc_surface.py",
+    "specs/secu-surface-attaque-abap2023.md"
+  ],
+  "mode": "explore",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/secu-surface-attaque-abap2023.md",
+      "sha256": "7cd814dc54a61c1c0e2ee3284995b617a4d16230958b372c930be1e7aeb928d6"
+    },
+    {
+      "path": "tests/robot/api/secu_surface_attaque_abap2023.robot",
+      "sha256": "cf275959d17e7b1f46fab8fbaacf6fd666b2f317786cc4a516e6e222426e9f3f"
+    },
+    {
+      "path": "specs/evidence/secu-surface-attaque-abap2023.2026-09-14.json",
+      "sha256": "ad81e25e073421288c8a4db9f43996a0e7c1356efc5ce1560da77567e09312b2"
+    }
+  ]
+}

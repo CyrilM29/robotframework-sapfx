@@ -76,6 +76,24 @@ un XPath ``contains()`` sur ``@lsdata`` et retourne un sélecteur ``xpath=`` ; `
 pas exercé par le smoke de l'OpenUI5 Demo Kit (pas de WebGUI là) ; le constructeur SID-XPath
 et la logique de capture sont testés par des tests unitaires à la place.
 
+Le canal sait aussi **lire des tableaux** : `Read Webgui Grid` /
+`Get Webgui Grid Info` transforment une ALV rendue en HTML en lignes clées par
+les identifiants TECHNIQUES des colonnes, et `Get Webgui Session Identity` lit
+le système derrière la session (le miroir WebGUI de `Get System Identity` et
+`Read System Identity`). Deux faits de rendu commandent le lecteur de grille.
+Le DOM ÉCLATE une grille à colonnes figées en deux tables HTML
+(`<id>-mrss-cont-left-content` et `-none-content`) alors que le SID de chaque
+cellule la ré-unifie (`.../row[N]/cell[M]`, M étant l'index dans les
+``ColumnIDs`` que la grille publie), donc le lecteur adresse par SID et jamais
+par la structure du DOM. Et la grille PUBLIE son contrat dans son ``lsdata`` :
+identifiants de colonnes, ``totalRows``, ``visibleRows``, ``scrolling``,
+``clientCellThreshold``. Ce dernier point compte plus qu'il n'y paraît : le
+serveur n'envoie qu'une PAGE de lignes (200 mesurées pour 2000 déclarées) et
+les RENUMÉROTE à partir de 1, donc une lecture de grille est souvent partielle
+et rien dans les lignes ne le montre. `declared_rows` est rendu pour cela, et
+`Table Extract Should Be Complete` (`sapfx_common.table_extract`) est la règle
+de refus que les trois canaux partagent.
+
 ### UI5 Web Components : le moteur `wc`
 
 Les pages bâties sur les **UI5 Web Components** (page d'accueil SuccessFactors,

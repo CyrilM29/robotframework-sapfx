@@ -48,6 +48,29 @@ cible **GUI + API** sur un même système, le socle de
 `tests/robot/flagship_cross_paradigm.robot` (compte SE16 == `$count` OData,
 validé live) via `SapApiLibrary`.
 
+**Le chemin d'écriture d'EPM est cassé sur les deux images trial** (mesuré le
+2026-09-21 en montant la campagne produit à trois canaux). Un `POST` sur
+`SEPMRA_PROD_MAN/SEPMRA_C_PD_Product` crée un brouillon, mais son activation
+et sa suppression sont refusées : sur A4H par `CM_EPM_REF_APPS/002` (« Object
+node type DemoObject does not exist ») ; sur ABAP Platform 2023 l'activation
+entre en collision avec un compteur de numéros produit désynchronisé des
+brouillons orphelins (`/BOBF/FRW_COMMON/141`) et la suppression échoue
+exactement comme sur A4H. Vérifié après un redémarrage du conteneur, après
+une restauration du conteneur A4H depuis une sauvegarde antérieure à toute
+donnée de test, et en contre-épreuve sur la seconde release : le défaut est
+cuit dans le contenu de démonstration, ce n'est pas un état d'exécution. Deux
+faits de plus sur la même table : `SNWD_PD` n'est maintenable par aucun écran
+(`MAINFLAG` vide dans `DD02L`, donc SE16 refuse le mode saisie sur le poste
+comme sur le WebGUI), et aucun document de modification n'existe pour elle
+(`TCDOB` et `CDPOS` vides : l'application est bâtie sur BOPF et trace
+ailleurs). Conséquence pour les campagnes : lire le catalogue EPM, ne jamais y
+créer, et filtrer `IsActiveEntity eq true` sur cet entity set, parce que les
+brouillons orphelins, non supprimables, s'accumulent et qu'une lecture nue
+les rend tous. `tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot`
+lit un produit existant (découvert sur la cible : `HT-1000`, souvent cité,
+est absent de ce catalogue) par OData, SE16 en WebGUI et `RFC_READ_TABLE`, et
+confronte les trois prix entre eux.
+
 ## 2. Cibles de test Fiori / UI5 publiques
 
 - **OpenUI5 Demo Kit, vivant** (notre cible smoke actuelle) : <https://sdk.openui5.org/> ;

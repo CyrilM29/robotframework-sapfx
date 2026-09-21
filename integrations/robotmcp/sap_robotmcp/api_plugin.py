@@ -196,6 +196,12 @@ class SapApiPlugin(StaticLibraryPlugin):
                 # pouvant le partager.
                 "Read Rfc Table", "Rfc Should Fail With Code",
                 "Rfc Should Fail With Message Id",
+                # extraction tabulaire : le RFC entre dans le contrat commun
+                # aux quatre canaux. Le comptage passe par un module DISTINCT
+                # de celui qui lit, et c'est toute la valeur de la garde :
+                # une lecture bornée par ROWCOUNT rend N lignes propres sans
+                # aucun témoin, donc seul un total venu d'ailleurs la démasque.
+                "Count Rfc Table Rows", "Extract Rfc Table",
                 # perception des jobs de fond : quels jobs la cible porte
                 # déjà pour chaque issue de l'attente, et ce que la
                 # bibliothèque cartographie des statuts. C'est ce qui permet
@@ -238,5 +244,33 @@ class SapApiPlugin(StaticLibraryPlugin):
                 # pas appelable à distance : mesuré live 2026-08-29).
                 "Read Change Documents", "Get Idoc Status",
                 "Read Application Log", "Get Job Log",
+                # la SURFACE d'attaque, distincte de la configuration : ce qui
+                # est réellement atteignable. Chacun de ces keywords existe
+                # parce qu'une lecture naïve de la zone conclut faux (mesuré
+                # le 2026-09-14 sur la release 758). Un compte non verrouillé
+                # peut être EXPIRÉ donc inutilisable (quatre comptes ouverts
+                # sur six, là où le masque de verrouillage en annonce six) ;
+                # un service web DÉCLARÉ n'est pas servi (3410 noeuds pour 219
+                # actifs) ; une commande du système d'exploitation qui accepte
+                # des arguments additionnels n'offre pas la surface d'une
+                # commande figée (109 sur 117) ; et surtout un journal d'audit
+                # ARMÉ ne prouve aucun enregistrement, ce que seul le
+                # croisement de sa configuration et de son contenu établit.
+                "Read Account Usability", "Read Icf Exposure",
+                "Read External Commands", "Read Audit Log Coverage",
+                "Read Rfc Trust Surface", "Count Authorization Object Usage",
+                "Read Role Assignments", "Read Forbidden Password Count",
+                # la sécurité OBSERVÉE du transport, par opposition à celle qui
+                # est déclarée : le paramètre qui pilote le drapeau HttpOnly
+                # des cookies est positionné sur la cible, et aucun des trois
+                # cookies de session ne le porte, ticket d'authentification
+                # compris (mesuré le 2026-09-14 sur la release 758). Un audit
+                # qui s'arrête à la valeur conclut à une protection qui
+                # n'existe pas, et aucun autre canal ne peut le voir.
+                # Corollaire encodé dans le verdict : la valeur d'un paramètre
+                # de sécurité n'est pas un curseur, un contrôle « au moins 3 »
+                # serait vert et faux.
+                "Get Api Cookie Security", "Get Api Security Headers",
+                "Confront Security Control",
             )
         }

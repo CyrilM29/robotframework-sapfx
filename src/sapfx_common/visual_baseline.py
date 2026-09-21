@@ -256,5 +256,12 @@ def decode_image_to_gray(image_bytes: bytes) -> GrayImage:
     import io
     image = Image.open(io.BytesIO(image_bytes)).convert("L")
     width, height = image.size
-    data = list(image.getdata())
+    # `tobytes()` et non `getdata()` : le second est déprécié depuis Pillow 12
+    # et retiré en 14 (octobre 2027), et son remplaçant `get_flattened_data`
+    # n'existe pas sur le plancher déclaré du paquet (Pillow >= 10). Sur une
+    # image « L » les deux rendent la MÊME suite d'octets, une ligne après
+    # l'autre et sans remplissage de fin de ligne, donc le découpage qui suit
+    # est inchangé : c'est ce que vérifie le test de géométrie sur de vraies
+    # images (une transposition se verrait).
+    data = list(image.tobytes())
     return [data[y * width:(y + 1) * width] for y in range(height)]

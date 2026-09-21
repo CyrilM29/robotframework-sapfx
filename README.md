@@ -163,6 +163,45 @@ deployment pack:
   `SapFioriPlugin` plug into the [rf-mcp](https://github.com/manykarim/robotframework-mcp)
   server: keyword routing, SAP selector guidance, and live screen perception for
   AI agents. Validated end-to-end against a live A4H system and a live UI5 page.
+- **Cross-channel campaigns**: the same business fact read through SAP GUI,
+  SAP GUI for HTML, OData and RFC, the readings compared with each other and
+  the target proven per channel before anything is read. See the next section.
+
+## Cross-channel and hybrid campaigns
+
+SAP is never one channel, and a defect rarely sits where a single channel
+looks. The lab suites below read the **same business fact through independent
+channels** (SAP GUI desktop client, SAP GUI for HTML, OData, RFC) and compare
+the readings **with each other**, not each against an expected value: two
+channels reading the same stale copy would pass the second kind of test and
+fail the first. Three rules hold across all of them, each paid for live. The
+TARGET is proven per channel before anything is read, because the two lab
+containers announce the same system id and the same host name, so only a
+release, a catalogue size or the address actually reached tells them apart
+(a guard on one channel out of three lets an incomplete variable override
+compare two systems and stay green). Every table reading is confronted with
+the total the source DECLARES, because all four channels materialise tables
+lazily and three leave no trace. And a negative result is preceded by a
+positive witness, so "constated absent" never means "failed to read".
+
+| Campaign | Channels | What it proves, live |
+|---|---|---|
+| `tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` | OData + WebGUI SE16 + `RFC_READ_TABLE` | One EPM product, three readings, one price, compared between channels after numeric normalisation with the user's decimal notation read on the system (`3,25` on screen, `3.25` on both protocols). 7/7 on two releases (754 and 758). Born from a write-cycle prompt: the product service's write path turned out broken on both trial images, so the campaign is read-only by measurement, not by convenience. |
+| `tests/robot/cross/croisement_ddic_odata.robot` | SE16 dictionary + OData | Which tables and entity sets a target really exposes, and whether screen and API agree on existence, volume and field contract. 9/9. |
+| `tests/robot/cross/simulation_ecriture_lecture.robot` | SE16 write + OData read | A row written through the screen, observed through the API, deleted, its disappearance asserted on the entity, never on a count. Opt-in twice over. 8/8. |
+| `tests/robot/cross/commande_achat_epm_procure_to_pay.robot` | OData action + SE16 read | Procure-to-Pay EPM: a goods receipt posted through the business object's own action, the stock increment checked in `SNWD_STOCK` through the screen. |
+| `tests/robot/cross/secu_croisement_trois_canaux_abap2023.robot` | SAP GUI + RFC + HTTP | A security posture read three ways: where a parameter's value comes from (the screen report says, the RFC does not), the reference client, and whether a declared cookie flag is actually served. 13/13. |
+| `tests/robot/cross/extraction_multi_cibles.robot` | SAP GUI + WebGUI + UI5, five targets in sequence | The same table capture written to five formats on five targets with nothing but variables changing; 25 files byte-identical on replay. 6/6. |
+| `tests/robot/flagship_cross_paradigm.robot` | SE16 + OData, then UI5 + OData v4 | The founding pair: an SE16 count equal to an OData `$count` on one system, and a List Report row that exists through OData v4 on a local CAP service. |
+
+**Hybrid pages**, where UI5, UI5 Web Components, WebGUI and non-SAP widgets
+share one document or nest in iframes, are handled by `Get Page Composition`
+(which technologies live where, and which engine to use), the five
+resolution engines (`role`, `xpath`, `sid`, `wc`, `dom`) and the frame stack
+(`Push/Pop Ui5 Frame`). `tests/robot/fiori_hybrid_smoke.robot` runs offline on
+a fixture that mixes all of them across two nested frames;
+`tests/robot/fiori_frame_smoke.robot` on a genuinely cross-origin launchpad
+iframe.
 
 ## Layout
 
@@ -197,9 +236,11 @@ tests/unit/                 # off-SAP/off-browser logic tests (run anywhere)
 tests/robot/                # ecc_smoke + ecc_data_smoke + ecc_exploration (need SAP),
                             # fiori_smoke (OpenUI5 Demo Kit), fiori_sflight_smoke
                             # (local cap-sflight), compat smokes (UI5 1.60 legacy,
-                            # UI5 2.0 nightly, cross-origin iframes)
+                            # UI5 2.0 nightly, cross-origin iframes, hybrid pages)
                             # + recorder smokes (desktop record engine, web record mode)
                             # + flagship_cross_paradigm (GUI ↔ API ↔ Fiori cross-checks)
+  cross/                    #   the cross-channel campaigns (see the section above)
+  ui/ecc, ui/fiori, api/    #   the generated campaigns, one folder per channel
 tools/recorder/             # desktop recorder (SAP GUI object tree, GUI launcher,
                             # native event record engine w/ polling fallback)
 tools/recorder_web/         # web recorder: snippet + Chrome MV3 extension

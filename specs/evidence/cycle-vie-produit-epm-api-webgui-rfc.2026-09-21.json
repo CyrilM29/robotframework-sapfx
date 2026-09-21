@@ -1,0 +1,87 @@
+{
+  "campagne": "cycle-vie-produit-epm-api-webgui-rfc",
+  "plan": "specs/cycle-vie-produit-epm-api-webgui-rfc.md",
+  "suite": "tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot",
+  "date": "2026-09-21",
+  "mode": "lecture_seule",
+  "cible": {
+    "systeme": "A4H",
+    "mandant": "001",
+    "utilisateur": "DEVELOPER",
+    "release_composant_de_base": "754",
+    "services_catalogue_gateway": 38,
+    "adresse_webgui": "localhost:50000",
+    "note": "La cible est prouvee par UN discriminant par canal. L'identifiant systeme et le nom d'hote interne sont IDENTIQUES sur les deux conteneurs du banc, donc aucun des deux ne prouve rien."
+  },
+  "run": {
+    "tests": 7,
+    "passes": 7,
+    "echecs": 0,
+    "interpreteur": "python 3.12 (venv portant pyrfc, requis par le canal RFC)",
+    "runs_live_apres_durcissement": 3
+  },
+  "assertion_reine": {
+    "produit": "AR-FB-1000",
+    "decouvert_a_l_execution": true,
+    "prix_normalise": "3.25",
+    "devise": "USD",
+    "lectures": {
+      "api": "3.25",
+      "webgui": "3,25",
+      "rfc": "3.25"
+    },
+    "notation_decimale_utilisateur": "separateur de milliers vide, virgule decimale (lue sur le systeme, champ USR01-DCPFM)",
+    "note": "Les trois valeurs sont confrontees ENTRE ELLES apres normalisation numerique, et non chacune a une valeur attendue."
+  },
+  "resultat_negatif_avec_temoin": {
+    "temoin_positif": "lecture NON filtree du catalogue des documents de modification, bornee a 5 lignes, non vide",
+    "classes_objet_pour_la_table_produits": 0,
+    "postes_de_documents_pour_la_table_produits": 0,
+    "note": "Le temoin positif etablit que la lecture sait rendre des lignes : sans lui, une absence reelle et une lecture ratee produiraient le meme zero."
+  },
+  "contre_epreuves_jouees": [
+    {
+      "garde": "cible du canal API (volume du catalogue Gateway)",
+      "provocation": "EXPECTED_SERVICES=58, soit le volume de l'AUTRE conteneur",
+      "resultat": "refus dans le Suite Setup, message nommant 38 contre 58 et les variables a verifier",
+      "portee": "aucun test ne lit : la garde EMPECHE au lieu de rougir"
+    },
+    {
+      "garde": "cible du canal WebGUI (adresse reellement atteinte)",
+      "provocation": "EXPECTED_WEBGUI_HOST=localhost:50100, soit le port de l'AUTRE conteneur",
+      "resultat": "refus dans le Suite Setup, message nommant localhost:50000 contre localhost:50100",
+      "portee": "aucun test ne lit"
+    }
+  ],
+  "defauts_applicatifs_constates": [
+    {
+      "objet": "service OData SEPMRA_PROD_MAN, chemin d'ecriture",
+      "constat": "activation et suppression d'un brouillon refusees sur les DEUX releases du banc",
+      "codes": [
+        "CM_EPM_REF_APPS/002",
+        "/BOBF/FRW_COMMON/141"
+      ],
+      "verifie_apres": "redemarrage du conteneur, restauration depuis une sauvegarde du 2026-08-23, contre-epreuve sur le second systeme",
+      "consequence": "toute ecriture serait irreversible, d'ou le repli en lecture seule (Ecart n 3 du plan)"
+    }
+  ],
+  "revue_independante": {
+    "agent": "sap-verifier",
+    "verdict_initial": "needs_human",
+    "reserves_traitees": [
+      "garde de cible limitee a un canal sur trois : etendue aux trois, chacune confrontee a une valeur attendue dans le Suite Setup",
+      "resultat negatif du scenario 7 sans temoin positif : temoin ajoute",
+      "assertions du scenario 2 qui ne pouvaient pas echouer : remplacees par les trois comparaisons reelles"
+    ],
+    "reserves_consignees_non_traitees": [],
+    "reserves_mineures_traitees": [
+      "parse_number convertissait au lieu de refuser : ferme par un aller-retour de notation, qui asserte la notation elle-meme",
+      "les deux lectures du canal API ne se parlaient pas : prix et devise desormais confrontes entre la decouverte et la lecture par cle",
+      "un critere sans libelle propre adoptait celui d'un voisin : ferme par une regle structurelle, un libelle appartient au PREMIER champ a sa droite"
+    ],
+    "non_regression_carte_des_criteres": {
+      "criteres_derives_ecran_snwd_pd": 23,
+      "note": "Identique au releve d'avant correction. La regle d'interposition pouvait retrecir la carte en silence, ce qu'aucun scenario n'aurait vu puisque la suite ne filtre que sur un champ ; le compte est desormais journalise a chaque filtrage."
+    }
+  }
+}

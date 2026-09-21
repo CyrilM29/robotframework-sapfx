@@ -12,6 +12,7 @@ readers preserve base permissions, other calls ask (`RF_AGENT_READ_ONLY=1`
 denies). Host loading still needs qualification. Handoff hashes/facts and
 recovery milestones live in scripts/agent_contract.py and agent_journal.py;
 no automatic retry or measured LLM quality follows from their offline tests.
+`agent_contract.py handoff --all` sweeps every sidecar, names each refusal's cause and remedy, and re-signs drifted evidence only on an explicit `--refresh`; hard in CI and a unit test, reported by the post-edit hook. It first ran on 2026-09-16 and found three of six sidecars invalid, for three different reasons.
 Regenerate canonical `.claude/agents/` into four legacy chatmodes plus
 `.github/agents/sap-verifier.agent.md`. The pack ships the scripts/contract
 and minimal hook settings, never the workstation's permissions.
@@ -302,6 +303,11 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   baseline; `exploratory_campaign_{a4h,fiori}.robot` are the self-contained
   ECC/Fiori exploration campaigns (delivery-class/control inventory, reversible
   writes/interaction, dynamic table/control-type sweeps).
+- **Reading an ALV that has not been scrolled returns BLANK rows, never an error** (2026-09-15): the same read of the RSPARAM report returned 1635 full rows on release 758 and 1639 rows of which 137 were filled on 754. Every completeness check passed, because all of them reasoned about ROWS (declared count equals read count, file reads back identical, expected columns present) and a hollow reading is perfectly consistent with itself. Use `Read Full Grid` (it scrolls) to extract, then `Count Blank Grid Rows` to confirm the scrolling was enough: the first acts, the second checks. Same run, same lesson elsewhere: a target guard that fails inside a scenario PREVENTS nothing, the scenarios after it still wrote four files from the wrong system under names announcing the right one, so such a guard belongs in the suite setup and output names must derive from the MEASURED identity.
+- **Tabular restitution** (`table_svg` / `table_xlsx` / `table_csv` / `table_json` / `table_parquet`, 2026-09-15): writes a grid reading to the five formats an audit report or a data pipeline consumes, four of them stdlib-pure (Parquet delegates to `pyarrow`, extra `parquet`, and DECLARES itself unavailable rather than failing obscurely, like the RFC channel). One shared contract: same columns, a JSON-safe verdict stating what was written, every writer paired with a READER so the file is confronted with the source reading, everything written as TEXT (inferring types turns client `000` into `0`), and deterministic bytes (no timestamp injected, so a difference between two extractions means a difference in the SYSTEM). `headers=` (the `{technical id: displayed title}` map from `Get Grid Column Titles`) puts SAP's own column names in the delivered file while keeping technical ids as the reading keys: extracting is not asserting, and a file named after ids nobody recognises is a worse deliverable. CSV additionally COUNTS formula-injection cells (a value starting with `=`, `+`, `-` or `@` executes on open; RSPARAM has 40) without ever altering them by default.
+- **All four channels materialise their table lazily, and THREE leave no trace** (2026-09-15, extended to the RFC channel on 2026-09-16). **RFC** is the limit case: `RFC_READ_TABLE` bounded by `ROWCOUNT` returns exactly N clean, ordered rows (3 measured out of the 205 of `SNWD_PD`) and declares NO total at all, so the total has to come from a DIFFERENT module (`EM_GET_NUMBER_OF_ENTRIES`, counting server side, about 0.02 s against 0.8 s to read 28,782 rows). Counting through a second `RFC_READ_TABLE` would be a guard that holds true whatever happens. That counter takes no selection clause, so a filtered read is never paired with it (refused at entry, before any network call), but it does follow the connection's client, so both measurements cover the same population; a table that does not exist is announced at zero. An ALV renders every row but with EMPTY cells until scrolled, which is detectable. A **WebGUI** grid sends one PAGE of 200 rows and RENUMBERS them from 1: an SE16 selection of 2000 rows carries `totalRows:2000` in the grid's `lsdata` and 200 rows in the DOM, clean, complete, numbered 1 to 200 (the switch to server-side scrolling is governed by `clientCellThreshold:4000`, a cap in CELLS, not rows). A **`sap.m.Table`** stops at its `growingThreshold`: 30 rows rendered against 4133 declared by `binding.getLength()`, all perfectly filled. On the two web channels, only the DECLARED total separates an inventory from an excerpt, hence one shared refusal rule, `sapfx_common.table_extract` (`Build Table Extract` / `Table Extract Should Be Complete` / `Describe Table Extract`), used by the three suites: a per-channel rule is a rule the next channel makes you forget. Practical corollaries: never size a loop on what a table reader returned; read a WebGUI grid through the cells' SIDs (`.../row[N]/cell[M]`, M indexing `ColumnIDs`) because the DOM splits a frozen-column grid into two HTML tables; and growing a UI5 table is not a route (`growingScrollToLoad` loads on scroll, neither the `<id>-trigger` nor `setGrowingThreshold` fills it).
+- **A JS template passed to `Evaluate JavaScript` must START with its function.** A comment placed before it makes the source evaluate as an expression: the function is never called, the result comes back EMPTY and **the call SUCCEEDS** (verified in isolation 2026-09-15). No error, no symptom on the Robot side, just a probe that answers nothing. The inline probes of `_ui5_js.py` escape it because their comments live on the Python side; a standalone `.js.tpl` carries its explanation INSIDE the function body, and a unit test pins the first line.
+- **Deux lectures d'une meme table peuvent ne pas voir les memes colonnes, et le retrait doit etre DIT** (2026-09-15). Sur une table Fiori Elements, `getColumns()` rend une colonne a en-tete VIDE (l'indicateur de brouillon) que les lignes rendent aussi : une colonne sans nom n'est pas extractible et se retire, mais le retrait silencieux a exactement le meme symptome qu'un DECALAGE de colonnes, ou les valeurs ont glisse d'un cran et ou le fichier produit serait complet, propre, fidele au releve et faux. `Build Table Extract` rend donc `ignored_columns`, et une cle NOMMEE laissee de cote est l'alarme. Meme famille cote WebGUI : une cellule dont l'index depasse `ColumnIDs` sort en `COL<n>` au lieu d'etre jetee. C'est le seul defaut de ces canaux qu'aucune relecture de fichier ne peut demasquer, la relecture confrontant le fichier au releve et non le releve a l'ecran.
 - **`sapfx_common`** (`src/sapfx_common/`): shared `poll_until`/`retry_call`/
   `retry_until` primitives, `com_safety.ensure_com_initialized()` (defensive
   `CoInitialize`, shared by ECC connection bootstrap and the rf-mcp state
@@ -313,8 +319,10 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   structured perception model), `semantic` (label-based geometric resolution +
   the verified inverse `describe_element` used by the recorder, plus
   `is_editable_field`/`actionable_targets`/`screen_affordances` behind
-  `mode=semantic` and the annotated screenshot; ported from
-  RoboSAPiens, Apache-2.0, see `NOTICE`), `abap_list` (geometric row
+  `mode=semantic` and the annotated screenshot; tolerances follow the
+  rendering scale measured on the screen, the Scripting API returning
+  physical pixels that an RDP session or a Windows scale factor multiplies;
+  ported from RoboSAPiens, Apache-2.0, see `NOTICE`), `abap_list` (geometric row
   reconstruction for classic ABAP lists), `visual_hash` (pure perceptual
   dHash + crop/mask/tile primitives behind the visual assertions) and
   `visual_baseline` (the shared snapshot-baseline semantics + Pillow decode
@@ -322,6 +330,48 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   including the per-geometry baselines behind `per_resolution=True`).
   New wait/retry loops go here, never inline; their deadlines run on
   `time.monotonic()`, never on the wall clock. Typed (`mypy`).
+- **Security crossed over THREE channels (screen, RFC, HTTP).**
+  `tests/robot/cross/secu_croisement_trois_canaux_abap2023.robot` (live 13/13
+  on release 758, replayed with an identical artifact fingerprint, reviewed by
+  `sap-verifier`), capabilities in `sapfx_common/parameter_origin.py`,
+  `alv_cells.py`, `http_security.py` and the `SapApiLibrary._http_security`
+  mixin. It lifts three limits the two RFC-only campaigns consign as
+  uncovered, each a CHANNEL limit: where a parameter's value comes from (39 of
+  42 audited security parameters hold their default, 3 are declared in the
+  profile and NONE is modified there, so the hardening is not an operator
+  setting); the reference client, out of reach over RFC but read by a screen
+  report; and the effect actually produced, where the cookie `HttpOnly`
+  parameter is set and none of the three session cookies carries the flag,
+  SSO ticket included. General lesson: **a security parameter's value is not a
+  dial** (a control written "at least 3" would be green and wrong), and **the
+  instrument that reports an absence must be proven able to report a
+  presence** (the cookie reader had no test, a blind reader would have
+  produced the published conclusion, and the test the review demanded found a
+  real defect). Reading traps encoded: the profile column is silently
+  truncated at 60 chars, the lock column is an ICON code, the password-status
+  column is a translated string.
+- **Attack surface: what a system DECLARES is not what is REACHABLE.**
+  `tests/robot/api/secu_surface_attaque_abap2023.robot` (live 12/12 on release
+  758, replayed green, reviewed by `sap-verifier`), capability in
+  `SapApiLibrary._rfc_surface` plus pure logic in
+  `sapfx_common/security_surface.py`. Complements the configuration campaign
+  below rather than repeating it, on the zones its plan listed as uncovered.
+  Four gaps measured 2026-09-14, each a reading that is accurate and
+  misleading: an unlocked account is not a **usable** one (six accounts, zero
+  locked, two EXPIRED, so four real entries); a declared web service is not a
+  **served** one (3410 declared ICF nodes, 219 active); a command accepting
+  additional arguments is not a fixed one (109 of 117); and an armed audit log
+  proves no recording (armed, ten slots declared, none active, **zero entries
+  over four years**), which the configuration campaign could only DEDUCE and
+  this one OBSERVES by crossing configuration with content. Silent call traps
+  encoded: `RSAU_READ_LOG` returns zero entries without raising when called
+  without its mandatory interval (and wants `DAT_FROM`, not `DATE_FROM`); a
+  non-existent field makes `RFC_READ_TABLE` blame the TABLE, which declared a
+  3417-row table empty; `RFCTRUST` has no `RFCSYSID` column. Method lesson from
+  its review, worth more than the campaign: a guard whose two terms come from
+  the SAME read measures nothing (the join check compared two numbers from one
+  table, and the blocking scenario depending on it verified itself on empty
+  data), and a green suite is not a verified suite.
 - **Security configuration posture, one campaign per target.**
   `tests/robot/api/secu_configuration_a4h.robot` (live 12/12) and
   `secu_configuration_abap2023.robot` (live 13/13), both replayed green,
@@ -421,6 +471,34 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   one notch from selective delete: the filtered grid is re-read and the
   keyword stops without deleting whenever the selection is not exactly the
   targeted row.
+  **Three EPM campaigns** generated from scenario prompts (2026-09-18 to 21):
+  `tests/robot/ui/ecc/commande_vente_epm_order_to_cash.robot` (SAP GUI
+  `SEPM_SO`, the order number taken from the message PARAMETER, confronted
+  with `SNWD_SO`, deleted in teardown),
+  `tests/robot/cross/commande_achat_epm_procure_to_pay.robot` (a goods receipt
+  posted through the business object's own OData action, the `SNWD_STOCK`
+  increment checked in SE16, explicit opt-in since a receipt has no inverse)
+  and `tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` (one
+  product read through OData, WebGUI SE16 and `RFC_READ_TABLE`, the three
+  prices compared WITH EACH OTHER after numeric normalisation in the user's
+  decimal notation read on the system; live 7/7 on both releases). The last
+  one is read-only BY MEASUREMENT: `SNWD_PD` is not maintainable by any
+  screen (`MAINFLAG` empty), carries no change document (BOPF), and
+  `SEPMRA_PROD_MAN` refuses to activate AND to delete a draft on both trial
+  images (`CM_EPM_REF_APPS/002`, `/BOBF/FRW_COMMON/141`), verified after a
+  container restart, an image restore and on the second release, so any write
+  would be irreversible. Its independent review returned `needs_human` on a
+  GREEN suite: the target guard covered one channel of three (an incomplete
+  variable override would compare two systems and stay green, both images
+  carrying the same EPM data), a catalogue size announced as discriminant was
+  only compared to zero, and the negative result had no witness; fixed with
+  one discriminant per channel in the Suite Setup, a positive witness, and
+  every guard SEEN refusing. It also brought `Get Webgui Selection Criteria`
+  (SapFioriLibrary, pure logic `sapfx_common/webgui_selection.py`): the
+  `{FIELD: SID}` map of a WebGUI SE16 selection screen DERIVED from the page,
+  since criteria are positional and their type prefix varies per field; a
+  label belongs to the FIRST SID-bearing field to its right, whatever its
+  kind, the rule that closed a silent neighbour-label mis-pairing.
   **Recorders** in `tools/recorder`
   (desktop, COM, `--engine auto|native|poll`: native uses the API's own
   `Session.Record`+`Change` events, with automatic polling fallback;
@@ -578,7 +656,10 @@ SAP test automation for Robot Framework, one business vocabulary across two chan
   deployed pack the agents write only to `resources/site_keywords.resource`,
   never to shipped files. **Deployment pack sources** in
   `packaging/` (installer, pack READMEs, two MCP templates, `-WithMcp` renders
-   `.mcp.json` and `.vscode/mcp.json` in place; ships 6 sample suites: smokes
+   `.mcp.json` and `.vscode/mcp.json` in place; ships 12 sample suites (since
+   2026-09-21 the three-channel EPM campaign with its plan is among them: the
+   only one exercising `sepmra_prod_man.resource` and the WebGUI filter
+   keyword, skipping cleanly without the optional RFC channel): smokes
    (including the offline Browser/WC product check),
   the self-contained `business_data_exploration.robot`, the drift sentinel,
   the cross-paradigm flagship, the maintenance scripts

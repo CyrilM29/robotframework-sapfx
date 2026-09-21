@@ -42,6 +42,30 @@ Trois leçons durables :
   (le suffixe `menuItem-<clé>` vaut l'ancienne propriété `key`) ; la
   propriété et le containment sont les premiers à bouger.
 
+## Suite du 2026-09-16 : la réparation n'avait couvert qu'une suite sur deux
+
+Quinze jours plus tard, un rejeu de TOUTES les suites du dépôt a trouvé
+`exploratory_campaign_fiori.robot` rouge 6 sur 6, sans qu'une ligne du dépôt
+ait bougé entre-temps. Elle visait encore l'ACCUEIL et son `sap.m.SearchField`,
+c'est-à-dire exactement la dérive réparée le 2026-09-01 sur `fiori_smoke.robot`.
+Mesuré ce jour-là sur la 1.152.0 : **zéro** `sap.m.SearchField` sur l'accueil
+(la recherche y est un `ShellBarSearch` de Web Component), **un** sur `#/api`,
+où les six types attendus par la campagne sont tous rendus. Le correctif est
+donc le même, une URL, et la suite repasse 6/6 sur trois exécutions, balayage
+dynamique compris (44 types découverts, wrappers WC inclus, tous convergents
+entre les moteurs role et xpath).
+
+**Ce qui vaut d'être retenu n'est pas le localisateur, c'est le périmètre du
+correctif.** Réparer la suite qui a rougi ne suffit pas : il faut chercher
+toutes celles qui visent la MÊME cible avec le MÊME contrôle. Ici la seconde
+était une campagne exploratoire auto-suffisante, validée une fois en juillet et
+jamais rejouée, donc structurellement invisible : aucune CI ne la joue (cible
+publique, navigateur visible par défaut), et rien ne signale une suite qui
+dort. Deux réflexes en découlent : au moment de corriger une dérive de cible,
+`grep` l'URL et le contrôle dans TOUT `tests/robot/`, et rejouer périodiquement
+les suites que la CI ne joue pas, sans quoi leur dernier verdict vieillit en
+silence.
+
 Voir aussi `bundle-injecte-garde-a-vie-par-la-page.md` (l'autre famille de
 dérive web) et l'entrée du 2026-09-01 de `docs/heal-journal.md` (le détail de
 la réparation).

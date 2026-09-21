@@ -224,6 +224,36 @@ docker start a4h     # redémarrage (plus rapide que le 1er boot)
 docker rm a4h        # suppression (perte des données du système)
 ```
 
+**Restaurer le conteneur depuis une sauvegarde** (déroulé en live le
+2026-09-21, depuis une image sauvegardée par `docker commit` + `docker save`
+un mois plus tôt). Charger l'archive (`docker load -i <sauvegarde>.tar` :
+38 Go, environ 45 minutes, et AUCUNE sortie avant la ligne finale
+`Loaded image:`, donc la lancer détachée et surveiller le processus plutôt
+qu'un appel de shell borné), puis remplacer le conteneur :
+
+```powershell
+docker rm -f a4h
+docker run -d --name a4h --hostname vhcala4hci `
+  --mac-address 02:42:ac:11:00:02 `
+  --sysctl kernel.shmmni=32768 --memory 32g `
+  -p 3200:3200 -p 3300:3300 -p 8443:8443 -p 30213:30213 -p 50000:50000 -p 50001:50001 `
+  a4h-configure:<date-de-sauvegarde> -agree-to-sap-license -skip-limits-check
+```
+
+`--mac-address` est le paramètre qui compte : la clé matérielle en dérive, et
+avec la même MAC les deux licences, le profil de scripting, le service ICF
+`webgui` et l'activation de la Gateway reviennent avec l'image, rien à refaire
+(vérifié : `disp+work` GREEN, licences valides, MAC et clé matérielle
+inchangées, tous les ports ouverts). Dériver les autres paramètres de
+`docker inspect` du conteneur qu'on va remplacer, AVANT de le supprimer. Deux
+limites : un simple `docker restart` (environ 6 minutes, HANA puis ABAP) ne
+purge que l'état en mémoire et ne touche pas aux données persistées, et une
+restauration ne répare pas un défaut cuit dans le contenu même de l'image (le
+chemin d'écriture du service produit EPM est cassé dans l'archive exactement
+comme dans le système en marche, voir
+[docs/sap-test-data.fr.md](sap-test-data.fr.md) §1) ; ce qu'elle fait, c'est
+effacer tout artefact de test écrit depuis la sauvegarde.
+
 ## 11. Validé en live : points durs rencontrés (✅ ecc_smoke 5/5)
 
 Validation réelle effectuée avec une **image 1909** (l'officielle étant retirée :

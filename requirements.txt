@@ -1,7 +1,7 @@
 # Runtime : ECC / SAP GUI (Windows only)
 robotframework>=7.4
 # Pinned exactly (CLAUDE.md convention 6): pywin32 is the #1 source of COM breakage.
-pywin32==311; platform_system == "Windows"
+pywin32==312; platform_system == "Windows"
 
 # Runtime : Fiori / web (phase 2). After install, run `rfbrowser init` once to
 # download the Playwright browser binaries. Upper bound: SapFioriLibrary imports
@@ -22,3 +22,21 @@ pre-commit>=3.0
 # Baseline`, `Check Screen Against Watch`): Pillow only decodes the PNG at the
 # boundary, the perceptual-hash core is stdlib-pure (`visual` extra).
 Pillow>=10.0
+
+# Tabular restitution, Parquet writer only (`parquet` extra). The four other
+# formats (SVG, XLSX, CSV, JSON Lines) are stdlib-pure and need nothing; Parquet
+# cannot be written by hand (Thrift metadata), so `sapfx_common.table_parquet`
+# delegates and DECLARES itself unavailable rather than failing obscurely. It is
+# listed here because the extraction suites of `tests/robot/` exercise all five
+# writers, and this file's promise is that the commands documented in CLAUDE.md
+# run after a plain `pip install -r requirements.txt`.
+pyarrow>=14.0
+
+# NOT listed on purpose: `pyrfc`, the optional RFC/BAPI channel of
+# SapApiLibrary. It has no wheel beyond Python 3.12 and all its PyPI versions
+# are yanked (SAP archived the project on 2026-05-28), so pip must never
+# resolve it on its own: a suite that needs it lives in a dedicated 3.10-3.12
+# environment (`pip install "pyrfc==3.3.1"`), and the RFC suites skip cleanly
+# everywhere else. The native runtime is often already present, shipped by the
+# « SAP NWRFC x64 Shared » component of SAP GUI for Windows 8.00; see
+# `packaging/install-rfc.ps1 -CheckOnly`.

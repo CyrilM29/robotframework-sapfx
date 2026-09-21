@@ -121,20 +121,32 @@ class OdataReadKeywords(_ApiCore):
 
     def call_odata_function(self, path: str, method: str = "GET",
                             payload: Any = None, alias: str = "default",
+                            csrf_fetch_path: Optional[str] = None,
                             **query: str) -> Any:
         """Appelle un **function import** (v2) ou une **action/fonction**
         (v4) : beaucoup de logique métier SAP n'est accessible que par là.
         ``method=GET`` pour les fonctions de lecture (paramètres en arguments
         nommés, littéraux OData à la charge de l'appelant : ``code='FR'``) ;
         ``method=POST`` pour les actions (``payload`` dict ou chaîne, CSRF
-        appliqué). Retourne le JSON décodé (``{}`` si 204)."""
+        appliqué). Retourne le JSON décodé (``{}`` si 204).
+
+        ``csrf_fetch_path`` : chemin utilisé pour obtenir le jeton CSRF quand
+        la session n'en a pas encore un, si différent de ``path``. Sans lui,
+        le jeton est sondé par un GET nu sur ``path`` lui-même : pour une
+        fonction NON LIÉE dont les paramètres sont OBLIGATOIRES (mesuré live
+        sur ``SEPMRA_C_PO_PurOrdGoodsreceipt``), ce GET nu échoue côté serveur
+        (« Invalid Function Import Parameter »), et l'action n'est jamais
+        tentée. Donner la racine du service (``csrf_fetch_path='/mon/service/'``)
+        évite ce piège, comme `Post Odata Batch` le fait déjà en interne pour
+        ``$batch`` (un GET sur ``$batch`` n'existe pas non plus)."""
         method = str(method).upper().strip()
         if method == "GET":
             return self.get_odata(path, alias=alias, **query)
         body = None
         if payload is not None:
             body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
-        status, _, raw = self._write_request(alias, method, path, query, body)
+        status, _, raw = self._write_request(
+            alias, method, path, query, body, csrf_fetch_path=csrf_fetch_path)
         if status == 204 or not raw.strip():
             return {}
         return self._decode_json(raw, status, path)

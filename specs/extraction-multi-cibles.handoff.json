@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "mission_id": "extraction-multi-cibles-2026-09-16",
+  "target": "banc-cinq-cibles-trois-canaux",
+  "invariant": "Le meme geste d'ecriture pour trois canaux et cinq cibles, en lecture seule. Un releve n'est ecrit que si les lignes lues EGALENT les lignes DECLAREES par la source, et un fichier n'est repute juste que relu et confronte ligne a ligne au releve. Chaque cible ouvre et referme son propre canal, une cible qui tombe n'emporte pas les autres, et un bilan ou une cible PREVUE n'a rien produit est refuse. Le denominateur de ce bilan est compte avant toute cible, sinon il vaudrait toujours le nombre de cibles reussies.",
+  "scope": [
+    "tests/robot/cross/extraction_multi_cibles.robot",
+    "resources/table_export_keywords.resource",
+    "resources/fiori_keywords.resource",
+    "resources/security_screen_keywords.resource",
+    "resources/page_objects/capsflight_travel.resource",
+    "src/sapfx_common/table_extract.py",
+    "src/sapfx_common/auth_flows.py",
+    "specs/extraction-multi-cibles.md"
+  ],
+  "mode": "read_only",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/extraction-multi-cibles.md",
+      "sha256": "0fd4e26b5ab8bfdf82545c7f36aa6d41349313a858a3d8312ad1a7d80a062ae5"
+    },
+    {
+      "path": "specs/evidence/extraction-multi-cibles.2026-09-16.json",
+      "sha256": "f1366de3e646759b1d550942b216a97451a31ce39fd7633cefc6cf442a157047"
+    },
+    {
+      "path": "tests/robot/cross/extraction_multi_cibles.robot",
+      "sha256": "5653bbda330fa382a65dbc6adca4908cf96187902a0d54d169069344682f0a67"
+    }
+  ]
+}

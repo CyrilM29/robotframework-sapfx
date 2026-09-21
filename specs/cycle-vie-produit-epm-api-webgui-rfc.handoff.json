@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "mission_id": "cycle-vie-produit-epm-api-webgui-rfc-2026-09-21",
+  "target": "a4h-754-client-001",
+  "invariant": "Le MEME produit EPM, lu par TROIS canaux independants (OData SEPMRA_PROD_MAN, ecran SE16 via WebGUI, RFC_READ_TABLE sur SNWD_PD), rend la MEME valeur de prix, les trois valeurs confrontees ENTRE ELLES apres normalisation numerique et non chacune a une valeur attendue ; la cible de CHACUN des trois canaux est prouvee par son propre discriminant avant toute lecture metier, les deux conteneurs du banc partageant identifiant systeme et nom d'hote ; campagne en LECTURE SEULE, le chemin d'ecriture du service etant casse sur les deux releases donc irreversible.",
+  "scope": [
+    "tests/robot/cross",
+    "resources/page_objects",
+    "specs/cycle-vie-produit-epm-api-webgui-rfc.md"
+  ],
+  "mode": "read_only",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/cycle-vie-produit-epm-api-webgui-rfc.md",
+      "sha256": "d2919a1cefdfe2909942f02e979487948d145c69f04a52e7b176e5ab8b73b6be"
+    },
+    {
+      "path": "specs/evidence/cycle-vie-produit-epm-api-webgui-rfc.2026-09-21.json",
+      "sha256": "ad7845391855d452e379885e671002caa70020dd946206052a1ff7e553343ca0"
+    }
+  ]
+}

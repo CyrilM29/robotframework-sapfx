@@ -88,6 +88,58 @@ ${TABLE_CATALOG}                DD02L
 ${TABLE_CATALOG_FIELDS}         TABNAME,TABCLASS
 ${FIELD_CATALOG}                DD03L
 ${FIELD_CATALOG_KEY_FIELD}      FIELDNAME
+# La longueur d'un champ, en octets. C'est la colonne qui permet de MESURER la
+# largeur d'une ligne au lieu de la supposer, et donc de savoir avant d'appeler
+# si une projection va dépasser le tampon du module.
+${FIELD_LENGTH_FIELD}           LENG
+# Le tampon que le serveur impose à une ligne PROJETÉE. Ce n'est pas un réglage
+# de la bibliothèque : c'est une limite du module ABAP, au même titre que les 72
+# caractères d'une clause de sélection.
+${ROW_BUFFER_LIMIT}             ${512}
+
+# --- Le tableau à RESTITUER : les réservations de vol du modèle classique ---
+# La cible de l'extraction à l'échelle. Les treize champs sont ceux mesurés
+# valides sur la cible, et la projection tient sous le tampon de 512 octets par
+# ligne du module (environ 89 octets relevés) : c'est ce qui permet de lire les
+# 28 782 lignes d'un trait. Y ajouter un champ long ferait basculer la lecture
+# en `DATA_BUFFER_EXCEEDED`, un refus qui n'accuse pas la projection.
+${BOOKING_TABLE}                SBOOK
+${BOOKING_FIELDS}               CARRID,CONNID,FLDATE,BOOKID,CUSTOMID,CUSTTYPE,CLASS,ORDER_DATE,FORCURAM,FORCURKEY,WUNIT,LUGGWEIGHT,CANCELLED
+# La colonne qui ne peut pas être vide. Elle ne se confond pas avec une colonne
+# légitimement vide : sur cette table, l'indicateur d'annulation est vide pour
+# toute réservation non annulée, et ce n'est pas un défaut de lecture.
+${BOOKING_KEY_FIELD}            BOOKID
+# Les en-têtes HUMAINS des treize colonnes, et c'est un choix de cette couche,
+# jamais une lecture de SAP : le canal RFC n'expose AUCUN libellé affiché,
+# exactement l'inverse du canal UI5, dont les seules clés sont des titres
+# traduits. Ils n'entrent donc dans aucune assertion (convention 3) ; les noms
+# de champs ABAP restent les clés de lecture.
+&{BOOKING_HEADERS}              CARRID=Compagnie    CONNID=Liaison
+...                             FLDATE=Date du vol    BOOKID=Réservation
+...                             CUSTOMID=Client    CUSTTYPE=Type de client
+...                             CLASS=Classe    ORDER_DATE=Date de commande
+...                             FORCURAM=Montant    FORCURKEY=Devise
+...                             WUNIT=Unité de poids
+...                             LUGGWEIGHT=Poids des bagages
+...                             CANCELLED=Annulée
+# Des PLANCHERS, jamais le compte exact, qui est une donnée de la cible et
+# changerait à la prochaine génération du jeu de démonstration. Le plancher de
+# lignes n'est pas décoratif sur ce canal : le module de comptage annonce une
+# table INEXISTANTE à zéro au lieu de la refuser, donc un relevé vide confronté
+# à un total de zéro franchit toutes les égalités de la garde et se déclare
+# complet. C'est le seul endroit de la chaîne où une faute de frappe sur un nom
+# de table produit un résultat vert.
+${MIN_BOOKINGS}                 ${1000}
+${MIN_BOOKING_COLUMNS}          ${13}
+
+# --- Le catalogue des produits : la cible du croisement à trois canaux ---
+# La table et sa clé existent déjà plus haut ; seule la projection manquait.
+${PRODUCT_FIELDS}               PRODUCT_ID,CATEGORY,TYPE_CODE,PRICE,CURRENCY_CODE
+# Une clause de sélection RÉELLE (23 caractères, sous la limite de 72 du
+# module) : c'est elle qui fait tomber le refus du couple filtre et total.
+${PRODUCT_CATEGORY_FILTER}      CATEGORY EQ 'Batteries'
+${MIN_PRODUCTS}                 ${50}
+${MIN_PRODUCT_COLUMNS}          ${5}
 
 # --- Modèle de voyage MODERNE (le second jeu de démonstration) ---
 # Il porte SON PROPRE catalogue de compagnies, de population différente de
@@ -331,6 +383,17 @@ Read Client Directory
     ${lignes}=    Read Business Records    ${CLIENT_TABLE}    ${CLIENT_FIELDS}
     ...    alias=${alias}
     RETURN    ${lignes}
+
+Read Installed Client Codes
+    [Documentation]    Les codes des mandants installés sur le système, lus dans
+    ...    son annuaire. À la différence du mandant que les attributs d'une
+    ...    connexion rapportent, celui-ci est une donnée que le SERVEUR rend :
+    ...    y retrouver le mandant servi est une vérification qui peut échouer,
+    ...    là où comparer un paramètre d'ouverture à lui-même n'en est pas une.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${lignes}=    Read Client Directory    alias=${alias}
+    ${codes}=    Get Values From Dicts    ${lignes}    ${CLIENT_KEY_FIELD}
+    RETURN    ${codes}
 
 Read Airlines
     [Documentation]    Les compagnies aériennes du modèle de démonstration, avec
@@ -891,6 +954,253 @@ Compare Channel Surfaces
     [Arguments]    ${chemin_a}    ${chemin_b}
     ${comparaison}=    Compare Rfc Surface Artifacts    ${chemin_a}    ${chemin_b}
     RETURN    ${comparaison}
+
+# ------------------------------------------------- Extraction tabulaire
+# Le canal RFC est le quatrième à rejoindre le contrat commun d'extraction,
+# et il y entre avec une difficulté que les trois autres n'ont pas : une ALV
+# publie son nombre de lignes, une grille WebGUI son total, une table UI5 la
+# longueur de son binding, alors que la lecture RFC ne déclare RIEN. Le total
+# doit donc venir d'AILLEURS, et le choix de cet ailleurs est la seule décision
+# qui compte ici : le mesurer par une seconde lecture reviendrait à comparer
+# deux nombres que le même module produit de la même façon, c'est-à-dire à
+# écrire une garde vraie quoi qu'il arrive.
+
+Count Declared Business Records
+    [Documentation]    Le total d'une table, mesuré SANS en rapatrier une seule
+    ...    ligne. Miroir de `Count Business Records`, et son opposé de MÉTHODE :
+    ...    celui-là lit les lignes et les compte, celui-ci fait compter le
+    ...    serveur par un module DIFFÉRENT de celui qui lit.
+    ...
+    ...    C'est cette différence qui fait que la garde d'extraction mesure
+    ...    quelque chose. Les deux noms doivent rester distincts à l'usage :
+    ...    confondre « compter en lisant » et « faire compter » est exactement
+    ...    ce qui produit une assertion vraie quoi qu'il arrive.
+    ...
+    ...    Le compteur ignore toute clause de sélection (il compte la table
+    ...    ENTIÈRE) mais suit le mandant de la connexion : il compte donc bien
+    ...    la même population que la lecture, tant qu'elle n'est pas filtrée.
+    [Arguments]    ${table}    ${alias}=${RFC_ALIAS}
+    ${total}=    Count Rfc Table Rows    ${table}    alias=${alias}
+    RETURN    ${total}
+
+Count Declared Flight Bookings
+    [Documentation]    Le nombre de réservations que la table DÉCLARE contenir.
+    ...    Le nom métier de `Count Declared Business Records` sur la cible du
+    ...    relevé à l'échelle : une suite ne cite aucun nom de table.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${total}=    Count Declared Business Records    ${BOOKING_TABLE}    alias=${alias}
+    RETURN    ${total}
+
+Count Declared Products
+    [Documentation]    Le nombre de produits que le catalogue DÉCLARE contenir,
+    ...    mesuré par le compteur serveur. À ne pas confondre avec
+    ...    `Count Products`, qui lit les lignes et les compte : ce sont deux
+    ...    mesures indépendantes, et c'est tout leur intérêt.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${total}=    Count Declared Business Records    ${PRODUCT_TABLE}    alias=${alias}
+    RETURN    ${total}
+
+Count Filtered Products
+    [Documentation]    Le nombre de produits d'une CATÉGORIE, compté en lisant.
+    ...    Le compteur serveur ne sait pas filtrer, donc ce nombre vient
+    ...    forcément du module qui lit : il ne prouve aucune complétude, et
+    ...    n'est là que pour fournir à une lecture filtrée le total qu'elle
+    ...    réclame.
+    [Arguments]    ${filter}=${PRODUCT_CATEGORY_FILTER}    ${alias}=${RFC_ALIAS}
+    ${nombre}=    Count Business Records    ${PRODUCT_TABLE}    ${PRODUCT_KEY_FIELD}
+    ...    filter=${filter}    alias=${alias}
+    RETURN    ${nombre}
+
+Extract Business Records
+    [Documentation]    Extraction générique d'un tableau par RFC, rendu AVEC son
+    ...    contrat : le miroir sans écran d'`Extract Displayed Report` (SAP GUI),
+    ...    d'`Extract Displayed WebGui Grid` et d'`Extract Displayed Ui5 Table`.
+    ...    Même dictionnaire en sortie, donc même garde de refus et mêmes
+    ...    écrivains de fichiers : une règle par canal est une règle qu'un canal
+    ...    de plus fait oublier.
+    ...
+    ...    `declared_rows` est FACULTATIF, et c'est ce qui rend le croisement à
+    ...    trois canaux possible : le passer permet d'établir la complétude par
+    ...    un total venu d'ailleurs (le `$count` du service OData qui projette la
+    ...    même table), donc sans que le compteur RFC y participe.
+    ...
+    ...    `limit` borne la lecture, et c'est le geste DANGEREUX : le module rend
+    ...    alors exactement N lignes propres et ordonnées, sans aucun témoin.
+    [Arguments]    ${table}    ${fields}    ${key}=${EMPTY}    ${headers}=${NONE}
+    ...    ${filter}=${EMPTY}    ${limit}=0    ${declared_rows}=${NONE}
+    ...    ${alias}=${RFC_ALIAS}
+    ${extrait}=    Extract Rfc Table    ${table}    ${fields}    alias=${alias}
+    ...    options=${filter}    rowcount=${limit}    key=${key}
+    ...    headers=${headers}    declared_rows=${declared_rows}
+    RETURN    ${extrait}
+
+Extract Flight Bookings
+    [Documentation]    Le tableau des réservations de vol, extrait EN ENTIER avec
+    ...    son contrat, ses en-têtes humains et sa colonne clé. Le relevé à
+    ...    l'échelle de la campagne : dix-sept fois le plus gros tableau que ce
+    ...    dépôt ait extrait jusqu'ici.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${extrait}=    Extract Business Records    ${BOOKING_TABLE}    ${BOOKING_FIELDS}
+    ...    key=${BOOKING_KEY_FIELD}    headers=${BOOKING_HEADERS}    alias=${alias}
+    RETURN    ${extrait}
+
+Extract Flight Bookings With Ceiling
+    [Documentation]    Le MÊME tableau, délibérément BORNÉ. Son nom dit qu'il est
+    ...    dangereux, et c'est sa seule raison d'être : reproduire sur la cible
+    ...    réelle la troncature silencieuse du canal, pour montrer que les lignes
+    ...    rendues ne portent aucun témoin et que seule la confrontation au total
+    ...    la démasque. Aucun fichier ne doit être écrit depuis un tel relevé.
+    [Arguments]    ${limit}    ${alias}=${RFC_ALIAS}
+    ${extrait}=    Extract Business Records    ${BOOKING_TABLE}    ${BOOKING_FIELDS}
+    ...    key=${BOOKING_KEY_FIELD}    headers=${BOOKING_HEADERS}    limit=${limit}
+    ...    alias=${alias}
+    RETURN    ${extrait}
+
+Extract Product Catalogue
+    [Documentation]    Le catalogue des produits, extrait avec son contrat. Le
+    ...    total peut venir d'AILLEURS (`declared_rows`), et c'est le scénario du
+    ...    croisement : un `$count` OData établit alors la complétude sans que ni
+    ...    le module qui lit ni celui qui compte n'y participent.
+    ...
+    ...    Sans total fourni, une lecture FILTRÉE est refusée à l'entrée : le
+    ...    compteur serveur mesure la table entière, donc son total décrirait une
+    ...    autre population que la clause.
+    [Arguments]    ${declared_rows}=${NONE}    ${filter}=${EMPTY}
+    ...    ${alias}=${RFC_ALIAS}
+    ${extrait}=    Extract Business Records    ${PRODUCT_TABLE}    ${PRODUCT_FIELDS}
+    ...    key=${PRODUCT_KEY_FIELD}    filter=${filter}
+    ...    declared_rows=${declared_rows}    alias=${alias}
+    RETURN    ${extrait}
+
+Extracting A Filtered Table Without A Total Should Be Refused
+    [Documentation]    Une lecture FILTRÉE sans total fourni DOIT être refusée,
+    ...    et AVANT tout aller-retour réseau : un refus qui constate après coup
+    ...    n'empêche rien. Même patron que `Reading With An Oversized Selection
+    ...    Clause Should Be Refused`.
+    ...
+    ...    Le message est retourné pour que la suite en juge le contenu. La seule
+    ...    chose assertée ici est qu'il CITE la clause refusée : sans elle, le
+    ...    lecteur du refus ne saurait pas laquelle de ses lectures est en cause.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${erreur}=    Run Keyword And Expect Error    ValueError:*
+    ...    Extract Product Catalogue    filter=${PRODUCT_CATEGORY_FILTER}
+    ...    alias=${alias}
+    Should Contain    ${erreur}    ${PRODUCT_CATEGORY_FILTER}
+    ...    msg=Le refus ne cite pas la clause de sélection refusée : impossible de savoir quelle lecture est en cause.
+    RETURN    ${erreur}
+
+Measure Table Row Width
+    [Documentation]    La largeur d'une LIGNE de table, en octets, mesurée dans
+    ...    le dictionnaire plutôt que supposée : la somme des longueurs de ses
+    ...    champs. Rend `{fields, field_count, width}`, la projection COMPLÈTE
+    ...    étant dérivée au passage.
+    ...
+    ...    Elle existe parce que le module de lecture borne la ligne PROJETÉE à
+    ...    un tampon, et que rien dans la table ne l'annonce : savoir si une
+    ...    projection va déborder se calcule AVANT d'appeler, ou se découvre
+    ...    dans un refus. Dériver la liste plutôt que la graver est ce qui garde
+    ...    la mesure vraie sur une release qui ajoute un champ.
+    ...
+    ...    Les entrées de structure incluse (`.INCLUDE`, `.APPEND`) sont
+    ...    écartées : ce ne sont pas des champs, elles portent une longueur qui
+    ...    double celle des champs qu'elles apportent.
+    [Arguments]    ${table}    ${alias}=${RFC_ALIAS}
+    ${filtre}=    Set Variable    TABNAME EQ '${table}'
+    ${lignes}=    Read Business Records    ${FIELD_CATALOG}
+    ...    ${FIELD_CATALOG_KEY_FIELD},${FIELD_LENGTH_FIELD}    filter=${filtre}
+    ...    alias=${alias}
+    Should Not Be Empty    ${lignes}
+    ...    msg=La table ${table} n'a aucun champ au dictionnaire : elle n'existe pas sur cette cible.
+    @{champs}=    Create List
+    ${largeur}=    Set Variable    ${0}
+    FOR    ${ligne}    IN    @{lignes}
+        ${nom}=    Set Variable    ${ligne}[${FIELD_CATALOG_KEY_FIELD}]
+        IF    not "${nom}".startswith(".")
+            Append To List    ${champs}    ${nom}
+            ${largeur}=    Evaluate    ${largeur} + int("${ligne}[${FIELD_LENGTH_FIELD}]")
+        END
+    END
+    ${nombre}=    Get Length    ${champs}
+    ${projection}=    Catenate    SEPARATOR=,    @{champs}
+    ${mesure}=    Create Dictionary    fields=${projection}    field_count=${nombre}
+    ...    width=${largeur}
+    RETURN    ${mesure}
+
+Measure Wide Table Row Width
+    [Documentation]    La largeur de ligne du catalogue des produits, la table
+    ...    LARGE de la campagne. Elle est large au sens du canal : sa projection
+    ...    complète dépasse le tampon, ce qui en fait la seule cible de ce
+    ...    laboratoire capable de PROUVER le refus sans inventer une table.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${mesure}=    Measure Table Row Width    ${PRODUCT_TABLE}    alias=${alias}
+    RETURN    ${mesure}
+
+Measure Booking Table Row Width
+    [Documentation]    La largeur de ligne du tableau des réservations. Elle
+    ...    explique pourquoi la campagne restait sous le tampon SANS LE VOULOIR :
+    ...    la table entière tient largement sous la limite, donc aucune
+    ...    projection d'elle, même complète, ne peut déborder. Le relevé à
+    ...    l'échelle ne pouvait pas éprouver ce refus.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${mesure}=    Measure Table Row Width    ${BOOKING_TABLE}    alias=${alias}
+    RETURN    ${mesure}
+
+Extracting Beyond The Row Buffer Should Be Refused With Code
+    [Documentation]    Extraire la table large en projection COMPLÈTE doit être
+    ...    refusé, et le refus jugé sur son CODE technique.
+    ...
+    ...    Le refus vient du serveur et traverse la bibliothèque INTACT : c'est
+    ...    ce qui permet de l'asserter par code plutôt que par texte. L'envelopper
+    ...    dans une erreur maison aurait amélioré le message au prix de
+    ...    l'attribut que l'oracle lit, donc au prix de l'assertion elle-même.
+    [Arguments]    ${code}    ${projection}    ${alias}=${RFC_ALIAS}
+    ${refus}=    Rfc Should Fail With Code    ${code}    Extract Rfc Table
+    ...    ${PRODUCT_TABLE}    ${projection}    alias=${alias}
+    ...    key=${PRODUCT_KEY_FIELD}
+    RETURN    ${refus}
+
+Extracting Beyond The Row Buffer Should Be Refused With Message Id
+    [Documentation]    Le même refus, jugé sur son IDENTIFIANT DE MESSAGE
+    ...    (classe, type, numéro). Le critère FIN qui complète le code : le code
+    ...    est stable mais grossier, l'identifiant désigne le refus exact, et ni
+    ...    l'un ni l'autre ne dépend de la langue.
+    [Arguments]    ${identifiant}    ${projection}    ${alias}=${RFC_ALIAS}
+    ${refus}=    Rfc Should Fail With Message Id    ${identifiant}
+    ...    Extract Rfc Table    ${PRODUCT_TABLE}    ${projection}    alias=${alias}
+    ...    key=${PRODUCT_KEY_FIELD}
+    RETURN    ${refus}
+
+Rfc Target Should Be Release
+    [Documentation]    La garde de CIBLE, à poser avant toute lecture. Les deux
+    ...    conteneurs du banc annoncent le même identifiant système ET le même
+    ...    nom d'hôte applicatif : ni l'un ni l'autre ne prouve quoi que ce soit,
+    ...    et l'adresse IP est mesurée volatile. Seules la release et le kernel
+    ...    les distinguent.
+    ...
+    ...    La release est corroborée par une SECONDE source indépendante,
+    ...    l'inventaire des composants logiciels installés : la fiche que le
+    ...    système publie sur lui-même et le composant de base doivent porter le
+    ...    même numéro, sinon les deux sources se contredisent.
+    ...
+    ...    Retourne l'identité mesurée, dont les noms de fichiers sont ensuite
+    ...    dérivés : un fichier ne peut pas annoncer un système qu'il ne porte
+    ...    pas.
+    [Arguments]    ${release}    ${peer_release}=${EMPTY}    ${alias}=${RFC_ALIAS}
+    ${systeme}=    Read System Information    alias=${alias}
+    Should Be Equal    ${systeme}[RFCSAPRL]    ${release}
+    ...    msg=Cible REFUSÉE : le canal parle à la release ${systeme}[RFCSAPRL], pas ${release}. Les deux conteneurs du banc partagent identifiant système et nom d'hôte, donc rien d'autre ne les distingue. Aucune lecture n'a lieu. Pour viser cette cible-là : -v EXPECTED_RELEASE:${systeme}[RFCSAPRL] -v PEER_RELEASE:${release}
+    IF    '${peer_release}' != '${EMPTY}'
+        Should Not Be Equal    ${systeme}[RFCSAPRL]    ${peer_release}
+        ...    msg=La cible et la release voisine portent le même numéro : la contre-épreuve ne distingue plus rien.
+    END
+    Should Not Be Empty    ${systeme}[RFCKERNRL]
+    ...    msg=Le kernel n'a pas été lu : deux conteneurs de même release resteraient indiscernables.
+    ${corroboration}=    Read Release Of Software Component    ${BASE_SOFTWARE_COMPONENT}
+    ...    alias=${alias}
+    Should Be Equal    ${corroboration}    ${systeme}[RFCSAPRL]
+    ...    msg=Les deux sources de release se contredisent : la fiche système annonce ${systeme}[RFCSAPRL], le composant de base ${corroboration}.
+    ${identite}=    Read Target Identity For Artifact    alias=${alias}
+    RETURN    ${identite}
 
 Calling A Closed Rfc Channel Should Name The Opening Keyword
     [Documentation]    Un alias jamais ouvert, ou déjà fermé par un teardown, est

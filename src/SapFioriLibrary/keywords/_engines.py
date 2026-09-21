@@ -14,13 +14,17 @@ Extrait de ``SapFioriLibrary.py`` (convention #13).
 
 
 from sapfx_common.secrets import reveal_secret
+from sapfx_common.system_identity import webgui_identity
+from sapfx_common.webgui_selection import selection_criteria
 
 from .._ui5_js import (
     RESOLVE_DOM_JS,
     RESOLVE_WC_JS,
     WEBGUI_COUNT_PROBE_JS,
+    WEBGUI_IDENTITY_PROBE_JS,
     WEBGUI_MENU_ITEMS_PROBE_JS,
     WEBGUI_MENUS_PROBE_JS,
+    WEBGUI_SELECTION_PROBE_JS,
     sid_xpath,
 )
 from .._ui5_runtime import (
@@ -87,6 +91,30 @@ class EngineKeywords:
             else str(int(window))
         return int(self._evaluate(WEBGUI_COUNT_PROBE_JS, arg=arg) or 0)
 
+    def get_webgui_session_identity(self):
+        """L'identité du système derrière une session **WebGUI**.
+
+        Le miroir WebGUI de `Get System Identity` (canal écran) et de
+        `Read System Identity` (canal RFC) : ``{system_id, client, user,
+        transaction, program, screen}``, lu dans la zone info système du
+        bandeau. Lecture PURE, sans injection ni navigation.
+
+        La garde qu'il sert : deux conteneurs d'un même poste répondent sur
+        deux ports en annonçant le même identifiant système, et l'ICF de l'un
+        REDIRIGE vers le nom d'hôte virtuel que les deux partagent (relevé le
+        2026-08-24). Viser le mauvais port ouvre donc une session parfaitement
+        fonctionnelle sur l'autre système, et tout ce qu'on en extrait est
+        lisible et faux.
+
+        Les valeurs se reconnaissent à leur FORME et non au libellé qui les
+        précède, lequel est traduit (convention 3). Une clé non lue reste vide
+        plutôt que devinée ; zone info absente = toutes les clés vides, jamais
+        une erreur, parce que ce keyword sert aussi à CONSTATER qu'aucune
+        session n'est ouverte.
+        """
+        brut = self._evaluate(WEBGUI_IDENTITY_PROBE_JS)
+        return webgui_identity(brut if isinstance(brut, dict) else {})
+
     def list_webgui_menus(self, window=0):
         """Ids DOM **visibles** des menus de la barre de menus WebGUI de la
         fenêtre ``window`` (``wnd[N]/mbar/menu[i]…-BtnChoiceMenu``), dans
@@ -108,6 +136,46 @@ class EngineKeywords:
         menu pas (encore) ouvert."""
         return list(self._evaluate(WEBGUI_MENU_ITEMS_PROBE_JS,
                                    arg=str(menu_id)) or [])
+
+    def get_webgui_selection_criteria(self):
+        """Carte ``{CHAMP: SID}`` des critères de l'écran de sélection SE16
+        COURANT, côté **WebGUI**.
+
+        Le miroir web de `Get Se16 Selection Criteria` (canal écran), et il
+        existe pour la même raison : les critères sont POSITIONNELS
+        (``I1-LOW``, ``I2-LOW``...), leur ordre suit le choix des champs de
+        sélection, qui persiste par utilisateur, et le préfixe de type varie
+        d'un champ à l'autre (mesuré live le 2026-09-21 sur ``SNWD_PD`` :
+        ``txtI1-LOW`` pour ``NODE_KEY`` mais ``ctxtI2-LOW`` pour
+        ``PRODUCT_ID``). Un SID gravé dans une couche métier est donc faux de
+        deux façons, et il le devient en SILENCE : l'écran répond, un AUTRE
+        critère se remplit, et la lecture qui suit rend des lignes
+        parfaitement lisibles qui ne sont pas celles qu'on a demandées.
+
+        La carte est DÉRIVÉE de la page : SE16 affiche en libellé le nom
+        TECHNIQUE du champ (``PRODUCT_ID``) et non son texte court traduit,
+        donc l'appariement reste indépendant de la langue (convention 3).
+
+        Lecture PURE : aucune injection, aucune saisie, rien de modifié.
+        Retourne un dict JSON-safe, jamais vide : un écran sans aucun critère
+        reconnaissable est un échec actionnable (l'écran de sélection n'est
+        probablement pas ouvert, ou la grille de résultats est déjà là).
+        """
+        brut = self._evaluate(WEBGUI_SELECTION_PROBE_JS)
+        perception = brut if isinstance(brut, dict) else {}
+        criteres = selection_criteria(perception.get("labels") or [],
+                                      perception.get("fields") or [])
+        if not criteres:
+            raise AssertionError(
+                "get_webgui_selection_criteria : aucun critère de sélection "
+                "technique sur la page courante (%d champ(s) et %d libellé(s) "
+                "perçus). Ouvrir l'écran de sélection SE16 d'abord (Display "
+                "WebGui Table Contents s'arrête, lui, sur la grille de "
+                "résultats), et vérifier la portée de frame courante avec "
+                "Get Page Composition."
+                % (len(perception.get("fields") or []),
+                   len(perception.get("labels") or [])))
+        return criteres
 
     # -- moteur Web Components (pages UI5 Web Components, hors registre UI5) ---
 

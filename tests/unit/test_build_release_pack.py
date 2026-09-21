@@ -200,6 +200,10 @@ def test_build_manifest_on_real_repo_covers_the_three_deliverables():
     # écran <-> API font partie des suites d'exemple livrées.
     assert "tests/robot/ecc_drift_sentinel.robot" in dests
     assert "tests/robot/flagship_cross_paradigm.robot" in dests
+    # La vitrine cross-canal voyage avec son plan : sans lui, le
+    # `check_spec_sync.py` embarqué signalerait à raison un marqueur cassé.
+    assert "tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot" in dests
+    assert "specs/cycle-vie-produit-epm-api-webgui-rfc.md" in dests
     # Outillage de maintenance embarqué (stdlib pure, racine du pack).
     assert "scripts/healing_drift_report.py" in dests
     assert "scripts/check_spec_sync.py" in dests

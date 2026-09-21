@@ -12,7 +12,7 @@ to run SAP test automation with Robot Framework, without cloning the source repo
 | `resources/` | Business-readable Robot Framework keywords, one mirrored vocabulary per channel (`ecc_keywords`, `fiori_keywords`, `api_keywords`, `rfc_keywords`) plus page objects and demo-data guards. **Examples to customize**, measured on the lab systems of the project: reusable in good part, never authoritative, to be verified against your target and adapted to your business domain (see `resources/README.md`). Tests import this layer, never raw SAP ids; what holds on every SAP system is the library wheel, not this folder. Your own keywords go to `resources\site_keywords.resource` (see below), which a pack update never overwrites. |
 | `tools/recorder/` + `recorder.cmd` | Desktop recorder (SAP GUI over COM): dump / capture / hover / record; record uses the Scripting API's native events (exact buttons) with automatic polling fallback. Double-click `recorder.cmd` to open the launcher GUI, which exposes the engine choice (auto/native/poll) and the semantic mode (human keywords by visible label). |
 | `tools/recorder_web/` | Web recorder: `recorder_snippet.js` (paste in DevTools) and `extension/` (Chrome MV3 extension, load unpacked via `chrome://extensions`). |
-| `tests/robot/` | Seven sample suites: ECC/Fiori smokes plus the deterministic offline `fiori_wc_smoke.robot`, the autonomous exploration campaign, drift sentinel, cross-paradigm flagship, and `api/canal_api_odata.robot` (the API channel on its own terms, the same business keywords against OData v2 with `--include a4h` and v4 with `--include capsflight`). |
+| `tests/robot/` | Twelve sample suites: ECC/Fiori smokes plus the deterministic offline `fiori_wc_smoke.robot`, the autonomous exploration campaign, drift sentinel, cross-paradigm flagship, `api/canal_api_odata.robot` (the API channel on its own terms, the same business keywords against OData v2 with `--include a4h` and v4 with `--include capsflight`), `ui/fiori/navigation_interaction_demokit.robot` (the only one needing neither credentials nor a system to provision, with its plan) and the two extractions `ui/ecc/extraction_parametres_profil.robot` and `ui/fiori/extraction_grille_webgui.robot` (turning a SAP screen into a usable file, from the desktop client and from the WebGUI, see below), plus `webgui_grid_fixture_smoke.robot`, its OFFLINE counterpart (no SAP, no network: the only check that exercises the WebGUI grid reader on a workstation with access to nothing yet), and `cross/cycle_vie_produit_epm_trois_canaux.robot`, the cross-channel showcase (one EPM product read through OData, WebGUI SE16 and RFC, the three prices compared with each other, the target proven per channel; needs the optional RFC channel and skips cleanly without it; its plan ships with it, see below). |
 | `scripts/` | Maintenance tooling (stdlib-only, run from the pack root): `healing_drift_report.py` (reads the healing telemetry, proposes, or applies with `--apply`, the `resources/` patches for stable locator drifts) and `check_spec_sync.py` (fails when a generated suite is stale vs its `specs/` plan). |
 | `.claude/` + `.github/chatmodes/` + `specs/` | **SAP test agents** (sap-planner / sap-generator / sap-healer / sap-istqb): agent definitions + `/sap-*` commands for Claude Code, generated chat modes for VS Code / Copilot, and the test-plan directory with its reference example (+ `specs/istqb/` for ISTQB test plans). See « Test agents » below. |
 | `install.cmd` / `install.ps1` | Installer: creates a local `.venv`, installs the wheels + pinned dependencies, renders the MCP configs. |
@@ -30,7 +30,7 @@ target PC that means:
   overrides land there, and a pack update never overwrites them. A library
   defect gets reported upstream instead of being worked around locally,
   otherwise the same bug is paid for twice.
-- **Seven sample suites**, not the repo's full validation suite: they are an
+- **Twelve sample suites**, not the repo's full validation suite: they are an
   installation check and a template to copy, not coverage.
 - **Four maintenance scripts** out of the repo's fifteen or so: the others are
   development guards (bilingual pairing, vendor drift, AI-support consistency)
@@ -260,6 +260,96 @@ and *name the exact setting to fix*:
 The full checklist (server, workstation, web, MCP containment) is
 `docs/hardening-test-environment.md` in the source repo, each point mapped to
 the preflight that verifies it.
+
+## Turning a SAP screen into a file (new in 0.8.2)
+
+The most common need on a test workstation: hand over what a screen shows, in
+a format someone else can open. Five formats, all in the wheel, four with no
+dependency at all:
+
+| Keyword | Format | For whom |
+|---|---|---|
+| `Write Table Svg` | vector SVG | a proof to paste into a report |
+| `Write Table Xlsx` | Excel workbook | a reading someone sorts and filters |
+| `Write Table Csv` | CSV | another tool chain |
+| `Write Table Json` | JSON or JSON Lines | a Python/R script, a BI tool |
+| `Write Table Parquet` | Parquet | large volumes (needs `pip install pyarrow`) |
+
+Each one is paired with a reader (`Read Table Xlsx`...): what was written can
+be READ BACK and confronted with the source reading, because a file that
+exists is not a file that is right.
+
+Three traps are closed by default, and none of them is theoretical:
+
+- **Excel retypes what it reads.** Client `000` becomes `0`, and the
+  corruption shows on opening, not on writing: every cell is therefore written
+  as explicit text, with no option to do otherwise.
+- **An ALV only loads rows as you scroll**, and reading an unloaded row
+  returns EMPTY cells rather than failing. Use `Read Full Grid` to extract,
+  then `Count Blank Grid Rows` to check the scrolling was enough, and refuse
+  to write when it returns anything but zero. Measured on a 1639-row report:
+  137 filled, and every check based on the row COUNT stayed green.
+- **A CSV executes formulas.** A value starting with `=`, `+`, `-` or `@` is
+  interpreted on open. Nothing is altered by default, but the write verdict
+  COUNTS the cells concerned; `neutralize_formulas=True` prefixes them when the
+  file is meant to be opened.
+
+The full example is `tests/robot/ui/ecc/extraction_parametres_profil.robot`
+(the RSPARAM report into all five formats, read-only, no secret required: it
+attaches to an already-open SAP GUI session). It expects a given release by
+default and REFUSES to write anything if the open session targets another
+system: its message then gives the command line to use. To adapt it to your
+own screens, copy `Extract Displayed Report` from
+`resources/security_screen_keywords.resource` into
+`resources/site_keywords.resource` and change the grid locator.
+
+**The same thing from the WebGUI**, and the trap that goes with it:
+`tests/robot/ui/fiori/extraction_grille_webgui.robot` extracts an ALV served
+as HTML (SAP GUI for HTML / ITS) into the same five formats, through
+`Read Webgui Grid`. Rows come back keyed by the TECHNICAL column ids, which
+the grid publishes itself, and the DOM's split of frozen columns into two HTML
+tables is handled for you.
+
+**Confront a reading with the total the source DECLARES, always, before you
+write anything from it.** All three channels materialise their table lazily
+and two leave no trace at all:
+
+| Channel | Rows rendered | Rows declared | What betrays the gap |
+| --- | --- | --- | --- |
+| SAP GUI (ALV) | all of them, cells EMPTY where unscrolled | `Get Row Count` | blank rows |
+| WebGUI | one page of 200, renumbered from 1 | `declared_rows` | nothing |
+| UI5 table | the growing threshold, 30 of 4133 measured | `Get Ui5 Table Info` | nothing |
+
+On the two web channels the rendered rows are clean, ordered and complete, so
+a file written from them is faithful to what was read and is an excerpt
+presented as an inventory. `Table Extract Should Be Complete`
+(`Library sapfx_common.table_extract`) is the single refusal rule the three
+sample suites share; put it in the suite SETUP, not in a scenario, because a
+refusal that only reports lets the following scenarios write anyway.
+
+## The same fact through three channels (new in 0.8.2)
+
+`tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` is the pack's
+cross-channel showcase: one EPM product read through the OData service,
+through SE16 in the WebGUI and through `RFC_READ_TABLE`, the three prices
+compared **with each other** after numeric normalisation in the user's
+decimal notation read on the system (`3,25` on screen, `3.25` on both
+protocols). It needs the API channel, the `webgui` ICF service and the
+optional RFC channel (see above): without `pyrfc` it skips cleanly instead of
+failing. Two things it shows that a single-channel suite cannot. The TARGET
+is proven per channel in the Suite Setup, before anything is read: the
+release by RFC, the size of the Gateway catalogue by API, the address
+actually reached by WebGUI. On a bench where two systems share their system
+id and their host name, a guard on one channel lets an incomplete variable
+override compare two systems and stay green, since both carry the same demo
+data. And a negative result (no change document for the table) is preceded by
+a positive witness, so "absent" never means "failed to read". The target
+variables (`API_BASE_URL`, `WEBGUI_URL`, `RFC_ASHOST`, `EXPECTED_RELEASE`,
+`EXPECTED_SERVICES`, `EXPECTED_WEBGUI_HOST`) are overridable with `-v`; read
+the plan shipped next to the suite before adapting it: it documents why the
+campaign only READS (the product service's write path is broken on both
+trial images, verified after a container restore), and its measured target
+values (38 published services on release 754, 58 on 758).
 
 ## Use the MCP plugins
 

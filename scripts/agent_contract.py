@@ -31,8 +31,15 @@ def confined_path(root: Path, value: object) -> Path:
 def validate_handoff(data: object, root: Path) -> dict:
     required = {"schema_version", "mission_id", "target", "invariant", "scope",
                 "mode", "budgets", "evidence"}
-    if not isinstance(data, dict) or set(data) != required:
-        raise ValueError("Invalid handoff fields")
+    if not isinstance(data, dict):
+        raise ValueError("Handoff is not an object")
+    if set(data) != required:
+        extra, missing = sorted(set(data) - required), sorted(required - set(data))
+        raise ValueError(
+            "Invalid handoff fields (extra: %s; missing: %s). The schema is "
+            "closed on purpose: a free-form key is where an agent slips an "
+            "unchecked claim into an artifact that is supposed to be verified."
+            % (", ".join(extra) or "none", ", ".join(missing) or "none"))
     if type(data["schema_version"]) is not int or data["schema_version"] != SCHEMA_VERSION:
         raise ValueError("Unsupported handoff schema")
     identifier(data["mission_id"])
@@ -58,10 +65,35 @@ def validate_handoff(data: object, root: Path) -> dict:
             raise ValueError("Invalid evidence fields")
         path = confined_path(root, item["path"])
         if not path.is_file():
-            raise ValueError("Evidence file is missing")
+            raise ValueError("Evidence file is missing: %s" % item["path"])
         if hashlib.sha256(path.read_bytes()).hexdigest() != item["sha256"]:
-            raise ValueError("Evidence hash mismatch")
+            raise ValueError(
+                "Evidence hash mismatch on %s (the file changed after the "
+                "handoff was signed; re-sign with --refresh once the change "
+                "is intended)" % item["path"])
     return data
+
+
+def refresh_evidence(data: dict, root: Path) -> list[tuple[str, str, str]]:
+    """Recompute every evidence hash in place, returning what moved.
+
+    An explicit, visible gesture rather than a silent repair: a handoff is an
+    attestation, so re-signing one is a decision, and the caller must see
+    which artifact drifted. It only touches hashes, so a handoff that is
+    invalid for any other reason stays invalid and says so.
+    """
+    moved: list[tuple[str, str, str]] = []
+    for item in data.get("evidence", []):
+        if not isinstance(item, dict) or "path" not in item:
+            continue
+        path = confined_path(root, item["path"])
+        if not path.is_file():
+            continue
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != item.get("sha256"):
+            moved.append((item["path"], str(item.get("sha256"))[:12], digest[:12]))
+            item["sha256"] = digest
+    return moved
 
 
 def heal_verdict(facts: dict) -> str:
@@ -102,21 +134,71 @@ def main(argv=None) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["handoff", "verdict"])
-    parser.add_argument("artifact", type=Path)
+    parser.add_argument("artifact", type=Path, nargs="?")
     parser.add_argument("--root", type=Path, default=Path.cwd())
+    parser.add_argument("--all", action="store_true",
+                        help="check every specs/*.handoff.json under --root")
+    parser.add_argument("--refresh", action="store_true",
+                        help="re-sign evidence hashes that drifted, and say which")
     args = parser.parse_args(argv)
+
+    if args.all:
+        if args.operation != "handoff":
+            parser.error("--all only applies to the handoff operation")
+        return _check_every_handoff(args.root, args.refresh)
+    if args.artifact is None:
+        parser.error("an artifact path is required unless --all is given")
+    return _check_one(args.operation, args.artifact, args.root, args.refresh)
+
+
+def _check_one(operation, artifact: Path, root: Path, refresh: bool) -> int:
+    """One artifact, with the REASON printed on refusal.
+
+    The generic wording this used to print ("Invalid or unreadable agent
+    artifact") hid the one thing a reader needs: three handoffs of this repo
+    were invalid at once, for three different reasons, and telling them apart
+    required rewriting the check by hand. A guard that will not say why is a
+    guard nobody repairs.
+    """
     try:
-        data = json.loads(args.artifact.read_text(encoding="utf-8-sig"))
-        if args.operation == "handoff":
-            validate_handoff(data, args.root)
-            print("Handoff structure and evidence hashes verified; business truth not inferred.")
-            return 0
-        result = heal_verdict(data)
-        print(json.dumps({"verdict": result, "basis": "supplied facts, independent review required"}))
-        return 0 if result == "repaired_verified" else 1
-    except (ValueError, TypeError, OSError):
-        print("Invalid or unreadable agent artifact.", file=sys.stderr)
+        data = json.loads(artifact.read_text(encoding="utf-8-sig"))
+        if operation != "handoff":
+            result = heal_verdict(data)
+            print(json.dumps({"verdict": result,
+                              "basis": "supplied facts, independent review required"}))
+            return 0 if result == "repaired_verified" else 1
+        if refresh:
+            for path, before, after in refresh_evidence(data, root):
+                print("re-signed %s: %s -> %s" % (path, before, after))
+            artifact.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                                encoding="utf-8", newline="\n")
+        validate_handoff(data, root)
+        print("Handoff structure and evidence hashes verified; "
+              "business truth not inferred.")
+        return 0
+    except (ValueError, TypeError, OSError) as err:
+        print("%s: %s" % (artifact, err), file=sys.stderr)
         return 2
+
+
+def _check_every_handoff(root: Path, refresh: bool) -> int:
+    """Every sidecar at once, which is what a repository guard needs.
+
+    Checking one file at a time is why this never ran anywhere: a guard has to
+    be able to sweep. Missing sidecars are not invented here, an empty sweep
+    simply says so rather than passing silently.
+    """
+    sidecars = sorted((root / "specs").glob("*.handoff.json"))
+    if not sidecars:
+        print("No handoff sidecar found under specs/.", file=sys.stderr)
+        return 2
+    failed = 0
+    for sidecar in sidecars:
+        if _check_one("handoff", sidecar, root, refresh) != 0:
+            failed += 1
+    print("[agent_contract] %d handoff(s) checked, %d invalid."
+          % (len(sidecars), failed))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

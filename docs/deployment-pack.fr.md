@@ -35,7 +35,7 @@ python scripts/build_release_pack.py
 
 Sortie : `dist/sapfx-pack-<version>-win.zip` (et le staging dézippé à côté).
 Le script construit les deux wheels (`pip wheel --no-deps`), assemble le
-manifeste (recorders, `resources/`, six suites d'exemple dont le smoke Browser hors ligne, les scripts de
+manifeste (recorders, `resources/`, douze suites d'exemple dont le smoke Browser hors ligne et la campagne EPM à trois canaux, les scripts de
 maintenance `healing_drift_report.py`/`check_spec_sync.py`, les agents de
 test, installateur, LICENSE/NOTICE) et zippe. `--skip-wheels` ré-assemble sans reconstruire les
 wheels ; la version vient de `pyproject.toml`. Les sources de tout ce que le
@@ -122,10 +122,14 @@ propre, supprimez d'abord `.venv\`.
   cibles isolées du réseau, demandez la variante offline (wheels de dépendances
   embarqués dans `wheels/`), non construite par défaut car les wheels pywin32
   sont spécifiques à la version de Python.
-- Le pack embarque six suites d'exemple (les smokes ECC/Fiori, le smoke WC hors ligne, la campagne
-  d'exploration autonome, la sentinelle de dérive et le flagship
-  cross-paradigme) ; les autres suites de campagne (data-driven, SCARR/SPFLI…)
-  restent dans le dépôt car elles exigent un A4H live ou des fixtures locales.
+- Le pack embarque douze suites d'exemple (les smokes ECC/Fiori, les smokes
+  WC et grille WebGUI hors ligne, la campagne d'exploration autonome, la
+  sentinelle de dérive, le flagship cross-paradigme, la suite du canal API, la
+  campagne Demo Kit avec son plan, les deux extractions et la campagne EPM à
+  trois canaux avec son plan) ; les autres suites de campagne (data-driven,
+  SCARR/SPFLI, les campagnes de sécurité et de registre de capacités…)
+  restent dans le dépôt car elles exigent un A4H live, des fixtures locales ou
+  la seconde release.
 
 ## Intégrité et provenance
 

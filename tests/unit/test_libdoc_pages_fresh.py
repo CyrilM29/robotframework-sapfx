@@ -26,10 +26,18 @@ import re
 import sys
 
 import pytest
+import robot
 
 _ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 _LIBDOC_DIR = os.path.join(_ROOT, "comms", "libdoc")
 _PAGES = ["SapEccLibrary.html", "SapFioriLibrary.html", "SapApiLibrary.html"]
+
+# Version de Robot Framework, pour la garde des typedocs plus bas : 7.5 y a
+# changé le calcul des ``usages``. Import au niveau module parce qu'un
+# ``skipif`` s'évalue au chargement ; robotframework est une dépendance
+# obligatoire du paquet, l'import ne peut donc pas manquer.
+_RF_VERSION = tuple(
+    int(n) for n in re.findall(r"\d+", robot.version.VERSION)[:2])
 
 # Les pages sont régénérées dans le studio (dépôt privé) ; l'arbre public en
 # reçoit une COPIE sous ``docs/libdoc`` mais pas le dossier ``comms/``. Ce test
@@ -146,6 +154,18 @@ def test_spec_lists_every_keyword_the_library_exposes(library):
         "(procédure dans comms/libdoc/README.md).")
 
 
+@pytest.mark.skipif(
+    _RF_VERSION < (7, 5),
+    reason="Robot Framework 7.5 fait entrer le type de RETOUR d'un keyword "
+           "dans les `usages` d'un typedoc, là où 7.4 ne comptait que les "
+           "paramètres (mesuré 2026-09-16 : le typedoc None de SapApiLibrary "
+           "passe de 23 à 29 usages, les six entrants étant exactement les "
+           "keywords annotés `-> None`). Même situation que pour Python 3.10 "
+           "ci-dessous : aucune spec committée ne peut satisfaire à la fois "
+           "7.4 et 7.5, la spec est produite par la version qualifiée du "
+           "dépôt (celle de packaging/constraints-deploy.txt) et la "
+           "comparaison ne vaut que là. Les NOMS de keywords, eux, restent "
+           "comparés sur toutes les versions par la garde voisine.")
 @pytest.mark.skipif(
     sys.version_info < (3, 11),
     reason="Python 3.10 applique encore l'Optional implicite de PEP 484 : "

@@ -1,0 +1,125 @@
+{
+  "campaign": "extraction-tableau-canal-rfc-a4h",
+  "channel": "RFC",
+  "generated_at": "2026-09-16T20:02:45+00:00",
+  "hash_scope": {
+    "excluded_keys": [
+      "generated_at",
+      "hash_scope",
+      "sha256"
+    ],
+    "hashed_keys": [
+      "measurements",
+      "posture",
+      "run",
+      "target"
+    ]
+  },
+  "interpreter": "python3.12 + pyrfc (venv sapfx-rfc-312), Robot Framework 7.5",
+  "measured_on": "2026-09-16",
+  "measurements": {
+    "bookings_extract": {
+      "blank_rows": 0,
+      "columns": 13,
+      "complete": true,
+      "declared_rows": 28782,
+      "rows_read": 28782
+    },
+    "ceiling_counter_proof": {
+      "blank_rows": 0,
+      "ceiling": 3,
+      "declared_rows": 28782,
+      "keyless_rows": 0,
+      "missing_rows": 28779,
+      "refused_by_shared_guard": true,
+      "witness_in_rows": false
+    },
+    "files": {
+      "csv": {
+        "byte_identical": true,
+        "bytes": 2070713,
+        "second_pass_sha256": "ed41a8e5354b609a8d4791ccf6f338dadfd509d2a1b336de15e67b6c43f6fe0d",
+        "sha256": "ed41a8e5354b609a8d4791ccf6f338dadfd509d2a1b336de15e67b6c43f6fe0d"
+      },
+      "jsonl": {
+        "byte_identical": true,
+        "bytes": 7826962,
+        "second_pass_sha256": "a532e18874b1c5b74e78e13aa6534e582f63e786fe3ccc2e0a591425f940f3c0",
+        "sha256": "a532e18874b1c5b74e78e13aa6534e582f63e786fe3ccc2e0a591425f940f3c0"
+      },
+      "parquet": {
+        "byte_identical": true,
+        "bytes": 299740,
+        "second_pass_sha256": "a21ee93092002bea8f319e05b3835acff26b55c5fe5fbd720c43e192fac65567",
+        "sha256": "a21ee93092002bea8f319e05b3835acff26b55c5fe5fbd720c43e192fac65567"
+      },
+      "svg": {
+        "byte_identical": true,
+        "bytes": 24363051,
+        "second_pass_sha256": "4319015fae8a979db407a7d7dfc4db52a912143e2139e75d416da54b4aa22f66",
+        "sha256": "4319015fae8a979db407a7d7dfc4db52a912143e2139e75d416da54b4aa22f66"
+      },
+      "xlsx": {
+        "byte_identical": true,
+        "bytes": 1689029,
+        "second_pass_sha256": "a2ef1970b1174d3c5a4494f23d4e3002ea431e5acf4f5a9542c83e6e054f22f0",
+        "sha256": "a2ef1970b1174d3c5a4494f23d4e3002ea431e5acf4f5a9542c83e6e054f22f0"
+      }
+    },
+    "readback": {
+      "csv_columns": 13,
+      "csv_rows": 28782,
+      "matches_extract": true
+    },
+    "row_buffer_refusal": {
+      "limit_bytes": 512,
+      "narrow_projection_rows": 205,
+      "refusal_code": "DATA_BUFFER_EXCEEDED",
+      "refusal_message_id": "AD/E/559",
+      "scale_table_can_overflow": false,
+      "scale_table_row_bytes": 163,
+      "wide_table_fields": 24,
+      "wide_table_row_bytes": 533
+    },
+    "row_order_premise": {
+      "bounded_equals_prefix_of_full": true,
+      "bounded_reads_stable": true,
+      "note": "mesure du 2026-09-16 sur 25 lignes ; le canal n'offre aucune clause de tri, la propriete est observee et non garantie",
+      "two_full_reads_identical": true
+    },
+    "three_channel_crossing": {
+      "agree": true,
+      "odata_count": 205,
+      "rfc_entry_counter": 205,
+      "rfc_read": 205
+    }
+  },
+  "posture": "read_only",
+  "run": {
+    "failed": 0,
+    "passed": 8,
+    "skipped": 0,
+    "suite_status": "PASS",
+    "tests": {
+      "Deux ecritures de la meme mesure sont identiques a l octet pres": "PASS",
+      "La cible est bien le systeme attendu": "PASS",
+      "La completude est prouvee par un troisieme canal": "PASS",
+      "Le plafond silencieux est refuse alors qu aucune ligne ne le trahit": "PASS",
+      "Le tableau des reservations est lu en entier et sa completude vient d une autre source que le lecteur": "PASS",
+      "Le tableau est ecrit dans les cinq formats relu et confronte": "PASS",
+      "Une lecture filtree sans total mesure est refusee avant tout appel reseau": "PASS",
+      "Une projection plus large que le tampon de ligne est refusee par son code": "PASS"
+    },
+    "total": 8
+  },
+  "sha256": "1c75f6c91441646a6dd20fc3be21c31e26e9540b27ceb15e2105e7c63f9e9668",
+  "target": {
+    "client": "001",
+    "database": "HDB",
+    "host": "vhcala4h",
+    "kernel": "777",
+    "operating_system": "Linux",
+    "release": "754",
+    "system_id": "A4H"
+  }
+}

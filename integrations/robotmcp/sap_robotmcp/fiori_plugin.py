@@ -250,6 +250,11 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # lecture / assertions
                 "Read Ui5 Table", "Get Ui5 Text", "Ui5 Control Should Be Visible",
                 "Ui5 Text Should Be", "Get Ui5 Match Count",
+                # Ce qu'une table DÉCLARE, par opposition à ce qu'elle a rendu :
+                # `Read Ui5 Table` rend les lignes INSTANCIÉES (30 mesurées
+                # pour 4133 déclarées), toutes parfaitement remplies. Sans ce
+                # keyword, rien ne distingue un inventaire d'un extrait.
+                "Get Ui5 Table Info",
                 # Lecture d'une PROPRIÉTÉ au registre : exacte (le rendu ajoute
                 # ce que le contrôle dessine) et lisible même quand le contrôle
                 # est masqué (colonne repliée), là où `Get Ui5 Text` exige la
@@ -298,6 +303,28 @@ class SapFioriPlugin(StaticLibraryPlugin):
                 # Present), comptage global ou par fenêtre, menus visibles
                 "Webgui Is Present", "Get Webgui Element Count",
                 "List Webgui Menus", "List Webgui Menu Items",
+                # Identité du système derrière la session : deux conteneurs
+                # d'un même poste annoncent le même identifiant système et
+                # l'ICF de l'un REDIRIGE vers le nom d'hôte que les deux
+                # partagent, donc viser le mauvais port ouvre une session
+                # fonctionnelle sur l'AUTRE système.
+                "Get Webgui Session Identity",
+                # Lecture d'une grille ALV rendue en HTML : le DOM l'éclate en
+                # deux tables (colonnes figées / défilantes), les SID des
+                # cellules la ré-unifient. `declared_rows` est indispensable :
+                # le serveur n'envoie qu'une PAGE de lignes qu'il renumérote à
+                # partir de 1 (200 mesurées pour 2000 déclarées), et rien dans
+                # les lignes rendues ne le montre.
+                "Read Webgui Grid", "Get Webgui Grid Info",
+                # Critères d'un écran de sélection SE16 rendu en HTML : la
+                # carte {CHAMP: SID} DÉRIVÉE de la page, miroir web de Get
+                # Se16 Selection Criteria. Les critères sont positionnels
+                # (I1-LOW, I2-LOW…), leur ordre suit un réglage qui persiste
+                # par utilisateur et le préfixe de type varie d'un champ à
+                # l'autre : un SID gravé remplit un AUTRE critère en silence,
+                # et la grille rend ensuite des lignes lisibles qui ne sont
+                # pas celles qu'on a demandées.
+                "Get Webgui Selection Criteria",
                 # moteur Web Components (pages ui5-* hors registre UI5)
                 "Resolve Wc Control", "Click Wc Control", "Fill Wc Input",
                 "Get Wc Text", "Wc Control Should Be Visible", "Get Wc Match Count",

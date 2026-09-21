@@ -113,6 +113,40 @@ ${TABLE_RFC_DESTINATIONS}       RFCDES
 # ABAP (3) et HTTP (H, G). Les autres (T, I, X, @) n'en portent pas.
 @{LOGON_BEARING_TYPES}          3    H    G
 
+# --- Les objets d'autorisation dont l'empreinte dans les rôles vaut d'être
+# mesurée. Convention 1 : leurs noms vivent ICI. Ce ne sont pas des « objets
+# interdits », c'est la liste de ceux dont la diffusion dit quelque chose de la
+# posture : appel distant, développement, transaction, accès table, fonctions
+# d'administration, confiance RFC, gestion des utilisateurs, commandes système.
+@{CRITICAL_AUTH_OBJECTS}
+...                             S_RFC
+...                             S_RFCACL
+...                             S_DEVELOP
+...                             S_TCODE
+...                             S_TABU_DIS
+...                             S_ADMI_FCD
+...                             S_USER_GRP
+...                             S_LOG_COM
+
+# --- Les motifs de nom d'un service web qu'un audit regarde en premier. Une
+# aide au RAPPORT, jamais un critère d'échec : ce qui est sensible dépend du
+# site, et la campagne rend l'inventaire complet à côté.
+@{SENSITIVE_ICF_PATTERNS}
+...                             webgui
+...                             its
+...                             soap
+...                             bsp
+...                             nwbc
+...                             public
+...                             ui2
+...                             gui
+
+# Les deux objets dont une empreinte NULLE trahirait une lecture douteuse
+# plutôt qu'un système exemplaire : l'appel distant et l'accès aux tables.
+# Nommés ici pour qu'aucune suite ne porte un identifiant d'objet SAP.
+${AUTH_OBJECT_REMOTE_CALL}      S_RFC
+${AUTH_OBJECT_TABLE_ACCESS}     S_TABU_DIS
+
 # --- Où vivent les références de dérive (une par cible, committée).
 ${SECURITY_REFERENCE_DIR}       ${CURDIR}/../tests/robot/security_baselines
 
@@ -332,4 +366,92 @@ Count Destinations Of Type
             ${compte}=    Evaluate    ${compte} + 1
         END
     END
+    RETURN    ${compte}
+
+# =========================================================================
+# La SURFACE d'attaque : ce qui est réellement atteignable.
+#
+# Les mots-clés ci-dessus lisent la CONFIGURATION (paramètres, comptes livrés,
+# destinations déclarées). Ceux qui suivent lisent ce à quoi on peut
+# effectivement accéder, et les deux ne coïncident pas : un compte non
+# verrouillé peut être expiré, un service web déclaré peut être inactif, un
+# journal armé peut n'enregistrer rien. Chacun de ces écarts a été mesuré.
+# =========================================================================
+
+Read Account Surface
+    [Documentation]    Qui peut réellement entrer dans le mandant, et qui ne
+    ...    le peut plus. Complète `Read Standard Accounts`, qui répond à une
+    ...    autre question : celui-là dit si un compte est VERROUILLÉ, celui-ci
+    ...    s'il est UTILISABLE. Un compte peut être ni verrouillé ni utilisable,
+    ...    et le confondre surestime la surface d'entrée.
+    [Arguments]    ${alias}=${RFC_ALIAS}    ${mandant}=${RFC_CLIENT}
+    ${surface}=    Read Account Usability    alias=${alias}    client=${mandant}
+    RETURN    ${surface}
+
+Read Web Exposure
+    [Documentation]    La surface web réellement servie : services déclarés,
+    ...    services actifs, actifs sans chiffrement, et ceux qui portent un
+    ...    compte de service (donc s'exécutent sans authentifier l'appelant).
+    ...    Compter les services DÉCLARÉS donne une surface que personne ne peut
+    ...    auditer ; ce sont les actifs qui répondent sur le réseau.
+    [Arguments]    ${alias}=${RFC_ALIAS}    ${motifs}=${SENSITIVE_ICF_PATTERNS}
+    ${exposition}=    Read Icf Exposure    alias=${alias}    sensitive_patterns=${motifs}
+    RETURN    ${exposition}
+
+Read Os Command Surface
+    [Documentation]    Les commandes du système d'exploitation déclarées, et
+    ...    surtout combien acceptent des arguments additionnels : c'est l'écart
+    ...    entre « exécuter une sauvegarde » et « exécuter ce que l'appelant
+    ...    voudra ». Les commandes définies sur le système (espace de noms
+    ...    client) sont isolées, puisqu'elles ne viennent d'aucun standard.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${commandes}=    Read External Commands    alias=${alias}
+    RETURN    ${commandes}
+
+Read Audit Coverage
+    [Documentation]    La couverture d'audit RÉELLE : la configuration du
+    ...    journal CROISÉE avec son contenu. `Read Audit Filtering` dit ce que
+    ...    le journal est censé faire ; celui-ci dit ce qu'il a effectivement
+    ...    enregistré, donc transforme « armé sans filtre, donc il n'enregistre
+    ...    rien » d'une déduction en un constat. Une lecture qui échoue rend
+    ...    ``not_measured`` et jamais zéro.
+    [Arguments]    ${alias}=${RFC_ALIAS}    ${fenetre_jours}=365
+    ${couverture}=    Read Audit Log Coverage    alias=${alias}
+    ...    window_days=${fenetre_jours}
+    RETURN    ${couverture}
+
+Read Trust Surface
+    [Documentation]    Les relations de confiance RFC entrantes et sortantes,
+    ...    plus la liste blanche des rappels. Inventaire à faire même quand il
+    ...    est vide : sans lui, on ne distingue pas « aucune relation n'est
+    ...    configurée » de « personne n'a regardé », et seule la première
+    ...    situation rend visible l'apparition d'une relation.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${confiance}=    Read Rfc Trust Surface    alias=${alias}
+    RETURN    ${confiance}
+
+Read Critical Authorization Footprint
+    [Documentation]    L'empreinte des objets d'autorisation critiques dans les
+    ...    rôles DÉFINIS du système. Ce n'est pas un compte de droits effectifs,
+    ...    et la nuance compte : un rôle défini n'est pas un rôle attribué.
+    [Arguments]    ${alias}=${RFC_ALIAS}    ${objets}=${CRITICAL_AUTH_OBJECTS}
+    ${empreinte}=    Count Authorization Object Usage    ${objets}    alias=${alias}
+    RETURN    ${empreinte}
+
+Read Effective Role Assignments
+    [Documentation]    Les attributions de rôles effectives du mandant, avec
+    ...    celles qui n'ont pas d'échéance. Une attribution sans fin n'est pas
+    ...    un défaut en soi : c'est une propriété à voir, parce qu'elle survit à
+    ...    la raison qui l'a justifiée.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${attributions}=    Read Role Assignments    alias=${alias}
+    RETURN    ${attributions}
+
+Count Forbidden Passwords
+    [Documentation]    La taille de la liste des mots de passe interdits. Zéro
+    ...    signifie qu'aucun mot de passe trivial n'est refusé. La table ne
+    ...    porte que des empreintes : le décompte est tout ce qui est à la fois
+    ...    mesurable et utile.
+    [Arguments]    ${alias}=${RFC_ALIAS}
+    ${compte}=    Read Forbidden Password Count    alias=${alias}
     RETURN    ${compte}

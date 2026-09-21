@@ -9,7 +9,9 @@ from ._frames import FrameKeywords
 from ._locators import LocatorKeywords
 from ._perception import PerceptionKeywords
 from ._state import StateKeywords
+from ._tables import TableKeywords
 
 __all__ = ["ActionKeywords", "CompositionKeywords", "EngineKeywords",
            "FioriBase", "FlpKeywords", "FlpServiceKeywords", "FrameKeywords",
-           "LocatorKeywords", "PerceptionKeywords", "StateKeywords"]
+           "LocatorKeywords", "PerceptionKeywords", "StateKeywords",
+           "TableKeywords"]

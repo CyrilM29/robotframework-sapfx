@@ -35,7 +35,7 @@ python scripts/build_release_pack.py
 
 Output: `dist/sapfx-pack-<version>-win.zip` (and the unzipped staging next to it).
 The script builds both wheels (`pip wheel --no-deps`), assembles the manifest
-(recorders, `resources/`, six sample suites including the offline Browser smoke, the maintenance scripts
+(recorders, `resources/`, twelve sample suites including the offline Browser smoke and the three-channel EPM campaign, the maintenance scripts
 `healing_drift_report.py`/`check_spec_sync.py`, the test agents, installer,
 LICENSE/NOTICE) and zips.
 `--skip-wheels` re-assembles without rebuilding the wheels; the version comes
@@ -117,10 +117,13 @@ first.
 - The install step needs PyPI (or an internal mirror). For air-gapped targets,
   ask for the offline variant (dependency wheels bundled in `wheels/`), not
   built by default because pywin32 wheels are Python-version specific.
-- The pack ships six sample suites (the ECC/Fiori smokes, the offline WC smoke, the autonomous
-  exploration campaign, the drift sentinel and the cross-paradigm flagship);
-  the other campaign suites (data-driven, SCARR/SPFLI…) stay in the repo
-  because they need a live A4H or local fixtures.
+- The pack ships twelve sample suites (the ECC/Fiori smokes, the offline WC
+  and WebGUI-grid smokes, the autonomous exploration campaign, the drift
+  sentinel, the cross-paradigm flagship, the API channel suite, the Demo Kit
+  campaign with its plan, the two extractions, and the three-channel EPM
+  campaign with its plan); the other campaign suites (data-driven,
+  SCARR/SPFLI, the security and capability-register campaigns…) stay in the
+  repo because they need a live A4H, local fixtures or the second release.
 
 ## Integrity and provenance
 

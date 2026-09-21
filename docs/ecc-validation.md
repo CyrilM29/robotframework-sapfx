@@ -223,6 +223,34 @@ docker start a4h     # restart (faster than first boot)
 docker rm a4h        # delete (system data is lost)
 ```
 
+**Restoring the container from a backup** (done live on 2026-09-21, from an
+image saved with `docker commit` + `docker save` a month earlier). Load the
+archive (`docker load -i <backup>.tar`: 38 GB, about 45 minutes, and no output
+at all until the final `Loaded image:` line, so launch it detached and watch
+the process rather than a bounded shell call), then replace the container:
+
+```powershell
+docker rm -f a4h
+docker run -d --name a4h --hostname vhcala4hci `
+  --mac-address 02:42:ac:11:00:02 `
+  --sysctl kernel.shmmni=32768 --memory 32g `
+  -p 3200:3200 -p 3300:3300 -p 8443:8443 -p 30213:30213 -p 50000:50000 -p 50001:50001 `
+  a4h-configure:<backup-date> -agree-to-sap-license -skip-limits-check
+```
+
+`--mac-address` is the parameter that matters: the hardware key derives from
+it, and with the same MAC both licences, the scripting profile, the ICF
+`webgui` service and the Gateway activation come back with the image, nothing
+to redo (verified: `disp+work` GREEN, licences valid, MAC and hardware key
+unchanged, all ports open). Derive the other parameters from `docker inspect`
+of the container you are about to replace, BEFORE removing it. Two limits: a
+plain `docker restart` (about 6 minutes, HANA then ABAP) clears in-memory state
+only and does not touch persisted data, and a restore cannot repair a defect
+baked into the image's own content (the EPM product service's write path is
+broken in the archive exactly as it is in the running system, see
+[docs/sap-test-data.md](sap-test-data.md) §1); what it does do is wipe every
+test artefact written since the backup.
+
 ## 11. Validated Live: Hard Points Encountered (✅ ecc_smoke 5/5)
 
 Real validation performed with a **1909 image** (the official one being withdrawn:

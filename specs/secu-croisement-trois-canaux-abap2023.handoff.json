@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "mission_id": "secu-croisement-trois-canaux-abap2023-2026-09-14",
+  "target": "abap-2023-758-client-001",
+  "invariant": "La meme verite de securite, regardee par TROIS canaux (ecran, RFC, HTTP), sans rien ecrire. Chaque canal leve une limite que les autres consignent : l'origine d'un parametre (profil contre defaut), le mandant que le RFC ne peut pas ouvrir, et l'effet reellement produit sur le fil. Une lecture qui echoue ne vaut jamais zero, un code d'icone ne se traduit pas sans contraste, et la valeur d'un parametre de securite n'est pas un curseur.",
+  "scope": [
+    "tests/robot/cross/secu_croisement_trois_canaux_abap2023.robot",
+    "resources/security_screen_keywords.resource",
+    "src/sapfx_common/parameter_origin.py",
+    "src/sapfx_common/alv_cells.py",
+    "src/sapfx_common/http_security.py",
+    "src/SapApiLibrary/_http_security.py",
+    "specs/secu-croisement-trois-canaux-abap2023.md"
+  ],
+  "mode": "explore",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/secu-croisement-trois-canaux-abap2023.md",
+      "sha256": "c14d304b713b0a9e6c28f2492267274d2d3ee74194059ebb02f96ca39563aa6c"
+    },
+    {
+      "path": "tests/robot/cross/secu_croisement_trois_canaux_abap2023.robot",
+      "sha256": "dce5b06f8bd9070fdd324e0245d28347526475c8f0eb570e800cc4c3a9e8458d"
+    },
+    {
+      "path": "specs/evidence/secu-croisement-trois-canaux-abap2023.2026-09-14.json",
+      "sha256": "e9214484d30d5d6d05e84009fab2618e6bc2f46f28a9afad1eba30255b367e53"
+    }
+  ]
+}

@@ -8,7 +8,13 @@ Deux sévérités, calées sur la nature de chaque garde :
   message remonte à l'assistant qui doit corriger immédiatement ;
 * ``check_spec_sync.py`` (suite périmée, plan marqué PÉRIMÉE) : un échec peut
   être transitoire au milieu d'un cycle légitime (plan annoté puis re-stampé
-  par sap-generator) → non bloquant, remonté en information.
+  par sap-generator) → non bloquant, remonté en information ;
+* ``agent_contract.py handoff --all`` (sidecar de mission dont une empreinte
+  de preuve a dérivé) : même nature transitoire, donc même sévérité. Ce relais
+  existe parce que ce garde ne tournait NULLE PART, ni en CI ni ici : le
+  2026-09-16, trois sidecars sur six étaient invalides pour trois causes
+  différentes, sans que rien ne l'ait signalé. Le verrou DUR est le test
+  unitaire, qui juge un arbre au repos.
 
 La décision vit dans :func:`decide`, séparée des entrées/sorties : le hook
 relaie des sous-processus, c'est la seule façon d'en tester les quatre
@@ -106,6 +112,29 @@ def decide(file_path: str, run: Runner) -> tuple[int, str, str]:
             "systemMessage": "check_spec_sync : dérive plan ↔ suite détectée "
                              "(voir détail) : re-stamper, régénérer, ou "
                              "ré-explorer si le plan est marqué PÉRIMÉE.",
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": report,
+            },
+        }, ensure_ascii=False)
+        return 0, "", message
+
+    # Le sidecar de mission, qui atteste qu'une mission a produit CES
+    # artefacts-là. INFORMATIF et non bloquant, délibérément : pendant un tour
+    # de génération le plan bouge avant que le sidecar ne soit ré-émis, et
+    # bloquer là-dessus arrêterait le cycle en plein milieu pour une dérive
+    # attendue. Le verrou DUR est le test unitaire, donc la CI, qui juge un
+    # arbre au repos. Sans ce relais, la garde ne tournait nulle part : trois
+    # sidecars sur six étaient invalides le 2026-09-16, pour trois causes
+    # différentes, sans que rien ne l'ait jamais signalé.
+    handoff = run("agent_contract.py", "handoff", "--all")
+    if handoff.returncode != 0:
+        report = (handoff.stdout + handoff.stderr).strip()
+        message = json.dumps({
+            "systemMessage": "agent_contract : un sidecar de mission ne valide "
+                             "plus (voir détail). Normal en cours de "
+                             "génération ; à ré-émettre avant de committer "
+                             "(--refresh une fois le changement voulu).",
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",
                 "additionalContext": report,

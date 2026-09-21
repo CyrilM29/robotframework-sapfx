@@ -183,63 +183,6 @@
     return { role: role, xpath: xprop, xpathShort: xShort, text: txt };
   }
 
-  // ---- Lecture de table UI5 (parité avec Read Grid côté ECC) ----------------
-  // Extrait le texte significatif d'un contrôle cellule, quel que soit son type.
-  function controlText(c) {
-    if (!c) return '';
-    try {
-      if (typeof c.getText === 'function' && c.getText()) return String(c.getText());
-      if (typeof c.getTitle === 'function' && c.getTitle()) return String(c.getTitle());
-      if (typeof c.getValue === 'function' && c.getValue() !== undefined && c.getValue() !== null && c.getValue() !== '')
-        return String(c.getValue());
-      if (typeof c.getNumber === 'function' && c.getNumber()) return String(c.getNumber());
-      if (typeof c.getSelected === 'function') return c.getSelected() ? 'true' : 'false';
-    } catch (e) {}
-    try { const dom = c.getDomRef && c.getDomRef(); if (dom) return (dom.textContent || '').trim(); }
-    catch (e) {}
-    return '';
-  }
-  // Lit une table sap.m.Table (getItems/getCells) ou sap.ui.table.Table (getRows, lignes
-  // VISIBLES seulement, virtualisation) vers une liste d'objets {en-tête: valeur}.
-  // Rend un CONSTAT, pas seulement des lignes : le type du contrôle, la voie de lecture
-  // employée, le nombre de lignes candidates et combien ont été écartées faute de
-  // cellules. Sans ces compteurs, un contrôle qui porte bien des lignes mais ne les
-  // expose pas par `getCells` (sap.ui.documentation.LightTable, mesuré 2026-08-30) est
-  // indiscernable d'une table légitimement vide : l'appelant rendait alors [] en
-  // silence, vert et faux. C'est `tableReadVerdict` (Python) qui tranche.
-  function readTable(controlId) {
-    if (!isUI5()) return null;
-    const t = byId(controlId);
-    if (!t) return null;
-    let type = '';
-    try { type = String(t.getMetadata && t.getMetadata().getName ? t.getMetadata().getName() : ''); }
-    catch (e) {}
-    const hasColumns = (typeof t.getColumns === 'function');
-    const cols = hasColumns ? (t.getColumns() || []) : [];
-    const headers = cols.map((col, i) => {
-      let h = '';
-      try {
-        if (typeof col.getHeader === 'function') h = controlText(col.getHeader());
-        if (!h && typeof col.getLabel === 'function') h = controlText(col.getLabel());
-      } catch (e) {}
-      return h || ('col' + i);
-    });
-    let items = [], source = null;
-    if (typeof t.getItems === 'function') { items = t.getItems() || []; source = 'items'; }
-    else if (typeof t.getRows === 'function') { items = t.getRows() || []; source = 'rows'; }
-    const out = [];
-    let skipped = 0;
-    items.forEach((row) => {
-      if (typeof row.getCells !== 'function') { skipped++; return; }   // en-tête de groupe
-      const cells = row.getCells();
-      const obj = {};
-      cells.forEach((cell, i) => { obj[headers[i] || ('col' + i)] = controlText(cell); });
-      out.push(obj);
-    });
-    return { type: type, source: source, hasColumns: hasColumns, headers: headers,
-             candidates: items.length, skipped: skipped, rows: out };
-  }
-
   // ---- XPath structurel le plus court et unique sur l'arbre de contrôles ----
   // Porté depuis playwright-sap UI5Xpath.ts (getShortestXPath) : construit le chemin
   // positionnel complet, puis retourne le '//suffixe' le plus court qui résout encore

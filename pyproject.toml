@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "robotframework-sapfx"
-version = "0.8.1"
+version = "0.8.2"
 description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -78,7 +78,15 @@ web = ["robotframework-browser>=20.0,<21"]
 # Visual assertions (Screen Should Match Baseline): Pillow decodes the PNG at
 # the boundary; the perceptual-hash core itself is stdlib-pure.
 visual = ["Pillow>=10.0"]
-dev = ["pytest>=7.0", "pytest-cov>=5.0", "ruff>=0.4", "pre-commit>=3.0", "mypy>=1.10"]
+# Restitution d'un relevé en Parquet (`sapfx_common.table_parquet`), pour les
+# volumes destinés à un script ou à un outil décisionnel. Optionnel à dessein :
+# les trois autres formats (CSV, JSON/JSON Lines, XLSX) n'ont AUCUNE dépendance
+# et portent la même donnée, JSON Lines étant le repli d'une chaîne
+# décisionnelle. Parquet ne s'écrit pas à la main (métadonnées Thrift), donc le
+# module délègue et se DÉCLARE indisponible plutôt que d'échouer obscurément,
+# comme le canal RFC le fait pour pyrfc.
+parquet = ["pyarrow>=14.0"]
+dev =["pytest>=7.0", "pytest-cov>=5.0", "ruff>=0.4", "pre-commit>=3.0", "mypy>=1.10"]
 
 [project.urls]
 Homepage = "https://github.com/CyrilM29/robotframework-sapfx"

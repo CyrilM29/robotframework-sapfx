@@ -11,6 +11,7 @@ One PreToolUse hook in `.claude/settings.json` serves both hosts: readers retain
 base permissions, other calls ask (`RF_AGENT_READ_ONLY=1` denies). Qualify host
 loading before relying on it. `agent_contract.py` checks handoff hashes/supplied
 facts; `agent_journal.py` records recovery milestones, never automatically retries.
+`agent_contract.py handoff --all` sweeps every sidecar, names each refusal's cause and remedy, and re-signs drifted evidence only on an explicit `--refresh`; hard in CI and a unit test, reported by the post-edit hook. It first ran on 2026-09-16 and found three of six sidecars invalid, for three different reasons.
 Offline tests are not measured LLM quality. Regenerate `.claude/agents/` into
 four legacy chatmodes and `.github/agents/sap-verifier.agent.md`. The pack carries
 the common scripts/contract and minimal hooks, never workstation permissions.
@@ -105,7 +106,10 @@ per file, update the index in the same operation, never secrets anywhere.
   and human locators (`Find/Fill/Read Field By Label`, `Click Button By
   Label`: visible label + geometry, grid/position addressing (`N @ Label`/
   `Label @ N`) and the scoped-anchor operator (`Anchor >> Rest`); ambiguity
-  always reported with the candidate list, never a silent first match). An
+  always reported with the candidate list, never a silent first match;
+  tolerances follow the rendering scale measured on the screen itself, since
+  the Scripting API returns physical pixels and an RDP session or a Windows
+  scale factor multiplies every distance). An
   **embedded-browser-control bridge** (`Enable Embedded Browser Debugging`,
   `Get/Switch (To) Embedded Browser Page`) pilots a WebView2 control embedded
   in a SAP GUI/Business Client window through the Browser library over CDP.
@@ -201,6 +205,33 @@ per file, update the index in the same operation, never secrets anywhere.
   (Apache-2.0, NOTICE).
   It reuses the Browser library's active page: suites import
   `Library    Browser` alongside it.
+- **Security over THREE channels (screen, RFC, HTTP)**:
+  `tests/robot/cross/secu_croisement_trois_canaux_abap2023.robot` (live 13/13,
+  release 758), capabilities in `sapfx_common/parameter_origin.py`,
+  `alv_cells.py`, `http_security.py`, mixin `SapApiLibrary._http_security`.
+  Lifts three CHANNEL limits the RFC-only campaigns consign: a parameter's
+  origin (39/42 hold their default, 3 declared in the profile, NONE modified
+  there), the reference client (out of reach over RFC, read by a screen
+  report), and the effect actually produced (the `HttpOnly` parameter is set,
+  none of the three session cookies carries the flag). Lessons: **a security
+  parameter's value is not a dial**, and **an instrument reporting an absence
+  must be proven able to report a presence**. Traps: profile column silently
+  truncated at 60 chars, lock column is an ICON code, password status is a
+  translated string (report, never assert).
+- **Attack surface (declared is not reachable)**:
+  `tests/robot/api/secu_surface_attaque_abap2023.robot` (live 12/12, release
+  758), capability in `SapApiLibrary._rfc_surface`, pure logic in
+  `sapfx_common/security_surface.py`. Complements the configuration suite
+  below. Measured 2026-09-14: an unlocked account is not a USABLE one (zero
+  locked, two EXPIRED, four real entries out of six); 3410 declared web
+  services for **219 active**; 109 of 117 OS commands accept additional
+  arguments; audit log armed with **zero entries over four years**, which
+  crossing configuration with content OBSERVES instead of deducing. Traps:
+  `RSAU_READ_LOG` returns zero without raising when called without its
+  mandatory interval (`DAT_FROM`, not `DATE_FROM`); a non-existent field makes
+  `RFC_READ_TABLE` blame the TABLE; `RFCTRUST` has no `RFCSYSID` column. Method
+  lesson: a guard whose two terms come from the SAME read measures nothing, and
+  a green suite is not a verified suite.
 - **Security posture, one suite per target**:
   `tests/robot/api/secu_configuration_a4h.robot` (live 12/12) and
   `secu_configuration_abap2023.robot` (live 13/13), READ-ONLY, RFC channel.
@@ -274,6 +305,28 @@ per file, update the index in the same operation, never secrets anywhere.
   menu index appears nowhere in it, which a unit test enforces. A third
   criterion decides a write target and is invisible from OData: the table must
   allow maintenance (`DD02L`), which the `/DMO/*` RAP model does not.
+  Three EPM campaigns generated from scenario prompts (2026-09-18 to 21):
+  `tests/robot/ui/ecc/commande_vente_epm_order_to_cash.robot` (SAP GUI
+  `SEPM_SO`, order number from the message PARAMETER, confronted with
+  `SNWD_SO`, deleted in teardown),
+  `tests/robot/cross/commande_achat_epm_procure_to_pay.robot` (goods receipt
+  posted through the business object's own OData action, `SNWD_STOCK`
+  increment checked in SE16, explicit opt-in) and
+  `tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` (one product
+  read through OData, WebGUI SE16 and `RFC_READ_TABLE`, the three prices
+  compared WITH EACH OTHER after numeric normalisation in the user's decimal
+  notation; live 7/7 on both releases). The last one is read-only BY
+  MEASUREMENT: `SNWD_PD` has no entry screen (`MAINFLAG` empty) and no change
+  documents (BOPF), and `SEPMRA_PROD_MAN` refuses to activate AND to delete a
+  draft on both trial images, verified after a container restart, an image
+  restore and on the second release. Its independent review found, on a GREEN
+  suite, a target guard covering one channel of three, a "discriminant" only
+  compared to zero and a negative result without witness; fixed with one
+  discriminant per channel in the Suite Setup, a positive witness, and every
+  guard seen refusing. It brought `Get Webgui Selection Criteria`
+  (`sapfx_common/webgui_selection.py`): the `{FIELD: SID}` map of a WebGUI
+  SE16 selection screen derived from the page, where a label belongs to the
+  FIRST SID-bearing field to its right, whatever its kind.
 - Business keywords live in `resources/*.resource`; recorders in `tools/`
   (shipped in the pack, so they are in the mypy scope and have their own
   coverage floor in CI; `--replay` fails on any step it could not run, and
@@ -383,6 +436,11 @@ per file, update the index in the same operation, never secrets anywhere.
   `resources/common.resource` for cross-screen keywords, environment data
   under `variables/` (never credentials); the healer patches that layer,
   never test bodies.
+- **Reading an ALV that has not been scrolled returns BLANK rows, never an error** (2026-09-15): the same read of the RSPARAM report returned 1635 full rows on release 758 and 1639 rows of which 137 were filled on 754. Every completeness check passed, because all of them reasoned about ROWS (declared count equals read count, file reads back identical, expected columns present) and a hollow reading is perfectly consistent with itself. Use `Read Full Grid` (it scrolls) to extract, then `Count Blank Grid Rows` to confirm the scrolling was enough: the first acts, the second checks. Same run, same lesson elsewhere: a target guard that fails inside a scenario PREVENTS nothing, the scenarios after it still wrote four files from the wrong system under names announcing the right one, so such a guard belongs in the suite setup and output names must derive from the MEASURED identity.
+- **Tabular restitution** (`table_svg` / `table_xlsx` / `table_csv` / `table_json` / `table_parquet`, 2026-09-15): writes a grid reading to the five formats an audit report or a data pipeline consumes, four of them stdlib-pure (Parquet delegates to `pyarrow`, extra `parquet`, and DECLARES itself unavailable rather than failing obscurely, like the RFC channel). One shared contract: same columns, a JSON-safe verdict stating what was written, every writer paired with a READER so the file is confronted with the source reading, everything written as TEXT (inferring types turns client `000` into `0`), and deterministic bytes (no timestamp injected, so a difference between two extractions means a difference in the SYSTEM). `headers=` (the `{technical id: displayed title}` map from `Get Grid Column Titles`) puts SAP's own column names in the delivered file while keeping technical ids as the reading keys: extracting is not asserting, and a file named after ids nobody recognises is a worse deliverable. CSV additionally COUNTS formula-injection cells (a value starting with `=`, `+`, `-` or `@` executes on open; RSPARAM has 40) without ever altering them by default.
+- **All four channels materialise their table lazily, and THREE leave no trace** (2026-09-15, extended to the RFC channel on 2026-09-16). **RFC** is the limit case: `RFC_READ_TABLE` bounded by `ROWCOUNT` returns exactly N clean, ordered rows (3 measured out of the 205 of `SNWD_PD`) and declares NO total at all, so the total has to come from a DIFFERENT module (`EM_GET_NUMBER_OF_ENTRIES`, counting server side, about 0.02 s against 0.8 s to read 28,782 rows). Counting through a second `RFC_READ_TABLE` would be a guard that holds true whatever happens. That counter takes no selection clause, so a filtered read is never paired with it (refused at entry, before any network call), but it does follow the connection's client, so both measurements cover the same population; a table that does not exist is announced at zero. An ALV renders every row but with EMPTY cells until scrolled, which is detectable. A **WebGUI** grid sends one PAGE of 200 rows and RENUMBERS them from 1: an SE16 selection of 2000 rows carries `totalRows:2000` in the grid's `lsdata` and 200 rows in the DOM, clean, complete, numbered 1 to 200 (the switch to server-side scrolling is governed by `clientCellThreshold:4000`, a cap in CELLS, not rows). A **`sap.m.Table`** stops at its `growingThreshold`: 30 rows rendered against 4133 declared by `binding.getLength()`, all perfectly filled. On the two web channels, only the DECLARED total separates an inventory from an excerpt, hence one shared refusal rule, `sapfx_common.table_extract` (`Build Table Extract` / `Table Extract Should Be Complete` / `Describe Table Extract`), used by the three suites: a per-channel rule is a rule the next channel makes you forget. Practical corollaries: never size a loop on what a table reader returned; read a WebGUI grid through the cells' SIDs (`.../row[N]/cell[M]`, M indexing `ColumnIDs`) because the DOM splits a frozen-column grid into two HTML tables; and growing a UI5 table is not a route (`growingScrollToLoad` loads on scroll, neither the `<id>-trigger` nor `setGrowingThreshold` fills it).
+- **A JS template passed to `Evaluate JavaScript` must START with its function.** A comment placed before it makes the source evaluate as an expression: the function is never called, the result comes back EMPTY and **the call SUCCEEDS** (verified in isolation 2026-09-15). No error, no symptom on the Robot side, just a probe that answers nothing. The inline probes of `_ui5_js.py` escape it because their comments live on the Python side; a standalone `.js.tpl` carries its explanation INSIDE the function body, and a unit test pins the first line.
+- **Deux lectures d'une meme table peuvent ne pas voir les memes colonnes, et le retrait doit etre DIT** (2026-09-15). Sur une table Fiori Elements, `getColumns()` rend une colonne a en-tete VIDE (l'indicateur de brouillon) que les lignes rendent aussi : une colonne sans nom n'est pas extractible et se retire, mais le retrait silencieux a exactement le meme symptome qu'un DECALAGE de colonnes, ou les valeurs ont glisse d'un cran et ou le fichier produit serait complet, propre, fidele au releve et faux. `Build Table Extract` rend donc `ignored_columns`, et une cle NOMMEE laissee de cote est l'alarme. Meme famille cote WebGUI : une cellule dont l'index depasse `ColumnIDs` sort en `COL<n>` au lieu d'etre jetee. C'est le seul defaut de ces canaux qu'aucune relecture de fichier ne peut demasquer, la relecture confrontant le fichier au releve et non le releve a l'ecran.
 - `src/sapfx_common/polling.py` holds the shared `poll_until`/`retry_call`/
   `retry_until` primitives: reuse them for any wait/retry logic instead of
   writing new `while time.time() < deadline` loops (their own deadlines run on

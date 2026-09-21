@@ -32,6 +32,18 @@ Validate with `python scripts/agent_contract.py handoff <file> --root <root>`
 when execution is permitted. Offline agents request a prepared validation
 report instead of acquiring shell tools.
 
+Three affordances added on 2026-09-16, the day this check first ran and found
+three of six sidecars invalid for three DIFFERENT reasons: `--all` sweeps every
+`specs/*.handoff.json` (a check that takes one file at a time never becomes a
+repository guard), a refusal NAMES its cause and its remedy (the generic
+wording it printed before is why nobody repaired them), and `--refresh`
+re-signs drifted evidence hashes while printing what moved. Re-signing is an
+explicit decision: an attestation that repairs itself silently attests nothing,
+but a guard with no way through gets switched off. It is now enforced hard at
+rest (unit test, therefore CI) and reported softly during an edit (hook),
+because mid-generation the plan legitimately changes before the sidecar is
+re-issued.
+
 ```json
 {
   "schema_version": 1,

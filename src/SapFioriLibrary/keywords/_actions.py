@@ -106,11 +106,23 @@ class ActionKeywords:
         L'échec renvoie alors vers la lecture au registre (`Get Ui5 Control Info`,
         `Get Ui5 Aggregation Info`, `Get Ui5 Properties`), la voie des tables qui
         ne suivent pas le contrat.
+
+        Une lecture PARTIELLE reste un retour normal (c'est ce que l'écran
+        montre, et des suites légitimes lisent les lignes affichées), mais elle
+        n'est plus MUETTE : un WARNING nomme l'écart quand la table déclare
+        plus de lignes qu'elle n'en a rendues, sur le patron de la réparation
+        de localisateur qui journalise toujours ce qu'elle a fait. Pour juger
+        de la complétude plutôt que d'en être averti, `Get Ui5 Table Info`
+        rend le total déclaré et `Table Extract Should Be Complete` refuse
+        l'écart.
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
         dom_id = self._pick_id(ids, index, selector, noun="table")
-        return table_read_verdict(self._evaluate(READ_TABLE_JS, arg=dom_id), str(selector))
+        brut = self._evaluate(READ_TABLE_JS, arg=dom_id)
+        lignes = table_read_verdict(brut, str(selector))
+        _warn_partial_read(brut, lignes, str(selector))
+        return lignes
 
 
     def upload_file_via_ui5(self, file_path, index=0, **selector_parts):
@@ -237,3 +249,36 @@ class ActionKeywords:
             raise AssertionError(
                 "UI5 control %s text is %r, expected %r."
                 % (selector_parts or ("index %s" % index), actual, expected))
+
+
+def _warn_partial_read(payload, rows, description):
+    """Journalise l'écart entre ce qu'une table DÉCLARE et ce qu'elle a rendu.
+
+    `Read Ui5 Table` garde son contrat : il rend les lignes INSTANCIÉES, et des
+    suites légitimes lisent ce que l'écran montre. Mais une lecture partielle
+    ne doit pas être MUETTE. Mesuré le 2026-09-15 : une List Report rendait 30
+    lignes quand son binding en déclarait 4133, toutes les 30 parfaitement
+    remplies, donc rien dans le retour ne permettait de s'en apercevoir.
+
+    Best-effort et jamais bloquant : un canal qui n'expose pas de total
+    n'apprend rien ici, et ce n'est pas la place du refus (voir
+    `Table Extract Should Be Complete`).
+    """
+    if not isinstance(payload, dict):
+        return
+    declare = payload.get("declared")
+    if declare is None:
+        return
+    try:
+        declare = int(declare)
+    except (TypeError, ValueError):
+        return
+    lues = len(rows)
+    if declare > lues:
+        logger.warn(
+            "Read Ui5 Table %s : %d ligne(s) rendues pour %d DÉCLARÉES par le "
+            "binding. La table n'a matérialisé qu'une partie de son contenu "
+            "(seuil de croissance, virtualisation) et les lignes rendues ne le "
+            "montrent en rien. Get Ui5 Table Info donne le total, et Table "
+            "Extract Should Be Complete refuse l'écart avant toute écriture."
+            % (description, lues, declare))

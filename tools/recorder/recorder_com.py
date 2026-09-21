@@ -123,7 +123,7 @@ def walk(node, depth=0):
     node_type = _safe(node, "Type")
     node_text = _safe(node, "Text")
     yield depth, node_id, node_type, node_text
-    children = getattr(node, "Children", None)
+    children = _children(node)
     if children is None:
         return
     try:
@@ -143,6 +143,23 @@ def _safe(node, attr):
         return getattr(node, attr)
     except (AttributeError, com_error):
         return ""
+
+
+def _children(node):
+    """Collection ``Children`` du nœud, ou ``None`` si elle est indisponible.
+
+    L'accès à la propriété elle-même n'est PAS anodin : pendant un aller-retour
+    serveur, SAP GUI répond ``E_PENDING`` (« les données nécessaires ne sont pas
+    encore disponibles ») à la lecture de ``Children``, et non au ``Count`` qui
+    suit. Le mode record sonde en continu, donc il traverse forcément cet état
+    transitoire : sans ce garde, une transition d'écran tuait la boucle
+    d'enregistrement par une ``com_error`` brute et l'enregistrement en cours
+    était perdu (relevé live sur A4H, SE16, 2026-09-12). Un cycle manqué se
+    rattrape au suivant ; un recorder mort, non."""
+    try:
+        return getattr(node, "Children", None)
+    except (AttributeError, com_error):
+        return None
 
 
 def collect(engine):
@@ -195,7 +212,7 @@ def highlight(engine, element_id, seconds=3.0):
 def _walk_objects(node):
     """Génère les objets élément (pas seulement leurs ids) de ``node`` et descendants."""
     yield node
-    children = getattr(node, "Children", None)
+    children = _children(node)
     if children is None:
         return
     try:

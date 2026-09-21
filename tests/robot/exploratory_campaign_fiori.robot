@@ -15,6 +15,20 @@ Documentation       Campagne exploratoire Fiori / UI5, pendant WEB de
 ...                 app UI5 (p. ex. cap-sflight ``http://localhost:4004/…`` après
 ...                 ``npx cds watch``, ou un vrai Fiori Launchpad).
 ...
+...                 La suite ouvre la **Référence API** (``#/api``) et non l'accueil, pour la
+...                 même raison que ``fiori_smoke.robot`` : depuis que le shell du Demo Kit
+...                 est passé aux **Web Components** (SDK 1.152.0, relevé le 2026-09-01), la
+...                 recherche de l'accueil est un ``ShellBarSearch`` de Web Component, et le
+...                 ``sap.m.SearchField`` CLASSIQUE que visent ces scénarios role/xpath ne
+...                 vit plus que dans le filtre de l'arbre de la Référence API. Mesuré le
+...                 2026-09-16 sur la 1.152.0 : zéro ``sap.m.SearchField`` sur l'accueil,
+...                 un seul sur ``#/api``, où les six types attendus sont tous rendus.
+...                 Corollaire de méthode : cette suite était restée sur l'accueil quand
+...                 ``fiori_smoke.robot`` avait été corrigé, donc verte au dernier run
+...                 d'avant la dérive puis rouge sans que rien du dépôt n'ait bougé. Une
+...                 dérive de cible publique se corrige sur TOUTES les suites qui visent
+...                 cette cible, pas seulement sur celle qui a rougi en premier.
+...
 ...                 Le Suite Setup accepte d'abord la bannière de consentement cookies du
 ...                 Demo Kit (widget TrustArc DOM, bouton d'id stable ``truste-consent-button``).
 ...
@@ -53,7 +67,7 @@ Suite Teardown      Close Browser
 
 
 *** Variables ***
-${FIORI_URL}        https://sdk.openui5.org/
+${FIORI_URL}        https://sdk.openui5.org/#/api
 ${BROWSER}          chromium
 ${HEADLESS}         ${False}      # navigateur VISIBLE par défaut (demande explicite) ; -v HEADLESS:True en CI
 ${SEARCH_TEXT}      SapFioriLibrary rocks

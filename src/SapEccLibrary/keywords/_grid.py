@@ -13,6 +13,7 @@ sur les coordonnées de cellules.
 from pythoncom import com_error
 from robot.api import logger
 
+from sapfx_common._tabular import blank_rows
 from sapfx_common.abap_list import reconstruct_rows
 from sapfx_common.com_safety import shell_subtype
 from sapfx_common.object_tree import LEAF_SHELL_SUBTYPES
@@ -31,6 +32,64 @@ class GridKeywords:
         """Retourne la liste des identifiants techniques des colonnes d'une grille ALV, dans l'ordre d'affichage."""
         grid = self._grid(table_id)
         return [col for col in grid.ColumnOrder]
+
+    def count_blank_grid_rows(self, rows, columns=None):
+        """Combien de lignes d'un relevé de grille sont **entièrement vides**.
+
+        La garde que le nombre de lignes ne donne PAS. Une ALV ne matérialise
+        ses lignes qu'au fil du défilement, et `Read Grid` lit les lignes non
+        chargées en cellules VIDES plutôt que d'échouer : le relevé porte
+        alors le bon nombre de lignes, se relit fidèlement, se compare à
+        lui-même sans écart, et ne contient rien.
+
+        Mesuré le 2026-09-15 sur le rapport RSPARAM : la MÊME lecture rendait
+        1635 lignes pleines sur un système du banc et 1639 lignes dont 137
+        seulement remplies sur l'autre. Ce qui est ÉTABLI est l'écart entre
+        les deux mesures, pas sa cause : la matérialisation dépend de la
+        fenêtre visible, donc de la géométrie de capture et du poste autant
+        que du système, et une seule observation par cible ne permet pas de
+        trancher. Ce qui compte en pratique tient quand même : aucun contrôle
+        de complétude fondé sur le compte de lignes ne peut attraper le cas.
+
+        Employer `Read Full Grid` (qui fait défiler) pour une lecture
+        exhaustive, PUIS ce keyword pour vérifier que le défilement a suffi :
+        les deux sont complémentaires, le premier agit, le second constate. ::
+
+            ${lignes}=    Read Full Grid    ${GRID}    columns=${colonnes}
+            ${vides}=    Count Blank Grid Rows    ${lignes}    ${colonnes}
+            Should Be Equal As Integers    ${vides}    0
+        """
+        return blank_rows(rows, as_name_list(columns, "columns") or None)
+
+    def get_grid_column_titles(self, table_id):
+        """Retourne la carte ``{id technique: titre AFFICHÉ}`` des colonnes d'une
+        grille ALV, dans l'ordre d'affichage.
+
+        Le complément de `Get Grid Column Ids`, et ce qui manquait pour
+        EXTRAIRE un tableau plutôt que l'asserter. Les deux lectures n'ont pas
+        le même usage, et les confondre produit deux défauts opposés : un
+        fichier livré avec des ids techniques en en-tête ne ressemble pas à
+        l'écran dont il vient et son lecteur ne s'y retrouve pas ; un test qui
+        asserte sur des titres affichés dépend de la langue de session
+        (convention 3). D'où la carte : les clés restent techniques, les titres
+        ne servent qu'à ce qui est LU par un humain.
+
+        Un titre peut être vide (colonne sans en-tête) ou répété (deux colonnes
+        au même libellé) : la carte les rend TELS QUELS, sans rien inventer ni
+        dédoublonner. C'est à la couche de rendu de décider, et elle ne peut
+        décider que si elle voit le cas.
+
+        Exemple (RSPARAM, ABAP Platform 2023) : ``NAME`` -> ``Parameter Name``,
+        ``USER_VALUE`` -> ``User-Defined Value``,
+        ``DEFAULT_VALUE`` -> ``System Default Value``. ::
+
+            ${titres}=    Get Grid Column Titles    ${GRID}
+            ${lignes}=    Read Grid    ${GRID}    columns=${titres}
+            Write Table Xlsx    releve.xlsx    ${lignes}    headers=${titres}
+        """
+        grid = self._grid(table_id)
+        return {str(cid): grid.GetDisplayedColumnTitle(cid)
+                for cid in grid.ColumnOrder}
 
     def get_column_id_by_title(self, table_id, title):
         """Résout un ``title`` de colonne visible en son identifiant technique.

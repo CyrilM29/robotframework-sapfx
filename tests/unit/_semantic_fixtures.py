@@ -82,6 +82,50 @@ SELECTION_ROW = [
 _SELECTION_INPUT_TYPES = ("GuiTextField", "GuiCTextField")
 
 
+def _selection_row(index, name, ctext=False, top=None):
+    """Une ligne d'écran de sélection SE16 aux mesures RÉELLES (A4H, SNWD_SO,
+    2026-09-21, 96 DPI) : libellé = champ texte non modifiable de 231 px
+    (right=258), LOW à 283 (écart 25 px pour un plafond de 30 : la marge est
+    de 5 px, ce qui rend l'ancrage sensible à la moindre échelle de rendu)."""
+    top = 170 + 27 * (index - 1) if top is None else top
+    low_type = "GuiCTextField" if ctext else "GuiTextField"
+    prefix = "ctxt" if ctext else "txt"
+    return [
+        _el("wnd[0]/usr/txt%%_I%d_%%_APP_%%-TEXT" % index, "GuiTextField", name,
+            box=(27, top, 231, 24)),
+        _el("wnd[0]/usr/%sI%d-LOW" % (prefix, index), low_type, "",
+            changeable=True, box=(283, top, 151, 24)),
+        _el("wnd[0]/usr/txt%%_I%d_%%_APP_%%-TO_TEXT" % index, "GuiTextField", "to",
+            box=(435, top, 47, 24)),
+        _el("wnd[0]/usr/%sI%d-HIGH" % (prefix, index), low_type, "",
+            changeable=True, box=(483, top, 151, 24)),
+    ]
+
+
+# Trois critères d'un écran de sélection SE16 (SNWD_SO), géométrie relevée
+# live : la matière du test d'échelle de rendu.
+SE16_SELECTION = (
+    [_el("wnd[0]", "GuiMainWindow", "SAP", box=(0, 0, 1920, 1032))]
+    + _selection_row(1, "NODE_KEY")
+    + _selection_row(2, "SO_ID")
+    + _selection_row(3, "CREATED_BY", ctext=True)
+)
+
+
+def scale_elements(elements, factor):
+    """Les mêmes éléments rendus à l'échelle ``factor`` : ce que SAP GUI rend
+    sous un facteur d'échelle Windows ou une session RDP depuis un poste à
+    écran dense (toute la géométrie multipliée, ids et textes inchangés)."""
+    def _scaled(value):
+        return None if value is None else int(round(value * factor))
+    return [ScreenElement(id=el.id, type=el.type, text=el.text,
+                          tooltip=el.tooltip, changeable=el.changeable,
+                          left=_scaled(el.left), top=_scaled(el.top),
+                          width=_scaled(el.width), height=_scaled(el.height),
+                          subtype=el.subtype)
+            for el in elements]
+
+
 SCOPED = [
     # deux groupes avec le MÊME libellé non-unique ("Amount"), chacun ancré
     # sous un libellé unique différent ("Header" / "Item").

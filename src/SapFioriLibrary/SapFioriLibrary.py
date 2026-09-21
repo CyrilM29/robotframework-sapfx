@@ -43,17 +43,18 @@ from .keywords import (
     LocatorKeywords,
     PerceptionKeywords,
     StateKeywords,
+    TableKeywords,
 )
 
 
 class SapFioriLibrary(FrameKeywords, LocatorKeywords, EngineKeywords,
-                      CompositionKeywords, ActionKeywords, StateKeywords,
-                      PerceptionKeywords, FlpKeywords, FlpServiceKeywords,
-                      FioriBase):
+                      CompositionKeywords, ActionKeywords, TableKeywords,
+                      StateKeywords, PerceptionKeywords, FlpKeywords,
+                      FlpServiceKeywords, FioriBase):
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 
-    __version__ = "0.8.1"
+    __version__ = "0.8.2"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 

@@ -59,6 +59,9 @@ ${TADIR_DEVCLASS_FIELD}     wnd[0]/usr/ctxtI8-LOW              # TADIR : DEVCLAS
 ...                          ARRTIME=wnd[0]/usr/ctxtI11-LOW    DISTANCE=wnd[0]/usr/txtI12-LOW
 ...                          DISTID=wnd[0]/usr/ctxtI13-LOW    FLTYPE=wnd[0]/usr/ctxtI14-LOW
 ...                          PERIOD=wnd[0]/usr/txtI15-LOW
+# SNWD_BPA (partenaires commerciaux EPM) : BP_ROLE distingue client (01) de
+# fournisseur (02), relevé live A4H ; spec specs/commande-vente-epm-order-to-cash.md.
+&{SNWD_BPA_SELECTION_FIELDS}    BP_ROLE=wnd[0]/usr/ctxtI2-LOW
 
 
 *** Keywords ***
@@ -182,6 +185,21 @@ Read Displayed Grid
     ...                `Display Table Contents`) en liste de dicts.
     [Arguments]    ${max_rows}=10
     ${rows}=    Read Grid    ${SE16_GRID}    max_rows=${max_rows}
+    RETURN    ${rows}
+
+Read Full Displayed Grid
+    [Documentation]    Lit EXHAUSTIVEMENT la grille de résultats SE16 courante
+    ...                (après `Display Table Contents` / `Display Table
+    ...                Contents With Filter`) en faisant défiler pour
+    ...                matérialiser TOUTES les lignes avant lecture
+    ...                (`Read Full Grid`), contrairement à `Read Displayed
+    ...                Grid` qui ne lit que la fenêtre visible et peut donc
+    ...                rendre des lignes non chargées en cellules vides. À
+    ...                préférer avec `Count Blank Grid Rows` quand la
+    ...                COMPLÉTUDE du relevé doit être prouvée, pas seulement
+    ...                son contenu affiché.
+    [Arguments]    ${max_rows}=${None}
+    ${rows}=    Read Full Grid    ${SE16_GRID}    max_rows=${max_rows}
     RETURN    ${rows}
 
 Display Table Contents With Filter

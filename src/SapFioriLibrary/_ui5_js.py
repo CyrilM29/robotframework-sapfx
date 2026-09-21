@@ -132,6 +132,7 @@ _BUNDLE_TEMPLATES = ("_ui5_bundle_core.js.tpl",
                      "_ui5_bundle_info.js.tpl",
                      "_ui5_bundle_shadow.js.tpl",
                      "_ui5_bundle_capture.js.tpl",
+                     "_ui5_bundle_tables.js.tpl",
                      "_ui5_bundle_engines.js.tpl")
 _BUNDLE_SOURCE = ("".join(_read_js_template(name) for name in _BUNDLE_TEMPLATES)
                   % (_js_string_array(ALLOWED_PROPERTY_PRIORITY),
@@ -164,6 +165,7 @@ RESOLVE_DOM_JS = build_call("resolveByDom")
 PAGE_COMPOSITION_JS = build_call("pageComposition")
 BEST_XPATH_JS = build_call("bestXpath")
 READ_TABLE_JS = build_call("readTable")
+TABLE_INFO_JS = build_call("tableInfo")
 READ_PROPERTY_JS = build_call("readProperty")
 OPEN_POPUPS_JS = build_call("openPopups")
 DIALOG_BUTTON_JS = build_call("dialogButton")
@@ -347,45 +349,19 @@ PAGE_LANGUAGES_PROBE_JS = (
     "() => ({ document: String(document.documentElement.lang || ''), "
     "navigator: String(navigator.language || '') })")
 
-# WebGUI (SAP GUI for HTML) : présence et menus. Le témoin de présence est le
-# nombre d'éléments porteurs de `lsdata` (l'attribut où vit le SID) ; les ids
-# de la barre de menus suivent la structure `wnd[N]/mbar/menu[i]` avec le
-# suffixe de rendu `-BtnChoiceMenu`, et les items DIRECTS d'un menu ouvert
-# n'ont plus aucun `/` après leur préfixe (relevés live 2026-07-18). Un
-# élément est visible quand son `offsetParent` n'est pas null. On itère sur
-# `[id]` plutôt que d'interpoler l'id dans un sélecteur CSS : les crochets des
-# ids SAP GUI y exigeraient un échappement fragile.
-WEBGUI_COUNT_PROBE_JS = (
-    "(first, second) => { const w = (second === undefined) ? first : second; "
-    "if (w === null || w === undefined || w === '') "
-    "return document.querySelectorAll('[lsdata]').length; "
-    "const tag = 'wnd[' + String(w) + ']'; "
-    "const nodes = document.querySelectorAll('[lsdata]'); let n = 0; "
-    "for (let i = 0; i < nodes.length; i++) { const e = nodes[i]; "
-    "if ((e.getAttribute('lsdata') || '').indexOf(tag) === -1) continue; "
-    "if (e.offsetParent === null) continue; n++; } "
-    "return n; }")
-
-WEBGUI_MENUS_PROBE_JS = (
-    "(first, second) => { const w = (second === undefined) ? first : second; "
-    "const prefix = 'wnd[' + String((w === null || w === undefined || w === '') ? 0 : w) + ']/mbar/menu['; "
-    "const out = []; const nodes = document.querySelectorAll('[id]'); "
-    "for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; const id = String(n.id || ''); "
-    "if (id.indexOf(prefix) !== 0) continue; "
-    "if (id.slice(-14) !== '-BtnChoiceMenu') continue; "
-    "if (n.offsetParent === null) continue; out.push(id); } "
-    "return out; }")
-
-WEBGUI_MENU_ITEMS_PROBE_JS = (
-    "(first, second) => { let base = String(((second === undefined) ? first : second) || ''); "
-    "if (base.slice(-14) === '-BtnChoiceMenu') base = base.slice(0, -14); "
-    "const prefix = base + '/menu['; "
-    "const out = []; const nodes = document.querySelectorAll('[id]'); "
-    "for (let i = 0; i < nodes.length; i++) { const n = nodes[i]; const id = String(n.id || ''); "
-    "if (id.indexOf(prefix) !== 0) continue; "
-    "if (id.slice(prefix.length).indexOf('/') !== -1) continue; "
-    "if (n.offsetParent === null) continue; out.push(id); } "
-    "return out; }")
+# Les sondes PURES du canal WebGUI (présence, menus, identité, grille ALV,
+# écran de sélection) vivent dans `_webgui_js` : elles n'ont rien à voir avec
+# le bundle `__SAPFX`, socle des pages UI5, et les tenir à part garde ce
+# module sous la limite de la convention #13. Ré-exportées ici pour que tout
+# consommateur historique garde son import.
+from ._webgui_js import (  # noqa: E402,F401  (ré-export de compatibilité)
+    WEBGUI_COUNT_PROBE_JS,
+    WEBGUI_GRID_PROBE_JS,
+    WEBGUI_IDENTITY_PROBE_JS,
+    WEBGUI_MENU_ITEMS_PROBE_JS,
+    WEBGUI_MENUS_PROBE_JS,
+    WEBGUI_SELECTION_PROBE_JS,
+)
 
 
 def sid_xpath(sid):

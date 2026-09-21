@@ -48,6 +48,11 @@ class RfcKeywords(_ApiCore):
         "read rfc table": "read_rfc_table",
         "call bapi": "call_bapi",
         "wait for background job": "wait_for_background_job",
+        # Les deux keywords d'extraction (mixin voisin `_rfc_extract`) : sans
+        # eux, le refus du tampon de 512 octets sur le chemin d'extraction ne
+        # pourrait s'asserter que par son TEXTE, donc de façon localisée.
+        "extract rfc table": "extract_rfc_table",
+        "count rfc table rows": "count_rfc_table_rows",
     }
 
     def get_rfc_channel_status(self) -> dict[str, Any]:

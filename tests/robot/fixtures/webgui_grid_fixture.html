@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WebGUI ALV grid fixture</title>
+<!--
+  Fixture HORS LIGNE reproduisant ce qu'un WebGUI (SAP GUI for HTML / ITS) rend
+  pour une grille ALV, relevé live le 2026-09-15 contre SE16 d'un A4H.
+
+  Elle existe parce que la logique qui rend l'invariant vrai sur ce canal vit
+  en JavaScript (`src/SapFioriLibrary/_webgui_grid.js.tpl`) et n'était éprouvée
+  que par une suite live contre un conteneur : les tests Python couvrent le
+  contrat du keyword, pas le balayage du DOM. Cinq propriétés y sont
+  reproduites, chacune parce qu'elle a un mode de panne SILENCIEUX :
+
+  1. DEUX grilles sur le même écran. Sans désignation explicite, une lecture
+     doit REFUSER plutôt que prendre la première du DOM.
+  2. La grille A est ÉCLATÉE en deux tables de contenu (colonnes gelées et
+     colonnes défilantes), comme une vraie ALV à colonne figée. Ce sont les
+     SID des cellules qui la ré-unifient.
+  3. `totalRows` (7) dépasse le nombre de lignes rendues (2), et les lignes
+     rendues sont propres et numérotées à partir de 1 : le cas dangereux.
+  4. Une cellule dont l'index DÉPASSE `ColumnIDs` (`cell[3]` pour trois
+     colonnes) : le lecteur doit la rendre sous `COL3` et non la perdre, ce qui
+     est le témoin d'un décalage de colonnes.
+  5. Les titres affichés DIFFÈRENT des identifiants techniques, et une cellule
+     composite (deux lignes visibles) côtoie un texte MASQUÉ.
+
+  Les deux dialectes d'`lsdata` cohabitent : littéral JS (`SID:'...'`, ce que
+  rend un WebGUI réel) sur la grille A, JSON (`"SID":"..."`, anciens ITS et
+  fixtures) sur la grille B.
+-->
+<style>
+  body { font: 13px sans-serif; margin: 12px; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #bbb; padding: 2px 6px; text-align: left; }
+  .split { display: inline-block; vertical-align: top; }
+  .stacked span { display: block; }
+  .masque { display: none; }
+</style>
+</head>
+<body>
+
+<h1>Grille A : ALV a colonne figee</h1>
+
+<!-- L'element porteur du `lsdata` de la grille : c'est lui qui publie le
+     contrat (ColumnIDs, totalRows, visibleRows, scrolling). Dans un WebGUI
+     reel il enveloppe les deux tables de contenu. -->
+<table id="C102" role="grid"
+  lsdata="{2:'NONE',34:{id:'C102',SID:'wnd[0]/usr/cntlGRID1/shellcont/shell',Type:'GuiGridView',ColumnIDs:['MANDT','MTEXT','EXTRA'],totalRows:7,visibleRows:2,totalColumns:3,scrolling:'server',firstVisibleRow:0,scrollingOnDemand:1,clientCellThreshold:4000,containerName:'GRID1'}}">
+  <thead>
+    <tr>
+      <!-- La colonne de selection porte le SID `.../col` SANS nom de champ :
+           ce n'est pas une colonne de donnee et elle ne doit pas entrer dans
+           la carte des titres. -->
+      <th lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/col'}"></th>
+      <th lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/colMANDT'}" title="Client">Client</th>
+      <th lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/colMTEXT'}" title="Nom">Nom</th>
+      <th lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/colEXTRA'}" title="Complement">Complement</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td colspan="4">
+        <!-- Colonnes GELEES : une table HTML a part, comme le fait le WebGUI. -->
+        <table class="split" id="C102-mrss-cont-left-content">
+          <tr>
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[1]/cell[0]'}"><span>000</span></td>
+          </tr>
+          <tr>
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[2]/cell[0]'}"><span>001</span></td>
+          </tr>
+        </table>
+        <!-- Colonnes DEFILANTES : l'autre table. Les SID des cellules sont la
+             seule chose qui relie les deux moities. -->
+        <table class="split" id="C102-mrss-cont-none-content">
+          <tr>
+            <!-- Cellule COMPOSITE : deux valeurs rendues sur deux lignes. Lue
+                 en `textContent` elles se COLLENT (« SAP SEWalldorf »), lue en
+                 `innerText` elles restent separees. -->
+            <td class="stacked" lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[1]/cell[1]'}"><span>SAP SE</span><span>Walldorf</span></td>
+            <!-- Texte MASQUE a cote d'un texte visible : `innerText` rend ce
+                 qui est AFFICHE, `textContent` rendrait les deux. C'est un
+                 arbitrage consigne, pas un effet de bord. -->
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[1]/cell[2]'}"><span>visible</span><span class="masque">MASQUE</span></td>
+            <!-- Index de cellule AU-DELA de ColumnIDs : doit sortir en COL3. -->
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[1]/cell[3]'}"><span>hors-carte</span></td>
+          </tr>
+          <tr>
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[2]/cell[1]'}"><span>Autre</span></td>
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[2]/cell[2]'}"><span>x</span></td>
+            <td lsdata="{SID:'wnd[0]/usr/cntlGRID1/shellcont/shell/[1]/rowcol/row[2]/cell[3]'}"><span>y</span></td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>Grille B : seconde ALV du meme ecran, dialecte JSON</h1>
+
+<table id="C201" role="grid"
+  lsdata='{"2":"NONE","34":{"id":"C201","SID":"wnd[0]/usr/cntlGRID2/shellcont/shell","Type":"GuiGridView","ColumnIDs":["CARRID"],"totalRows":1,"visibleRows":1,"totalColumns":1,"scrolling":"client","firstVisibleRow":0,"clientCellThreshold":4000,"containerName":"GRID2"}}'>
+  <thead>
+    <tr>
+      <th lsdata='{"SID":"wnd[0]/usr/cntlGRID2/shellcont/shell/colCARRID"}' title="Compagnie">Compagnie</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td lsdata='{"SID":"wnd[0]/usr/cntlGRID2/shellcont/shell/[1]/rowcol/row[1]/cell[0]"}'><span>LH</span></td>
+    </tr>
+  </tbody>
+</table>
+
+</body>
+</html>

@@ -31,5 +31,6 @@
   ],
   "window.autoDetectColorScheme": false,
   "workbench.commandPalette.preserveInput": false,
-  "workbench.activityBar.autoHide": false
+  "workbench.activityBar.autoHide": false,
+  "git.ignoreLimitWarning": true
 }

@@ -40,6 +40,7 @@ Documentation       **EXEMPLE À PERSONNALISER** : ce fichier porte le vocabulai
 ...                 `ecc_keywords.resource`.
 
 Library             Browser
+Library             Collections
 # Import sans argument (défaut ui5_timeout=15s) : une suite qui veut un autre
 # budget appelle `Set Ui5 Timeout` (0.6.1) au lieu de ré-importer la lib avec
 # d'autres arguments : Robot ignorerait le second import avec un warning.
@@ -47,6 +48,21 @@ Library             SapFioriLibrary
 # Primitives pures atteintes par un KEYWORD (décision DDIC 2026-08-17) :
 # `Displayed Count` normalise un compteur affiché (séparateurs de milliers).
 Library             sapfx_common.robot_args
+# Le contrat d'extraction d'un tableau, COMMUN aux trois canaux : la règle de
+# refus d'un relevé amputé vit à un seul endroit, sans quoi chaque canal la
+# réécrit et finit par l'oublier.
+Library             sapfx_common.table_extract
+# Déballage d'un `Secret` RF 7.4 à la FRONTIÈRE (ici l'en-tête HTTP qui porte
+# l'authentification) : par un keyword, jamais par un `Evaluate getattr(...)`
+# qui sortirait la valeur claire dans l'espace des variables. `Basic Auth
+# Header` est du savoir de protocole, donc de la bibliothèque.
+Library             sapfx_common.secrets
+Library             sapfx_common.auth_flows
+# Le message d'un critère de sélection absent, qui LISTE ceux que l'écran
+# porte vraiment : un nom manquant est le plus souvent un champ écarté du
+# choix des champs de sélection (réglage persistant par utilisateur), pas une
+# faute de frappe, et la liste tranche sans retourner sur le système.
+Library             sapfx_common.webgui_selection
 
 
 *** Variables ***
@@ -63,11 +79,18 @@ ${WEBGUI_OKCODE_SID}                wnd[0]/tbar[0]/okcd    # champ transaction :
 ${WEBGUI_TABLE_NAME_SID}            wnd[0]/usr/ctxtDATABROWSE-TABLENAME    # SE16 : nom de table
 ${WEBGUI_TABLE_CONTENTS_SID}        wnd[0]/tbar[1]/btn[7]    # SE16 initial : « Table Contents (F7) »
 ${WEBGUI_COUNT_BUTTON_SID}          wnd[0]/tbar[1]/btn[31]    # écran de sélection : « Number of Entries »
+${WEBGUI_MAX_HITS_SID}              wnd[0]/usr/txtMAX_SEL    # écran de sélection : « Maximum No. of Hits »
+${WEBGUI_EXECUTE_SID}               wnd[0]/tbar[1]/btn[8]    # écran de sélection : « Execute » (F8)
 ${WEBGUI_COUNT_RESULT_SID}          wnd[1]/usr/txtG_DBCOUNT    # compteur du popup : SPAN texte, pas un input
 ${WEBGUI_POPUP_CLOSE_SID}           wnd[1]/tbar[0]/btn[0]    # popup : « Close (Enter) »
 ${WEBGUI_POPUP_CONFIRM_SID}         wnd[1]/usr/btnSPOP-OPTION1    # popup SPOP : « Yes »
 ${WEBGUI_MORE_BUTTON_SELECTOR}      css=[id$="-moreButton"] >> visible=true    # bandeau : bouton « More » (id u… dynamique par écran, jamais en dur)
 ${WEBGUI_SYSINFO_DYNPRO_SELECTOR}    css=[id="sysInfoAreaMenuItemSAPITS_MBAR_DYNPRO"]    # zone info système : ligne dynpro (id stable)
+# --- Vocabulaire métier du Data Browser en WebGUI (convention 1 : un nom de
+# transaction, de table ou de colonne vit ICI et jamais dans une suite).
+${WEBGUI_DATA_BROWSER_TCODE}        SE16    # le Data Browser
+${WEBGUI_MESSAGE_TABLE}             T100    # les textes de messages système : présente sur tout système SAP
+${WEBGUI_MESSAGE_LANGUAGE_COLUMN}    SPRSL    # la langue d'un texte de message : la colonne qui ne peut pas être vide
 
 
 *** Keywords ***
@@ -177,9 +200,30 @@ Open WebGui
     ...                vérifie par `Get Page Composition` que les moteurs `sid` et
     ...                `dom` s'appliquent (échec explicite sinon). Prévu pour
     ...                Suite Setup, avant `Log In To WebGui`.
+    ...
+    ...                `extra_headers` pose des en-têtes sur le contexte, ce
+    ...                qui permet notamment de porter une AUTHENTIFICATION HTTP
+    ...                directe et de court-circuiter le formulaire. Ce n'est pas
+    ...                un raccourci de confort : mesuré le 2026-09-15, un des
+    ...                deux systèmes du banc rend un formulaire de connexion
+    ...                dont TOUS les champs restent à 0x0, en HTTP comme en
+    ...                HTTPS, donc inatteignables par n'importe quel moteur.
+    ...                Voir `Open WebGui Session`, qui choisit la voie.
+    ...
+    ...                `ignore_https_errors` est indispensable devant un
+    ...                certificat auto-signé, ce qu'est celui d'un conteneur de
+    ...                laboratoire. NB d'orthographe : la bibliothèque Browser
+    ...                refuse `ignoreHttpsErrors`, la forme est
+    ...                `ignoreHTTPSErrors`.
     [Arguments]    ${url}=${WEBGUI_URL}    ${browser}=${BROWSER}    ${headless}=${HEADLESS}
+    ...    ${extra_headers}=${None}    ${ignore_https_errors}=${False}
     New Browser    ${browser}    headless=${headless}
-    New Context
+    IF    $extra_headers is None
+        New Context    ignoreHTTPSErrors=${ignore_https_errors}
+    ELSE
+        New Context    ignoreHTTPSErrors=${ignore_https_errors}
+        ...    extraHTTPHeaders=${extra_headers}
+    END
     Set Browser Timeout    ${WEBGUI_TIMEOUT}
     New Page    ${url}    wait_until=domcontentloaded
     ${comp}=    Get Page Composition
@@ -227,6 +271,87 @@ WebGui Ok Code Field Should Be Present
     ${sel}=    Resolve Sid    ${WEBGUI_OKCODE_SID}
     Wait For Elements State    ${sel}    attached    timeout=${WEBGUI_TIMEOUT}
     ...    message=Champ OK-code introuvable par SID : session WebGUI non connectée ?
+
+Open WebGui Session
+    [Documentation]    Ouvre une session WebGUI RENDUE, par la voie qui convient
+    ...                à la cible, et rend l'identité du système atteint.
+    ...
+    ...                Deux stratégies NOMMÉES, jamais un `IF` sur le système
+    ...                (même règle que les page objects multi-release) :
+    ...
+    ...                - `form` : le formulaire de connexion ICF, rempli au
+    ...                  moteur `dom` (rôle + nom accessible). La voie nominale.
+    ...                - `basic` : l'authentification HTTP portée par le
+    ...                  contexte du navigateur, qui court-circuite le
+    ...                  formulaire.
+    ...
+    ...                La seconde n'est pas un raccourci : mesuré le 2026-09-15,
+    ...                un des deux systèmes du banc rend un formulaire dont TOUS
+    ...                les champs restent à 0x0 sans parent de mise en page, en
+    ...                HTTP comme en HTTPS, donc hors d'atteinte de n'importe
+    ...                quel moteur (14 champs, 0 visible), là où l'autre en rend
+    ...                5 visibles. La même adresse répond en revanche
+    ...                parfaitement à une authentification d'en-tête. Un test
+    ...                qui ne connaîtrait que la voie formulaire conclurait
+    ...                « cible injoignable » sur un système disponible.
+    ...
+    ...                **La CAUSE n'est pas établie.** L'avertissement « No
+    ...                switch to HTTPS occurred, so it is not secure to send a
+    ...                password » avait d'abord paru l'expliquer ; une seconde
+    ...                mesure l'a trouvé AUSSI sur le système dont le formulaire
+    ...                fonctionne, donc il accompagne toute page servie en clair
+    ...                et n'explique rien. Le seul écart propre au système muet
+    ...                est qu'il rend son fragment de repli sans script comme du
+    ...                TEXTE. Consigné comme indice, pas comme cause : la
+    ...                stratégie se choisit sur le CONSTAT que le formulaire est
+    ...                inatteignable, pas sur une explication.
+    [Arguments]    ${url}    ${user}    ${password}    ${strategy}=form
+    ...    ${ignore_https_errors}=${False}
+    IF    '${strategy}' == 'basic'
+        # L'identifiant part dans un EN-TÊTE et non dans le dictionnaire
+        # `httpCredentials` de la bibliothèque Browser : celui-ci n'accepte
+        # qu'une variable par la syntaxe `$variable`, qui ne résout PAS une
+        # variable créée dans un keyword utilisateur (vérifié le 2026-09-15).
+        # L'en-tête, lui, passe partout, et la construction de l'identifiant
+        # est du savoir de protocole, donc de la bibliothèque.
+        ${previous_log_level}=    Set Log Level    NONE
+        ${autorisation}=    Basic Auth Header    ${user}    ${password}
+        ${entetes}=    Create Dictionary    Authorization=${autorisation}
+        Open WebGui    ${url}    ignore_https_errors=${ignore_https_errors}
+        ...    extra_headers=${entetes}
+        Set Log Level    ${previous_log_level}
+        WebGui Should Be Rendered
+    ELSE IF    '${strategy}' == 'form'
+        Open WebGui    ${url}    ignore_https_errors=${ignore_https_errors}
+        Log In To WebGui    ${user}    ${password}
+    ELSE
+        Fail    Stratégie de connexion WebGUI inconnue : « ${strategy} ». Les stratégies connues sont « form » (formulaire ICF) et « basic » (authentification d'en-tête, pour une cible dont le formulaire ne s'affiche pas).
+    END
+    ${identite}=    Read WebGui Session Identity
+    RETURN    ${identite}
+
+WebGui Identity Should Be Readable
+    [Documentation]    Assertion instantanée : la zone info système nomme un
+    ...                identifiant système. La forme à sonder dans un
+    ...                `Wait Until Keyword Succeeds`, et elle est nécessaire :
+    ...                le bandeau se rend APRÈS les premiers éléments `lsdata`,
+    ...                donc une lecture d'identité enchaînée sur le login passe
+    ...                parfois et échoue parfois, en rendant une identité VIDE
+    ...                plutôt qu'une erreur (course gagnée deux fois puis perdue
+    ...                le 2026-09-15). Retourne l'identité lue.
+    ${identite}=    Get Webgui Session Identity
+    Should Not Be Empty    ${identite}[system_id]
+    ...    msg=La zone info système ne nomme encore aucun identifiant système : le bandeau n'est pas rendu.
+    RETURN    ${identite}
+
+Read WebGui Session Identity
+    [Documentation]    L'identité du système derrière la session, une fois le
+    ...                bandeau rendu. C'est la forme à employer dans un Suite
+    ...                Setup, là où `Get Webgui Session Identity` (bibliothèque)
+    ...                est la lecture instantanée.
+    ${identite}=    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
+    ...    WebGui Identity Should Be Readable
+    RETURN    ${identite}
 
 Go To WebGui Transaction
     [Documentation]    Navigue vers une transaction par le paramètre d'URL
@@ -305,27 +430,182 @@ Count WebGui Table Entries
     Close WebGui Popup
     RETURN    ${count}
 
+Open WebGui Data Browser
+    [Documentation]    Ouvre le Data Browser et vérifie qu'on y est. Le code
+    ...                transaction vit ICI et non dans une suite (convention 1),
+    ...                comme les noms de table et de colonne du vocabulaire
+    ...                ci-dessus.
+    [Arguments]    ${url}=${WEBGUI_URL}
+    Go To WebGui Transaction    ${WEBGUI_DATA_BROWSER_TCODE}    ${url}
+    WebGui Data Browser Should Be Open
+
+Display WebGui Table Contents
+    [Documentation]    Depuis l'écran initial du Data Browser (SE16), affiche le
+    ...                CONTENU de `${table}` dans une grille ALV : nom de table,
+    ...                « Table Contents », plafond de hits, puis « Execute ».
+    ...                Miroir WebGUI de `Display Table Contents` (ECC).
+    ...
+    ...                Le plafond de hits n'est pas un détail d'ergonomie : la
+    ...                grille WebGUI n'envoie au navigateur qu'une PAGE de
+    ...                lignes (200 mesurées), donc au-delà la lecture est
+    ...                partielle et rien dans les lignes rendues ne le montre.
+    ...                Le laisser à sa valeur par défaut (200) garde la lecture
+    ...                complète ; le monter est un choix à confronter ensuite à
+    ...                `declared_rows`.
+    [Arguments]    ${table}    ${max_hits}=${EMPTY}
+    Fill Sid Input    ${WEBGUI_TABLE_NAME_SID}    ${table}
+    Click Sid    ${WEBGUI_TABLE_CONTENTS_SID}
+    Sid Should Be Visible    ${WEBGUI_COUNT_BUTTON_SID}    # écran de sélection rendu
+    IF    '${max_hits}' != '${EMPTY}'
+        Fill Sid Input    ${WEBGUI_MAX_HITS_SID}    ${max_hits}
+    END
+    Click Sid    ${WEBGUI_EXECUTE_SID}
+    WebGui Should Be Rendered
+    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s    WebGui Grid Should Be Rendered
+
+WebGui Grid Should Be Rendered
+    [Documentation]    Assertion instantanée : une grille ALV est rendue et
+    ...                porte au moins une colonne. La forme à sonder dans un
+    ...                `Wait Until Keyword Succeeds` : le rendu d'une grille
+    ...                suit l'aller-retour serveur, donc une lecture instantanée
+    ...                part trop tôt et rendrait un relevé vide plutôt qu'une
+    ...                erreur.
+    ${info}=    Get Webgui Grid Info
+    Should Not Be Empty    ${info}[columns]
+    ...    msg=La grille WebGUI est rendue mais ne déclare aucune colonne.
+    RETURN    ${info}
+
+Display WebGui Table Contents With Filter
+    [Documentation]    Comme `Display WebGui Table Contents`, mais applique
+    ...                d'abord des critères nommés (``CHAMP=valeur``, ids
+    ...                TECHNIQUES en majuscules) sur l'écran de sélection.
+    ...                Miroir WebGUI de `Display Table Contents With Filter`
+    ...                (ECC), à une différence près qui vaut d'être dite : ce
+    ...                canal n'a AUCUN dictionnaire de positions à maintenir.
+    ...
+    ...                Les critères d'un écran de sélection SE16 sont
+    ...                positionnels (``I1-LOW``, ``I2-LOW``…), leur ordre suit
+    ...                le choix des champs de sélection (qui persiste par
+    ...                utilisateur) et le préfixe de type varie d'un champ à
+    ...                l'autre : `Get Webgui Selection Criteria` DÉRIVE la
+    ...                carte de l'écran courant plutôt que de la déclarer, ce
+    ...                qui rend ce keyword utilisable sur n'importe quelle
+    ...                table sans rien ajouter ici.
+    ...
+    ...                Un champ absent de l'écran ÉCHOUE en listant les
+    ...                critères réellement présents : sans cette garde, la
+    ...                sélection partirait sans filtre et la grille rendrait
+    ...                des lignes parfaitement lisibles qui ne sont pas
+    ...                celles qu'on a demandées. Sans critère, équivaut à
+    ...                `Display WebGui Table Contents`.
+    ...
+    ...                Ex. : ``Display WebGui Table Contents With Filter    SNWD_PD    PRODUCT_ID=AR-FB-1000``
+    [Arguments]    ${table}    ${max_hits}=${EMPTY}    &{filters}
+    Fill Sid Input    ${WEBGUI_TABLE_NAME_SID}    ${table}
+    Click Sid    ${WEBGUI_TABLE_CONTENTS_SID}
+    Sid Should Be Visible    ${WEBGUI_COUNT_BUTTON_SID}    # écran de sélection rendu
+    # Les conditions lisent les VARIABLES (`$filters`, `$champ`) au lieu de
+    # les interpoler : une valeur de filtre peut porter des apostrophes ou des
+    # crochets, et la forme interpolée les injecterait dans l'expression
+    # Python évaluée.
+    IF    $filters
+        ${criteres}=    Get Webgui Selection Criteria
+        # La carte est DÉRIVÉE de l'écran : la journaliser est ce qui permet,
+        # après coup, de distinguer « ce champ n'existe pas sur cette table »
+        # d'une dérivation qui aurait silencieusement rétréci.
+        ${releves}=    Get Length    ${criteres}
+        Log    Critères dérivés de l'écran de sélection de ${table} : ${releves} (${criteres}).
+        FOR    ${champ}    ${valeur}    IN    &{filters}
+            IF    $champ not in $criteres
+                ${message}=    Missing Criterion Message    ${champ}    ${criteres}
+                Fail    ${message} Table ${table}.
+            END
+            Fill Sid Input    ${criteres}[${champ}]    ${valeur}
+        END
+    END
+    IF    '${max_hits}' != '${EMPTY}'
+        Fill Sid Input    ${WEBGUI_MAX_HITS_SID}    ${max_hits}
+    END
+    Click Sid    ${WEBGUI_EXECUTE_SID}
+    WebGui Should Be Rendered
+    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s    WebGui Grid Should Be Rendered
+
+Extract Displayed WebGui Grid
+    [Documentation]    Lit la grille ALV affichée et rend le relevé AVEC son
+    ...                contrat, sous la forme commune aux trois canaux
+    ...                (`Build Table Extract`) : lignes, colonnes TECHNIQUES,
+    ...                titres affichés, total DÉCLARÉ par la grille.
+    ...
+    ...                Le jugement n'est pas fait ici : `Table Extract Should Be
+    ...                Complete` est la garde, et elle s'appelle avant toute
+    ...                écriture. Miroir WebGUI d'`Extract Displayed Report`
+    ...                (ECC).
+    [Arguments]    ${sid}=${EMPTY}    ${key}=${EMPTY}    ${source}=${EMPTY}
+    ${grille}=    Read Webgui Grid    ${sid}
+    ${nom}=    Set Variable If    '${source}' == '${EMPTY}'
+    ...    grille WebGUI ${grille}[container]    ${source}
+    ${extrait}=    Build Table Extract    ${grille}[rows]    columns=${grille}[columns]
+    ...    headers=${grille}[headers]    declared_rows=${grille}[declared_rows]
+    ...    source=${nom}    key=${key}
+    # Le contrat que la GRILLE publie voyage avec le relevé : il porte de quoi
+    # asserter que le balayage des titres a fonctionné (`headers_found`, seule
+    # chose qui distingue des titres identiques aux identifiants d'un repli
+    # silencieux) et de quoi journaliser ce que la cible a réellement déclaré,
+    # au lieu de le raconter dans une documentation.
+    Set To Dictionary    ${extrait}    headers_found=${grille}[headers_found]
+    ...    candidates=${grille}[candidates]    visible_rows=${grille}[visible_rows]
+    ...    scrolling=${grille}[scrolling]
+    ...    client_cell_threshold=${grille}[client_cell_threshold]
+    ...    first_row_index=${grille}[first_row_index]
+    RETURN    ${extrait}
+
 Log Off WebGui
     [Documentation]    Déconnexion propre : bouton « More » du bandeau, menu System
     ...                repéré par POSITION RELATIVE (avant-dernier : la barre de menus
     ...                varie par transaction), dernier item (Log Off), confirmation
     ...                SPOP, puis assertion 100 % locale-indépendante de fin de
     ...                session : plus AUCUN élément `lsdata`.
-    Click    ${WEBGUI_MORE_BUTTON_SELECTOR}
-    ${menu_ids}=    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
-    ...    WebGui Menu Bar Entries
-    ${system_menu}=    Set Variable    ${menu_ids}[-2]    # System = avant-dernier, Help = dernier
-    Click    css=[id="${system_menu}"]
-    # Items DIRECTS du menu System seulement (pas les sous-menus, que la
-    # bibliothèque écarte). Log Off = dernier item (convention SAP).
-    ${items}=    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
-    ...    WebGui Open Menu Items    ${system_menu}
-    ${logoff_item}=    Set Variable    ${items}[-1]
-    Click    css=[id="${logoff_item}"]
-    Sid Should Be Visible    ${WEBGUI_POPUP_CONFIRM_SID}
-    Click Sid    ${WEBGUI_POPUP_CONFIRM_SID}
-    Wait Until Keyword Succeeds    ${WEBGUI_TIMEOUT}    0.5s
-    ...    WebGui Session Should Be Over
+    ...
+    ...                `budget` borne chaque attente du déroulé, y compris les
+    ...                deux étapes qui ne répondent qu'au timeout du navigateur
+    ...                (le clic sur « More » et l'attente du popup) : c'est la
+    ...                PREMIÈRE de ces deux-là qui n'aboutit pas sur la cible
+    ...                concernée, donc les borner à moitié ne bornait rien. Le défaut
+    ...                convient à une déconnexion qu'on veut voir aboutir ; un
+    ...                teardown, lui, en passe un court, parce qu'un déroulé qui
+    ...                ne peut pas aboutir sur une cible donnée y coûterait
+    ...                plusieurs minutes d'acharnement. Mesuré le 2026-09-15 sur
+    ...                une campagne à cinq cibles : 361 s de tentatives en échec
+    ...                pour une cible, soit les deux tiers des 535 s de la
+    ...                campagne entière, là où la cible voisine se déconnectait
+    ...                en 1,2 s.
+    [Arguments]    ${budget}=${WEBGUI_TIMEOUT}
+    # Le budget borne AUSSI les deux étapes qui passent par la bibliothèque
+    # Browser (le clic sur « More », et l'attente du popup de confirmation) :
+    # celles-là n'écoutent que le timeout du navigateur, et la PREMIÈRE est
+    # justement celle qui n'aboutit pas sur la cible qui a motivé ce
+    # paramètre. Sans cette bascule, un teardown qui promet dix secondes en
+    # coûtait quarante-cinq.
+    ${timeout_precedent}=    Set Browser Timeout    ${budget}
+    TRY
+        Click    ${WEBGUI_MORE_BUTTON_SELECTOR}
+        ${menu_ids}=    Wait Until Keyword Succeeds    ${budget}    0.5s
+        ...    WebGui Menu Bar Entries
+        ${system_menu}=    Set Variable    ${menu_ids}[-2]    # System = avant-dernier, Help = dernier
+        Click    css=[id="${system_menu}"]
+        # Items DIRECTS du menu System seulement (pas les sous-menus, que la
+        # bibliothèque écarte). Log Off = dernier item (convention SAP).
+        ${items}=    Wait Until Keyword Succeeds    ${budget}    0.5s
+        ...    WebGui Open Menu Items    ${system_menu}
+        ${logoff_item}=    Set Variable    ${items}[-1]
+        Click    css=[id="${logoff_item}"]
+        Sid Should Be Visible    ${WEBGUI_POPUP_CONFIRM_SID}
+        Click Sid    ${WEBGUI_POPUP_CONFIRM_SID}
+        Wait Until Keyword Succeeds    ${budget}    0.5s
+        ...    WebGui Session Should Be Over
+    FINALLY
+        Set Browser Timeout    ${timeout_precedent}
+    END
 
 WebGui Menu Bar Entries
     [Documentation]    Menus VISIBLES de la barre de menus WebGUI (perception
@@ -357,11 +637,25 @@ Close WebGui
     ...                session WebGUI est encore rendue (ne jamais accumuler de
     ...                sessions GUI serveur). Prévu pour Suite Teardown, miroir
     ...                WebGUI de `Close SAP`.
+    ...
+    ...                La tentative de déconnexion est BORNÉE (`logoff_budget`,
+    ...                court par défaut) : un teardown doit rendre la main. Sur
+    ...                une cible dont le déroulé de déconnexion n'aboutit pas,
+    ...                le budget nominal coûtait 361 s d'acharnement, mesuré le
+    ...                2026-09-15. Quand elle échoue, la session serveur est
+    ...                laissée à EXPIRER et le journal le DIT : une session
+    ...                abandonnée en silence est une ressource qu'on croit
+    ...                rendue.
+    [Arguments]    ${logoff_budget}=10s
     ${status}    ${still}=    Run Keyword And Ignore Error
     ...    Get Webgui Element Count
     IF    '${status}' == 'PASS'
         IF    ${still} > 0
-            Run Keyword And Ignore Error    Log Off WebGui
+            ${verdict}    ${detail}=    Run Keyword And Ignore Error
+            ...    Log Off WebGui    budget=${logoff_budget}
+            IF    '${verdict}' != 'PASS'
+                Log    Déconnexion WebGUI NON aboutie en ${logoff_budget} : la session serveur est laissée à expirer. Cause : ${detail}    WARN
+            END
         END
     END
     Close Browser

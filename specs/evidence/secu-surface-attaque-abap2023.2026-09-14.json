@@ -1,0 +1,194 @@
+{
+  "artifact": {
+    "hash_scope": {
+      "excluded_keys": [
+        "generated_at",
+        "hash_scope",
+        "sha256"
+      ],
+      "hashed_keys": [
+        "surface"
+      ]
+    },
+    "sha256": "682950ac0e931b53d5b08e93d82ef489a43ac1be277be8e5b1c885c79c117988"
+  },
+  "campaign": "secu-surface-attaque-abap2023",
+  "channel": "RFC",
+  "measured_on": "2026-09-14",
+  "measurements": {
+    "accounts": {
+      "by_status": {
+        "active": [
+          "BWDEVELOPER",
+          "DDIC",
+          "DEVELOPER",
+          "SAP*"
+        ],
+        "expired": [
+          "DEVELOPER_5",
+          "SDMI_DLRYYAU"
+        ]
+      },
+      "hash_versions": {
+        "H": 6
+      },
+      "total": 6,
+      "unusable": [
+        "DEVELOPER_5",
+        "SDMI_DLRYYAU"
+      ],
+      "usable": [
+        "BWDEVELOPER",
+        "DDIC",
+        "DEVELOPER",
+        "SAP*"
+      ]
+    },
+    "audit": {
+      "configuration_verdict": "armed_without_filter",
+      "entries": 0,
+      "files": 0,
+      "slots_active": 0,
+      "slots_declared": 10,
+      "verdict": "armed_without_filter_and_silent",
+      "window_days": 365
+    },
+    "authorizations": {
+      "S_ADMI_FCD": 549,
+      "S_DEVELOP": 4068,
+      "S_LOG_COM": 190,
+      "S_RFC": 5311,
+      "S_RFCACL": 127,
+      "S_TABU_DIS": 3374,
+      "S_TCODE": 6336,
+      "S_USER_GRP": 351
+    },
+    "forbidden_passwords": 0,
+    "os_commands": {
+      "accepting_additional": 109,
+      "customer_defined": [],
+      "total": 117
+    },
+    "roles": {
+      "total": 9,
+      "without_end_date": [
+        "BWDEVELOPER:ZDEVELOPER",
+        "BWDEVELOPER:Z_EPM_REF_APPS_BASIC_AUTH",
+        "DEVELOPER:ZDEVELOPER",
+        "DEVELOPER:Z_BC_GCTS_ADMIN",
+        "DEVELOPER:Z_EPM_REF_APPS_BASIC_AUTH",
+        "DEVELOPER_5:ZAP_BC_ABAP_DEVELOPER_5",
+        "DEVELOPER_5:ZAP_CR_ABAP_DEVELOPER_5",
+        "DEVELOPER_5:ZAP_IWFND_RT_ADMIN",
+        "DEVELOPER_5:ZAP_IWFND_RT_DEVELOPER"
+      ]
+    },
+    "trust": {
+      "any_trust_configured": false,
+      "callback_allowlist_entries": 2,
+      "callback_destinations": [
+        "C_TP_00_vhcala4hci"
+      ],
+      "trusted_ids": [],
+      "trusted_systems": 0,
+      "trusting_ids": [],
+      "trusting_systems": 0
+    },
+    "web": {
+      "active": 219,
+      "active_without_ssl": 219,
+      "declared": 3410,
+      "matched": 219,
+      "sensitive_active": [
+        "bsp",
+        "gui",
+        "its",
+        "nwbc",
+        "public",
+        "ui2",
+        "webgui"
+      ],
+      "unmatched": 0,
+      "with_stored_user": []
+    }
+  },
+  "not_measurable": {
+    "client_000": "ouverture de session REFUSEE (RFC_LOGON_FAILURE) avec les identifiants de la campagne",
+    "gateway_acl_content": "aucun module de lecture de fichier appelable a distance sur cette release (TH_GET_SEC_INFO, RFC_READ_FILE, GWY_READ_SECINFO absents)",
+    "rfc_blacklist_9010": "table annoncee par le plan voisin NON RETROUVEE ; mesure a la place : RFCCBWHITELIST=2 entrees, UCONRFCSERVHEAD=1873 services"
+  },
+  "posture": "lecture seule",
+  "review": {
+    "agent": "sap-verifier",
+    "assumed": [
+      "couplage par variables de suite"
+    ],
+    "fixed_and_replayed": 7,
+    "initial_verdict": "needs_human",
+    "reservations": 8
+  },
+  "run": {
+    "failed": 0,
+    "passed": 12,
+    "tests": [
+      {
+        "name": "La cible est bien la release auditee et pas sa voisine",
+        "status": "PASS"
+      },
+      {
+        "name": "Un compte non verrouille n est pas forcement utilisable",
+        "status": "PASS"
+      },
+      {
+        "name": "Les empreintes de mots de passe sont toutes au format moderne",
+        "status": "PASS"
+      },
+      {
+        "name": "La liste des mots de passe interdits est mesuree et non supposee",
+        "status": "PASS"
+      },
+      {
+        "name": "La surface web servie n est pas la surface declaree",
+        "status": "PASS"
+      },
+      {
+        "name": "Aucun service actif ne s execute sans authentifier son appelant",
+        "status": "PASS"
+      },
+      {
+        "name": "Aucune commande du systeme d exploitation n a ete ajoutee",
+        "status": "PASS"
+      },
+      {
+        "name": "Le journal d audit est arme et il n enregistre rien",
+        "status": "PASS"
+      },
+      {
+        "name": "Aucune relation de confiance RFC n est configuree",
+        "status": "PASS"
+      },
+      {
+        "name": "L empreinte des objets d autorisation critiques est mesuree",
+        "status": "PASS"
+      },
+      {
+        "name": "Les attributions de roles effectives sont inventoriees",
+        "status": "PASS"
+      },
+      {
+        "name": "La surface tient dans un artefact rejouable",
+        "status": "PASS"
+      }
+    ]
+  },
+  "target": {
+    "client": "001",
+    "database": "HDB",
+    "host": "vhcala4h",
+    "kernel": "793",
+    "operating_system": "Linux",
+    "read_on": "20260914",
+    "release": "758",
+    "system_id": "A4H"
+  }
+}

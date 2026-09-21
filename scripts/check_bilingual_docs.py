@@ -66,13 +66,16 @@ _FR_ONLY = {
 # définitions d'agents au format actuel de VS Code, générées depuis .claude/
 # comme les chat modes ; tests/agent_eval/ porte les dossiers synthétiques de
 # qualification des agents (des fixtures d'évaluation rédigées en français,
-# lues par un agent sous test, jamais une doc destinée à l'utilisateur).
+# lues par un agent sous test, jamais une doc destinée à l'utilisateur) ;
+# scenarios_test/ porte des fiches de prompts de génération de tests, privées
+# comme comms/, rédigées en français pour le même agent qui lit specs/.
 _SINGLE_LANGUAGE_PREFIXES = (
     ".claude/",
     ".github/agents/",
     ".github/chatmodes/",
     "comms/",
     "memory/",
+    "scenarios_test/",
     "specs/",
     "tests/agent_eval/",
 )
@@ -87,10 +90,20 @@ def _is_exempt(path):
 def _tracked_md_files():
     # ``encoding`` explicite : sans lui, la sortie de git est décodée dans
     # l'encodage du poste, et les autres gardes du dépôt le passent déjà.
-    out = subprocess.run(["git", "ls-files", "*.md"], cwd=_ROOT, capture_output=True,
-                         text=True, encoding="utf-8", errors="replace",
-                         check=True).stdout
-    return [line for line in out.splitlines() if line]
+    #
+    # ``-z`` (chemins séparés par NUL) parce que git CITE et ÉCHAPPE tout nom
+    # non ASCII par défaut : un fichier nommé « Scénario_1.md » ressort
+    # ``"comms/presentation/Sc\303\251nario_1.md"``, guillemet initial compris.
+    # Le chemin ne commence alors plus par son dossier, donc aucune exemption
+    # de préfixe ne s'applique, et le nom de traduction dérivé est faux. Le
+    # garde réclamait ainsi une traduction pour des fichiers d'un répertoire
+    # explicitement hors contrat bilingue, c'est-à-dire qu'il refusait pour une
+    # raison qui n'existait pas (relevé le 2026-09-21). ``-z`` désactive la
+    # citation, à la source, pour tout nom accentué à venir.
+    out = subprocess.run(["git", "ls-files", "-z", "*.md"], cwd=_ROOT,
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", check=True).stdout
+    return [path for path in out.split("\0") if path]
 
 
 def check_pairing(files):

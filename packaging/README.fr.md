@@ -13,7 +13,7 @@ cloner le dépôt source :
 | `resources/` | Keywords Robot Framework en langage métier, un vocabulaire en miroir par canal (`ecc_keywords`, `fiori_keywords`, `api_keywords`, `rfc_keywords`), plus les page objects et les garanties de données. **Des exemples à personnaliser**, relevés sur les systèmes du laboratoire du projet : réutilisables en bonne part, jamais faisant autorité, à vérifier sur votre cible et à adapter à votre métier (voir `resources/README.fr.md`). Les tests importent cette couche, jamais d'ids SAP bruts ; ce qui tient sur tout système SAP, c'est le wheel des bibliothèques, pas ce dossier. Vos propres keywords vont dans `resources\site_keywords.resource` (voir plus bas), qu'une mise à jour du pack n'écrase jamais. |
 | `tools/recorder/` + `recorder.cmd` | Recorder desktop (SAP GUI via COM) : dump / capture / survol / record ; le record utilise les événements natifs de l'API de scripting (boutons exacts) avec repli polling automatique. Double-cliquez `recorder.cmd` pour ouvrir le lanceur graphique, qui expose le choix du moteur (auto/native/poll) et le mode sémantique (keywords humains par libellé visible). |
 | `tools/recorder_web/` | Recorder web : `recorder_snippet.js` (à coller dans DevTools) et `extension/` (extension Chrome MV3, à charger non empaquetée via `chrome://extensions`). |
-| `tests/robot/` | Sept suites d'exemple : smokes ECC/Fiori plus `fiori_wc_smoke.robot` déterministe et hors ligne, campagne d'exploration autonome, sentinelle de dérive, flagship cross-paradigme, et `api/canal_api_odata.robot` (le canal API pour lui-même, les mêmes mots-clés métier contre OData v2 avec `--include a4h` et v4 avec `--include capsflight`). |
+| `tests/robot/` | Douze suites d'exemple : smokes ECC/Fiori plus `fiori_wc_smoke.robot` déterministe et hors ligne, campagne d'exploration autonome, sentinelle de dérive, flagship cross-paradigme, `api/canal_api_odata.robot` (le canal API pour lui-même, les mêmes mots-clés métier contre OData v2 avec `--include a4h` et v4 avec `--include capsflight`), `ui/fiori/navigation_interaction_demokit.robot` (la seule qui ne demande ni identifiants ni système à provisionner, et son plan) et les deux extractions `ui/ecc/extraction_parametres_profil.robot` et `ui/fiori/extraction_grille_webgui.robot` (sortir un écran SAP en fichier exploitable, depuis le client lourd et depuis le WebGUI, voir ci-dessous), plus `webgui_grid_fixture_smoke.robot`, sa contre-partie HORS LIGNE (ni SAP ni réseau : le seul contrôle qui vérifie le lecteur de grille WebGUI sur un poste qui n'a encore accès à rien), et `cross/cycle_vie_produit_epm_trois_canaux.robot`, la vitrine cross-canal (un produit EPM lu par OData, SE16 en WebGUI et RFC, les trois prix confrontés entre eux, la cible prouvée canal par canal ; exige le canal RFC optionnel et se saute proprement sans lui ; son plan voyage avec elle, voir ci-dessous). |
 | `scripts/` | Outillage de maintenance (stdlib pure, à lancer depuis la racine du pack) : `healing_drift_report.py` (relit la télémétrie de healing, propose, ou applique avec `--apply`, les patchs `resources/` des dérives stables de localisateurs) et `check_spec_sync.py` (échoue quand une suite générée est en retard sur son plan `specs/`). |
 | `.claude/` + `.github/chatmodes/` + `specs/` | **Agents de test SAP** (sap-planner / sap-generator / sap-healer / sap-istqb) : définitions d'agents + commandes `/sap-*` pour Claude Code, chat modes générés pour VS Code / Copilot, et le répertoire des plans de test avec son exemple de référence (+ `specs/istqb/` pour les plans ISTQB). Voir « Agents de test » plus bas. |
 | `install.cmd` / `install.ps1` | Installateur : crée un `.venv` local, installe les wheels + dépendances épinglées, rend les configs MCP. |
@@ -31,7 +31,7 @@ Ce qui en découle sur le poste :
   surcharges de localisateurs y vont, et une mise à jour du pack ne les écrase
   pas. Un défaut de bibliothèque se signale en amont au lieu d'être contourné
   localement, sinon le même bug est payé deux fois.
-- **Sept suites d'exemple**, pas la suite de validation complète du dépôt :
+- **Douze suites d'exemple**, pas la suite de validation complète du dépôt :
   elles servent de contrôle d'installation et de modèle à copier, pas de
   couverture.
 - **Quatre scripts de maintenance** sur la quinzaine du dépôt : les autres sont
@@ -267,6 +267,99 @@ réglage exact à corriger* :
 La checklist complète (serveur, poste, web, confinement MCP) est
 `docs/hardening-test-environment.md` dans le dépôt source, chaque point mappé
 sur le préflight qui le vérifie.
+
+## Sortir un écran SAP en fichier (nouveau en 0.8.2)
+
+Le besoin le plus fréquent d'un poste de recette : livrer ce qu'un écran
+montre, dans un format que quelqu'un d'autre peut ouvrir. Cinq formats, tous
+dans le wheel, quatre sans aucune dépendance :
+
+| Keyword | Format | Pour qui |
+|---|---|---|
+| `Write Table Svg` | SVG vectoriel | une preuve à coller dans un rapport |
+| `Write Table Xlsx` | classeur Excel | un relevé qu'on trie et filtre |
+| `Write Table Csv` | CSV | une autre chaîne d'outils |
+| `Write Table Json` | JSON ou JSON Lines | un script Python/R, un outil décisionnel |
+| `Write Table Parquet` | Parquet | les gros volumes (demande `pip install pyarrow`) |
+
+Chacun est doublé d'un lecteur (`Read Table Xlsx`…) : ce qui a été écrit peut
+être RELU et confronté au relevé d'origine, parce qu'un fichier qui existe
+n'est pas un fichier juste.
+
+Trois pièges sont fermés par défaut, et ils ne sont pas théoriques :
+
+- **Excel retype ce qu'il lit.** Un mandant `000` y devient `0` et la
+  corruption se voit à l'ouverture, pas à l'écriture : toutes les cellules
+  sont donc écrites en texte explicite, sans option pour faire autrement.
+- **Une ALV ne charge ses lignes qu'au défilement**, et lire une ligne non
+  chargée rend des cellules VIDES au lieu d'échouer. Employer `Read Full Grid`
+  pour extraire, puis `Count Blank Grid Rows` pour vérifier que le défilement
+  a suffi. Mesuré sur un rapport de 1639 lignes : 137 remplies, et tous les
+  contrôles fondés sur le NOMBRE de lignes restaient verts.
+- **Un CSV exécute des formules.** Une valeur commençant par `=`, `+`, `-` ou
+  `@` est interprétée à l'ouverture. Rien n'est altéré par défaut, mais le
+  verdict d'écriture COMPTE les cellules concernées ; `neutralize_formulas=True`
+  les préfixe quand le fichier est destiné à être ouvert.
+
+L'exemple complet est `tests/robot/ui/ecc/extraction_parametres_profil.robot`
+(rapport RSPARAM vers les cinq formats, lecture seule, aucun secret demandé :
+il se rattache à une session SAP GUI déjà ouverte). Il attend par défaut une
+release donnée et REFUSE d'écrire quoi que ce soit si la session ouverte vise
+un autre système : son message donne alors la ligne de commande à employer.
+Pour l'adapter à vos écrans, copiez `Extract Displayed Report` de
+`resources/security_screen_keywords.resource` dans
+`resources/site_keywords.resource` et changez le localisateur de grille.
+
+**La même chose depuis le WebGUI**, et le piège qui va avec :
+`tests/robot/ui/fiori/extraction_grille_webgui.robot` extrait une ALV servie
+en HTML (SAP GUI for HTML / ITS) vers les mêmes cinq formats, via
+`Read Webgui Grid`. Les lignes reviennent clées par les identifiants
+TECHNIQUES des colonnes, que la grille publie elle-même, et la découpe du DOM
+(colonnes figées dans une table séparée) est prise en charge pour vous.
+
+**Confrontez toujours un relevé au total que la source DÉCLARE, avant d'en
+écrire quoi que ce soit.** Les trois canaux matérialisent leur tableau
+paresseusement, et deux ne laissent aucune trace :
+
+| Canal | Lignes rendues | Lignes déclarées | Ce qui trahit l'amputation |
+| --- | --- | --- | --- |
+| SAP GUI (ALV) | toutes, cellules VIDES si non défilées | `Get Row Count` | les lignes vides |
+| WebGUI | une page de 200, renumérotées à partir de 1 | `declared_rows` | rien |
+| Table UI5 | le seuil de croissance, 30 mesurées sur 4133 | `Get Ui5 Table Info` | rien |
+
+Sur les deux canaux web, les lignes rendues sont propres, ordonnées et
+complètes : un fichier écrit à partir de là est fidèle à ce qui a été lu, et
+c'est un extrait présenté comme un inventaire.
+`Table Extract Should Be Complete` (`Library sapfx_common.table_extract`) est
+la règle de refus unique que partagent les trois suites d'exemple ; placez-la
+dans le SETUP de suite et non dans un scénario, parce qu'un refus qui se
+contente de constater laisse les scénarios suivants écrire quand même.
+
+## Le même fait par trois canaux (nouveau en 0.8.2)
+
+`tests/robot/cross/cycle_vie_produit_epm_trois_canaux.robot` est la vitrine
+cross-canal du pack : un produit EPM lu par le service OData, par SE16 dans le
+WebGUI et par `RFC_READ_TABLE`, les trois prix confrontés **entre eux** après
+normalisation numérique dans la notation décimale de l'utilisateur, lue sur le
+système (`3,25` à l'écran, `3.25` par les deux protocoles). Elle exige le
+canal API, le service ICF `webgui` et le canal RFC optionnel (voir plus
+haut) : sans `pyrfc`, elle se saute proprement au lieu d'échouer. Elle montre
+deux choses qu'une suite mono-canal ne peut pas montrer. La CIBLE est prouvée
+canal par canal dans le Suite Setup, avant toute lecture : la release par le
+RFC, le volume du catalogue Gateway par l'API, l'adresse réellement atteinte
+par le WebGUI. Sur un banc où deux systèmes partagent identifiant système et
+nom d'hôte, une garde sur un seul canal laisse une surcharge de variables
+incomplète comparer deux systèmes en restant verte, puisque tous deux portent
+le même jeu de démonstration. Et un résultat négatif (aucun document de
+modification pour la table) est précédé d'un témoin positif, pour que
+« absent » ne veuille jamais dire « pas réussi à lire ». Les variables de
+cible (`API_BASE_URL`, `WEBGUI_URL`, `RFC_ASHOST`, `EXPECTED_RELEASE`,
+`EXPECTED_SERVICES`, `EXPECTED_WEBGUI_HOST`) se surchargent par `-v` ; lisez
+le plan livré à côté de la suite avant de l'adapter : il documente pourquoi
+la campagne ne fait que LIRE (le chemin d'écriture du service produit est
+cassé sur les deux images trial, vérifié après restauration du conteneur) et
+ses valeurs de cible mesurées (38 services publiés sur la release 754, 58 sur
+la 758).
 
 ## Utiliser les plugins MCP
 

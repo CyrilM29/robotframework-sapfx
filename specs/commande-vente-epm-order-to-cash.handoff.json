@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "mission_id": "commande-vente-epm-order-to-cash-2026-09-18",
+  "target": "a4h-1909-client-001",
+  "invariant": "Toute commande de vente EPM creee par SEPM_SO (Business Partner + un poste Produit/Quantite) est retrouvee dans SNWD_SO par son numero exact (LIFECYCLE_STATUS=N), puis n'existe plus apres suppression par la meme transaction : le cycle est repetable sans limite parce que le numero de commande est attribue par SAP a chaque sauvegarde, jamais choisi par le test.",
+  "scope": [
+    "tests/robot/ui/ecc",
+    "resources/page_objects",
+    "resources/ecc_keywords.resource",
+    "specs/commande-vente-epm-order-to-cash.md"
+  ],
+  "mode": "full",
+  "budgets": {
+    "attempts": 2,
+    "tool_calls": 20,
+    "seconds": 900
+  },
+  "evidence": [
+    {
+      "path": "specs/commande-vente-epm-order-to-cash.md",
+      "sha256": "d60a84b0b8e671095953e41b15d952a769da83196085c7e2d7ec511a1e58ff0e"
+    }
+  ]
+}

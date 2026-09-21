@@ -1,0 +1,203 @@
+{
+  "artifact": {
+    "hash_scope": {
+      "excluded_keys": [
+        "generated_at",
+        "hash_scope",
+        "sha256"
+      ],
+      "hashed_keys": [
+        "crossing"
+      ]
+    },
+    "sha256": "1d82683a0b889aa018ea9134664ed74e24c2cbec779f4149b1c9ee0afb3aa5b8"
+  },
+  "campaign": "secu-croisement-trois-canaux-abap2023",
+  "channels": [
+    "SAP GUI Scripting (ecran)",
+    "RFC",
+    "HTTP/OData"
+  ],
+  "measured_on": "2026-09-14",
+  "measurements": {
+    "cookie_security": {
+      "names": [
+        "MYSAPSSO2",
+        "SAP_SESSIONID_A4H_001",
+        "sap-usercontext"
+      ],
+      "over_https": false,
+      "total": 3,
+      "without_httponly": [
+        "MYSAPSSO2",
+        "SAP_SESSIONID_A4H_001",
+        "sap-usercontext"
+      ],
+      "without_secure": [
+        "MYSAPSSO2",
+        "SAP_SESSIONID_A4H_001",
+        "sap-usercontext"
+      ]
+    },
+    "cookie_verdict": "declared_without_effect",
+    "parameter_origins": {
+      "divergent": [],
+      "kernel_backed": [
+        "auth/no_check_in_some_cases",
+        "auth/object_disabling_active",
+        "auth/rfc_authority_check",
+        "gw/acl_mode",
+        "gw/monitor",
+        "gw/reg_no_conn_info",
+        "gw/rem_start",
+        "http/security_session_timeout",
+        "icf/set_HTTPonly_flag_on_cookies",
+        "login/disable_multi_gui_login",
+        "login/failed_user_auto_unlock",
+        "login/fails_to_session_end",
+        "login/fails_to_user_lock",
+        "login/isolate_rfc_system_calls",
+        "login/min_password_diff",
+        "login/min_password_digits",
+        "login/min_password_letters",
+        "login/min_password_lng",
+        "login/min_password_lowercase",
+        "login/min_password_specials",
+        "login/min_password_uppercase",
+        "login/no_automatic_user_sapstar",
+        "login/password_compliance_to_current_policy",
+        "login/password_expiration_time",
+        "login/password_hash_algorithm",
+        "login/password_history_size",
+        "login/password_max_idle_initial",
+        "login/password_max_idle_productive",
+        "login/ticket_only_by_https",
+        "rdisp/gui_auto_logout",
+        "rec/client",
+        "rfc/callback_security_method",
+        "rfc/reject_expired_passwd",
+        "rsau/enable",
+        "rsau/integrity",
+        "rsau/selection_slots",
+        "rsau/user_selection",
+        "snc/enable",
+        "system/secure_communication"
+      ],
+      "not_comparable": [],
+      "profile_backed": [
+        "gw/reg_info",
+        "gw/sec_info",
+        "login/password_downwards_compatibility"
+      ],
+      "profile_changing": [],
+      "profile_redundant": [
+        "gw/reg_info",
+        "gw/sec_info",
+        "login/password_downwards_compatibility"
+      ],
+      "total": 42
+    },
+    "screen_report": {
+      "parameters": 1635,
+      "substituted_by_profile": 325
+    },
+    "security_headers_missing": [
+      "content-security-policy",
+      "referrer-policy",
+      "strict-transport-security",
+      "x-content-type-options",
+      "x-frame-options"
+    ],
+    "web_exposure": {
+      "active": 219,
+      "declared": 3410,
+      "matched": 219,
+      "unmatched": 0
+    }
+  },
+  "not_established": {
+    "colonne_defaut_egale_noyau": "suppose, non mesure (voir plan, §7)",
+    "ecarts_754_758": "exigerait la meme mesure sur la 754, campagne mono-cible",
+    "sens_du_pictogramme": "recoupement NON discriminant : un seul code, un seul etat, sens non etabli"
+  },
+  "posture": "lecture seule",
+  "review": {
+    "agent": "sap-verifier",
+    "fixed_and_replayed": 8,
+    "found_a_real_defect": "le lecteur de cookies ratait trois orthographes du drapeau sur cinq, defaut trouve par le test que la revue a impose",
+    "initial_verdict": "needs_human",
+    "reservations": 8
+  },
+  "run": {
+    "failed": 0,
+    "passed": 13,
+    "tests": [
+      {
+        "name": "Les trois canaux parlent bien a la meme cible",
+        "status": "PASS"
+      },
+      {
+        "name": "L ecran de detail d un parametre est hors de portee de l API",
+        "status": "PASS"
+      },
+      {
+        "name": "Le rapport de parametres porte les deux colonnes que le RFC n a pas",
+        "status": "PASS"
+      },
+      {
+        "name": "Le durcissement de cette release vient du noyau et non d un reglage",
+        "status": "PASS"
+      },
+      {
+        "name": "Le profil l emporte quand il existe",
+        "status": "PASS"
+      },
+      {
+        "name": "La colonne de profil est tronquee et la campagne l ecarte",
+        "status": "PASS"
+      },
+      {
+        "name": "Le mandant de reference est mesure par l ecran",
+        "status": "PASS"
+      },
+      {
+        "name": "Le pictogramme de verrouillage s interprete par croisement",
+        "status": "PASS"
+      },
+      {
+        "name": "Le statut des mots de passe est rapporte et jamais asserte",
+        "status": "PASS"
+      },
+      {
+        "name": "Le parametre qui protege les cookies ne produit pas son effet",
+        "status": "PASS"
+      },
+      {
+        "name": "Les en tetes de securite de la reponse sont inventories",
+        "status": "PASS"
+      },
+      {
+        "name": "Le canal HTTP repose sur un noeud que le canal RFC mesure",
+        "status": "PASS"
+      },
+      {
+        "name": "Le croisement tient dans un artefact rejouable",
+        "status": "PASS"
+      }
+    ]
+  },
+  "target": {
+    "client": "001",
+    "database": "HDB",
+    "host": "vhcala4h",
+    "kernel": "793",
+    "operating_system": "Linux",
+    "release": "758",
+    "system_id": "A4H"
+  },
+  "what_each_channel_unlocked": {
+    "ecran": "origine profil contre defaut (le RFC rend l'effectif sans dire d'ou il vient) et mandant 000, dont l'ouverture RFC est refusee",
+    "http": "effet REELLEMENT produit : aucun cookie ne porte HttpOnly alors que le parametre est positionne",
+    "rfc": "valeur effective, masque de verrouillage, inventaire des noeuds de services web"
+  }
+}

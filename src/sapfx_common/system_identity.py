@@ -22,6 +22,7 @@ même conteneur), et compare deux identités. Typé, testé hors SAP.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable, Mapping, Sequence
 
 STATUS_PROGRAM = "SAPLSHSY"
@@ -243,3 +244,55 @@ def expected_mismatches(identity: Mapping[str, Any],
             mismatches.append({"key": str(key), "expected": _text(wanted),
                                "actual": "" if actual is None else _text(actual)})
     return mismatches
+
+
+# --- Identité lue dans la zone info système d'une session WebGUI -------------
+# Les ids de cette zone sont techniques et stables (``SAPITS_MBAR_SYSTEM``…),
+# mais leur TEXTE mêle un libellé traduit et la valeur (« System A4H (001) »,
+# et « Système » ailleurs). On n'y coupe donc pas sur le libellé : les valeurs
+# se reconnaissent à leur FORME, qui elle ne dépend d'aucune langue (un
+# identifiant système SAP fait trois caractères alphanumériques, un mandant
+# trois chiffres, un dynpro s'écrit ``PROGRAMME/NNNN``).
+_SYSTEM_AND_CLIENT = re.compile(r"\b([A-Z0-9]{3})\s*\((\d{3})\)")
+_THREE_DIGITS = re.compile(r"\b(\d{3})\b")
+_DYNPRO = re.compile(r"\b([A-Z0-9_/]+)/(\d{3,4})\b")
+
+
+def webgui_identity(texts: Mapping[str, Any]) -> dict[str, str]:
+    """L'identité d'une session WebGUI, depuis les textes de sa zone info.
+
+    Le miroir WebGUI de `Get System Identity` (écran) et de
+    `Read System Identity` (RFC), et il sert la même garde : sur ce poste, deux
+    conteneurs répondent sur deux ports en annonçant le même identifiant
+    système, et l'ICF de l'un REDIRIGE vers le nom d'hôte virtuel que les deux
+    partagent. Viser le mauvais port donne donc une session parfaitement
+    fonctionnelle sur l'autre système.
+
+    Toutes les clés existent, VIDES tant qu'elles ne sont pas lues : une valeur
+    absente ne doit jamais être remplacée par une valeur plausible.
+    """
+    brut = {str(k): _text(v) for k, v in (texts or {}).items()}
+    identite = {"system_id": "", "client": "", "user": "", "transaction": "",
+                "program": "", "screen": ""}
+
+    couple = _SYSTEM_AND_CLIENT.search(brut.get("system", ""))
+    if couple:
+        identite["system_id"] = couple.group(1)
+        identite["client"] = couple.group(2)
+    if not identite["client"]:
+        mandant = _THREE_DIGITS.search(brut.get("client", ""))
+        if mandant:
+            identite["client"] = mandant.group(1)
+
+    # L'utilisateur et la transaction sont le DERNIER mot de leur ligne : le
+    # libellé les précède dans toutes les langues observées.
+    for cle, source in (("user", "user"), ("transaction", "transaction")):
+        mots = brut.get(source, "").split()
+        if mots:
+            identite[cle] = mots[-1]
+
+    ecran = _DYNPRO.search(brut.get("dynpro", ""))
+    if ecran:
+        identite["program"] = ecran.group(1)
+        identite["screen"] = ecran.group(2)
+    return identite

@@ -240,6 +240,7 @@ class SapEccPlugin(StaticLibraryPlugin):
                 "Set Default Timeout", "Set Poll Interval",
                 # grilles ALV par titre
                 "Read Grid", "Read Full Grid", "Get Grid Column Ids",
+                "Get Grid Column Titles", "Count Blank Grid Rows",
                 "Get Column Id By Title", "Get Cell Value By Column Title",
                 "Set Cell Value By Column Title", "Find Row By Column Value",
                 "Select Row By Column Value", "Get Cell Value By Row Content",

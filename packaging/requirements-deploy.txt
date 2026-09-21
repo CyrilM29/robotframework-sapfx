@@ -1,7 +1,7 @@
 # Dépendances runtime du pack de déploiement (le wheel apporte robotframework ;
 # on ré-épingle ici ce que l'environnement cible doit fixer exactement).
 # pywin32 épinglé exact (convention 6 du dépôt) : #1 source de casse COM.
-pywin32==311; platform_system == "Windows"
+pywin32==312; platform_system == "Windows"
 # Côté Fiori / web. Après installation : `rfbrowser init chromium` (option
 # -WithBrowsers de install.ps1) ou utiliser le Chrome système (channel=chrome).
 # Borne haute alignée sur l'extra `web` du wheel : la bibliothèque Fiori vise

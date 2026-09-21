@@ -495,3 +495,4 @@ def test_connect_to_session_tolere_coinitialize_absent(monkeypatch):
     monkeypatch.delattr(pythoncom, "CoInitialize", raising=False)
     lib = make_lib(ConnectionKeywords, _FakeBase)
     assert lib.connect_to_session() == "delegated"
+

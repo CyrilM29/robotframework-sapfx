@@ -1,0 +1,106 @@
+{
+  "cibles": {
+    "ecran-754": {
+      "channel": "ecran SAP GUI",
+      "client": "001",
+      "columns": 5,
+      "complete": true,
+      "declared_rows": 1639,
+      "formats": [
+        "csv",
+        "jsonl",
+        "parquet",
+        "svg",
+        "xlsx"
+      ],
+      "reached": "release 754 kernel 777",
+      "rows": 1639,
+      "source": "RSPARAM (canal écran)",
+      "system": "A4H"
+    },
+    "ecran-758": {
+      "channel": "ecran SAP GUI",
+      "client": "001",
+      "columns": 5,
+      "complete": true,
+      "declared_rows": 1635,
+      "formats": [
+        "csv",
+        "jsonl",
+        "parquet",
+        "svg",
+        "xlsx"
+      ],
+      "reached": "release 758 kernel 793",
+      "rows": 1635,
+      "source": "RSPARAM (canal écran)",
+      "system": "A4H"
+    },
+    "ui5-capsflight": {
+      "channel": "UI5",
+      "client": "",
+      "columns": 8,
+      "complete": true,
+      "declared_rows": 2,
+      "formats": [
+        "csv",
+        "jsonl",
+        "parquet",
+        "svg",
+        "xlsx"
+      ],
+      "reached": "localhost:4004",
+      "rows": 2,
+      "source": "reservations d un voyage (cap-sflight)",
+      "system": "cap-sflight"
+    },
+    "webgui-2023": {
+      "channel": "WebGUI",
+      "client": "001",
+      "columns": 4,
+      "complete": true,
+      "declared_rows": 150,
+      "formats": [
+        "csv",
+        "jsonl",
+        "parquet",
+        "svg",
+        "xlsx"
+      ],
+      "reached": "localhost:50101 (connexion basic)",
+      "rows": 150,
+      "source": "T100 via WebGUI (webgui-2023)",
+      "system": "A4H"
+    },
+    "webgui-a4h": {
+      "channel": "WebGUI",
+      "client": "001",
+      "columns": 4,
+      "complete": true,
+      "declared_rows": 150,
+      "formats": [
+        "csv",
+        "jsonl",
+        "parquet",
+        "svg",
+        "xlsx"
+      ],
+      "reached": "localhost:50000 (connexion form)",
+      "rows": 150,
+      "source": "T100 via WebGUI (webgui-a4h)",
+      "system": "A4H"
+    }
+  },
+  "generated_at": "2026-09-15T22:41:23+00:00",
+  "hash_scope": {
+    "excluded_keys": [
+      "generated_at",
+      "hash_scope",
+      "sha256"
+    ],
+    "hashed_keys": [
+      "cibles"
+    ]
+  },
+  "sha256": "e7b9320374b7898d6ece11eef472de3d9e2b87b3509473c321e5d8e055ec3f32"
+}

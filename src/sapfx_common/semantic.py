@@ -61,8 +61,10 @@ from typing import Optional, Sequence
 
 from ._semantic_match import (  # noqa: F401  (re-exports : API publique stable)
     ALIGN_TOLERANCE,
+    MAX_GEOMETRY_SCALE,
     MAX_HORIZONTAL_GAP,
     MAX_VERTICAL_GAP,
+    REFERENCE_FIELD_HEIGHT,
     SCOPE_RADIUS,
     _SCOPE_SEPARATOR,
     _STRUCTURAL_TYPES,
@@ -77,7 +79,9 @@ from ._semantic_match import (  # noqa: F401  (re-exports : API publique stable)
     _right_of_gap,
     _scope_to_anchor,
     _target_filter,
+    geometry_scale,
     is_label,
+    scaled,
     text_matches,
 )
 from .object_tree import ScreenElement
@@ -89,7 +93,8 @@ def resolve_semantic(elements: Sequence[ScreenElement], locator: str,
                      max_horizontal_gap: int = MAX_HORIZONTAL_GAP,
                      max_vertical_gap: int = MAX_VERTICAL_GAP,
                      changeable_only: bool = False,
-                     scope_radius: Optional[int] = None) -> list[SemanticMatch]:
+                     scope_radius: Optional[int] = None,
+                     _scale: Optional[float] = None) -> list[SemanticMatch]:
     """Résout un localisateur humain sur la liste des contrôles de l'écran.
 
     Retourne TOUS les matches de la première étape qui en produit (voir la
@@ -105,25 +110,40 @@ def resolve_semantic(elements: Sequence[ScreenElement], locator: str,
 
     ``scope_radius`` (px) étend le voisinage de l'opérateur ``>>`` au-delà du
     défaut :data:`SCOPE_RADIUS` : une intention (« le voisinage que je vise »),
-    pas une tolérance de rendu ; hérité par les ``>>`` imbriqués."""
+    pas une tolérance de rendu ; hérité par les ``>>`` imbriqués.
+
+    Toutes les distances (tolérances ET rayon) s'entendent à l'ÉCHELLE DE
+    RÉFÉRENCE (rendu 100 %) et sont portées à l'échelle de rendu mesurée sur
+    l'écran lui-même (:func:`geometry_scale`) : un poste à DPI élevé, une
+    session RDP ou un zoom multiplient la géométrie que rend SAP GUI, et des
+    tolérances fixes n'y rattachaient plus aucun libellé. ``_scale`` (privé)
+    transmet l'échelle déjà calculée aux appels internes, sans la remesurer
+    sur un sous-ensemble ni la cumuler."""
     locator = (locator or "").strip()
     if not locator:
         return []
+    scale = geometry_scale(elements) if _scale is None else _scale
+    align_tolerance = scaled(align_tolerance, scale)
+    max_horizontal_gap = scaled(max_horizontal_gap, scale)
+    max_vertical_gap = scaled(max_vertical_gap, scale)
     if _SCOPE_SEPARATOR in locator:
         anchor_text, rest = (part.strip() for part in locator.split(_SCOPE_SEPARATOR, 1))
-        radius = scope_radius if scope_radius is not None else SCOPE_RADIUS
+        radius = scaled(scope_radius if scope_radius is not None else SCOPE_RADIUS,
+                        scale)
         neighborhood = _scope_to_anchor(elements, anchor_text, exact, radius)
         if not neighborhood or not rest:
             return []
         # Récursion dans le seul voisinage de l'ancre : `reste` accepte
         # n'importe quelle forme de la grammaire (y compris un `>>` imbriqué,
-        # qui hérite du même rayon).
+        # qui hérite du même rayon). Tolérances et échelle transmises telles
+        # qu'elles ont été reçues : l'échelle est fixée par l'écran entier,
+        # jamais remesurée sur le voisinage (qui pourrait n'avoir aucun champ).
         return resolve_semantic(neighborhood, rest, types=types, exact=exact,
                                 align_tolerance=align_tolerance,
                                 max_horizontal_gap=max_horizontal_gap,
                                 max_vertical_gap=max_vertical_gap,
                                 changeable_only=changeable_only,
-                                scope_radius=scope_radius)
+                                scope_radius=scope_radius, _scale=1.0)
     if locator.startswith("="):
         content = locator[1:].strip()
         return _dedupe_sorted(
@@ -189,7 +209,8 @@ def scope_hint(elements: Sequence[ScreenElement], locator: str,
     if _SCOPE_SEPARATOR not in locator:
         return None
     anchor_text, rest = (part.strip() for part in locator.split(_SCOPE_SEPARATOR, 1))
-    radius = scope_radius if scope_radius is not None else SCOPE_RADIUS
+    radius = scaled(scope_radius if scope_radius is not None else SCOPE_RADIUS,
+                    geometry_scale(elements))
     anchors = [el for el in elements
                if is_label(el) and text_matches(el.text, anchor_text, exact)]
     if not anchors:
@@ -214,7 +235,8 @@ def scope_hint(elements: Sequence[ScreenElement], locator: str,
 def describe_element(elements: Sequence[ScreenElement], element_id: str,
                      align_tolerance: int = ALIGN_TOLERANCE,
                      max_horizontal_gap: int = MAX_HORIZONTAL_GAP,
-                     max_vertical_gap: int = MAX_VERTICAL_GAP) -> Optional[str]:
+                     max_vertical_gap: int = MAX_VERTICAL_GAP,
+                     _scale: Optional[float] = None) -> Optional[str]:
     """Localisateur humain **vérifié** pour un élément donné : l'inverse de
     :func:`resolve_semantic`, pensé pour le recorder : transcrire l'id technique
     d'un événement en libellé rejouable.
@@ -225,10 +247,17 @@ def describe_element(elements: Sequence[ScreenElement], element_id: str,
     (via ``resolve_semantic``) vers ce seul élément : garantie de rejouabilité
     que RoboSAPiens n'offre pas (premier match non vérifié). ``None`` si aucun
     localisateur humain fiable n'existe (l'appelant garde alors l'id technique,
-    jamais de perte d'information)."""
+    jamais de perte d'information). Tolérances à l'échelle de référence,
+    portées à l'échelle de rendu de l'écran comme dans
+    :func:`resolve_semantic` (``_scale`` privé : l'échelle déjà mesurée)."""
     target = next((el for el in elements if el.id == element_id), None)
     if target is None:
         return None
+    scale = geometry_scale(elements) if _scale is None else _scale
+    reference = (align_tolerance, max_horizontal_gap, max_vertical_gap)
+    align_tolerance = scaled(align_tolerance, scale)
+    max_horizontal_gap = scaled(max_horizontal_gap, scale)
+    max_vertical_gap = scaled(max_vertical_gap, scale)
     candidates: list[str] = []
     # Texte/tooltip propres : candidats sauf pour les champs de SAISIE, dont le
     # texte est la VALEUR en cours, volatile, jamais un localisateur. Le test
@@ -259,9 +288,10 @@ def describe_element(elements: Sequence[ScreenElement], element_id: str,
         # exacte, l'inverse est faux.
         matches = resolve_semantic(
             elements, locator, exact=False,
-            align_tolerance=align_tolerance,
-            max_horizontal_gap=max_horizontal_gap,
-            max_vertical_gap=max_vertical_gap)
+            align_tolerance=reference[0],
+            max_horizontal_gap=reference[1],
+            max_vertical_gap=reference[2],
+            _scale=scale)
         if len(matches) == 1 and matches[0].element.id == element_id:
             return locator
     return None
@@ -363,12 +393,16 @@ def screen_affordances(elements: Sequence[ScreenElement],
     moins chère en tokens) : chaque ligne se rejoue telle quelle en
     ``Fill Field By Label`` / ``Click Button By Label``, ou par id."""
     lines: list[str] = []
+    # L'échelle de rendu se mesure UNE fois pour tout l'écran : la même pour
+    # chaque cible, et un calcul de moins par ligne.
+    scale = geometry_scale(elements)
     for element in actionable_targets(elements):
         label = describe_element(
             elements, element.id,
             align_tolerance=align_tolerance,
             max_horizontal_gap=max_horizontal_gap,
-            max_vertical_gap=max_vertical_gap)
+            max_vertical_gap=max_vertical_gap,
+            _scale=scale)
         editable = is_editable_field(element)
         mark = "* " if editable else "  "
         line = "%s%s\t%s\t%s" % (mark, label if label is not None else "?",

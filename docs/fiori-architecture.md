@@ -74,6 +74,22 @@ GUI scripting (``wnd[0]/usr/ctxtVBAK-VBELN``). `Resolve Sid` matches it with a
 not exercised by the OpenUI5 Demo Kit smoke (no WebGUI there); the SID-XPath builder
 and capture logic are unit-tested instead.
 
+The channel also **reads tables**: `Read Webgui Grid` / `Get Webgui Grid Info`
+turn an ALV rendered as HTML into rows keyed by the TECHNICAL column ids, and
+`Get Webgui Session Identity` reads the system behind the session (the WebGUI
+mirror of `Get System Identity` and `Read System Identity`). Two rendering
+facts drive the grid reader. The DOM SPLITS a frozen-column grid into two HTML
+tables (`<id>-mrss-cont-left-content` and `-none-content`) while each cell's
+SID reunifies it (`.../row[N]/cell[M]`, M indexing the grid's own
+``ColumnIDs``), so the reader addresses by SID and never by DOM structure. And
+the grid PUBLISHES its contract in its ``lsdata``: column ids, ``totalRows``,
+``visibleRows``, ``scrolling``, ``clientCellThreshold``. That last point
+matters more than it looks: the server sends only one PAGE of rows (200
+measured against 2000 declared) and RENUMBERS them from 1, so a grid reading
+is often partial and nothing in the rows shows it. `declared_rows` is returned
+for exactly that, and `Table Extract Should Be Complete`
+(`sapfx_common.table_extract`) is the refusal rule the three channels share.
+
 ### UI5 Web Components: the `wc` engine
 
 Pages built on **UI5 Web Components** (the SuccessFactors home page,
