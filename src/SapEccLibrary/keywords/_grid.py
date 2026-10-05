@@ -1,0 +1,463 @@
+"""Keywords pratiques pour les tables ALV GridView.
+
+L'upstream expose déjà les opérations primitives sur les grilles (`Get Cell Value`,
+`Set Cell Value`, `Get Row Count`, `Select Table Row`, `Click Toolbar Button`).
+Toutes nécessitent de connaître l'*identifiant technique* de la colonne (ex. ``"MATNR"``),
+habituellement obtenu via l'enregistreur Scripting Tracker.
+
+Ce mixin ajoute la couche ergonomique par-dessus : résoudre les colonnes par leur
+*titre visible*, et lire une grille entière dans une liste de dicts compatible
+Robot pour que les tests puissent faire des assertions sur les données plutôt que
+sur les coordonnées de cellules.
+"""
+from pythoncom import com_error
+from robot.api import logger
+
+from sapfx_common._tabular import blank_rows
+from sapfx_common.abap_list import reconstruct_rows
+from sapfx_common.com_safety import shell_subtype
+from sapfx_common.object_tree import LEAF_SHELL_SUBTYPES
+from sapfx_common.robot_args import as_name_list, as_optional_int
+
+# Le remède joint à l'erreur de conversion de `max_rows` : l'incident vécu est
+# une liste de colonnes passée en POSITION (donc dans le trou de max_rows).
+_COLUMNS_HINT = "Une liste de colonnes se passe par columns=."
+
+
+class GridKeywords:
+    """Mixin ajouté à :class:`SapEccLibrary`. Opère sur les objets shell GuiGridView
+    (plus `Read Abap List` pour les sorties liste classiques, sans objet grille)."""
+
+    def get_grid_column_ids(self, table_id):
+        """Retourne la liste des identifiants techniques des colonnes d'une grille ALV, dans l'ordre d'affichage."""
+        grid = self._grid(table_id)
+        return [col for col in grid.ColumnOrder]
+
+    def count_blank_grid_rows(self, rows, columns=None):
+        """Combien de lignes d'un relevé de grille sont **entièrement vides**.
+
+        La garde que le nombre de lignes ne donne PAS. Une ALV ne matérialise
+        ses lignes qu'au fil du défilement, et `Read Grid` lit les lignes non
+        chargées en cellules VIDES plutôt que d'échouer : le relevé porte
+        alors le bon nombre de lignes, se relit fidèlement, se compare à
+        lui-même sans écart, et ne contient rien.
+
+        Mesuré le 2026-09-15 sur le rapport RSPARAM : la MÊME lecture rendait
+        1635 lignes pleines sur un système du banc et 1639 lignes dont 137
+        seulement remplies sur l'autre. Ce qui est ÉTABLI est l'écart entre
+        les deux mesures, pas sa cause : la matérialisation dépend de la
+        fenêtre visible, donc de la géométrie de capture et du poste autant
+        que du système, et une seule observation par cible ne permet pas de
+        trancher. Ce qui compte en pratique tient quand même : aucun contrôle
+        de complétude fondé sur le compte de lignes ne peut attraper le cas.
+
+        Employer `Read Full Grid` (qui fait défiler) pour une lecture
+        exhaustive, PUIS ce keyword pour vérifier que le défilement a suffi :
+        les deux sont complémentaires, le premier agit, le second constate. ::
+
+            ${lignes}=    Read Full Grid    ${GRID}    columns=${colonnes}
+            ${vides}=    Count Blank Grid Rows    ${lignes}    ${colonnes}
+            Should Be Equal As Integers    ${vides}    0
+        """
+        return blank_rows(rows, as_name_list(columns, "columns") or None)
+
+    def get_grid_column_titles(self, table_id):
+        """Retourne la carte ``{id technique: titre AFFICHÉ}`` des colonnes d'une
+        grille ALV, dans l'ordre d'affichage.
+
+        Le complément de `Get Grid Column Ids`, et ce qui manquait pour
+        EXTRAIRE un tableau plutôt que l'asserter. Les deux lectures n'ont pas
+        le même usage, et les confondre produit deux défauts opposés : un
+        fichier livré avec des ids techniques en en-tête ne ressemble pas à
+        l'écran dont il vient et son lecteur ne s'y retrouve pas ; un test qui
+        asserte sur des titres affichés dépend de la langue de session
+        (convention 3). D'où la carte : les clés restent techniques, les titres
+        ne servent qu'à ce qui est LU par un humain.
+
+        Un titre peut être vide (colonne sans en-tête) ou répété (deux colonnes
+        au même libellé) : la carte les rend TELS QUELS, sans rien inventer ni
+        dédoublonner. C'est à la couche de rendu de décider, et elle ne peut
+        décider que si elle voit le cas.
+
+        Exemple (RSPARAM, ABAP Platform 2023) : ``NAME`` -> ``Parameter Name``,
+        ``USER_VALUE`` -> ``User-Defined Value``,
+        ``DEFAULT_VALUE`` -> ``System Default Value``. ::
+
+            ${titres}=    Get Grid Column Titles    ${GRID}
+            ${lignes}=    Read Grid    ${GRID}    columns=${titres}
+            Write Table Xlsx    releve.xlsx    ${lignes}    headers=${titres}
+        """
+        grid = self._grid(table_id)
+        return {str(cid): grid.GetDisplayedColumnTitle(cid)
+                for cid in grid.ColumnOrder}
+
+    def get_column_id_by_title(self, table_id, title):
+        """Résout un ``title`` de colonne visible en son identifiant technique.
+
+        La correspondance est insensible à la casse et ignore les espaces en bordure.
+        Lève une exception si aucune colonne ne correspond : l'erreur liste les
+        titres disponibles pour faciliter le débogage des localisateurs.
+        """
+        grid = self._grid(table_id)
+        wanted = title.strip().lower()
+        available = {}
+        for col_id in grid.ColumnOrder:
+            col_title = grid.GetDisplayedColumnTitle(col_id)
+            available[col_id] = col_title
+            if col_title.strip().lower() == wanted:
+                return col_id
+        self.take_screenshot()
+        raise ValueError(
+            "No column titled '%s' in grid '%s'. Available: %s"
+            % (title, table_id, available)
+        )
+
+    def get_cell_value_by_column_title(self, table_id, row_num, title):
+        """Comme `Get Cell Value` mais adresse la colonne par son titre visible."""
+        col_id = self.get_column_id_by_title(table_id, title)
+        return self.get_cell_value(table_id, row_num, col_id)
+
+    def set_cell_value_by_column_title(self, table_id, row_num, title, text):
+        """Comme `Set Cell Value` mais adresse la colonne par son titre visible.
+
+        Le pendant en écriture de `Get Cell Value By Column Title` : évite d'avoir à
+        connaître l'identifiant technique de colonne dans le test."""
+        col_id = self.get_column_id_by_title(table_id, title)
+        self.set_cell_value(table_id, row_num, col_id, text)
+
+    def find_row_by_column_value(self, table_id, title, value, ignore_case=False):
+        """Retourne l'index (base 0) de la **première** ligne dont la cellule de la
+        colonne ``title`` vaut ``value``, ou ``-1`` si aucune.
+
+        Ne lit que les lignes actuellement chargées (cf. `Read Grid`) ; pour une
+        grande table, appeler `Read Full Grid` au préalable ou paginer. La
+        comparaison est exacte par défaut ; ``ignore_case`` la rend insensible à la
+        casse. Retourne ``-1`` plutôt que de lever, pour permettre un test
+        d'existence : voir `Select Row By Column Value` pour la variante qui agit."""
+        grid = self._grid(table_id)
+        col_id = self.get_column_id_by_title(table_id, title)
+        wanted = value.lower() if ignore_case else value
+        for row in range(grid.RowCount):
+            cell = grid.GetCellValue(row, col_id)
+            if (cell.lower() if ignore_case else cell) == wanted:
+                return row
+        return -1
+
+    def select_row_by_column_value(self, table_id, title, value, ignore_case=False):
+        """Sélectionne la première ligne dont la colonne ``title`` vaut ``value``.
+
+        Lève si aucune ligne ne correspond (l'erreur nomme la colonne et la valeur).
+        Retourne l'index de la ligne sélectionnée pour permettre l'enchaînement."""
+        row = self.find_row_by_column_value(table_id, title, value, ignore_case)
+        if row < 0:
+            self.take_screenshot()
+            raise ValueError(
+                "No row in grid '%s' has '%s' = '%s'." % (table_id, title, value)
+            )
+        self.select_table_row(table_id, row)
+        return row
+
+    def get_cell_value_by_row_content(self, table_id, anchor_title, anchor_value,
+                                      target_title, ignore_case=False):
+        """Lit la cellule ``target_title`` de la ligne repérée par son **contenu** :
+        « la ligne dont ``anchor_title`` vaut ``anchor_value`` », l'adressage
+        ``contenu @ colonne`` (à la RoboSAPiens) appliqué à l'ALV. Aucun index de
+        ligne dans le test : l'adressage survit au tri, au filtre et aux insertions.
+
+        Lève si aucune ligne ne porte cette valeur (mêmes limites de chargement
+        différé que `Find Row By Column Value`). Usage type::
+
+            ${prix}=    Get Cell Value By Row Content    ${GRID}    Carrier    LH    Price
+        """
+        row = self.find_row_by_column_value(table_id, anchor_title, anchor_value,
+                                            ignore_case)
+        if row < 0:
+            self.take_screenshot()
+            raise ValueError(
+                "No row in grid '%s' has '%s' = '%s'."
+                % (table_id, anchor_title, anchor_value)
+            )
+        return self.get_cell_value_by_column_title(table_id, row, target_title)
+
+    def read_full_grid(self, table_id, page_step=None, max_rows=None,
+                       columns=None):
+        """Comme `Read Grid` mais **fait défiler** la grille pour forcer le chargement
+        différé de toutes les lignes avant de lire.
+
+        SAP ne matérialise les lignes d'une ALV GridView qu'au fur et à mesure du
+        défilement. On parcourt donc la grille par fenêtres de ``VisibleRowCount``
+        (ou ``page_step`` si fourni) en repositionnant ``FirstVisibleRow``, puis on
+        lit l'ensemble. ``max_rows`` plafonne le total lu (journalisé) ;
+        ``columns`` restreint la lecture à des colonnes TECHNIQUES (voir
+        `Read Grid`). Restaure la position de défilement initiale à la fin."""
+        grid = self._grid(table_id)
+        total = grid.RowCount
+        max_rows = as_optional_int(max_rows, "max_rows", hint=_COLUMNS_HINT)
+        if max_rows is not None:
+            total = min(total, max_rows)
+        page_step = as_optional_int(page_step, "page_step")
+        step = page_step if page_step else int(getattr(grid, "VisibleRowCount", 0) or 0)
+        if step <= 0:
+            step = total or 1
+        original = getattr(grid, "FirstVisibleRow", 0)
+        first = 0
+        while first < total:
+            grid.FirstVisibleRow = first      # déclenche le chargement de la fenêtre
+            first += step
+        try:
+            grid.FirstVisibleRow = original
+        except com_error:
+            pass
+        return self.read_grid(table_id, max_rows=max_rows, columns=columns)
+
+    def read_grid(self, table_id, max_rows=None, columns=None):
+        """Lit une grille ALV dans une liste de dicts ``[{column_title: value, ...}]``.
+
+        Seules les lignes actuellement chargées sont lues ; SAP charge les grilles
+        en différé, donc pour les grandes tables faites défiler/paginer d'abord
+        (voir `Scroll`) ou passez un plafond ``max_rows``. Le plafond est journalisé
+        pour qu'une lecture tronquée ne soit jamais confondue avec une lecture complète.
+
+        ``columns`` (liste d'ids TECHNIQUES, ``CARRID``… ; une valeur seule,
+        une chaîne à virgules ``CARRID,CONNID`` ou une liste-littérale
+        ``"['CARRID', 'CONNID']"`` sont acceptées : via rf-mcp tout argument
+        arrive en chaîne, et un id technique ne contient pas de virgule)
+        restreint la lecture à ces colonnes et fait des ids techniques
+        les clés des dicts : indépendant de la locale ET du profil d'affichage
+        ALV de l'utilisateur (les titres affichés n'égalent les ids techniques
+        que quand le profil montre les noms de champs), et beaucoup moins
+        d'appels COM quand la grille est large. Colonne inconnue = échec
+        listant les colonnes disponibles. Sans ``columns``, les clés restent
+        les titres affichés (comportement historique).
+        """
+        grid = self._grid(table_id)
+        row_count = grid.RowCount
+        max_rows = as_optional_int(max_rows, "max_rows", hint=_COLUMNS_HINT)
+        if max_rows is not None and row_count > max_rows:
+            logger.warn(
+                "Grid '%s' has %s rows; reading only the first %s (max_rows)."
+                % (table_id, row_count, max_rows)
+            )
+            row_count = max_rows
+        wanted = as_name_list(columns, "columns")
+        if wanted:
+            available = [str(cid) for cid in grid.ColumnOrder]
+            missing = [c for c in wanted if c not in available]
+            if missing:
+                self.take_screenshot()
+                raise ValueError(
+                    "Grid '%s' has no technical column(s) %s. Available: %s"
+                    % (table_id, ", ".join(missing), ", ".join(available)))
+            pairs = [(cid, cid) for cid in wanted]
+        else:
+            pairs = [(cid, grid.GetDisplayedColumnTitle(cid))
+                     for cid in grid.ColumnOrder]
+        rows = []
+        for row in range(row_count):
+            rows.append({key: grid.GetCellValue(row, cid) for cid, key in pairs})
+        return rows
+
+    def read_abap_list(self):
+        """Lit la **liste ABAP classique** affichée (sortie SE38, SE16 sans ALV,
+        protocoles…) : lignes de cellules texte ``[[cellule, ...], ...]``, de
+        haut en bas, cellules de gauche à droite.
+
+        Ces écrans n'ont AUCUN objet grille scriptable : l'écran n'est qu'une
+        nuée de ``GuiLabel`` : la structure est reconstruite par géométrie
+        (``sapfx_common.abap_list``, via le même parcours structuré que la
+        perception). Complémentaire de `Read Grid` (ALV) : plus besoin de
+        forcer `Use ALV Grid In Data Browser` pour une simple assertion de
+        contenu.
+
+        **Ce qui est mesuré (A4H, SAP GUI 8.00, 2026-09-07)** : la liste SE16
+        STANDARD (`Use Standard List In Data Browser`, dynpro ``SAPMSSY0/120``)
+        est rendue en ``GuiLabel`` et se lit ici SANS le mode accessibilité
+        SAP GUI. Une sortie rendue dans un shell de sous-type connu (la
+        ``GridView`` de RSPARAM, prise un temps pour une liste opaque) se lit
+        par le keyword de son sous-type (`Read Grid`), et le cas « shell opaque
+        sans aucun label », celui que le mode accessibilité (Options →
+        Interaction Design → Accessibility) corrigerait, n'a pas été observé
+        sur le poste de laboratoire. L'échec le signale explicitement (même
+        diagnostic que `Get List Rendering Status` / `Abap List Should Be
+        Readable`, à appeler en préflight pour échouer plus tôt). Lecture seule."""
+        rows = reconstruct_rows(self._screen_elements())
+        if not rows:
+            # Même diagnostic (et même message) que le préflight : une seule
+            # source de vérité pour « pourquoi cette liste est illisible ».
+            self.abap_list_should_be_readable()
+            self.take_screenshot()
+            raise AssertionError(
+                "Aucune liste ABAP détectée sur l'écran actif : des labels sont "
+                "présents mais aucun n'est positionné (géométrie indisponible).")
+        return rows
+
+    # -- helpers (méthodes internes) ------------------------------------------
+
+    # Profondeur maximale explorée sous un conteneur avant d'abandonner.
+    # Mesuré sur ABAP 2023 : la grille est à 2 niveaux sous le conteneur en
+    # SE16, à 4 en SM50 (qui insère un panneau HTML et un second splitter).
+    _MAX_CONTAINER_DEPTH = 6
+
+    # Ce que lit un GuiShell d'un autre sous-type, pour un refus qui nomme le
+    # bon keyword au lieu de laisser fuir une AttributeError COM.
+    _SHELL_READERS = {
+        "Tree": "un arbre : lire par Read Tree Nodes",
+        "Calendar": "un calendrier : Pick Calendar Date",
+        "AbapEditor": "un éditeur ABAP : hors API",
+        "TextEdit": "un éditeur de texte : hors API",
+        "HTMLViewer": "un HTMLViewer : hors API",
+        "Picture": "une image : hors API",
+    }
+
+    @staticmethod
+    def _is_grid_view(obj):
+        """Vrai pour une ALV réelle : un ``GuiShell`` de sous-type ``GridView``.
+        Sans sous-type exposé (doublure, conteneur), ``ColumnOrder`` décide,
+        comme avant ; AVEC un sous-type, ``ColumnOrder`` ne suffit plus, un
+        arbre à colonnes en portant une aussi (mesuré le 2026-09-08 sur l'IMG
+        de SPRO : `Get Grid Column Ids` passait sur l'arbre en rendant
+        ``['HierarchyHeader']``)."""
+        subtype = shell_subtype(obj)
+        if subtype:
+            return subtype == "GridView"
+        return hasattr(obj, "ColumnOrder")
+
+    def _grid(self, table_id):
+        self.element_should_be_present(table_id)
+        grid = self.session.findById(table_id)
+        if self._is_grid_view(grid):
+            return grid
+        subtype = shell_subtype(grid)
+        if subtype in LEAF_SHELL_SUBTYPES:
+            # Un shell FEUILLE d'un autre sous-type ne contient pas de grille :
+            # refuser tout de suite en nommant ce que c'est et le keyword qui
+            # le lit. Un Splitter, lui, est un conteneur : on descend.
+            self.take_screenshot()
+            raise ValueError(
+                "Element '%s' est un GuiShell/%s, pas une grille ALV : c'est %s. "
+                "Percevoir avec Get Screen Signature (colonne type GuiShell/<SubType>)."
+                % (table_id, subtype,
+                   self._SHELL_READERS.get(subtype, "un contrôle sans lecteur dédié")))
+        # Le chemin visé ne porte pas la grille elle-même. Les releases
+        # récentes enveloppent l'ALV dans un ou plusieurs GuiSplitterShell
+        # (relevé live le 2026-08-23 sur ABAP 2023), et la profondeur varie
+        # d'une transaction à l'autre : il n'existe donc pas de suffixe fixe
+        # à concaténer au localisateur. On descend jusqu'au PREMIER GridView
+        # réel, c'est-à-dire qu'on adresse l'identité du contrôle plutôt que
+        # la mise en page de l'écran.
+        found, found_id = self._grid_below(grid, table_id)
+        if found is not None:
+            # Jamais silencieux : la même règle que l'auto-réparation de
+            # localisateurs. Un test qui passe grâce à une descente doit le
+            # dire, sinon le localisateur périmé survit indéfiniment.
+            logger.warn(
+                "Grid '%s' n'est pas la grille elle-même mais un conteneur : "
+                "grille trouvée à '%s' et utilisée. Les releases récentes "
+                "enveloppent l'ALV dans des GuiSplitterShell, à une profondeur "
+                "qui varie selon la transaction. Mettre le localisateur à jour "
+                "si ce système devient la cible principale." % (table_id, found_id))
+            return found
+        self.take_screenshot()
+        raise ValueError(
+            "L'élément '%s' n'est pas une grille ALV (GuiShell/GridView : le "
+            "sous-type décide) et aucune grille n'a été trouvée en dessous "
+            "(%d niveaux explorés). Vérifier le localisateur avec Get Screen "
+            "Signature : l'écran rend-il bien une grille ?"
+            % (table_id, self._MAX_CONTAINER_DEPTH))
+
+    def _resolved_grid_id(self, table_id):
+        """Identifiant de la grille RÉELLE derrière ``table_id``.
+
+        Rend l'identifiant INCHANGÉ dans les deux cas où il ne faut pas
+        intervenir : le chemin porte déjà la grille (cas du 1909 et de toutes
+        les suites vertes), ou rien qui ressemble à une grille n'existe en
+        dessous (un GuiTableControl, par exemple). La primitive amont produit
+        alors son propre message d'erreur, qui reste le plus juste.
+        """
+        try:
+            element = self.session.findById(table_id)
+        except Exception:                                  # noqa: BLE001
+            return table_id
+        if self._is_grid_view(element) or shell_subtype(element) in LEAF_SHELL_SUBTYPES:
+            return table_id
+        found, found_id = self._grid_below(element, table_id)
+        if found is None or not found_id or found_id == table_id:
+            return table_id
+        logger.warn(
+            "Grid '%s' porte un conteneur : grille réelle '%s' utilisée."
+            % (table_id, found_id))
+        return found_id
+
+    # Primitives de grille héritées du code vendorisé : elles appellent
+    # `findById(table_id)` en direct, donc elles ne passent pas par `_grid`.
+    # On ne modifie pas le fichier amont (convention 4) : on résout
+    # l'identifiant ici, puis on délègue le comportement inchangé.
+
+    def get_row_count(self, table_id):
+        """Nombre de lignes d'une grille, y compris quand le localisateur vise
+        le conteneur qui l'enveloppe (releases récentes)."""
+        return super().get_row_count(self._resolved_grid_id(table_id))
+
+    def get_cell_value(self, table_id, row_num, col_id):
+        """Valeur d'une cellule, localisateur de conteneur toléré."""
+        return super().get_cell_value(
+            self._resolved_grid_id(table_id), row_num, col_id)
+
+    def set_cell_value(self, table_id, row_num, col_id, text):
+        """Écrit une cellule, localisateur de conteneur toléré."""
+        return super().set_cell_value(
+            self._resolved_grid_id(table_id), row_num, col_id, text)
+
+    def click_toolbar_button(self, table_id, button_id):
+        """Clique un bouton de la barre d'outils d'une grille, localisateur de
+        conteneur toléré."""
+        return super().click_toolbar_button(
+            self._resolved_grid_id(table_id), button_id)
+
+    def select_table_row(self, table_id, row_num):
+        """Sélectionne une ligne. Sur un GuiTableControl l'identifiant est rendu
+        inchangé, donc le comportement amont (qui gère les deux types) est
+        strictement préservé."""
+        return super().select_table_row(
+            self._resolved_grid_id(table_id), row_num)
+
+    @staticmethod
+    def _children_of(node):
+        """Enfants d'un conteneur COM, ou liste vide. Tolérant par dessein :
+        un objet sans ``Children``, un accesseur absent ou un appel qui lève
+        ne doivent pas faire échouer une simple exploration."""
+        children = getattr(node, "Children", None)
+        if children is None:
+            return []
+        try:
+            count = int(children.Count)
+        except Exception:                                  # noqa: BLE001
+            return []
+        items = []
+        for index in range(count):
+            for accessor in ("ElementAt", "Item"):
+                method = getattr(children, accessor, None)
+                if method is None:
+                    continue
+                try:
+                    child = method(index)
+                except Exception:                          # noqa: BLE001
+                    continue
+                if child is not None:
+                    items.append(child)
+                break
+        return items
+
+    def _grid_below(self, node, base_id):
+        """Premier descendant portant ``ColumnOrder``, en parcours en largeur
+        borné. Retourne ``(grille, identifiant)`` ou ``(None, None)``."""
+        queue = [(node, 0)]
+        while queue:
+            current, depth = queue.pop(0)
+            if depth >= self._MAX_CONTAINER_DEPTH:
+                continue
+            for child in self._children_of(current):
+                if self._is_grid_view(child):
+                    return child, str(getattr(child, "Id", "") or base_id)
+                queue.append((child, depth + 1))
+        return None, None

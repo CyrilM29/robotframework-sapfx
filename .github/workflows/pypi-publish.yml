@@ -1,0 +1,138 @@
+# Publication PyPI par Trusted Publishing (OIDC) : aucun token stocké.
+# Prérequis (une fois, côté pypi.org → projet robotframework-sapfx →
+# Publishing) : ajouter un « GitHub publisher » owner=CyrilM29,
+# repository=robotframework-sapfx, workflow=pypi-publish.yml, environment=pypi.
+# Déclenchement : MANUEL seulement (Actions → pypi-publish → Run workflow),
+# décision du 2026-09-29 : plus de GitHub Release publique, et une
+# publication PyPI est un geste humain explicite. La version à publier est
+# saisie au lancement et doit être celle de pyproject.toml : la saisie vaut
+# confirmation, et une faute de frappe arrête le job avant toute construction.
+# Le README poussé sur PyPI est la variante SANS le banner EN/FR (lien
+# relatif, cassé là-bas) et avec des liens de dépôt absolus : même règle que
+# l'outillage d'export.
+name: pypi-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version à publier, identique à celle de pyproject.toml (ex. 0.8.3).
+          Sert de confirmation : un écart arrête le job.
+        required: true
+      post:
+        description: >-
+          Numéro de POST-RELEASE (1, 2…) pour republier la MÊME version avec
+          une page PyPI corrigée. Laisser vide pour une publication normale.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # Le dépôt PRIVÉ embarque ce workflow (l'arbre public en est un export) :
+    # sans ce garde, un lancement depuis le dépôt privé échouerait à l'échange
+    # OIDC (le publisher PyPI n'autorise que le dépôt public), soit un run
+    # rouge sans conséquence mais trompeur (constaté en 0.6.5, du temps où une
+    # release déclenchait ce workflow).
+    if: github.repository == 'CyrilM29/robotframework-sapfx'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write # OIDC : c'est l'identité du workflow qui authentifie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Requested version must match pyproject version
+        env:
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          python - <<'EOF'
+          import os, re, sys
+          requested = os.environ["REQUESTED"].strip().lstrip("v")
+          text = open("pyproject.toml", encoding="utf-8").read()
+          version = re.search(r'^version = "([^"]+)"', text, re.M).group(1)
+          if requested != version:
+              sys.exit(f"version demandée {requested} != pyproject {version}")
+          print(f"version {version} OK")
+          EOF
+
+      # Les fichiers d'une version PyPI sont IMMUABLES : une page à corriger
+      # (README) impose de republier la même version en post-release. On patche
+      # donc pyproject le temps du build, sans jamais committer une version
+      # divergente (le dépôt reste sur X.Y.Z, et `__version__` des modules
+      # aussi : le code est identique, c'est la page qui change).
+      - name: Apply the post-release suffix (page-only fix)
+        if: inputs.post != ''
+        env:
+          POST: ${{ inputs.post }}
+        run: |
+          python - <<'EOF'
+          import os, pathlib, re, sys
+          post = os.environ["POST"].strip()
+          if not post.isdigit() or post == "0":
+              sys.exit(f"post doit être un entier >= 1 (reçu {post!r})")
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          current = re.search(r'^version = "([^"]+)"', text, re.M).group(1)
+          if ".post" in current or ".dev" in current or "rc" in current:
+              sys.exit(f"version déjà suffixée ({current}) : rien à faire ici")
+          target = f"{current}.post{post}"
+          path.write_text(
+              text.replace(f'version = "{current}"', f'version = "{target}"', 1),
+              encoding="utf-8")
+          print(f"post-release : {current} -> {target}")
+          EOF
+
+      - name: Render the PyPI README (no EN/FR banner, absolute links)
+        run: |
+          python - <<'EOF'
+          import pathlib, re, sys
+          p = pathlib.Path("README.md")
+          text = p.read_text(encoding="utf-8")
+          banner = "> **\U0001F1EC\U0001F1E7 English** · [\U0001F1EB\U0001F1F7 Français](README.fr.md)\n\n"
+          raw = "https://raw.githubusercontent.com/CyrilM29/robotframework-sapfx/main"
+          blob = "https://github.com/CyrilM29/robotframework-sapfx/blob/main"
+          if banner not in text:
+              sys.exit("banner EN/FR introuvable dans README.md")
+          text = text.replace(banner, "", 1)
+          # Les liens relatifs vers un fichier du dépôt (docs/…, LICENSE,
+          # NOTICE) sont MORTS sur la page PyPI, qui n'a aucune notion de
+          # dépôt : on les absolutise ici seulement (le README du dépôt garde
+          # ses relatifs). Une IMAGE part vers raw, un lien vers blob : une URL
+          # blob sert la page HTML du fichier, pas l'image. La cible n'est PAS
+          # restreinte aux .md, l'ancien motif l'exigeait et ](LICENSE) est
+          # parti relatif dans trois releases.
+          # MÊME règle que scripts/export_public_tree.py, que ce dépôt n'a pas
+          # (privé) : un test unitaire privé tient les deux égales.
+          text, linked = re.subn(
+              r"(!?)\[((?:[^\[\]]|\[[^\]]*\])*)\]\((?!https?://|#|mailto:)([^)\s]+)\)",
+              lambda m: "%s[%s](%s/%s)" % (
+                  m.group(1), m.group(2),
+                  raw if m.group(1) else blob, m.group(3).lstrip("./")), text)
+          if not linked:
+              sys.exit("aucun lien relatif de dépôt trouvé : motif changé ?")
+          # Garde inverse, plus LARGE que le réécriveur : un lien relatif resté
+          # est un lien mort, et « au moins un réécrit » ne le voyait pas.
+          leftovers = sorted(set(re.findall(
+              r"\]\((?!https?://|#|mailto:)([^)]+)\)", text)))
+          if leftovers:
+              sys.exit("liens relatifs RESTÉS, donc morts sur PyPI : %r" % leftovers)
+          p.write_text(text, encoding="utf-8")
+          print("README PyPI OK (%d lien(s) absolutisé(s))" % linked)
+          EOF
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --quiet build
+          python -m build
+
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

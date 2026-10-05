@@ -1,0 +1,410 @@
+  // --- popups OUVERTS ------------------------------------------------------
+  // Le pendant Fiori de `Get Open Windows` (ECC). Il existe parce qu'un
+  // dialogue FERMÉ reste RENDU : mesuré live sur un launchpad ABAP, le
+  // dialogue « À propos » garde son nœud DOM après acquittement, donc ni un
+  // comptage de correspondances ni une résolution ne distinguent ouvert de
+  // fermé. `sap.m.InstanceManager` est la seule source qui le sache.
+  function instanceManager() {
+    try {
+      const m = sap.ui.require && sap.ui.require('sap/m/InstanceManager');
+      if (m) return m;
+    } catch (e) {}
+    return (window.sap && sap.m && sap.m.InstanceManager) || null;
+  }
+
+  // Boutons RENDUS d'un popup, dans l'ordre de l'agrégation. Les MessageBox
+  // n'alimentent pas `buttons` mais `beginButton`/`endButton` : les deux
+  // formes donnent la même liste ordonnée.
+  function popupButtons(c) {
+    const out = [];
+    try {
+      const list = (typeof c.getButtons === 'function' && c.getButtons()) || [];
+      list.forEach((b) => { if (b && b.getDomRef && b.getDomRef()) out.push(b); });
+    } catch (e) {}
+    if (!out.length) {
+      ['getBeginButton', 'getEndButton'].forEach((name) => {
+        try {
+          const b = typeof c[name] === 'function' ? c[name]() : null;
+          if (b && b.getDomRef && b.getDomRef()) out.push(b);
+        } catch (e) {}
+      });
+    }
+    return out;
+  }
+
+  // Boutons rendus du CONTENU d'un popup, dans l'ordre des agrégations. Un
+  // popover de confirmation n'a souvent AUCUN bouton de pied : relevé sur
+  // l'abandon d'un brouillon Fiori Elements (2026-09-24), son unique bouton
+  // vit dans `content`. Réservé aux popovers : un dialogue dont les actions
+  // vivent dans une barre de pied doit continuer d'en compter zéro.
+  function contentButtons(c) {
+    const out = [];
+    try {
+      const found = typeof c.findAggregatedObjects === 'function'
+        ? c.findAggregatedObjects(true, (o) => !!(o && o.isA && o.isA('sap.m.Button')))
+        : [];
+      found.forEach((b) => { if (b && b.getDomRef && b.getDomRef()) out.push(b); });
+    } catch (e) {}
+    return out;
+  }
+  function actionButtons(c, kind) {
+    const own = popupButtons(c);
+    return (own.length || kind !== 'popover') ? own : contentButtons(c);
+  }
+
+  function popupEntry(c, kind) {
+    let state = '';
+    let type = '';
+    try { if (typeof c.getState === 'function') state = String(c.getState() || ''); } catch (e) {}
+    try { type = c.getMetadata().getName(); } catch (e) {}
+    return { id: String(c.getId()), controlType: type, kind: kind,
+             state: state, buttons: actionButtons(c, kind).length,
+             technology: 'ui5' };
+  }
+
+  // Popups OUVERTS côté Web Components : `InstanceManager` ne les connaît
+  // pas. Mesuré live (2026-08-26, shell Work Zone) : le menu utilisateur est
+  // un popover WC ouvert (propriété `open` vraie) et `Get Ui5 Open Popups`
+  // rendait []. Le témoin d'ouverture d'un popup WC est sa propriété/attribut
+  // `open` : les entrées d'un menu FERMÉ restent rendues dans le DOM (relevé
+  // sur le même shell), seul `open` distingue. Parcours PROFOND : ces popups
+  // vivent souvent dans le shadow root de leur ouvreur. Le cœur du tag est
+  // comparé une fois le préfixe (`ui5-`) et le suffixe de scoping
+  // (`-6bfd01e3`) neutralisés par la correspondance par préfixe de forme.
+  const WC_POPUP_KINDS = [
+    ['responsive-popover', 'popover'], ['popover', 'popover'],
+    ['dialog', 'dialog'], ['menu', 'popover'], ['toast', 'toast'],
+  ];
+  function wcPopupKind(tag) {
+    for (let p = 0; p < WC_PREFIXES.length; p++) {
+      if (tag.lastIndexOf(WC_PREFIXES[p], 0) !== 0) continue;
+      const core = tag.slice(WC_PREFIXES[p].length);
+      for (let k = 0; k < WC_POPUP_KINDS.length; k++) {
+        const key = WC_POPUP_KINDS[k][0];
+        if (core === key || core.lastIndexOf(key + '-', 0) === 0) {
+          return WC_POPUP_KINDS[k][1];
+        }
+      }
+      return null;
+    }
+    return null;
+  }
+  function wcOpenPopups() {
+    const out = [];
+    try {
+      const nodes = deepQueryAll();
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        const tag = el.tagName.toLowerCase();
+        if (tag.indexOf('-') === -1) continue;
+        const kind = wcPopupKind(tag);
+        if (!kind) continue;
+        const open = (el.open === true)
+          || (el.hasAttribute && el.hasAttribute('open'));
+        if (!open) continue;
+        out.push({ id: String(el.id || ''), controlType: tag, kind: kind,
+                   state: '', buttons: 0, technology: 'wc',
+                   css: wcCssPath(el) });
+      }
+    } catch (e) {}
+    return out;
+  }
+
+  function openPopups() {
+    const wc = wcOpenPopups();
+    if (!isUI5()) return wc.length ? wc : null;
+    const out = [];
+    const IM = instanceManager();
+    if (IM) {
+      try { (IM.getOpenDialogs() || []).forEach((d) => out.push(popupEntry(d, 'dialog'))); } catch (e) {}
+      try { (IM.getOpenPopovers() || []).forEach((p) => out.push(popupEntry(p, 'popover'))); } catch (e) {}
+    }
+    return out.concat(wc);
+  }
+
+  // Id DOM du bouton d'INDEX donné (base 0) du dialogue ouvert le plus récent,
+  // ou, sans dialogue ouvert, du POPOVER ouvert le plus récent (boutons de
+  // pied, sinon boutons du contenu). Les boutons d'une MessageBox portent un
+  // id GÉNÉRÉ (`__mbox-btn-0`) et un texte TRADUIT : la position est la seule
+  // adresse locale-indépendante (convention 3). Retourne { error } plutôt que
+  // de lever, pour que l'appelant Python compose un message actionnable.
+  function dialogButton(payload) {
+    if (!isUI5()) return null;
+    let req;
+    try { req = JSON.parse(payload) || {}; } catch (e) { req = {}; }
+    const IM = instanceManager();
+    if (!IM) return { error: 'no_instance_manager' };
+    let dialogs = [];
+    let popovers = [];
+    try { dialogs = IM.getOpenDialogs() || []; } catch (e) { dialogs = []; }
+    try { popovers = IM.getOpenPopovers() || []; } catch (e) { popovers = []; }
+    let d = null;
+    let kind = 'dialog';
+    if (req.id) {
+      // Popup DÉSIGNÉ : celui qu'on vient d'attendre, pas le plus récent (un
+      // popover de messages peut rester ouvert à côté d'une confirmation).
+      const want = String(req.id);
+      d = dialogs.find((x) => String(x.getId()) === want) || null;
+      if (!d) {
+        d = popovers.find((x) => String(x.getId()) === want) || null;
+        kind = 'popover';
+      }
+      if (!d) {
+        const open = dialogs.concat(popovers).map((x) => String(x.getId()));
+        return { error: 'not_open', dialog: want, open: open };
+      }
+    } else if (dialogs.length) {
+      d = dialogs[dialogs.length - 1];
+    } else if (popovers.length) {
+      d = popovers[popovers.length - 1];
+      kind = 'popover';
+    } else {
+      return { error: 'no_dialog' };
+    }
+    const buttons = actionButtons(d, kind);
+    const idx = parseInt(req.position, 10);
+    const pos = isNaN(idx) ? 0 : idx;
+    if (pos < 0 || pos >= buttons.length) {
+      return { error: 'out_of_range', count: buttons.length, dialog: String(d.getId()), kind: kind };
+    }
+    const dom = buttons[pos].getDomRef();
+    if (!dom || !dom.id) return { error: 'not_rendered', count: buttons.length, dialog: String(d.getId()), kind: kind };
+    return { id: dom.id, count: buttons.length, dialog: String(d.getId()), kind: kind };
+  }
+
+  // Spy : trouve le contrôle UI5 le plus proche propriétaire d'un nœud DOM et propose un sélecteur stable.
+  function closestControl(node) {
+    let cur = node;
+    while (cur) {
+      if (cur.id) {
+        const c = byId(cur.id);
+        if (c && c.getDomRef && c.getDomRef() && c.getDomRef().contains(node)) return c;
+      }
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+  // Suffixe d'id STABLE d'un id Fiori Elements : la partie à partir de 'fe::'
+  // (« <AppId>::<PageId>--fe::table::… » -> « fe::table::… »). Le préfixe
+  // app/route varie ; le suffixe est déterministe (doc officielle FE V4).
+  function feIdSuffix(id) {
+    const idx = String(id).indexOf('fe::');
+    return idx === -1 ? null : String(id).slice(idx);
+  }
+  function capture(node) {
+    if (!isUI5()) return null;
+    const c = closestControl(node);
+    if (!c) return null;
+    const full = c.getMetadata().getName();
+    const sh = shortType(full);
+    const p = props(c);
+    const xShort = bestXpath(c.getId());
+    // Id Fiori Elements ? Son suffixe 'fe::…' est le sélecteur LE PLUS stable
+    // (avant même les propriétés, qui portent souvent du texte localisé).
+    const fe = feIdSuffix(c.getId());
+    const txt = controlText(c);           // texte visible : assertions de valeur du recorder
+    if (fe) {
+      return { role: { idSuffix: fe }, xpath: '//' + sh, xpathShort: xShort, text: txt };
+    }
+    let role = { controlType: full };
+    let xprop = '//' + sh;
+    for (let i = 0; i < ALLOWED.length; i++) {
+      const name = ALLOWED[i];
+      if (name in p && typeof p[name] !== 'object' && String(p[name]) !== '') {
+        const val = String(p[name]);
+        role = { controlType: full, properties: {} };
+        role.properties[name] = val;
+        xprop = '//' + sh + '[@' + name + '=' + xpathLiteral(val) + ']';
+        return { role: role, xpath: xprop, xpathShort: xShort, text: txt };
+      }
+    }
+    if (ALLOW_WITHOUT.indexOf(sh) === -1) {
+      console.warn('[UI5 Recorder] no stable property matched for ' + sh +
+        ' (' + c.getId() + ') -- falling back to a dynamic control id, likely fragile.');
+      role = { id: c.getId() };
+      xprop = '//' + sh + '[@id=' + xpathLiteral(c.getId()) + ']';
+    }
+    return { role: role, xpath: xprop, xpathShort: xShort, text: txt };
+  }
+
+  // ---- XPath structurel le plus court et unique sur l'arbre de contrôles ----
+  // Porté depuis playwright-sap UI5Xpath.ts (getShortestXPath) : construit le chemin
+  // positionnel complet, puis retourne le '//suffixe' le plus court qui résout encore
+  // exactement vers le nœud cible.
+  function findNodeById(doc, id) {
+    const r = doc.evaluate('//*[@id=' + xpathLiteral(id) + ']',
+        doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+    return r.singleNodeValue;
+  }
+  function positionalPath(node) {
+    const parts = [];
+    let cur = node;
+    while (cur && cur.nodeType === 1 && cur.nodeName !== 'UI5Tree') {
+      let idx = 1, sib = cur.previousElementSibling;
+      while (sib) { if (sib.nodeName === cur.nodeName) idx++; sib = sib.previousElementSibling; }
+      parts.unshift(cur.nodeName + '[' + idx + ']');
+      cur = cur.parentElement;
+    }
+    return parts;
+  }
+  function bestXpath(controlId) {
+    if (!isUI5()) return null;
+    const doc = buildTree();
+    const node = findNodeById(doc, controlId);
+    if (!node) return null;
+    const parts = positionalPath(node);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const cand = '//' + parts.slice(i).join('/');
+      const res = doc.evaluate(cand, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      if (res.snapshotLength === 1 && res.snapshotItem(0) === node) return cand;
+    }
+    return '//' + parts.join('/');
+  }
+
+  // ---- Support du 'sid' SAP WebGUI (SAP GUI for HTML) -----------------------
+  // Les éléments ABAP classiques WebGUI portent un attribut `lsdata` où le "SID" stable
+  // (ex. wnd[0]/usr/ctxtVBAK-VBELN, l'id de scripting SAP GUI) apparaît sous DEUX
+  // encodages : JSON `"SID":"…"` (fixtures, anciens ITS) ou littéral JS `SID:'…'`
+  // (clé non citée, guillemets simples : le WebGUI live S/4 1909, constaté 2026-07-18).
+  // Porté depuis playwright-sap sidSelectorGenerator.ts (regex au lieu d'eval).
+  // Décodage d'entités HTML SANS innerHTML : même sur un <textarea> détaché,
+  // un lsdata hostile pourrait sortir du RCDATA par </textarea> et créer des
+  // nœuds à gestionnaire inline. Entités numériques + les nommées usuelles :
+  // largement assez pour un attribut lsdata.
+  const NAMED_ENTITIES = {amp: '&', lt: '<', gt: '>', quot: '"', apos: "'",
+                          nbsp: '\u00a0'};
+  function decodeEntities(raw) {
+    return raw.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function (all, ent) {
+      if (ent.charAt(0) === '#') {
+        const cp = (ent.charAt(1) === 'x' || ent.charAt(1) === 'X')
+          ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
+        return isNaN(cp) ? all : String.fromCodePoint(cp);
+      }
+      return Object.prototype.hasOwnProperty.call(NAMED_ENTITIES, ent)
+        ? NAMED_ENTITIES[ent] : all;
+    });
+  }
+  function sidFromElement(el) {
+    if (!el || !el.getAttribute) return undefined;
+    const raw = el.getAttribute('lsdata');
+    if (!raw) return undefined;
+    const m = decodeEntities(raw).match(/["']?SID["']?\s*:\s*["']([^"']+)["']/);
+    return m ? m[1] : undefined;
+  }
+  function captureSid(node) {
+    let cur = (node.nodeType === 1) ? node : node.parentElement;
+    let count = 0;
+    while (cur && count < 5) {
+      if (cur.id && cur.id.indexOf('helpbutton') !== -1) break;
+      if (cur.hasAttribute && cur.hasAttribute('lsdata')) {
+        const s = sidFromElement(cur);
+        if (s) return { sid: s };
+        break;
+      }
+      count++; cur = cur.parentElement;
+    }
+    const start = (node.nodeType === 1) ? node : node.parentElement;
+    const queue = start ? [{ n: start, d: 0 }] : [];
+    while (queue.length) {
+      const it = queue.shift();
+      if (!it || it.d > 2) break;
+      if (it.n.id && it.n.id.indexOf('helpbutton') !== -1) continue;
+      for (let i = 0; i < it.n.children.length; i++) {
+        const ch = it.n.children[i];
+        if (ch.hasAttribute('lsdata')) {
+          const s = sidFromElement(ch);
+          if (s) return { sid: s };
+        }
+        queue.push({ n: ch, d: it.d + 1 });
+      }
+    }
+    return null;
+  }
+
+  // ---- Accessibilité : rôle implicite + nom accessible ----------------------
+  // Les zones web génériques (React/Angular/vanilla) et les UI5 Web Components
+  // s'adressent au plus près de l'INTENTION utilisateur via l'arbre
+  // d'accessibilité : le rôle ARIA (explicite OU implicite, la sémantique
+  // HTML native, sous-ensemble pragmatique de HTML-AAM) et le nom accessible
+  // (calcul accname SIMPLIFIÉ, dans l'ordre de précédence de la spec W3C).
+  // Consommés par les clés `role=`/`name=` des moteurs dom et wc, jamais
+  // requis : les clés structurelles (css/tag/id) restent disponibles.
+  const IMPLICIT_ROLES = {
+    button: 'button', textarea: 'textbox', img: 'img', nav: 'navigation',
+    main: 'main', form: 'form', search: 'search', header: 'banner',
+    footer: 'contentinfo', aside: 'complementary', article: 'article',
+    section: 'region', dialog: 'dialog', table: 'table', ul: 'list',
+    ol: 'list', li: 'listitem', option: 'option', progress: 'progressbar',
+    output: 'status', summary: 'button', hr: 'separator', select: 'combobox',
+  };
+  const INPUT_ROLES = {
+    checkbox: 'checkbox', radio: 'radio', button: 'button', submit: 'button',
+    reset: 'button', image: 'button', range: 'slider', number: 'spinbutton',
+    search: 'searchbox',
+  };
+  function ariaRole(el) {
+    const explicit = String(el.getAttribute('role') || '').trim().split(/\s+/)[0];
+    if (explicit) return explicit.toLowerCase();
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'a' || tag === 'area') return el.hasAttribute('href') ? 'link' : '';
+    if (tag === 'input') {
+      const t = String(el.getAttribute('type') || 'text').toLowerCase();
+      if (t === 'hidden') return '';
+      return INPUT_ROLES[t] || 'textbox';
+    }
+    if (tag === 'select') return (el.multiple || Number(el.size) > 1) ? 'listbox' : 'combobox';
+    if (/^h[1-6]$/.test(tag)) return 'heading';
+    return IMPLICIT_ROLES[tag] || '';
+  }
+  function refsText(el, attr) {
+    const refs = String(el.getAttribute(attr) || '').trim();
+    if (!refs) return '';
+    const parts = [];
+    const ids = refs.split(/\s+/);
+    for (let i = 0; i < ids.length; i++) {
+      const ref = document.getElementById(ids[i]);
+      if (ref) { const t = (ref.textContent || '').trim(); if (t) parts.push(t); }
+    }
+    return parts.join(' ');
+  }
+  function accName(el) {
+    const labelledby = refsText(el, 'aria-labelledby');
+    if (labelledby) return labelledby;
+    const ariaLabel = String(el.getAttribute('aria-label') || '').trim();
+    if (ariaLabel) return ariaLabel;
+    // Convention UI5 Web Components : accessible-name (attribut) / accessibleName (propriété).
+    let wcName = el.getAttribute('accessible-name');
+    if (!wcName && ('accessibleName' in el) && typeof el.accessibleName !== 'object') {
+      wcName = el.accessibleName;
+    }
+    if (wcName && String(wcName).trim()) return String(wcName).trim();
+    // <label for=…> / <label> englobant : .labels pour les champs de formulaire
+    // natifs, requête label[for] pour les autres (custom elements à id).
+    if (el.labels && el.labels.length) {
+      const t = (el.labels[0].textContent || '').trim();
+      if (t) return t;
+    }
+    if (el.id && el.id.indexOf('"') === -1) {
+      const lab = document.querySelector('label[for="' + el.id + '"]');
+      if (lab) { const t = (lab.textContent || '').trim(); if (t) return t; }
+    }
+    const tag = el.tagName.toLowerCase();
+    if ((tag === 'img' || tag === 'area')) {
+      const alt = String(el.getAttribute('alt') || '').trim();
+      if (alt) return alt;
+    }
+    if (tag === 'input') {
+      const t = String(el.getAttribute('type') || '').toLowerCase();
+      // != null et non-vide, pas truthy : un bouton de pavé numérique value="0" a un nom
+      if ((t === 'button' || t === 'submit' || t === 'reset') &&
+          el.value !== undefined && el.value !== null && String(el.value) !== '') {
+        return String(el.value).trim();
+      }
+    }
+    const text = (el.textContent || '').trim();
+    if (text) return text.slice(0, 300);
+    const title = String(el.getAttribute('title') || '').trim();
+    if (title) return title;
+    return String(el.getAttribute('placeholder') || '').trim();
+  }
+
