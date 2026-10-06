@@ -54,18 +54,26 @@ class ActionKeywords:
 
         Re-résout puis re-clique en cas d'échec transitoire : entre la résolution et
         le clic, une vue Fiori peut se redessiner et invalider l'élément (*stale
-        element*). Chaque tentative repart d'une résolution fraîche."""
+        element*). Chaque tentative repart d'une résolution fraîche.
+
+        Exemple :
+        | `Click Ui5 Control`    idSuffix=fe::FilterBar::Travel-btnSearch
+        """
         self._act_with_retry(
             lambda: self._browser().click(
                 self.resolve_ui5_control(index=index, **selector_parts)),
             "click %s" % (selector_parts or "index %s" % index))
 
     def click_ui5_by_xpath(self, xpath, index=0):
-        """Résout un **UI5 XPath hiérarchique** puis clique le contrôle obtenu.
+        """Résout un *UI5 XPath hiérarchique* puis clique le contrôle obtenu.
 
         Pendant de `Click Ui5 Control` pour les localisateurs XPath (ex. cibler un
         bouton à l'intérieur d'un dialogue : ``//Dialog//Button[@text='OK']``).
-        Re-résout à chaque tentative pour absorber un re-rendu (*stale element*)."""
+        Re-résout à chaque tentative pour absorber un re-rendu (*stale element*).
+
+        Exemple :
+        | `Click Ui5 By Xpath`    //Button[contains(@id, 'FilterBar::Travel-btnSearch')]
+        """
         self._act_with_retry(
             lambda: self._browser().click(self.resolve_ui5_by_xpath(xpath, index=index)),
             "click xpath %s" % xpath)
@@ -73,8 +81,8 @@ class ActionKeywords:
     def fill_ui5_input(self, text, index=0, **selector_parts):
         """Résout un champ de saisie UI5 et le remplit avec ``text`` via Browser.
 
-        Les champs UI5 composites (``sap.m.Input``, ``SearchField``…) rendent un élément
-        interne ``<input>``/``<textarea>`` ; on s'y positionne, il est impossible de saisir
+        Les champs UI5 composites (``sap.m.Input``, ``SearchField`` …) rendent un élément
+        interne ``<input>`` / ``<textarea>`` ; on s'y positionne, il est impossible de saisir
         directement dans le ``<div>`` racine du contrôle. Re-résout puis ré-essaie en
         cas d'échec transitoire (*stale element* après re-rendu).
 
@@ -84,6 +92,9 @@ class ActionKeywords:
         ``getattr(value, 'value', value)`` sortait le secret dans l'espace des
         variables de la suite). Baisser le niveau de log autour de l'appel
         reste à la charge de l'appelant, comme pour toute saisie sensible.
+
+        Exemple :
+        | `Fill Ui5 Input`    Aussie    idSuffix=fe::FilterBar::Travel::BasicSearchField-inner
         """
         text = reveal_secret(text)
 
@@ -111,9 +122,7 @@ class ActionKeywords:
         acceptait ``6 juil. 2025``. Le texte tapé est donc calculé dans la page
         par le TYPE de la liaison du champ (celui qui relira la saisie), à
         défaut par le format d'affichage du ``DatePicker`` ; aucune locale n'est
-        supposée. ::
-
-            Fill Ui5 Date    2026-10-15    idSuffix=DataField::BeginDate::Field-edit
+        supposée.
 
         ``commit`` : touche qui valide la saisie (``Tab`` par défaut, la perte
         de focus qui écrit un brouillon Fiori Elements ; ``Enter`` possible). La
@@ -122,6 +131,12 @@ class ActionKeywords:
         l'état de saisie du contrôle. ``commit=NONE`` tape sans valider ni
         vérifier. Vise un ``DatePicker`` ou un champ ``sap.ui.mdc`` (racine ou
         saisie interne) ; refuse un type date-et-heure. Retourne le texte tapé.
+
+        Exemple :
+        | ${typed}=    `Fill Ui5 Date`    2026-10-15    id=dpOdataDate
+        | Should Be Equal    ${typed}    Oct 15, 2026
+        | ${model}=    `Get Ui5 Property`    text    id=rawOdataDate
+        | Should Be Equal    ${model}    2026-10-15
         """
         iso = iso_date(date)
         selector = build_control_selector(**selector_parts)
@@ -178,7 +193,7 @@ class ActionKeywords:
         Pendant Fiori de `Read Grid` (ECC). Résout la table (``sap.m.Table`` ou
         ``sap.ui.table.Table``) puis extrait ses lignes via le bundle : clés = textes
         d'en-tête de colonne (ou ``col<i>`` à défaut). Ne lit que les lignes
-        **instanciées** : ``sap.ui.table.Table`` virtualise, faire défiler d'abord
+        *instanciées* : ``sap.ui.table.Table`` virtualise, faire défiler d'abord
         pour les grandes tables. Les lignes d'en-tête de groupe sont ignorées.
 
         Une table vraiment vide rend une liste vide, mais un contrôle dont les
@@ -199,6 +214,10 @@ class ActionKeywords:
         de la complétude plutôt que d'en être averti, `Get Ui5 Table Info`
         rend le total déclaré et `Table Extract Should Be Complete` refuse
         l'écart.
+
+        Exemple :
+        | ${rows}=    `Read Ui5 Table`    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Length Should Be    ${rows}    30
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
@@ -218,7 +237,11 @@ class ActionKeywords:
         Selector` de Browser. Re-résout et ré-essaie sur échec transitoire
         (*stale element*). Sur une page UI5 Web Components sans runtime
         (moteur *wc*), résoudre l'hôte avec `Resolve Wc Control` puis appeler
-        directement `Upload File By Selector` avec ``<chemin> input[type=file]``."""
+        directement `Upload File By Selector` avec ``<chemin> input[type=file]``.
+
+        Exemple :
+        | `Upload File Via Ui5`    ${CURDIR}/travels.xlsx    controlType=sap.ui.unified.FileUploader
+        """
         def _upload():
             selector = build_control_selector(**selector_parts)
             ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector),
@@ -235,11 +258,16 @@ class ActionKeywords:
             _upload, "upload %s" % (selector_parts or "index %s" % index))
 
     def get_ui5_text(self, index=0, **selector_parts):
-        """Résout un contrôle et retourne son texte visible via `Get Text` de Browser."""
+        """Résout un contrôle et retourne son texte visible via `Get Text` de Browser.
+
+        Exemple :
+        | ${title}=    `Get Ui5 Text`    idSuffix=fe::table::Travel::LineItem-title
+        | Should Contain    ${title}    (
+        """
         return self._browser().get_text(self.resolve_ui5_control(index=index, **selector_parts))
 
     def get_ui5_properties(self, property_name, **selector_parts):
-        """Lit une PROPRIÉTÉ de contrôle sur **tous** les contrôles qui matchent,
+        """Lit une PROPRIÉTÉ de contrôle sur *tous* les contrôles qui matchent,
         dans l'ordre du registre, et retourne la liste des valeurs (JSON-safe).
 
         Le complément de `Get Ui5 Text`, et non son doublon. `Get Ui5 Text` lit ce
@@ -260,10 +288,7 @@ class ActionKeywords:
         Sélecteurs identiques à `Resolve Ui5 Control` (``controlType``,
         ``properties``, ``id``, ``idSuffix``, ``viewId``, ``bindingPath``,
         ``containedIn``). Lire les titres des lignes d'une liste tient alors en
-        un appel ::
-
-            ${noms}=    Get Ui5 Properties    title
-            ...    controlType=StandardListItem    viewId=container---home--list
+        un appel.
 
         Échoue si la propriété n'existe pas sur un contrôle matché, en listant
         les propriétés disponibles : une faute de frappe se voit tout de suite au
@@ -276,6 +301,10 @@ class ActionKeywords:
         indiscernable d'une chaîne vide légitime) ; les autres valeurs objet
         restent rendues en chaîne. L'inventaire DÉCLARÉ des propriétés (types,
         défauts, provenance) se lit par `Get Ui5 Control Metadata`.
+
+        Exemple :
+        | ${types}=    `Get Ui5 Properties`    type    controlType=sap.m.ColumnListItem
+        | Should Contain    ${types}    Navigation
         """
         selector = build_control_selector(**selector_parts)
         payload = '{"property": %s, "selector": %s}' % (
@@ -300,9 +329,11 @@ class ActionKeywords:
 
         Version « un seul contrôle » de `Get Ui5 Properties`, avec le même contrat
         d'ambiguïté que `Resolve Ui5 Control` : le nombre de correspondances est
-        journalisé, et un ``index`` hors bornes échoue en le disant. ::
+        journalisé, et un ``index`` hors bornes échoue en le disant.
 
-            ${titre}=    Get Ui5 Property    title    idSuffix=--productList-0
+        Exemple :
+        | ${threshold}=    `Get Ui5 Property`    growingThreshold    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Should Be Equal As Integers    ${threshold}    30
         """
         selector = build_control_selector(**selector_parts)
         values = self.get_ui5_properties(property_name, **selector_parts)
@@ -324,9 +355,10 @@ class ActionKeywords:
         """Vérifie que le texte visible du contrôle résolu vaut ``expected``
         (comparaison exacte après trim). C'est l'assertion de VALEUR émise par le
         recorder web (Shift+Alt+clic), pendant de `Ui5 Control Should Be Visible`
-        pour le contenu. ::
+        pour le contenu.
 
-            Ui5 Text Should Be    42,00 EUR    idSuffix=fe::HeaderInfo::NetAmount
+        Exemple :
+        | `Ui5 Text Should Be`    Travels (4,133)    idSuffix=fe::table::Travel::LineItem-title
         """
         actual = self.get_ui5_text(index=index, **selector_parts)
         if str(actual).strip() != str(expected).strip():

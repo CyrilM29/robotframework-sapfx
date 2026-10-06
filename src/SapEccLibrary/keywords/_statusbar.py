@@ -1,4 +1,4 @@
-"""Mixin **barre de statut** : l'IDENTITÉ d'un message, pas seulement son type.
+"""Mixin *barre de statut* : l'IDENTITÉ d'un message, pas seulement son type.
 
 `Get Status Message` (module principal) rend le type et le texte localisé ;
 ce mixin lit ce que ``wnd[0]/sbar`` expose en plus (mesuré le 2026-09-08 sur
@@ -45,7 +45,13 @@ class StatusBarKeywords:
         message ABAP (``MessageId``, padding de champ retiré : ``MO``),
         ``number`` son numéro, ``parameters`` les variables ``&`` ; ``text``
         n'est là que pour le lecteur. C'est l'ancre locale-safe d'un refus
-        EXACT, là où `Get Status Message` ne donne que le type."""
+        EXACT, là où `Get Status Message` ne donne que le type.
+
+        Exemple :
+        | ${message}=    `Get Status Message Identity`
+        | Should Be Equal    ${message}[identity]    MO/E/402
+        | Should Be Equal    ${message}[parameters][0]    ZZ_NO_SUCH_TABLE
+        """
         status = self.session.findById(_STATUSBAR)
         return message_identity(
             getattr(status, "MessageType", ""), getattr(status, "MessageId", ""),
@@ -57,7 +63,13 @@ class StatusBarKeywords:
         ``message_class`` et de numéro ``message_number`` (et du type
         ``message_type`` quand il est donné) : ``Status Message Should Be    MO
         402    E``. L'échec nomme l'attendu, l'identité lue et son texte, ou
-        dit qu'aucun message n'est affiché. Retourne l'identité lue."""
+        dit qu'aucun message n'est affiché. Retourne l'identité lue.
+
+        Exemple :
+        | `Input Text`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    ZZ_NO_SUCH_TABLE
+        | `Send Vkey`    0
+        | `Status Message Should Be`    MO    402    E
+        """
         identity = self.get_status_message_identity()
         if not identity_matches(identity, message_class, message_number, message_type):
             self.take_screenshot()

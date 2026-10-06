@@ -1,15 +1,26 @@
 """Keywords d'amorçage de la connexion.
 
-L'upstream `SapGuiBase.connect_to_session` suppose que le SAP Logon Pad est *déjà
-en cours d'exécution* (l'utilisateur est censé le démarrer lui-même via la bibliothèque
-Process ou AutoIt). Ce mixin supprime cette étape manuelle : il peut lancer
-``saplogon.exe`` lui-même, attendre que le moteur de scripting soit disponible,
-puis se connecter, permettant un amorçage de test entièrement autonome.
+`Connect To Session`, `Connect To Existing Connection` et `Open Connection`
+dérivent de robotframework-sapguilibrary 1.2.1 (Copyright Frank van der
+Kuur, Apache License 2.0, voir NOTICE), absorbée et réécrite pour SAPFX le
+2026-10-06, noms et signatures inchangés
+(``tests/unit/test_upstream_compatibility.py``). Ce qui a changé :
 
-Rien ici ne communique avec un serveur réel tant que `Open Connection` /
-`Connect To Session` (hérités de la base) ne sont pas appelés, ce qui rend la
-logique de lancement testable unitairement en simulant ``subprocess`` et la
-recherche dans la table des objets en cours d'exécution.
+* `Connect To Session` ne retient qu'un moteur de scripting qui RÉPOND : un
+  Logon fermé laisse un moment son entrée dans la table des objets actifs,
+  et l'amont gardait ce moteur mort ;
+* `Connect To Existing Connection` cherche la connexion parmi TOUTES les
+  connexions ouvertes (l'amont ne regardait que la première) ;
+* `Open Connection` attend que la session existe avant de rendre la main.
+
+L'amont supposait aussi le SAP Logon Pad *déjà en cours d'exécution* : ce
+mixin peut lancer ``saplogon.exe`` lui-même (`Open Sap Logon`), attendre que
+le moteur de scripting soit disponible, puis se connecter, pour un amorçage
+de test entièrement autonome.
+
+Rien ici ne communique avec un serveur réel tant qu'une connexion n'est pas
+ouverte, ce qui rend la logique de lancement testable unitairement en
+simulant ``subprocess`` et la recherche dans la table des objets actifs.
 """
 import contextlib
 import os
@@ -22,7 +33,7 @@ from pythoncom import com_error
 from robot.api import logger
 from robot.utils import timestr_to_secs
 
-from sapfx_common.com_safety import ensure_com_initialized, is_dead_server_error
+from sapfx_common.com_safety import ensure_com_initialized
 from sapfx_common.polling import poll_until, retry_call, retry_until
 
 # Emplacements d'installation courants ; à remplacer via l'argument `path` ou la variable d'env SAPLOGON_PATH.
@@ -31,17 +42,6 @@ _DEFAULT_SAPLOGON_PATHS = (
     r"C:\Program Files (x86)\SAP\FrontEnd\SAPGUI\saplogon.exe",  # SAP GUI 7.x (32-bit)
     r"C:\Program Files\SAP\FrontEnd\SAPGUI\saplogon.exe",
 )
-
-
-def _raise_unless_dead(error, what):
-    """Ne laisse passer qu'une panne qui PROUVE que le serveur COM a disparu
-    (``sapfx_common.com_safety.DEAD_SERVER_HRESULTS``) ; toute autre lève :
-    un objet vivant mais illisible n'est jamais un objet absent."""
-    if isinstance(error, com_error) and is_dead_server_error(error):
-        return
-    raise RuntimeError(
-        "SAP GUI illisible (%s : %s) : impossible de conclure qu'aucune "
-        "connexion n'est ouverte." % (what, error))
 
 
 def _engine_is_alive(engine):
@@ -59,35 +59,84 @@ class ConnectionKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`."""
 
     def connect_to_session(self, explicit_wait=0):
-        """Comme `Connect To Session` de la base, mais initialise d'abord COM sur le
-        thread courant.
+        """Se connecte au moteur de scripting du SAP Logon Pad en cours
+        d'exécution (sans ouvrir de connexion ni de session) et fixe la pause
+        de `Set Explicit Wait` (``0`` par défaut, une durée Robot sinon).
+        Échoue si aucun SAP Logon ne répond.
 
-        L'API SAP GUI Scripting est COM (STA). En exécution Robot classique, le thread
-        principal a déjà COM initialisé ; mais sous un orchestrateur qui exécute les
-        keywords hors du thread principal (p.ex. le serveur rf-mcp), ce thread doit
-        appeler ``CoInitialize`` avant tout accès COM, sinon l'acquisition du moteur
-        de scripting lève ``CoInitialize n'a pas été appelé``. Voir
-        ``sapfx_common.com_safety.ensure_com_initialized`` (partagé avec le state
-        provider rf-mcp, qui a le même besoin sur son propre thread)."""
+        Seul un moteur qui RÉPOND est retenu : un Logon fermé laisse un moment
+        son entrée dans la table des objets actifs, et réutiliser son moteur
+        faisait échouer l'ouverture suivante en « serveur RPC non disponible »
+        (relevé le 2026-10-01). COM est initialisé sur le thread courant
+        d'abord : un orchestrateur qui exécute les keywords hors du thread
+        principal (le serveur rf-mcp) l'exige.
+
+        Exemple :
+        | `Connect To Session`
+        | `Open Connection By String`    /H/vhcala4hci/S/3200
+        | `Element Should Be Present`    wnd[0]/usr/pwdRSYST-BCODE
+        """
         ensure_com_initialized()
-        result = super().connect_to_session(explicit_wait)
-        # La base garde le DERNIER moteur trouvé dans la table des objets actifs,
-        # y compris celui d'un Logon fermé juste avant (relevé 2026-10-01 : une
-        # seconde ouverture dans le même process réutilisait ce moteur mort et
-        # échouait en « serveur RPC non disponible »). Un moteur qui ne répond
-        # pas est remplacé par un moteur VIVANT, ou la connexion échoue et
-        # `Connect To Session With Retry` réessaie le temps que l'entrée morte
-        # disparaisse.
-        engine = getattr(self, "sapapp", None)
-        if engine is not None and engine != -1 and not _engine_is_alive(engine):
-            live = self._acquire_scripting_engine()
-            if live is None:
-                raise Warning(
-                    "Could not connect to Session, is Sap Logon Pad open? (le "
-                    "moteur de scripting trouvé ne répond plus : un Logon "
-                    "fermé laisse un moment son entrée dans la table des objets actifs)")
-            self.sapapp = live
-        return result
+        engine = self._acquire_scripting_engine()
+        if engine is None:
+            self.take_screenshot()
+            raise Warning("Could not connect to Session, is Sap Logon Pad open?")
+        self.sapapp = engine
+        self.set_explicit_wait(explicit_wait)
+        self._explicit_pause()
+
+    def connect_to_existing_connection(self, connection_name):
+        """Rattache la bibliothèque à une connexion DÉJÀ ouverte, désignée par
+        sa description dans SAP Logon (le nom de l'entrée, ex. ``A4H``), et à
+        sa première session. Toutes les connexions ouvertes sont examinées ;
+        aucune ne porte ce nom = échec listant celles qui existent. Une
+        connexion ouverte par chaîne n'a pas de description : `Attach To Open
+        Session` la rattache par index.
+
+        Exemple :
+        | `Connect To Session`
+        | `Connect To Existing Connection`    A4H
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SESSION_MANAGER
+        """
+        connections = self._engine_connections()
+        wanted = str(connection_name).strip()
+        names = []
+        for index in range(connections.Count):
+            connection = connections.ElementAt(index)
+            description = str(getattr(connection, "Description", "") or "").strip()
+            names.append(description or "(sans description)")
+            if description == wanted:
+                self.connection = connection
+                self._bind_first_session(wanted)
+                self._explicit_pause()
+                return
+        self.take_screenshot()
+        raise ValueError("No existing connection for '%s' found. Connexions ouvertes : %s"
+                         % (connection_name, ", ".join(names) or "aucune"))
+
+    def open_connection(self, connection_name):
+        """Ouvre la connexion enregistrée dans SAP Logon sous ``connection_name``
+        (la description COMPLÈTE de l'entrée, crochets compris) et attend que
+        sa session existe (jusqu'à ``default_timeout``). Pour un serveur sans
+        entrée enregistrée : `Open Connection By String`.
+
+        Exemple :
+        | `Connect To Session`
+        | `Open Connection`    A4H
+        | `Element Should Be Present`    wnd[0]/usr/txtRSYST-BNAME
+        """
+        if not hasattr(self.sapapp, "OpenConnection"):
+            self.take_screenshot()
+            raise Warning("Cannot find an open Sap Login Pad, is Sap Logon Pad open?")
+        try:
+            self.connection = self.sapapp.OpenConnection(connection_name, True)
+        except com_error:
+            self.take_screenshot()
+            raise ValueError("Cannot open connection '%s', please check connection name."
+                             % connection_name) from None
+        self._wait_for_first_session(connection_name)
+        self._explicit_pause()
 
     def _acquire_scripting_engine(self):
         """Le moteur de scripting SAP GUI acquis depuis la ROT pour le thread
@@ -97,7 +146,7 @@ class ConnectionKeywords:
         (``SapEccLibrary._touch_com_thread``) : un proxy COM STA ne se partage
         pas entre threads, mais chaque thread peut obtenir le SIEN par la ROT
         puis ``FindById(id de session)``. Même parcours que `Connect To
-        Session` (code amont), sans toucher ``self.sapapp``."""
+        Session`, sans toucher ``self.sapapp``."""
         engine = None
         for candidate, _error in self._scripting_engine_candidates():
             if candidate is not None and _engine_is_alive(candidate):
@@ -147,7 +196,7 @@ class ConnectionKeywords:
         return found
 
     def attach_to_open_session(self, connection_index=0, session_index=0):
-        """Rattache la bibliothèque à une session SAP GUI **déjà ouverte**,
+        """Rattache la bibliothèque à une session SAP GUI *déjà ouverte*,
         sans Logon Pad à lancer ni login à rejouer : le prérequis exact d'un
         replay d'enregistrement du recorder bureau (dont les suites générées
         utilisent ce keyword en Suite Setup).
@@ -155,10 +204,16 @@ class ConnectionKeywords:
         `Connect To Session` seul n'obtient que le MOTEUR de scripting
         (``sapapp``) ; la session, elle, n'est posée que par
         `Connect To Existing Connection`, qui exige le libellé exact de la
-        connexion. Ce keyword complète la chaîne par **index** (défaut : la
+        connexion (vide pour une connexion ouverte par chaîne). Ce keyword complète la chaîne par *index* (défaut : la
         première connexion, sa première session : la seule situation d'un
         poste de replay typique), avec des erreurs actionnables si rien n'est
-        ouvert."""
+        ouvert.
+
+        Exemple :
+        | `Attach To Open Session`    0    0
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SESSION_MANAGER
+        """
         self.connect_to_session()
         try:
             connections = self.sapapp.Children
@@ -186,95 +241,6 @@ class ConnectionKeywords:
                 "La connexion ou la session visée s'est refermée pendant le "
                 "rattachement (%s) : relancez le replay avec SAP GUI ouvert." % exc)
 
-    def get_open_sap_gui_connections(self):
-        """Les connexions SAP GUI ouvertes sur le poste, lues SANS capture
-        d'écran et sans toucher l'état de la bibliothèque : une liste de dicts
-        ``{index, description, connection_string, sessions}``, vide quand
-        aucun SAP Logon ne répond (rien n'est ouvert).
-
-        La sonde d'une PREUVE DE FERMETURE. La voie précédente rattachait
-        l'index 0 par `Attach To Open Session` et attendait son échec : un
-        échec qui passe par `Connect To Session` capture l'écran, donc chaque
-        run VERT laissait une capture (relevé le 2026-10-01 sur les campagnes
-        des scénarios 8 et 9). Une connexion dont la lecture rend une panne de
-        DISPARITION (voir plus bas) est ignorée ; toute autre panne, y compris
-        une entrée de la table des objets actifs illisible ou une connexion
-        qui se ferme entre le comptage et la lecture avec une autre erreur,
-        fait ÉCHOUER la sonde plutôt que de rendre une liste vide, qui
-        conclurait « rien n'est ouvert » (`Sap Gui Should Have No Open
-        Connection` réessaie alors jusqu'à son délai).
-
-        Seules les pannes COM de DISPARITION valent « disparu » (serveur RPC
-        indisponible : un SAP Logon fermé dont l'entrée traîne dans la table
-        des objets actifs ; objet déconnecté ; objet non connecté ; serveur
-        mort, l'appel exécuté ou non). Un moteur OCCUPÉ ou qui refuse l'accès
-        est vivant : la sonde ÉCHOUE (revue indépendante du 2026-10-01, où un
-        moteur occupé passait pour absent)."""
-        found = []
-        for engine_index, (engine, error) in enumerate(self._scripting_engine_candidates()):
-            if engine is None:
-                _raise_unless_dead(error, "moteur de scripting")
-                continue
-            try:
-                connections = engine.Children
-                count = connections.Count
-            except (AttributeError, com_error) as exc:
-                _raise_unless_dead(exc, "connexions du moteur")
-                continue
-            for index in range(count):
-                try:
-                    connection = connections.ElementAt(index)
-                    record = {
-                        "engine": engine_index,
-                        "index": index,
-                        "description": str(getattr(connection, "Description", "") or "").strip(),
-                        # SAP GUI préfixe la chaîne d'une espace, et la
-                        # description est VIDE pour une connexion ouverte par
-                        # chaîne (mesuré) : les deux sont rendues.
-                        "connection_string": str(getattr(connection, "ConnectionString", "") or "").strip(),
-                        "sessions": int(connection.Children.Count),
-                    }
-                except (AttributeError, com_error) as exc:
-                    _raise_unless_dead(exc, "connexion %d" % index)
-                    continue   # connexion refermée pendant la lecture
-                found.append(record)
-        return found
-
-    def sap_gui_should_have_no_open_connection(self, connection=None, timeout="5s"):
-        """Vérifie qu'aucune connexion SAP GUI n'est restée ouverte (ou aucune
-        dont la description ou la chaîne de connexion contient ``connection``,
-        pour ne viser que la sienne quand un autre SAP GUI tourne sur le
-        poste), en sondant jusqu'à ``timeout`` : un ``/nex`` met un instant à
-        refermer la connexion. Échec qui nomme les connexions encore ouvertes ;
-        aucune capture d'écran tant que rien ne reste ouvert. Le filtre
-        ignore la casse. Un SAP GUI ILLISIBLE (moteur occupé, accès refusé)
-        n'est jamais pris pour « fermé » : la sonde réessaie jusqu'au délai,
-        puis échoue en nommant la panne. Rend la dernière lecture de `Get Open
-        Sap Gui Connections`."""
-        wanted = str(connection).strip().casefold() if connection not in (None, "") else ""
-        state = {"open": [], "error": None}
-
-        def closed():
-            try:
-                state["open"] = [
-                    c for c in self.get_open_sap_gui_connections()
-                    if not wanted or wanted in c["description"].casefold()
-                    or wanted in c["connection_string"].casefold()]
-            except RuntimeError as error:
-                state["error"] = error
-                return False
-            state["error"] = None
-            return not state["open"]
-
-        if poll_until(closed, timestr_to_secs(timeout), self.poll_interval):
-            return []
-        if state["error"] is not None:
-            raise AssertionError("Fermeture SAP GUI NON constatée après %s : %s"
-                                 % (timeout, state["error"]))
-        raise AssertionError(
-            "Connexion(s) SAP GUI restée(s) ouverte(s)%s après %s : %s"
-            % (" (filtre %r)" % wanted if wanted else "", timeout, state["open"]))
-
     def open_sap_logon(self, path=None, timeout="30s"):
         """Lance le SAP Logon Pad et attend que son moteur de scripting soit
         accessible, puis connecte cette bibliothèque à celui-ci.
@@ -286,6 +252,12 @@ class ConnectionKeywords:
 
         Après ce keyword, vous pouvez appeler `Open Connection`/`Connect To Session`
         normalement. À associer avec `Close Sap Logon` dans une Suite Teardown.
+
+        Exemple :
+        | `Open Sap Logon`
+        | `Connect To Session With Retry`
+        | `Open Connection By String`    /H/vhcala4hci/S/3200
+        | `Element Should Be Present`    wnd[0]/usr/txtRSYST-BNAME
         """
         exe = self._resolve_saplogon_path(path)
         logger.info("Launching SAP Logon Pad: %s" % exe)
@@ -299,6 +271,10 @@ class ConnectionKeywords:
         """Arrête le SAP Logon Pad démarré par `Open Sap Logon`.
 
         Ne fait rien si cette bibliothèque ne l'a pas démarré (ex. il était déjà ouvert).
+
+        Exemple :
+        | `Close Sap Logon`
+        | `Sap Gui Should Have No Open Connection`    vhcala4hci
         """
         proc = getattr(self, "_saplogon_proc", None)
         if proc is not None and proc.poll() is None:
@@ -317,10 +293,18 @@ class ConnectionKeywords:
 
     def connect_to_session_with_retry(self, retries=3, retry_interval="2s", explicit_wait=0):
         """Comme `Connect To Session` mais réessaie pendant que le Logon Pad
-        finit de démarrer. Utile juste après `Open Sap Logon` sur les machines lentes."""
+        finit de démarrer. Utile juste après `Open Sap Logon` sur les machines lentes.
+
+        Exemple :
+        | `Open Sap Logon`
+        | `Connect To Session With Retry`    retries=5    retry_interval=1s
+        | `Open Connection By String`    /H/vhcala4hci/S/3200
+        | ${screen}=    `Get Current Screen`
+        | Should Be Equal    ${screen}[program]    SAPMSYST
+        """
         attempts = int(retries)
 
-        def log_failure(attempt, err):  # base raises Warning/ValueError when not ready
+        def log_failure(attempt, err):  # Warning/ValueError tant que le Logon démarre
             logger.info("connect_to_session attempt %s/%s failed: %s"
                         % (attempt, attempts, err))
 
@@ -337,7 +321,7 @@ class ConnectionKeywords:
             )
 
     def open_connection_by_string(self, connection_string, explicit_wait="0"):
-        """Ouvre une connexion par **chaîne de connexion** (ex. ``/H/host/S/3200``).
+        """Ouvre une connexion par *chaîne de connexion* (ex. ``/H/host/S/3200``).
 
         Contrairement à `Open Connection`, qui attend la *description* d'une entrée
         enregistrée dans le SAP Logon, ce keyword utilise
@@ -348,6 +332,11 @@ class ConnectionKeywords:
 
         La session étant créée de façon asynchrone, on attend qu'elle apparaisse
         (jusqu'à ``default_timeout``) avant de rendre la main.
+
+        Exemple :
+        | `Open Connection By String`    /H/vhcala4hci/S/3200
+        | ${screen}=    `Get Current Screen`
+        | Should Be Equal    ${screen}[program]    SAPMSYST
         """
         if not hasattr(self.sapapp, "OpenConnectionByConnectionString"):
             self.take_screenshot()
@@ -360,27 +349,56 @@ class ConnectionKeywords:
             self.take_screenshot()
             raise ValueError("Cannot open connection '%s': %s" % (connection_string, err))
 
+        self._wait_for_first_session(connection_string)
+        time.sleep(timestr_to_secs(explicit_wait))
+
+    # -- helpers (méthodes internes) ------------------------------------------
+
+    def _engine_connections(self):
+        """Les connexions du moteur de scripting (collection COM), ou un
+        ``Warning`` si `Connect To Session` n'a pas été appelé."""
+        try:
+            return self.sapapp.Children
+        except (AttributeError, com_error):
+            self.take_screenshot()
+            raise Warning("Not connected to the scripting engine; call `Connect To "
+                          "Session` / `Open Sap Logon` first.") from None
+
+    def _bind_first_session(self, label):
+        """Pose la première session de la connexion courante, ou échoue en
+        disant que la connexion n'en a aucune (login pas encore terminé)."""
+        try:
+            if self.connection.Children.Count > 0:
+                self.session = self.connection.Children(0)
+                return
+        except com_error:
+            pass
+        self.take_screenshot()
+        raise ValueError("La connexion '%s' n'a aucune session ouverte." % label)
+
+    def _wait_for_first_session(self, label):
+        """Attend (jusqu'à ``default_timeout``) que la connexion qui vient
+        d'être ouverte porte une session, puis la pose. La session est créée
+        de façon asynchrone : COM peut refuser l'accès pendant l'amorçage."""
         def session_ready():
             try:
                 if self.connection.Children.Count > 0:
                     self.session = self.connection.Children(0)
                     return True
             except Exception:
-                pass    # connexion en cours d'amorçage : COM peut refuser l'accès, on re-sonde
+                pass    # connexion en cours d'amorçage : on re-sonde
             return False
 
         # self.default_timeout est déjà en secondes (converti une fois dans
-        # SapEccLibrary.__init__) ; pas besoin de re-passer par timestr_to_secs ici.
+        # SapEccLibrary.__init__).
         if poll_until(session_ready, self.default_timeout, step=0.5):
-            time.sleep(timestr_to_secs(explicit_wait))
             return
         self.take_screenshot()
         raise AssertionError(
             "Connection '%s' opened but no session appeared within %s. Is the SAP "
             "system reachable and accepting dialog logons?"
-            % (connection_string, self.default_timeout))
+            % (label, self.default_timeout))
 
-    # -- helpers (méthodes internes) ------------------------------------------
 
     def _resolve_saplogon_path(self, path):
         candidates = []
@@ -402,7 +420,7 @@ class ConnectionKeywords:
         """Interroge `Connect To Session` jusqu'à ce que le moteur réponde ou que le délai expire.
 
         Les tentatives PRÉMATURÉES sont attendues pendant le démarrage du
-        Logon Pad : elles sondent sans capture d'écran (le code amont en
+        Logon Pad : elles sondent sans capture d'écran (l'ancienne voie en
         prenait une à chaque tentative, soit 9 captures par démarrage réussi,
         relevé le 2026-09-28), et une seule capture est prise si l'attente
         échoue vraiment."""

@@ -58,18 +58,28 @@ Product Count Is The Same On Screen And Through The API
 
 ## Internals de la bibliothèque ECC (`src/SapEccLibrary`)
 
-Composition par mixins au-dessus de la classe amont vendorisée :
+Composition par mixins, sans classe de base (abrégé) :
 
 ```
 SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
               PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
-              SemanticKeywords, EmbeddedBrowserKeywords, SapGuiBase)
+              SemanticKeywords, EmbeddedBrowserKeywords, ...,
+              GridCellKeywords, ElementKeywords, InputKeywords,
+              ValueCheckKeywords)
 ```
 
-- **`_vendor/sapgui_base.py`** : `SapGuiLibrary` amont, renommée `SapGuiBase`,
-  Apache-2.0 (voir `NOTICE`). Traitée en lecture seule ; jamais modifiée sauf lors d'une re-synchronisation.
-- **Les mixins** (`keywords/_*.py`) sont listés *avant* la base dans le MRO, ainsi une méthode de mixin remplace une
-  méthode de base portant le même nom, et les mixins peuvent appeler les keywords hérités via `self` :
+- **Les 37 keywords de robotframework-sapguilibrary** (Apache-2.0, voir
+  `NOTICE`) vivent dans nos propres mixins depuis le 6 octobre 2026 :
+  `_elements`, `_inputs`, `_value_checks`, `_grid_cells`, plus la connexion,
+  les attentes et la capture sur erreur. Leur code, d'abord vendorisé tel
+  quel, a été absorbé et réécrit (écritures relues, aucun focus déplacé par
+  une vérification, la fenêtre SAP capturée au lieu de l'écran entier) ; leurs
+  noms et signatures sont tenus par un test unitaire, donc les suites écrites
+  pour la bibliothèque amont tournent sans modification. Voir
+  [audit-upstream.fr.md](audit-upstream.fr.md).
+- **Les mixins** (`keywords/_*.py`) portent chacun une capacité et s'appellent
+  les uns les autres via `self` ; les quatre mixins des keywords absorbés
+  ferment le MRO :
   - `_connection` : bootstrap autonome (Logon Pad, connexion avec retry, `CoInitialize`
     pour l'exécution hors thread principal, p. ex. rf-mcp).
   - `_waits` : vraie synchronisation (`session.Busy` + polling d'éléments) ; les échecs
@@ -247,8 +257,8 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
   Robot normales reçoivent des instances isolées. Les limites rf-mcp sont documentées séparément.
 
 Pourquoi des mixins plutôt qu'une sous-classe regroupant tout dans un seul fichier : chaque préoccupation (connexion,
-attente, grille, perception, diagnostic, réparation) est testable de façon indépendante et re-synchronisable de façon
-indépendante, et le diff par rapport à l'amont reste lisible d'un coup d'œil.
+attente, grille, perception, diagnostic, réparation) est testable de façon indépendante, et aucun fichier ne
+dépasse la limite de taille du dépôt en accumulant des keywords sans rapport.
 
 **`src/sapfx_common/`** est la couche partagée par les *deux* canaux : `polling`
 (toutes les boucles d'attente/retry), `com_safety` (`ensure_com_initialized`),
@@ -345,7 +355,8 @@ DevTools Edge ; le prérequis restant sur un vrai SAP GUI est l'option poste
    moitié universelle, c'est `src/`, les bibliothèques, qui portent les capacités.
 2. Ne jamais utiliser `time.sleep` pour attendre SAP ; utiliser les keywords `Wait Until ...`.
 3. Assertions indépendantes de la locale uniquement (type de *message*, pas *texte* du message).
-4. Limiter le diff avec le vendeur amont à une ligne.
+4. Garder la surface de robotframework-sapguilibrary : ses 37 keywords gardent
+   leur nom et leur signature.
 
 ## Marques
 

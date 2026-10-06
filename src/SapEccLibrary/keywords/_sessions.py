@@ -4,7 +4,7 @@ L'API SAP GUI Scripting est nativement multi-session : un moteur de scripting
 (``sapapp``) porte N connexions (systèmes/utilisateurs différents), chacune
 jusqu'à 6 sessions/fenêtres (limite serveur ``rdisp/max_alt_modes``). La
 bibliothèque n'en exposait qu'UNE (``self.session``). Ce mixin ajoute un
-**registre par alias**, le pattern `Open Api Session` du canal API, et
+*registre par alias*, le pattern `Open Api Session` du canal API, et
 `New Context`/`Switch` de la bibliothèque Browser::
 
     Open Sap Session      erp_qa    connection_string=/H/hosta/S/3200
@@ -15,23 +15,23 @@ bibliothèque n'en exposait qu'UNE (``self.session``). Ce mixin ajoute un
 
 Les deux cas « deux sessions live » sont couverts :
 
-* **même connexion** (poser un verrou dans l'une, vérifier dans l'autre) :
+* *même connexion* (poser un verrou dans l'une, vérifier dans l'autre) :
   `Create Gui Session`, l'équivalent scripté de ``/o``, AUCUN nouveau login,
   donc jamais de popup multi-logon ;
-* **deux systèmes/utilisateurs** : `Open Sap Session` avec sa propre chaîne de
+* *deux systèmes/utilisateurs* : `Open Sap Session` avec sa propre chaîne de
   connexion et, optionnellement, ses identifiants.
 
 Rails de sûreté (le « en sécurité » du multi-session) :
 
-* **Affinité de thread (COM STA)** : les objets SAP GUI appartiennent au thread
+* *Affinité de thread (COM STA)* : les objets SAP GUI appartiennent au thread
   qui les a créés. Le registre mémorise ce thread ; un accès depuis un autre
   thread initialise COM défensivement (marshaling, le mode dont dépendent les
   state providers rf-mcp), et ``SAPFX_STRICT_COM_THREAD=1`` transforme ce cas
-  en erreur actionnable. Le multi-session est un **multiplexage** (une session
+  en erreur actionnable. Le multi-session est un *multiplexage* (une session
   active à la fois, bascule explicite), jamais du parallélisme de threads.
-* **Identifiants** : ``password`` accepte le type ``Secret`` de Robot
+* *Identifiants* : ``password`` accepte le type ``Secret`` de Robot
   Framework 7.4 et n'est jamais journalisé.
-* **Teardown isolé** : `Close Sap Session` ne ferme QUE la session visée ; les
+* *Teardown isolé* : `Close Sap Session` ne ferme QUE la session visée ; les
   autres alias et le Logon Pad partagé restent debout. La connexion n'est
   fermée que si plus aucun alias ne la référence.
 """
@@ -51,7 +51,7 @@ class SessionKeywords:
     if TYPE_CHECKING:
         # Contrat attendu du composite (SapEccLibrary) : le registre d'alias vit
         # à côté des propriétés ``session``/``connection`` dans SapEccLibrary.py,
-        # les keywords d'amorçage viennent de ConnectionKeywords/SapGuiBase.
+        # les keywords d'amorçage viennent de ConnectionKeywords.
         # Déclaré ici pour mypy seulement (mixin en duck-typing, convention du dépôt).
         _DEFAULT_ALIAS: str
         default_timeout: float
@@ -69,7 +69,7 @@ class SessionKeywords:
     def open_sap_session(self, alias, connection_string=None, connection_name=None,
                          user=None, password: "str | Secret | None" = None,
                          client=None, language=None):
-        """Ouvre une **nouvelle connexion SAP** enregistrée sous ``alias`` et
+        """Ouvre une *nouvelle connexion SAP* enregistrée sous ``alias`` et
         l'active. Le moteur de scripting doit déjà être joignable (`Connect To
         Session` / `Open Sap Logon` une fois par process : le Logon Pad est
         PARTAGÉ par toutes les sessions).
@@ -88,10 +88,13 @@ class SessionKeywords:
         termine pas (mauvais identifiants, popup multi-logon ``wnd[1]``, mot
         de passe expiré) échoue en le nommant. Pour une 2e session du MÊME
         utilisateur, préférer `Create Gui Session` : aucun re-login, donc
-        aucun popup multi-logon. ::
+        aucun popup multi-logon.
 
-            Open Sap Session    erp_qa    connection_string=/H/vhcala4hci/S/3200
-            ...    user=DEVELOPER    password=${SAP_PASSWORD}    client=001
+        Exemple :
+        | `Open Sap Session`    erp    connection_string=/H/vhcala4hci/S/3200
+        | ...    user=DEVELOPER    password=${SAP_PASSWORD}    client=001
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SESSION_MANAGER
         """
         alias = self._validate_session_alias(alias)
         registry = self._session_registry()
@@ -121,7 +124,7 @@ class SessionKeywords:
         return alias
 
     def create_gui_session(self, alias, timeout=None):
-        """Ouvre une **2e fenêtre/session** sur la connexion ACTIVE (même
+        """Ouvre une *2e fenêtre/session* sur la connexion ACTIVE (même
         système, même utilisateur, l'équivalent scripté de ``/o``) et
         l'enregistre sous ``alias``, qui devient la session active.
 
@@ -130,7 +133,14 @@ class SessionKeywords:
         la vérifier dans l'autre ». La création étant asynchrone, on attend
         (jusqu'à ``timeout``, défaut ``default_timeout``) que la nouvelle
         session apparaisse sur la connexion. Un refus dans les délais nomme
-        la limite serveur probable (``rdisp/max_alt_modes``, 6 max)."""
+        la limite serveur probable (``rdisp/max_alt_modes``, 6 max).
+
+        Exemple :
+        | `Create Gui Session`    second
+        | ${sessions}=    `List Sap Sessions`
+        | Should Be Equal    ${sessions}[-1][alias]    second
+        | Should Be True    ${sessions}[-1][active]
+        """
         alias = self._validate_session_alias(alias)
         registry = self._session_registry()
         if self._slot_bound(registry.get(alias)):
@@ -170,11 +180,19 @@ class SessionKeywords:
         return alias
 
     def switch_sap_session(self, alias):
-        """Bascule la **session active** vers ``alias`` : tous les keywords
+        """Bascule la *session active* vers ``alias`` : tous les keywords
         suivants (saisie, transaction, perception…) s'exécutent dessus. Le
         multi-session est un multiplexage : une session active à la fois,
         bascule explicite ; jamais deux threads sur deux sessions. Un alias
-        inconnu échoue en listant les alias connectés."""
+        inconnu échoue en listant les alias connectés.
+
+        Exemple :
+        | `Switch Sap Session`    erp
+        | `Run Transaction`    SE16
+        | `Switch Sap Session`    second
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SESSION_MANAGER
+        """
         alias = self._validate_session_alias(alias)
         registry = self._session_registry()
         if not self._slot_bound(registry.get(alias)):
@@ -188,8 +206,13 @@ class SessionKeywords:
         return alias
 
     def get_active_sap_session(self):
-        """Retourne l'**alias** de la session active (``default`` pour la
-        session historique hors registre). JSON-safe."""
+        """Retourne l'*alias* de la session active (``default`` pour la
+        session historique hors registre). JSON-safe.
+
+        Exemple :
+        | ${alias}=    `Get Active Sap Session`
+        | Should Be Equal    ${alias}    erp
+        """
         return self._active_alias()
 
     def list_sap_sessions(self):
@@ -198,7 +221,13 @@ class SessionKeywords:
         ``client`` / ``user`` / ``transaction`` (depuis ``session.Info``).
 
         Uniquement des chaînes/booléens, jamais d'objet COM (contrainte
-        rf-mcp : un objet COM ne doit JAMAIS traverser la frontière MCP)."""
+        rf-mcp : un objet COM ne doit JAMAIS traverser la frontière MCP).
+
+        Exemple :
+        | ${sessions}=    `List Sap Sessions`
+        | Should Be Equal    ${sessions}[-1][alias]    erp
+        | Should Be Equal    ${sessions}[-1][user]    DEVELOPER
+        """
         entries = []
         for alias in sorted(self._session_registry()):
             slot = self._session_registry()[alias]
@@ -223,7 +252,13 @@ class SessionKeywords:
         debout. La connexion sous-jacente n'est fermée que si plus aucun
         alias ne la référence. La fermeture COM est best-effort (une session
         déjà morte ne fait pas échouer le teardown) ; l'alias actif bascule
-        sur un alias restant. Retourne ``True`` si la fermeture COM a abouti."""
+        sur un alias restant. Retourne ``True`` si la fermeture COM a abouti.
+
+        Exemple :
+        | `Close Sap Session`    second
+        | ${alias}=    `Get Active Sap Session`
+        | Should Be Equal    ${alias}    erp
+        """
         registry = self._session_registry()
         alias = self._validate_session_alias(alias) if alias else self._active_alias()
         if not self._slot_bound(registry.get(alias)):
@@ -258,7 +293,13 @@ class SessionKeywords:
         """Ferme toutes les sessions du registre (best-effort, chacune
         isolément : une session morte n'empêche pas de fermer les autres) et
         revient sur l'alias ``default``. Le keyword de Suite Teardown du
-        multi-session. Retourne la liste des alias effectivement fermés."""
+        multi-session. Retourne la liste des alias effectivement fermés.
+
+        Exemple :
+        | ${closed}=    `Close All Sap Sessions`
+        | List Should Contain Value    ${closed}    erp
+        | `Sap Gui Should Have No Open Connection`    vhcala4hci
+        """
         registry = self._session_registry()
         closed = []
         for alias in sorted(list(registry)):

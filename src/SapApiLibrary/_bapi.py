@@ -1,4 +1,4 @@
-"""Mixin du pattern **BAPI** au-dessus du canal RFC : `Call Bapi` jugé par
+"""Mixin du pattern *BAPI* au-dessus du canal RFC : `Call Bapi` jugé par
 TYPE de BAPIRET2 (convention #3), `Commit/Rollback Bapi Transaction` qui
 ferment la LUW, et le refus asserté ou toléré par IDENTIFIANT de message.
 
@@ -30,8 +30,8 @@ class BapiKeywords(RfcKeywords):
     def call_bapi(self, function_name: str, alias: str = "default",
                   return_key: str = "RETURN", accept: Any = None,
                   **params: Any) -> Any:
-        """Appelle une **BAPI** et vérifie sa table ``RETURN`` (BAPIRET2) :
-        un message de type ``E``/``A``/``X`` = échec listant les messages
+        """Appelle une *BAPI* et vérifie sa table ``RETURN`` (BAPIRET2) :
+        un message de type ``E`` / ``A`` / ``X`` = échec listant les messages
         bloquants (décision par TYPE, jamais par texte localisé : convention
         n°3) et rappelant `Rollback Bapi Transaction`. Sinon retourne le
         résultat complet (dict pyrfc). Le pattern SAP de préparation de
@@ -49,7 +49,19 @@ class BapiKeywords(RfcKeywords):
         plus tôt, sans commit ni rollback depuis, réécrit l'objet depuis son
         tampon et EFFACE en silence ce que l'écran a changé entre-temps, sans
         document de modification. Appeler `Rollback Bapi Transaction` juste
-        avant une BAPI d'écriture ferme ce risque."""
+        avant une BAPI d'écriture ferme ce risque.
+
+        Les valeurs passent telles quelles : un paramètre entier de la BAPI
+        attend un entier Robot (``${3}``), une chaîne ``3`` est refusée par le
+        binding. Rien n'est converti à dessein, un champ caractère numérique
+        comme ``0400`` perdrait ses zéros.
+
+        Exemple :
+        | ${detail}=    `Call Bapi`    BAPI_USER_GET_DETAIL    alias=a4h    USERNAME=DEVELOPER
+        | Should Not Be Empty    ${detail}[LOGONDATA]
+        | ${flights}=    `Call Bapi`    BAPI_FLIGHT_GETLIST    alias=a4h    AIRLINE=LH    MAX_ROWS=${3}
+        | Log    ${flights}[FLIGHT_LIST][0][PRICE]
+        """
         accepted = bapi_return.expected_message_ids(accept) if accept else []
         result = self.call_rfc(function_name, alias=alias, **params)
         messages = bapi_return.iter_bapi_messages(result, return_key)
@@ -70,7 +82,7 @@ class BapiKeywords(RfcKeywords):
                                          return_key: str = "RETURN",
                                          rollback: bool = True,
                                          **params: Any) -> dict[str, Any]:
-        """Vérifie qu'une BAPI REFUSE avec l'**identifiant de message**
+        """Vérifie qu'une BAPI REFUSE avec l'*identifiant de message*
         attendu dans sa table ``RETURN`` (``R11/E/579``) et retourne la fiche
         du refus : ``{function, message_id, messages}``, chaque message avec
         son ``message_id``, JSON-safe.
@@ -83,7 +95,13 @@ class BapiKeywords(RfcKeywords):
         se produit plus), ou elle a refusé avec un AUTRE identifiant (les
         deux sont nommés). ``rollback`` (défaut vrai) annule la LUW APRÈS
         l'appel, dans tous les cas : une BAPI qui réussit là où un refus était
-        attendu ne doit jamais laisser une écriture en attente de commit."""
+        attendu ne doit jamais laisser une écriture en attente de commit.
+
+        Exemple :
+        | ${refusal}=    `Bapi Should Fail With Message Id`    R1/E/201    BAPI_BUPA_ROLES_GET_2
+        | ...    alias=a4h    BUSINESSPARTNER=9999999999
+        | Log    ${refusal}
+        """
         expected = bapi_return.expected_message_ids(
             expected_message_id, "expected_message_id")
         if len(expected) != 1:
@@ -120,7 +138,11 @@ class BapiKeywords(RfcKeywords):
         rend durables les écritures des BAPIs précédentes. ``wait=True``
         (défaut) attend la fin de la mise à jour (``WAIT='X'``) : le réglage
         sûr pour enchaîner une vérification. La table RETURN est vérifiée
-        comme dans `Call Bapi`."""
+        comme dans `Call Bapi`.
+
+        Exemple :
+        | `Commit Bapi Transaction`    alias=a4h
+        """
         params = {"WAIT": "X"} if _as_bool(wait) else {}
         return self.call_bapi("BAPI_TRANSACTION_COMMIT", alias=alias, **params)
 
@@ -128,5 +150,9 @@ class BapiKeywords(RfcKeywords):
         """``BAPI_TRANSACTION_ROLLBACK`` sur la connexion RFC ``alias`` :
         annule la LUW en cours (le réflexe après un `Call Bapi` en échec, un
         teardown sûr des préparations de données interrompues, et la remise
-        à zéro du tampon avant une BAPI d'écriture, voir `Call Bapi`)."""
+        à zéro du tampon avant une BAPI d'écriture, voir `Call Bapi`).
+
+        Exemple :
+        | `Rollback Bapi Transaction`    alias=a4h
+        """
         return self.call_rfc("BAPI_TRANSACTION_ROLLBACK", alias=alias)

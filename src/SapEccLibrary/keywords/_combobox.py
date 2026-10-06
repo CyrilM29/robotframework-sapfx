@@ -1,4 +1,4 @@
-"""Mixin **combo box et formats de l'utilisateur** : sélectionner par CLÉ,
+"""Mixin *combo box et formats de l'utilisateur* : sélectionner par CLÉ,
 lire les entrées, et saisir dates et nombres dans le format de l'utilisateur.
 
 Relevé live le 2026-09-07 (A4H, SAP GUI 8.00) : une ``GuiComboBox`` expose ses
@@ -57,7 +57,12 @@ class ComboBoxKeywords:
     def get_combo_box_entries(self, element_id):
         """Les entrées d'une combo box : liste de dicts ``{key, value}`` dans
         l'ordre d'affichage, la CLÉ étant la donnée technique (``A`` pour
-        « Dialog » dans SU01) et la valeur le libellé localisé."""
+        « Dialog » dans SU01) et la valeur le libellé localisé.
+
+        Exemple :
+        | ${entries}=    `Get Combo Box Entries`    wnd[0]/usr/tabsTABSTRIP1/tabpLOGO/ssubMAINAREA:SAPLSUID_MAINTENANCE:1101/cmbSUID_ST_NODE_LOGONDATA-USTYP
+        | Should Be Equal    ${entries}[0][key]    A
+        """
         combo = self._combo(element_id)
         try:
             return entries_as_dicts(combo.Entries)
@@ -69,7 +74,12 @@ class ComboBoxKeywords:
         l'ancre locale-safe d'une assertion, là où `Get Value` rend le libellé.
         Aucun blanc n'est retiré : une combo peut porter deux entrées de clés
         distinctes ``""`` et ``" "`` (relevé live sur SM37, « Or after event »),
-        et normaliser à la lecture rendrait une restauration invérifiable."""
+        et normaliser à la lecture rendrait une restauration invérifiable.
+
+        Exemple :
+        | ${key}=    `Get Combo Box Key`    wnd[0]/usr/tabsTABSTRIP1/tabpLOGO/ssubMAINAREA:SAPLSUID_MAINTENANCE:1101/cmbSUID_ST_NODE_LOGONDATA-USTYP
+        | Should Be Equal    ${key}    A
+        """
         combo = self._combo(element_id)
         key = getattr(combo, "Key", "")
         return "" if key is None else str(key)
@@ -83,7 +93,14 @@ class ComboBoxKeywords:
         affichage (``Changeable`` faux) ou clé absente = échec actionnable
         listant les entrées : jamais une ``AttributeError`` COM muette. Combo
         disparue après la sélection (l'écran a changé) = échec, la sélection
-        n'étant plus vérifiable."""
+        n'étant plus vérifiable.
+
+        Exemple :
+        | `Select Combo Box Entry By Key`    wnd[0]/usr/cmbBTCH2170-EVENTID    SAP_SYSTEM_START
+        | ${key}=    `Get Combo Box Key`    wnd[0]/usr/cmbBTCH2170-EVENTID
+        | Should Be Equal    ${key}    SAP_SYSTEM_START
+        | `Select Combo Box Entry By Key`    wnd[0]/usr/cmbBTCH2170-EVENTID    ${SPACE}
+        """
         combo = self._combo(element_id)
         entries = entries_as_dicts(combo.Entries)
         self._combo_should_be_changeable(element_id, combo)
@@ -152,7 +169,14 @@ class ComboBoxKeywords:
         en affichage, libellé inconnu (entrées listées), libellé ambigu. La
         sélection est relue sur l'élément ré-acquis, comme dans
         `Select Combo Box Entry By Key`, la voie à préférer dans une suite
-        locale-safe."""
+        locale-safe.
+
+        Exemple :
+        | `Select From List By Label`    wnd[0]/usr/cmbBTCH2170-EVENTID    SAP_SYSTEM_STOP
+        | ${key}=    `Get Combo Box Key`    wnd[0]/usr/cmbBTCH2170-EVENTID
+        | Should Be Equal    ${key}    SAP_SYSTEM_STOP
+        | `Select Combo Box Entry By Key`    wnd[0]/usr/cmbBTCH2170-EVENTID    ${SPACE}
+        """
         combo = self._combo(element_id)
         entries = entries_as_dicts(combo.Entries)
         self._combo_should_be_changeable(element_id, combo)
@@ -193,7 +217,12 @@ class ComboBoxKeywords:
         écran SAP standard, la primitive est donc dans la bibliothèque). Le
         format est une propriété de l'utilisateur, pas de la langue : deux
         utilisateurs de la même session EN peuvent lire ``DD.MM.YYYY`` et
-        ``MM/DD/YYYY``."""
+        ``MM/DD/YYYY``.
+
+        Exemple :
+        | ${formats}=    `Get User Formats`
+        | Should Be Equal    ${formats}[date_pattern]    DD.MM.YYYY
+        """
         self.run_transaction(_SU3_TCODE)
         self.wait_until_element_present(_SU3_DEFAULTS_TAB)
         self.click_element(_SU3_DEFAULTS_TAB)
@@ -222,7 +251,14 @@ class ComboBoxKeywords:
         ``element_id``, CONVERTIE au format de l'utilisateur (``01.09.2026``
         pour ``DD.MM.YYYY``) : la suite reste locale-safe. ``date_format`` =
         clé ``DATFM`` (``1`` à ``6``) ; sans lui, celle mémorisée par
-        `Get User Formats`. Retourne la chaîne réellement saisie."""
+        `Get User Formats`. Retourne la chaîne réellement saisie.
+
+        Exemple :
+        | `Get User Formats`
+        | `Run Transaction`    SM37
+        | ${typed}=    `Input Date`    wnd[0]/usr/ctxtBTCH2170-FROM_DATE    2026-09-01
+        | Should Be Equal    ${typed}    01.09.2026
+        """
         key = date_format if date_format not in (None, "", "None") else \
             self._known_user_formats("Input Date")["date_format"]
         text = format_date(str(iso_date), key)
@@ -234,7 +270,15 @@ class ComboBoxKeywords:
         champ ``element_id``, converti à la notation décimale de l'utilisateur
         (``1234,5`` pour ``1.234.567,89``). ``decimal_notation`` = clé ``DCPFM``
         (vide, ``X`` ou ``Y``) ; sans lui, celle de `Get User Formats`.
-        ``decimals`` fixe le nombre de décimales. Retourne la chaîne saisie."""
+        ``decimals`` fixe le nombre de décimales. Retourne la chaîne saisie.
+
+        Exemple :
+        | `Get User Formats`
+        | `Reach Se16 Selection Screen`    SFLIGHT
+        | ${criteria}=    `Get Se16 Selection Criteria`
+        | ${typed}=    `Input Number`    ${criteria}[PRICE]    1234.5    decimals=2
+        | Should Be Equal    ${typed}    1234,50
+        """
         if decimal_notation in (None, "None"):
             key = self._known_user_formats("Input Number")["decimal_notation"]
         else:

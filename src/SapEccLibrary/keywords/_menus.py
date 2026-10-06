@@ -1,4 +1,4 @@
-"""Mixin **barre de menus** : lister les entrées et en sélectionner une par
+"""Mixin *barre de menus* : lister les entrées et en sélectionner une par
 chemin (textes ou positions).
 
 Un ``GuiMenu`` se sélectionne par ``Select()`` (ce que `Click Element` fait
@@ -23,13 +23,23 @@ class MenuKeywords:
     def list_menu_items(self, window="wnd[0]"):
         """Les entrées de la barre de menus de ``window`` : liste de dicts
         ``{id, text, positions, path}`` dans l'ordre de perception (``path``
-        = positions jointes par ``>``, rejouable par `Select Menu Item`)."""
+        = positions jointes par ``>``, rejouable par `Select Menu Item`).
+
+        Exemple :
+        | ${items}=    `List Menu Items`
+        | Should Be Equal    ${items}[0][id]    wnd[0]/mbar/menu[0]
+        """
         return describe_menu(menu_items_from_elements(self._screen_elements(), window))
 
     def resolve_menu_item(self, path, window="wnd[0]"):
         """L'id du ``GuiMenu`` désigné par ``path`` (``System > Status``,
         ``4 > 11``, ou mixte), résolu niveau par niveau sur la barre PERÇUE ;
-        échec actionnable listant les entrées du niveau fautif."""
+        échec actionnable listant les entrées du niveau fautif.
+
+        Exemple :
+        | ${entry}=    `Resolve Menu Item`    System > Status
+        | Should Be Equal    ${entry}    wnd[0]/mbar/menu[5]/menu[11]
+        """
         items = menu_items_from_elements(self._screen_elements(), window)
         if not items:
             raise ValueError("Aucune entrée de menu perçue sous '%s/mbar'." % window)
@@ -39,7 +49,12 @@ class MenuKeywords:
         """Sélectionne l'entrée de menu désignée par ``path`` (`Resolve Menu
         Item` puis `Click Element`, qui appelle ``Select()`` sur un GuiMenu) et
         attend la fin de l'aller-retour. Retourne l'id sélectionné (à
-        journaliser dans le page object : c'est lui qui est stable)."""
+        journaliser dans le page object : c'est lui qui est stable).
+
+        Exemple :
+        | `Select Menu Item`    System > Status
+        | `Element Should Be Present`    wnd[1]/usr/txtSYST-MANDT
+        """
         element_id = self.resolve_menu_item(path, window)
         self.click_element(element_id)
         self.wait_until_busy_done()

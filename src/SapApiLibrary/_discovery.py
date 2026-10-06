@@ -36,13 +36,19 @@ class DiscoveryKeywords(OdataReadKeywords):
         JSON-safe : ``{"version", "entity_sets": {nom: {"entity_type",
         "keys", "properties": {nom: {"type", "nullable", "label",
         "max_length", "precision", "scale"}}}}, "function_imports",
-        "actions"}``. C'est la **perception** du canal
+        "actions"}``. C'est la *perception* du canal
         API : ce que `Get Screen Signature` est à un écran, ce keyword l'est
         à un service (exploration agent, plans de test, discovery).
 
         Mis en cache par session et par racine de service (le $metadata ne
         bouge pas en cours de suite) ; ``refresh=True`` force le
-        rechargement."""
+        rechargement.
+
+        Exemple :
+        | ${meta}=    `Get Odata Metadata`    /sap/opu/odata/sap/SEPMRA_SHOP    alias=a4h
+        | Dictionary Should Contain Key    ${meta}[entity_sets]    Products
+        | Log    ${meta}[entity_sets][Products][keys]
+        """
         session = self._session(alias)
         key = service_path.rstrip("/")
         if not _as_bool(refresh) and key in session.metadata_cache:
@@ -71,7 +77,13 @@ class DiscoveryKeywords(OdataReadKeywords):
         "property", "label", "type", "match"}`` (contrat d'ambiguïté maison :
         l'appelant tranche, jamais de premier-match silencieux) ;
         ``entity_set`` restreint la recherche. Aucun candidat = échec
-        actionnable listant un extrait des libellés connus."""
+        actionnable listant un extrait des libellés connus.
+
+        Exemple :
+        | ${hits}=    `Find Odata Property By Label`    /sap/opu/odata/sap/SEPMRA_SHOP    Price
+        | ...    alias=a4h    entity_set=Products
+        | Should Be Equal    ${hits}[0][property]    Price
+        """
         metadata = self.get_odata_metadata(service_path, alias=alias)
         candidates = odata_metadata.find_property_by_label(
             metadata, label, entity_set)
@@ -90,18 +102,24 @@ class DiscoveryKeywords(OdataReadKeywords):
                             catalog_path: Optional[str] = None,
                             **query: str) -> list[dict[str, Any]]:
         """Liste les services OData actifs de la Gateway via son catalogue
-        (``ServiceCollection``) : la **découverte** du canal API. Retourne
+        (``ServiceCollection``) : la *découverte* du canal API. Retourne
         une liste JSON-safe ``{"id", "title", "technical_name",
         "service_url", "version"}`` par service. ``catalog_path`` remplace le
         chemin standard au besoin ; les options OData passent en arguments
-        nommés (``top=10``)."""
+        nommés (``top=10``).
+
+        Exemple :
+        | ${services}=    `List Odata Services`    alias=a4h
+        | Should Not Be Empty    ${services}
+        | Log    ${services}[0][technical_name]
+        """
         path = catalog_path or gateway_status.CATALOG_SERVICE_PATH
         query.setdefault("format", "json")
         entries = self.get_odata_entities(path, alias=alias, **query)
         return odata_metadata.simplify_catalog_entries(entries)
 
     def get_abap_software_components(self, alias: str = "default") -> dict[str, Any]:
-        """Composants logiciels installés du système ABAP, lus par **HTTP seul**
+        """Composants logiciels installés du système ABAP, lus par *HTTP seul*
         (API des outils ABAP, ``/sap/bc/adt/system/components``) : ``{"release",
         "components": {nom: {"release", "sp_package", "sp_level",
         "description"}}}``, ``release`` étant celle de ``SAP_BASIS``.
@@ -111,15 +129,17 @@ class DiscoveryKeywords(OdataReadKeywords):
         identifiant système et le même nom d'hôte, et ``/sap/public/info`` est
         inactif sur les deux, si bien que le seul discriminant HTTP connu était
         jusqu'ici le volume du catalogue Gateway. Relevé le 2026-09-24 : cette
-        ressource rend ``SAP_BASIS 758`` sur ABAP Platform 2023. ::
-
-            ${inventaire}=    Get Abap Software Components    alias=rap
-            Should Be Equal    ${inventaire}[release]    758
+        ressource rend ``SAP_BASIS 758`` sur ABAP Platform 2023.
 
         Exige le service ICF des outils ABAP et l'autorisation d'y lire ; un
         refus HTTP échoue avec son statut, un corps qui n'est pas le flux
         attendu (page de connexion) échoue en le disant, jamais un inventaire
-        vide. Lecture seule."""
+        vide. Lecture seule.
+
+        Exemple :
+        | ${components}=    `Get Abap Software Components`    alias=a4h
+        | Should Be Equal    ${components}[release]    754
+        """
         _, _, body = self._request(alias, "GET", abap_components.COMPONENTS_PATH,
                                    headers={"Accept": abap_components.ATOM_FEED})
         components = abap_components.parse_adt_components(body)
@@ -128,7 +148,7 @@ class DiscoveryKeywords(OdataReadKeywords):
 
     def get_cds_header_annotations(self, name: str,
                                    alias: str = "default") -> dict[str, Any]:
-        """Les annotations d'EN-TÊTE d'une vue CDS ABAP avec leur **VALEUR**,
+        """Les annotations d'EN-TÊTE d'une vue CDS ABAP avec leur *VALEUR*,
         lues dans sa source DDL par l'API des outils ABAP
         (``/sap/bc/adt/ddic/ddl/sources/<nom>/source/main``) : un dict aux clés
         en majuscules et pointées, comme dans le dictionnaire
@@ -141,18 +161,19 @@ class DiscoveryKeywords(OdataReadKeywords):
         colonne de valeur (1300 caractères) dépasse ``RFC_READ_TABLE``, si bien
         qu'une garde par RFC constate qu'une annotation EXISTE et jamais ce
         qu'elle VAUT : ``dataExtraction.enabled: false`` y ressemble à
-        ``true`` (revue indépendante du 2026-09-29). ::
-
-            ${ann}=    Get Cds Header Annotations    SEPM_I_PurchaseOrder    alias=api
-            Should Be Equal    ${ann}[ANALYTICS.DATACATEGORY]    \\#DIMENSION
-            Should Be Equal    ${ann}[ABAPCATALOG.SQLVIEWNAME]    SEPM_IPO
+        ``true`` (revue indépendante du 2026-09-29).
 
         Les commentaires (``//``, ``--``, ``/* */``) sont retirés : une
         annotation commentée n'existe pas. Exige le service ICF des outils
         ABAP et l'autorisation d'y lire ; un refus HTTP échoue avec son
         statut, une réponse qui n'est pas une définition DDL (page de
         connexion) échoue en le disant, jamais un dictionnaire vide. Lecture
-        seule. Logique pure : ``sapfx_common.cds_source``."""
+        seule. Logique pure : ``sapfx_common.cds_source``.
+
+        Exemple :
+        | ${annotations}=    `Get Cds Header Annotations`    SEPM_I_PurchaseOrder    alias=a4h
+        | Should Be Equal    ${annotations}[ABAPCATALOG.SQLVIEWNAME]    SEPM_IPO
+        """
         _, _, body = self._request(alias, "GET", cds_source.ddl_source_path(name),
                                    headers={"Accept": "text/plain"})
         texte = body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body)
@@ -165,7 +186,7 @@ class DiscoveryKeywords(OdataReadKeywords):
                           max_chars: int = 20000,
                           headers: Optional[dict] = None,
                           **query: str) -> dict[str, Any]:
-        """Lecture HTTP **brute et tolérante** d'un chemin de la session :
+        """Lecture HTTP *brute et tolérante* d'un chemin de la session :
         retourne ``{"status", "headers", "body", "truncated", "error",
         "url"}`` sans JAMAIS lever. C'est la perception de ce que le serveur
         SERT vraiment, quand ce n'est pas de l'OData : la page HTML d'un
@@ -183,7 +204,12 @@ class DiscoveryKeywords(OdataReadKeywords):
         ``Accept`` autrement, sans toucher la session) ; les options de query
         passent en arguments nommés. Compte dans la télémétrie comme toute
         traversée réseau. Pour de l'OData, préférer `Get Odata Entities` et
-        ses assertions ; pour un verdict classé, `Get Gateway Status`."""
+        ses assertions ; pour un verdict classé, `Get Gateway Status`.
+
+        Exemple :
+        | ${response}=    `Get Http Response`    /sap/opu/odata/sap/SEPMRA_SHOP/Products('AR-FB-1000')    alias=a4h    max_chars=200
+        | Should Be Equal As Integers    ${response}[status]    200
+        """
         status, resp_headers, body, truncated, error, url = \
             self._probe_response(alias, path, query or None,
                                  max_chars=int(max_chars),
@@ -194,8 +220,8 @@ class DiscoveryKeywords(OdataReadKeywords):
                 "error": error, "url": url}
 
     def classify_http_response(self, response: dict) -> str:
-        """Range une réponse de `Get Http Response` dans une **famille de
-        reconnaissance**, par des critères purement structurels : statut,
+        """Range une réponse de `Get Http Response` dans une *famille de
+        reconnaissance*, par des critères purement structurels : statut,
         en-tête technique du routeur de plateforme, et forme du corps (JSON ou
         HTML), jamais un texte localisé (convention #3).
 
@@ -213,10 +239,12 @@ class DiscoveryKeywords(OdataReadKeywords):
         même statut, et c'est la couche qui répond qu'il s'agit d'identifier.
         Toujours sonder AUSSI un chemin volontairement absent sur le même hôte
         (le témoin absurde) : sans lui, on ne sait pas si un 404 qualifie la
-        ressource ou l'hôte entier. ::
+        ressource ou l'hôte entier.
 
-            ${reponse}=    Get Http Response    /odata
-            ${famille}=    Classify Http Response    ${reponse}
+        Exemple :
+        | ${response}=    `Get Http Response`    /sap/opu/odata/sap/ZZ_NO_SUCH_SERVICE/$metadata    alias=a4h
+        | ${family}=    `Classify Http Response`    ${response}
+        | Should Be Equal    ${family}    forbidden
         """
         return gateway_status.classify_http_response(
             response.get("status"), response.get("headers"),
@@ -238,14 +266,19 @@ class DiscoveryKeywords(OdataReadKeywords):
         connexion : un « vert et faux » sans ce classement, car AUCUNE route
         d'un tel site ne renvoie de défi d'authentification).
 
-        Sur une session ouverte par **clé d'API** (une couche de gestion
+        Sur une session ouverte par *clé d'API* (une couche de gestion
         d'API devant le système), un 401 se dédouble : ``auth_failed`` quand
         la couche refuse la clé, et ``backend_auth_failed`` quand elle
         l'ACCEPTE et que le système ABAP derrière refuse (relevé live le
         2026-09-06 sur le bac à sable SAP Business Accelerator Hub). Les
         deux méritent des remèdes opposés, et le second interdit
         explicitement de régénérer une clé saine. Ne lève jamais : le
-        miroir API de `Get Scripting Status`."""
+        miroir API de `Get Scripting Status`.
+
+        Exemple :
+        | ${gateway}=    `Get Gateway Status`    alias=a4h
+        | Should Be Equal    ${gateway}[status]    ok
+        """
         session = self._session(alias)
         path = catalog_path or gateway_status.CATALOG_SERVICE_PATH
         code, headers, excerpt, _, error, _ = self._probe_response(
@@ -262,7 +295,11 @@ class DiscoveryKeywords(OdataReadKeywords):
         """Échoue (message auto-corrigible nommant la remédiation) si la
         Gateway OData n'est pas opérationnelle : à appeler en Suite Setup
         avant tout test OData, comme `Scripting Should Be Fully Enabled`
-        côté GUI."""
+        côté GUI.
+
+        Exemple :
+        | `Gateway Should Be Active`    alias=a4h
+        """
         result = self.get_gateway_status(alias=alias, catalog_path=catalog_path)
         if result["status"] != "ok":
             raise AssertionError(gateway_status.format_gateway_failure(result))
@@ -277,7 +314,11 @@ class DiscoveryKeywords(OdataReadKeywords):
         (le boot ABAP prend plusieurs minutes). Jamais de ``time.sleep`` dans
         une suite : ce keyword EST l'attente. Retourne ``{"available": True,
         "waited_seconds", "status"}`` ; échec au timeout avec le dernier
-        diagnostic classé et sa remédiation."""
+        diagnostic classé et sa remédiation.
+
+        Exemple :
+        | `Wait Until Api Available`    alias=a4h    timeout=2m
+        """
         secs = timestr_to_secs(timeout)
         step = timestr_to_secs(poll)
         target = path or gateway_status.CATALOG_SERVICE_PATH
@@ -305,12 +346,17 @@ class DiscoveryKeywords(OdataReadKeywords):
 
     def lookup_business_term(self, term: str, domain: Optional[str] = None,
                              threshold: float = 0.8) -> dict[str, Any]:
-        """Résout un **terme métier** (français ou anglais, synonymes
+        """Résout un *terme métier* (français ou anglais, synonymes
         compris) vers sa fiche SAP : canonique, champ ABAP, table de
         référence, domaine. Le même vocabulaire partagé que les canaux GUI
         (``sapfx_common.vocabulary``, concept issu de playwright-praman,
         Apache-2.0, NOTICE) : côté API il donne la table à compter par SE16
         ou le champ à filtrer en ``$filter``. Ambiguïté ou score sous
         ``threshold`` = échec listant les candidats, jamais de premier-match
-        silencieux. Dict JSON-safe (rf-mcp)."""
+        silencieux. Dict JSON-safe (rf-mcp).
+
+        Exemple :
+        | ${entry}=    `Lookup Business Term`    customer
+        | Should Be Equal    ${entry}[abap_field]    KUNNR
+        """
         return lookup_as_dict(term, domain=domain, threshold=float(threshold))

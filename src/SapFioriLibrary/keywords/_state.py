@@ -42,7 +42,7 @@ class StateKeywords:
     et la plomberie de ``_base.py`` disponible par composition."""
 
     def wait_for_ui5_idle(self, timeout=None, settle="300 ms"):
-        """Attend que la page soit **réellement au repos** : plus aucune
+        """Attend que la page soit *réellement au repos* : plus aucune
         requête réseau en vol (XHR et fetch, instrumentés par le bundle à son
         injection), aucun indicateur busy UI5 visible, et un calme continu
         d'au moins ``settle``.
@@ -61,13 +61,9 @@ class StateKeywords:
         exigé en ms pour rendre une mauvaise unité visible.
         ``timeout`` défaut = ``ui5_timeout``. Retourne
         l'état final ``{"pending", "busy", "quiet_ms"}`` (JSON-safe). Jamais
-        une pause fixe : convention n°2. ::
+        une pause fixe : convention n°2.
 
-            Click Ui5 Control    controlType=Button    properties={'text': 'Go'}
-            Wait For Ui5 Idle
-            ${rows}=    Read Ui5 Table    controlType=Table
-
-        **Portée exacte** (vérifiée live sur cap-sflight) : ce keyword attend
+        *Portée exacte* (vérifiée live sur cap-sflight) : ce keyword attend
         le repos des requêtes DÉJÀ parties ; il ne devine pas qu'une requête
         *va* partir. Au tout premier chargement d'une app, il peut donc
         rendre la main avant que la vue n'ait lancé son ``initialLoad`` :
@@ -75,7 +71,13 @@ class StateKeywords:
         ou la résolution qui sonde déjà le rendu) reste la façon d'attendre
         un PREMIER rendu. C'est APRÈS une action (Go, tri, navigation), là où
         la vue est déjà là et où seules les données manquent, qu'il est
-        décisif."""
+        décisif.
+
+        Exemple :
+        | `Click Ui5 Control`    idSuffix=fe::FilterBar::Travel-btnSearch
+        | ${idle}=    `Wait For Ui5 Idle`    settle=400 ms
+        | Should Be Equal As Integers    ${idle}[pending]    0
+        """
         budget = timestr_to_secs(timeout if timeout is not None else self.ui5_timeout)
         settle_ms = timestr_to_secs(settle) * 1000.0
         state = {}
@@ -124,7 +126,7 @@ class StateKeywords:
         return dict(state)
 
     def ui5_runtime_is_present(self):
-        """Y a-t-il un **runtime UI5** dans la portée courante (page, ou frame
+        """Y a-t-il un *runtime UI5* dans la portée courante (page, ou frame
         ciblée par `Set Ui5 Frame` / `Push Ui5 Frame`) ? Retourne ``True`` ou
         ``False``, jamais d'échec : une page injoignable répond ``False``.
 
@@ -140,10 +142,11 @@ class StateKeywords:
         PAS le bundle ``__SAPFX`` : elle ne modifie donc rien (pas
         d'instrumentation ``fetch`` ni ``XMLHttpRequest``, pas de hook
         ``MessageToast``), ce qui la rend utilisable par une pure
-        observation, l'état applicatif servi aux agents notamment. ::
+        observation, l'état applicatif servi aux agents notamment.
 
-            ${ui5}=    Ui5 Runtime Is Present
-            IF    ${ui5}    Ui5 Should Have No Messages Of Type    Error
+        Exemple :
+        | ${ui5}=    `Ui5 Runtime Is Present`
+        | Should Be True    ${ui5}
         """
         try:
             return bool(self._evaluate(UI5_RUNTIME_PROBE_JS))
@@ -151,7 +154,7 @@ class StateKeywords:
             return False
 
     def get_ui5_application_state(self):
-        """L'état du canal web en **UN seul appel** : portée de frame active,
+        """L'état du canal web en *UN seul appel* : portée de frame active,
         présence d'un runtime UI5, et messages UI5 quand il y en a un.
         Retourne un dict JSON-safe ``{"frame_stack": [...], "ui5_runtime":
         bool, "messages": {...}}`` (``messages`` absent hors runtime UI5,
@@ -167,10 +170,11 @@ class StateKeywords:
         `Ui5 Runtime Is Present` (aucune injection) AVANT de lire les
         messages, qui exigent le runtime et installent le bundle. Une page
         sans UI5 (moteurs wc/sid/dom) est donc décrite honnêtement, sans
-        échec et sans être instrumentée pour rien. ::
+        échec et sans être instrumentée pour rien.
 
-            ${etat}=    Get Ui5 Application State
-            Log         Portée : ${etat}[frame_stack]
+        Exemple :
+        | ${state}=    `Get Ui5 Application State`
+        | Should Be True    ${state}[ui5_runtime]
         """
         state = {"frame_stack": self.get_ui5_frame_stack(),
                  "ui5_runtime": self.ui5_runtime_is_present()}
@@ -182,8 +186,8 @@ class StateKeywords:
         return state
 
     def ui5_runtime_is_ready(self):
-        """Le moteur UI5 de la portée courante est-il **inactif** (pas
-        seulement chargé) ? Retourne ``True``/``False``, jamais d'échec :
+        """Le moteur UI5 de la portée courante est-il *inactif* (pas
+        seulement chargé) ? Retourne ``True`` / ``False``, jamais d'échec :
         runtime présent (Core hérité OU module ``Element``, UI5 2.x
         supprimant ``sap.ui.getCore()``), aucune mise à jour d'UI en attente
         (``getUIDirty`` quand le Core l'expose), aucun indicateur
@@ -193,7 +197,12 @@ class StateKeywords:
         sonde en ``Wait Until Keyword Succeeds`` via `Ui5 Runtime Should Be
         Ready`). Lecture PURE, sans bundle : à la différence de `Wait For Ui5
         Idle`, cette sonde n'instrumente rien : c'est le témoin « moteur au
-        repos », pas « réseau au repos »."""
+        repos », pas « réseau au repos ».
+
+        Exemple :
+        | ${ready}=    `Ui5 Runtime Is Ready`
+        | Should Be True    ${ready}
+        """
         try:
             return bool(self._evaluate(UI5_READY_PROBE_JS))
         except Exception:      # noqa: BLE001 (sonde : jamais d'échec)
@@ -202,7 +211,11 @@ class StateKeywords:
     def ui5_runtime_should_be_ready(self):
         """Assertion : le moteur UI5 est chargé ET inactif. La forme à sonder
         dans un ``Wait Until Keyword Succeeds`` (voir
-        `Ui5 Runtime Is Ready`)."""
+        `Ui5 Runtime Is Ready`).
+
+        Exemple :
+        | Wait Until Keyword Succeeds    15s    0.5s    `Ui5 Runtime Should Be Ready`
+        """
         if not self.ui5_runtime_is_ready():
             raise AssertionError(
                 "Le moteur UI5 n'est pas (encore) inactif sur la portée "
@@ -218,14 +231,15 @@ class StateKeywords:
 
         ``future_expiration`` est le prédicat qui a un sens, et pas
         « expiration renseignée » : la bibliothèque Browser rend un cookie de
-        SESSION (sans expiration) avec une date de **1969** (epoch moins un),
+        SESSION (sans expiration) avec une date de *1969* (epoch moins un),
         qu'un test naïf lirait comme une expiration renseignée donc
         permanente : les six cookies d'un site passaient pour permanents et
         le test était vert à l'envers (leçon live 2026-08-26, campagne de
-        résilience Work Zone ; logique pure ``sapfx_common.web_cookies``). ::
+        résilience Work Zone ; logique pure ``sapfx_common.web_cookies``).
 
-            ${cookies}=    Get Session Cookie Summary
-            ${permanents}=    Evaluate    [c for c in $cookies if c['future_expiration']]
+        Exemple :
+        | ${cookies}=    `Get Session Cookie Summary`
+        | Log    ${cookies}
         """
         try:
             from Browser.utils.data_types import CookieType
@@ -236,18 +250,23 @@ class StateKeywords:
         return summarize_cookies(raw, time.time())
 
     def get_page_languages(self):
-        """La **langue réellement servie** : dict JSON-safe ``{document,
+        """La *langue réellement servie* : dict JSON-safe ``{document,
         navigator}`` (attribut ``lang`` du document de la portée courante,
         langue déclarée du navigateur). C'est la mesure qui tranche « le
         réglage de langue est-il appliqué » sans lire un seul texte localisé
         (convention #3) : le document sert ``fr`` ou ne le sert pas. Lecture
-        pure (aucune injection), respecte la portée de frame."""
+        pure (aucune injection), respecte la portée de frame.
+
+        Exemple :
+        | ${languages}=    `Get Page Languages`
+        | Should Be Equal    ${languages}[document]    en-US
+        """
         result = self._evaluate(PAGE_LANGUAGES_PROBE_JS)
         return result if isinstance(result, dict) else {"document": "",
                                                         "navigator": ""}
 
     def get_ui5_theme(self):
-        """Le **thème** du runtime UI5 : dict JSON-safe ``{requested, applied}``.
+        """Le *thème* du runtime UI5 : dict JSON-safe ``{requested, applied}``.
 
         Deux valeurs et non une, parce qu'elles divergent et que la différence
         est mesurable. ``requested`` est le thème que le runtime a reçu ordre
@@ -256,7 +275,7 @@ class StateKeywords:
         document porte réellement, extrait de la classe technique
         ``sapUiTheme-<clé>`` de ``<html>``.
 
-        Le témoin **locale-safe** d'un changement de thème (convention n°3) :
+        Le témoin *locale-safe* d'un changement de thème (convention n°3) :
         l'entrée de menu qui l'a choisi porte un libellé traduit, la clé
         technique ``sap_horizon_dark`` non. Relevé live sur le Demo Kit OpenUI5
         (2026-08-30) : juste après le clic, ``applied`` est VIDE le temps que le
@@ -264,6 +283,10 @@ class StateKeywords:
         la cible. Asserter le thème demande donc d'attendre la valeur voulue,
         jamais de lire une fois. Lecture pure (aucune injection du bundle, donc
         aucune instrumentation de la page), respecte la portée de frame.
+
+        Exemple :
+        | ${theme}=    `Get Ui5 Theme`
+        | Should Be Equal    ${theme}[applied]    sap_horizon
         """
         result = self._evaluate(UI5_THEME_PROBE_JS)
         if not isinstance(result, dict):
@@ -272,7 +295,7 @@ class StateKeywords:
                 "applied": applied_theme(result.get("classes"))}
 
     def get_ui5_messages(self, include_toasts=True):
-        """Lit les **messages UI5** de la page : le MessageManager (module
+        """Lit les *messages UI5* de la page : le MessageManager (module
         ``Messaging`` des UI5 récents, ``getMessageManager()`` sinon) plus les
         ``MessageToast`` récents, captés par un hook posé à l'injection du
         bundle (un toast est éphémère à l'écran, pas dans cette liste ; ceux
@@ -294,7 +317,12 @@ class StateKeywords:
         jamais sur le texte localisé (convention n°3), via
         `Ui5 Should Have No Messages Of Type`. Runtime UI5 absent sur la
         portée courante = échec actionnable nommant `Ui5 Runtime Is Present`
-        (la sonde à poser d'abord quand la page peut ne pas être UI5)."""
+        (la sonde à poser d'abord quand la page peut ne pas être UI5).
+
+        Exemple :
+        | ${messages}=    `Get Ui5 Messages`
+        | Should Be Empty    ${messages}[messages]
+        """
         result = self._evaluate(GET_MESSAGES_JS)
         if result is None:
             raise AssertionError(
@@ -308,15 +336,14 @@ class StateKeywords:
 
     def ui5_should_have_no_messages_of_type(self, message_type="Error"):
         """Échoue si le MessageManager UI5 porte AU MOINS un message du type
-        donné (``Error``, ``Warning``…) : l'assertion **locale-safe** du canal
+        donné (``Error``, ``Warning`` …) : l'assertion *locale-safe* du canal
         web (convention n°3 : on juge le TYPE, le texte n'est joint au message
         d'échec que pour le lecteur humain). Typiquement après une soumission
         de formulaire : l'app peut afficher l'écran suivant ET porter une
-        erreur de validation dans sa MessagePopover. ::
+        erreur de validation dans sa MessagePopover.
 
-            Click Ui5 Control    controlType=Button    properties={'text': 'Save'}
-            Wait For Ui5 Idle
-            Ui5 Should Have No Messages Of Type    Error
+        Exemple :
+        | `Ui5 Should Have No Messages Of Type`    Error
         """
         wanted = str(message_type).strip().casefold()
         result = self.get_ui5_messages()

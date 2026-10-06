@@ -8,9 +8,14 @@ This product includes software developed as part of:
   https://github.com/frankvanderkuur/robotframework-sapguilibrary
   Licensed under the Apache License, Version 2.0.
 
-The file `src/SapEccLibrary/_vendor/sapgui_base.py` is a vendored copy of that
-project's `SapGuiLibrary.py`, with the single modification of renaming the class
-`SapGuiLibrary` to `SapGuiBase`. See that file's header for details.
+Parts of `src/SapEccLibrary/` derive from that project's `SapGuiLibrary.py`
+(version 1.2.1). That file was first included verbatim, then absorbed and
+rewritten on 2026-10-06 into this project's own modules, keeping the names and
+signatures of its 37 keywords: `keywords/_connection.py`, `_elements.py`,
+`_inputs.py`, `_value_checks.py`, `_grid_cells.py`, `_grid_actions.py`,
+`_trees.py`, `_screenshots.py` and `_waits.py`, and the virtual-key table of
+`src/sapfx_common/vkeys.py`. Each of those files states the derivation in its
+header.
 
 ----------------------------------------------------------------------
 

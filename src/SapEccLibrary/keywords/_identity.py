@@ -1,4 +1,4 @@
-"""Mixin **identité du système** : release, kernel et composants lus à l'écran.
+"""Mixin *identité du système* : release, kernel et composants lus à l'écran.
 
 Le miroir SAP GUI de `Read System Identity` du canal RFC. Le modal « System:
 Status » (programme ``SAPLSHSY``, dynpro ``700``) est le seul endroit où un
@@ -87,7 +87,13 @@ class SystemIdentityKeywords:
         de session). Retourne l'id de l'entrée de menu CLIQUÉE (par exemple
         ``wnd[0]/mbar/menu[5]/menu[10]`` sur SE16 de la release 758), la trace
         de la résolution qu'un test peut confronter à un relevé indépendant du
-        menu ; le dialogue lui-même est ``wnd[1]``."""
+        menu ; le dialogue lui-même est ``wnd[1]``.
+
+        Exemple :
+        | ${entry}=    `Open System Status`
+        | `Element Should Be Present`    wnd[1]/usr/txtSYST-MANDT
+        | `Dismiss Modal Window`
+        """
         if self._element("wnd[1]") is not None:
             raise AssertionError(
                 "Un modal (wnd[1]) est déjà ouvert : le refermer d'abord "
@@ -187,7 +193,13 @@ class SystemIdentityKeywords:
         être lues, ``missing_fields`` les champs qu'un dialogue lu n'affichait
         pas (une autre release peut en omettre), jamais remplacés par une
         valeur plausible. Tous les modals ouverts sont refermés et leur
-        disparition vérifiée."""
+        disparition vérifiée.
+
+        Exemple :
+        | ${identity}=    `Get System Identity`
+        | Should Be Equal    ${identity}[system_id]    A4H
+        | Should Be Equal    ${identity}[basis_release]    754
+        """
         self.open_system_status()
         window = 1
         unread = []
@@ -213,7 +225,11 @@ class SystemIdentityKeywords:
         sur des clés d'ANCRE (``basis_release=754    kernel_release=777``
         ``client=001``...) : chaque écart est listé avec la valeur réelle, une
         clé absente de l'identité est un écart. Les clés volatiles (adresse IP,
-        transaction) sont refusées : elles ne prouvent rien."""
+        transaction) sont refusées : elles ne prouvent rien.
+
+        Exemple :
+        | `System Identity Should Be`    basis_release=754    kernel_release=777    client=001
+        """
         if not expected:
             raise ValueError(
                 "Aucune attente : passer des clés d'ancre (%s)." % ", ".join(ANCHOR_KEYS))

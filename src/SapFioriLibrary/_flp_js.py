@@ -1,4 +1,4 @@
-"""Sondes PURES des **tuiles** d'un launchpad : compteurs rendus, configuration
+"""Sondes PURES des *tuiles* d'un launchpad : compteurs rendus, configuration
 et symboles numériques de la page (fiche scénario 7, 2026-09-29).
 
 Un chapitre à part (convention #13) : ``_ui5_js`` approche de sa limite, et

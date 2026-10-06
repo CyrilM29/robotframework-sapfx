@@ -10,14 +10,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "robotframework-sapfx"
 version = "0.8.3"
-description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API. Forked from robotframework-sapguilibrary."
+description = "SAPFX - SAP test automation for Robot Framework: SAP GUI (ECC / S4 backend), Fiori/UI5, OData API."
 readme = "README.md"
 requires-python = ">=3.10"
 # Expression SPDX + fichiers de licence (PEP 639), à la place de
 # `license = { text = … }` et du classifieur « License :: OSI Approved », tous
 # deux dépréciés depuis setuptools 77 (et mutuellement exclusifs avec une
-# expression). `NOTICE` porte l'attribution de l'upstream vendorisé : il est
-# nommé ici, pas seulement ramassé par le glob par défaut.
+# expression). `NOTICE` porte l'attribution de robotframework-sapguilibrary,
+# dont le code a été absorbé : il est nommé ici, pas seulement ramassé par le
+# glob par défaut.
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Cyril Montiel", email = "cyril@montiel.me" }]
@@ -92,7 +93,6 @@ dev =["pytest>=7.0", "pytest-cov>=5.0", "ruff>=0.4", "pre-commit>=3.0", "mypy>=1
 Homepage = "https://github.com/CyrilM29/robotframework-sapfx"
 # Les pages Libdoc (une par bibliothèque) : PyPI l'affiche en barre latérale.
 Documentation = "https://cyrilm29.github.io/robotframework-sapfx/"
-Upstream = "https://github.com/frankvanderkuur/robotframework-sapguilibrary"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -54,11 +54,11 @@ class LocatorKeywords:
         le nombre de correspondances est journalisé afin qu'un sélecteur ambigu soit visible
         et ne soit jamais tronqué silencieusement.
 
-        ``idSuffix`` matche la **fin** de l'id du contrôle : le motif des ids
+        ``idSuffix`` matche la *fin* de l'id du contrôle : le motif des ids
         stables Fiori Elements V4 (``idSuffix=fe::table::<Entity>::LineItem::Table``),
         dont le préfixe app/route varie mais dont le suffixe est déterministe.
 
-        ``viewId`` restreint aux contrôles de cette **vue** : la vue propriétaire
+        ``viewId`` restreint aux contrôles de cette *vue* : la vue propriétaire
         est cherchée en remontant la hiérarchie, et à défaut l'identifiant donné
         est cherché dans l'id du contrôle. La seconde forme sert à porter la
         recherche sur un CONTENEUR (``viewId=<id de la liste>`` ne retient que
@@ -66,7 +66,7 @@ class LocatorKeywords:
         la première couvre les contrôles à id entièrement généré, que la seconde
         ne pouvait pas voir.
 
-        ``containedIn`` restreint aux contrôles dont le **nœud DOM** descend de
+        ``containedIn`` restreint aux contrôles dont le *nœud DOM* descend de
         celui du contrôle désigné (id exact, sinon suffixe d'id, sinon nœud DOM
         de cet id : c'est la valeur que `Get Ui5 Ids` vient de servir). ``viewId`` suit
         la propriété (vue, agrégations), ``containedIn`` suit le rendu : ce sont
@@ -76,6 +76,10 @@ class LocatorKeywords:
         titre et le compteur ne sont ni dans sa vue, ni dans ses agrégations, ni
         dans son contexte de liaison). Conteneur absent ou non rendu = aucune
         correspondance.
+
+        Exemple :
+        | ${selector}=    `Resolve Ui5 Control`    idSuffix=fe::FilterBar::Travel-btnSearch
+        | Should Start With    ${selector}    css=
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
@@ -86,19 +90,23 @@ class LocatorKeywords:
         return self._pick(ids, int(index), str(selector))
 
     def resolve_ui5_by_xpath(self, xpath, index=0):
-        """Résout un contrôle via un **UI5 XPath hiérarchique** sur l'arbre des contrôles.
+        """Résout un contrôle via un *UI5 XPath hiérarchique* sur l'arbre des contrôles.
 
         Les noms de balises de l'arbre correspondent aux types courts des contrôles et les
         attributs aux propriétés des contrôles, ce qui permet d'exprimer l'ancestralité et
-        des prédicats, par exemple::
+        des prédicats, par exemple :
 
-            //Table//ColumnListItem//Button[@text='Edit']
-            //Page[@title='Orders']//SearchField
+        | //Table//ColumnListItem//Button[@text='Edit']
+        | //Page[@title='Orders']//SearchField
 
-        Retourne ``css=[id="<controlId>"]`` pour la ``index``-ième correspondance (la première
-        par défaut). Remarque : la correspondance d'attributs XPath est exacte/`contains()`
+        Retourne ``css=[id="<controlId>"]`` pour la correspondance de rang ``index`` (la première
+        par défaut). Remarque : la correspondance d'attributs XPath est exacte ou par ``contains()``
         selon XPath 1.0 ; utiliser `Resolve Ui5 Control` pour une correspondance insensible
         à la casse ou par sous-chaîne.
+
+        Exemple :
+        | ${selector}=    `Resolve Ui5 By Xpath`    //SearchField[1]
+        | Should Start With    ${selector}    css=
         """
         ids = self._resolve(RESOLVE_XPATH_JS, xpath, xpath)
         return self._pick(ids, int(index), "xpath %s" % xpath)
@@ -114,7 +122,11 @@ class LocatorKeywords:
         rejoint celui des miroirs `Wc Control Should Be Visible` /
         `Dom Element Should Be Visible`, qui exigeaient déjà le rect non nul.
         L'échec distingue les deux causes : aucune correspondance, ou des
-        correspondances toutes de rectangle nul (en les nommant)."""
+        correspondances toutes de rectangle nul (en les nommant).
+
+        Exemple :
+        | `Ui5 Control Should Be Visible`    idSuffix=fe::table::Travel::LineItem-innerTable
+        """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
         if not ids:
@@ -133,35 +145,37 @@ class LocatorKeywords:
 
     def get_ui5_match_count(self, **selector_parts):
         """Retourne le nombre de contrôles rendus qui correspondent actuellement au sélecteur (0+).
-        N'attend pas : utile pour les assertions sur la cardinalité de listes/tableaux."""
+        N'attend pas : utile pour les assertions sur la cardinalité de listes/tableaux.
+
+        Exemple :
+        | ${rows}=    `Get Ui5 Match Count`    controlType=sap.m.ColumnListItem
+        | Should Be Equal As Integers    ${rows}    30
+        """
         selector = build_control_selector(**selector_parts)
         ids = self._evaluate(RESOLVE_ROLE_JS, arg=selector_to_json(selector)) or []
         return len(ids)
 
     def get_ui5_ids(self, **selector_parts):
-        """Retourne les **identifiants** des contrôles rendus qui correspondent au
+        """Retourne les *identifiants* des contrôles rendus qui correspondent au
         sélecteur, dans l'ordre du registre (liste, vide si rien ne matche).
 
         Le complément de `Get Ui5 Match Count` (combien) et de
-        `Get Ui5 Properties` (quelles valeurs) : celui-ci répond **lesquels**.
+        `Get Ui5 Properties` (quelles valeurs) : celui-ci répond *lesquels*.
         C'est la lecture qui manquait quand l'ancre documentée est un SUFFIXE
         d'identifiant : sur un shell dont les préfixes de vue sont générés et
         les positions de liste variables, seule la liste des ids réellement
         rendus permet de découvrir les entrées présentes au lieu de les
-        supposer. ::
-
-            ${ids}=    Get Ui5 Ids    controlType=sap.m.StandardListItem
-            # ['__list0-0-recentActivitiesBtn', '__list0-4-ActionModeBtn', ...]
+        supposer.
 
         Accepte les mêmes parties de sélecteur que `Resolve Ui5 Control`, dont
         ``containedIn`` (containment DOM), qui répond à « quels contrôles sont
         rendus À L'INTÉRIEUR de celui-ci », question qu'aucune autre partie ne
         pose : ``viewId`` suit la vue propriétaire ou l'id de fabrique, donc la
-        propriété, quand ``containedIn`` suit le rendu. ::
+        propriété, quand ``containedIn`` suit le rendu. Par exemple :
 
-            ${tuiles}=    Get Ui5 Ids    controlType=sap.ushell.ui.launchpad.Tile
-            ${titre}=     Get Ui5 Property    header    controlType=sap.m.GenericTile
-            ...           containedIn=${tuiles}[0]
+        | ${tuiles}=    `Get Ui5 Ids`    controlType=sap.ushell.ui.launchpad.Tile
+        | ${titre}=     `Get Ui5 Property`    header    controlType=sap.m.GenericTile
+        | ...           containedIn=${tuiles}[0]
 
         N'attend pas et ne lève pas : c'est une lecture, pas une assertion
         (voir `Ui5 Control Should Be Visible` pour exiger une présence). Comme
@@ -169,25 +183,29 @@ class LocatorKeywords:
         un contrôle déclaré mais sans nœud DOM n'y figure pas, ce qui est le
         comportement voulu (`visible` peut valoir vrai sur un contrôle que le
         shell n'a jamais construit).
+
+        Exemple :
+        | ${ids}=    `Get Ui5 Ids`    controlType=sap.m.Button    idSuffix=btnSearch
+        | Length Should Be    ${ids}    1
         """
         selector = build_control_selector(**selector_parts)
         ids = self._evaluate(RESOLVE_ROLE_JS, arg=selector_to_json(selector)) or []
         return [str(i) for i in ids]
 
     def get_ui5_open_popups(self):
-        """Retourne les popups actuellement **OUVERTS** (dialogues et
+        """Retourne les popups actuellement *OUVERTS* (dialogues et
         popovers), une liste de dicts JSON-safe ``{id, controlType, kind,
         state, buttons, technology}``.
 
         Le pendant Fiori de `Get Open Windows` (ECC), et il existe pour la même
         raison qu'un test ne doit jamais deviner : un dialogue fermé reste
-        **rendu**. Mesuré live sur un launchpad ABAP, le dialogue « À propos »
+        *rendu*. Mesuré live sur un launchpad ABAP, le dialogue « À propos »
         garde son nœud DOM après acquittement, donc `Get Ui5 Match Count` en
         rapporte encore 1 : ni un comptage ni une résolution ne distinguent
         ouvert de fermé. Deux sources, cumulées : ``sap.m.InstanceManager``
         pour les popups UI5 classiques (``technology=ui5``), et le balayage
         PROFOND des popups Web Components ouverts (``technology=wc`` :
-        ``ui5-popover``/``ui5-dialog``/``ui5-menu``/``ui5-toast``, tags scopés
+        ``ui5-popover`` / ``ui5-dialog`` / ``ui5-menu`` / ``ui5-toast``, tags scopés
         compris, témoin = leur propriété ``open``). Le second existe parce que
         le menu utilisateur d'un shell Work Zone est un popover WC (mesuré
         live 2026-08-26) : ouvert, ce keyword rendait ``[]``, et ses entrées
@@ -195,8 +213,8 @@ class LocatorKeywords:
         lever. Une entrée WC porte en plus ``css`` (le chemin résolvable de
         l'hôte, son ``id`` étant souvent vide) et ``state`` vide.
 
-        **Filtrer une entrée WC par ``kind`` et ``technology``, jamais par
-        ``id``** : mesuré sur le même shell, le popover du menu utilisateur
+        Filtrer une entrée WC par ``kind`` et ``technology``, *jamais* par
+        ``id`` : mesuré sur le même shell, le popover du menu utilisateur
         remonte l'id de l'hôte INTERNE au shadow root (``user-menu-rp``) et un
         ``controlType`` portant le suffixe de scoping de l'application
         (``ui5-responsive-popover-6bfd01e3``), jamais l'identifiant ushell que
@@ -207,15 +225,17 @@ class LocatorKeywords:
         existe (``Error``, ``Warning``, ``None``) : c'est l'ancre
         locale-indépendante d'un refus, là où le titre et le texte sont
         traduits. ``kind`` vaut ``dialog``, ``popover`` ou ``toast``,
-        ``buttons`` compte les boutons rendus (0 côté WC). ::
-
-            ${popups}=    Get Ui5 Open Popups
-            Should Be Equal    ${popups}[0][state]    Error
+        ``buttons`` compte les boutons rendus (0 côté WC).
 
         Lecture pure. Échoue si la portée courante n'a NI runtime UI5 NI popup
         Web Components ouvert (sonder d'abord avec `Ui5 Runtime Is Present`) ;
         sur une page wc/hybride sans runtime, les popups WC ouverts sont
         retournés au lieu de l'échec d'avant.
+
+        Exemple :
+        | ${popups}=    `Get Ui5 Open Popups`
+        | Length Should Be    ${popups}    2
+        | Should Be Equal    ${popups}[0][kind]    popover
         """
         result = self._evaluate(OPEN_POPUPS_JS, arg=None)
         if result is None:
@@ -227,18 +247,19 @@ class LocatorKeywords:
         return [dict(entry) for entry in result]
 
     def click_ui5_dialog_button(self, position=0, id=None):
-        """Clique le bouton d'index ``position`` (base 0) du **dialogue ouvert le
-        plus récent**, et non un bouton désigné par son libellé.
+        """Clique le bouton d'index ``position`` (base 0) du *dialogue ouvert le
+        plus récent*, et non un bouton désigné par son libellé.
 
         L'adresse d'un bouton de dialogue est sa POSITION : les boutons d'une
         MessageBox portent un identifiant généré (``__mbox-btn-0``) et un texte
         TRADUIT. Deux campagnes live l'ont payé, l'une en français et l'autre en
-        anglais, sur des dialogues par ailleurs identiques. ::
+        anglais, sur des dialogues par ailleurs identiques. La position suit
+        l'ordre du dialogue, jamais une convention : sur une confirmation, 0
+        acquitte souvent et 1 annule, mais le refus de navigation du launchpad
+        1.120 porte ``[0] Copy`` et ``[1] Close`` (acquitter en 0 copie le
+        message et laisse le dialogue ouvert).
 
-            Click Ui5 Dialog Button              # le premier bouton : acquitter
-            Click Ui5 Dialog Button    1         # le second : annuler
-
-        Sans dialogue ouvert, vise le **popover** ouvert le plus récent : ses
+        Sans dialogue ouvert, vise le *popover* ouvert le plus récent : ses
         boutons de pied, et à défaut les boutons de son CONTENU, dans l'ordre
         des agrégations. C'est la forme d'une confirmation Fiori Elements
         (abandon d'un brouillon : un popover sans pied, son unique bouton dans
@@ -246,19 +267,22 @@ class LocatorKeywords:
         échouait en « aucun dialogue ouvert »). Un dialogue ouvert reste
         prioritaire, et ses boutons de contenu ne sont jamais comptés.
 
-        ``id`` désigne le popup OUVERT à viser (l'``id`` rendu par `Get Ui5
+        ``id`` désigne le popup OUVERT à viser (la clé ``id`` rendue par `Get Ui5
         Open Popups`), au lieu du plus récent : après un refus de sauvegarde
         Fiori Elements, le popover des messages reste ouvert à côté de la
         confirmation qu'on vient d'attendre. Un ``id`` qui n'est pas ouvert
-        échoue en listant ceux qui le sont. ::
-
-            ${popups}=    Get Ui5 Open Popups
-            Click Ui5 Dialog Button    0    id=${popups}[-1][id]
+        échoue en listant ceux qui le sont.
 
         Échoue en nommant la cause : aucun dialogue ni popover ouvert (et `Get
         Ui5 Open Popups` pour le constater), ou position hors des boutons
         rendus, avec leur nombre. Ne referme rien de lui-même : c'est le popup
         qui décide de ce que fait son bouton.
+
+        Exemple :
+        | `Click Ui5 Dialog Button`    0    id=msgPop
+        | `Click Ui5 Dialog Button`    0
+        | ${status}=    `Get Ui5 Property`    text    id=popStatus
+        | Should Be Equal    ${status}    confirm
         """
         request = {"position": int(position)}
         if id not in (None, "", "None"):
@@ -298,14 +322,15 @@ class LocatorKeywords:
             "click dialog button at position %s" % position)
 
     def get_ui5_xpath(self, index=0, **selector_parts):
-        """Résout un contrôle puis retourne son **UI5 XPath unique le plus court**.
+        """Résout un contrôle puis retourne son *UI5 XPath unique le plus court*.
 
         Porté depuis playwright-sap : le ``//suffixe`` le plus court du chemin du contrôle dans
         l'arbre qui résout toujours vers exactement ce contrôle. Pratique pour la génération de
-        code et pour convertir un contrôle trouvé en localisateur hiérarchique stable et lisible::
+        code et pour convertir un contrôle trouvé en localisateur hiérarchique stable et lisible.
 
-            ${xpath}=    Get Ui5 Xpath    controlType=SearchField    # -> //SearchField
-            ${sel}=      Resolve Ui5 By Xpath    ${xpath}
+        Exemple :
+        | ${xpath}=    `Get Ui5 Xpath`    idSuffix=fe::FilterBar::Travel::BasicSearchField-inner
+        | Should Be Equal    ${xpath}    //SearchField[1]
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
@@ -317,7 +342,7 @@ class LocatorKeywords:
 
     def resolve_ui5_with_fallback(self, xpath=None, sid=None, wc=None, dom=None,
                                   attempt_timeout="3s", **selector_parts):
-        """Résout un contrôle par **chaîne de fallback** : rôle -> UI5 XPath -> SID -> WC -> DOM.
+        """Résout un contrôle par *chaîne de fallback* : rôle -> UI5 XPath -> SID -> WC -> DOM.
 
         Le pattern d'auto-réparation des localisateurs (jamais silencieux) : on
         essaie chaque forme de sélecteur fournie, dans l'ordre de stabilité
@@ -325,13 +350,13 @@ class LocatorKeywords:
         aboutit, un WARNING journalise quel localisateur primaire a dérivé : le
         test passe, la dérive est visible et corrigeable dans ``resources/``
         (et consignée dans le journal de télémétrie si ``SAPFX_HEALING_LOG``
-        est défini, voir ``sapfx_common.healing_telemetry``). ::
+        est défini, voir ``sapfx_common.healing_telemetry``). Par exemple :
 
-            ${sel}=    Resolve Ui5 With Fallback
-            ...    controlType=Button    properties={'text': 'Commander'}
-            ...    xpath=//Dialog//Button[2]
-            ...    sid=wnd[0]/tbar[1]/btn[8]
-            ...    wc={'tag': 'Button', 'text': 'Commander'}
+        | ${sel}=    `Resolve Ui5 With Fallback`
+        | ...    controlType=Button    properties={'text': 'Commander'}
+        | ...    xpath=//Dialog//Button[2]
+        | ...    sid=wnd[0]/tbar[1]/btn[8]
+        | ...    wc={'tag': 'Button', 'text': 'Commander'}
 
         ``wc=`` (dict ou littéral de dict) est le repli Web Components
         (`Resolve Wc Control`), pour une app re-plateformée en UI5 Web
@@ -340,7 +365,13 @@ class LocatorKeywords:
         moteur DOM générique, pour une zone re-plateformée hors de tout cadre
         SAP (widget React/Angular…). Échoue (avec le détail par moteur) si
         aucune forme ne résout. Au moins une forme (rôle, ``xpath=``,
-        ``sid=``, ``wc=`` ou ``dom=``) est requise."""
+        ``sid=``, ``wc=`` ou ``dom=``) est requise.
+
+        Exemple :
+        | ${selector}=    `Resolve Ui5 With Fallback`    idSuffix=fe::FilterBar::Travel::BasicSearchField-inner
+        | ...    xpath=//SearchField[1]    attempt_timeout=10s
+        | Should Start With    ${selector}    css=
+        """
         attempts = []
         if selector_parts:
             selector = build_control_selector(**selector_parts)

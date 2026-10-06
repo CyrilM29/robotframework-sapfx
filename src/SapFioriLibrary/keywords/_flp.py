@@ -1,6 +1,6 @@
 """Mixin launchpad, IDP et vocabulaire metier (ports de playwright-praman).
 
-`Open Fiori App` (navigation FLP par **intent** ``SemanticObject-action`` :
+`Open Fiori App` (navigation FLP par *intent* ``SemanticObject-action`` :
 le hash stable, cross-catalogue/theme/langue), `Log In Via Identity
 Provider` (presets sap-ias/azure-ad/generic, une-page et deux-etapes
 detectes dynamiquement, mot de passe jamais journalise) et
@@ -42,11 +42,11 @@ class FlpKeywords(FioriBase):
     #  réimplémentés sur nos moteurs, jamais portés verbatim)
 
     def open_fiori_app(self, intent, **params):
-        """Navigue le launchpad vers un **intent sémantique**
-        ``SemanticObject-action`` (``Shell-home``, ``SalesOrder-manage``…),
-        paramètres nommés émis en query string::
-
-            Open Fiori App    SalesOrder-manage    SalesOrder=1234
+        """Navigue le launchpad vers un *intent sémantique*
+        ``SemanticObject-action`` (``Shell-home``, ``SalesOrder-manage`` …),
+        paramètres nommés émis en query string (``Open Fiori App
+        SalesOrder-manage    SalesOrder=1234`` vise
+        ``#SalesOrder-manage?SalesOrder=1234``).
 
         C'est la voie STABLE de navigation FLP : le hash d'intent survit aux
         réorganisations de catalogue, au thème et à la langue, contrairement
@@ -54,7 +54,15 @@ class FlpKeywords(FioriBase):
         voie « comme l'utilisateur »). Intent invalide = échec immédiat avec
         la forme attendue. Ne fait QUE naviguer : enchaîner avec
         ``Wait For UI5 Ready`` (le keyword resource `Open App By Intent`
-        fait les deux)."""
+        fait les deux).
+
+        Exemple :
+        | `Open Fiori App`    EPMPurchaseOrder-approve
+        | `Wait For Ui5 Idle`    settle=2 s    timeout=60s
+        | ${location}=    `Get Page Location`
+        | Should Be Equal    ${location}[intent]    EPMPurchaseOrder-approve
+        | Should Start With    ${location}[app_route]    /PurchaseOrder/
+        """
         hash_ = build_intent_hash(intent, params or None)
         browser = self._browser()
         base = str(browser.get_url()).split("#", 1)[0]
@@ -64,16 +72,18 @@ class FlpKeywords(FioriBase):
     def get_page_location(self, url=None, base=None):
         """Décompose l'adresse RÉELLEMENT atteinte par le navigateur en dict
         JSON-safe ``{url, scheme, host, path, query, fragment, intent,
-        intent_params}`` : le « où suis-je » du canal web, l'inverse de
-        `Open Fiori App`. ::
-
-            ${ou}=    Get Page Location
-            Should Be Equal    ${ou}[intent]    ShoppingCart-display
+        intent_params, app_route}`` : le « où suis-je » du canal web,
+        l'inverse de `Open Fiori App`.
 
         ``intent`` n'est renseigné que si le fragment porte bien la forme
         ``SemanticObject-action`` (un fragment d'ancre ordinaire laisse
         ``None``, jamais une navigation FLP inventée), et ``intent_params``
-        rend ses paramètres décodés.
+        rend ses paramètres décodés. ``app_route`` rend, telle quelle, la
+        route PROPRE à l'application, que le shell sépare de l'intent par
+        ``&/`` : une application maître-détail ouverte par `Open Fiori App`
+        y porte la ligne affichée (``/PurchaseOrder/300001997``, relevé le
+        2026-10-06 sur A4H). Jusque-là cette route faisait rendre ``intent``
+        à ``None``.
 
         ``host`` est la partie qui compte pour un launchpad protégé : c'est
         elle qui distingue un fournisseur d'identité du site lui-même. Sans ce
@@ -88,10 +98,13 @@ class FlpKeywords(FioriBase):
         celui du site » se calcule alors sans ``Evaluate __import__``, que la
         convention #12 proscrit dans la couche resources). ``base=`` résout
         d'abord ``url`` contre cette base (une adresse RELATIVE relevée dans
-        la page redevient absolue avant décomposition) : ::
+        la page redevient absolue avant décomposition).
 
-            ${site}=    Get Page Location    url=${WORKZONE_SITE}
-            ${cible}=    Get Page Location    url=${href}    base=${WORKZONE_SITE}
+        Exemple :
+        | ${location}=    `Get Page Location`
+        | Should Be Equal    ${location}[intent]    Shell-home
+        | ${target}=    `Get Page Location`    url=#EPMPurchaseOrder-approve    base=${location}[url]
+        | Should Be Equal    ${target}[intent]    EPMPurchaseOrder-approve
         """
         if base is not None and url is None:
             raise ValueError(
@@ -103,27 +116,31 @@ class FlpKeywords(FioriBase):
         return parse_location(target)
 
     def get_ushell_config(self, path=None):
-        """Lit la **configuration ushell** de la page
+        """Lit la *configuration ushell* de la page
         (``window['sap-ushell-config']``) en dict JSON-safe : la source la
         plus locale-indépendante d'un launchpad, qui DÉCLARE ce que le shell
         offre avant de le rendre (services, renderer, réglages de session).
         Relevé live (2026-08-26, site SAP Build Work Zone) : c'est elle qui
         dit que la recherche `searchCEPNew` est désactivée, que 24 services
         sont déclarés et que la session expire à 19 minutes, autant de faits
-        qu'aucun contrôle rendu ne porte. ::
-
-            ${cfg}=    Get Ushell Config
-            ${to}=     Get Ushell Config    path=ushell.sessionTimeoutIntervalInMinutes
+        qu'aucun contrôle rendu ne porte.
 
         ``path`` (pointé) descend dans la configuration ; un chemin absent =
         échec listant les clés disponibles au premier niveau, jamais un
         ``None`` muet. Page sans configuration ushell (pas un launchpad, ou
         portée de frame posée sur l'application au lieu du shell) = échec
-        nommant les deux causes. **Lecture pure** : comme
+        nommant les deux causes. *Lecture pure* : comme
         `Ui5 Runtime Is Present`, ce keyword n'injecte PAS le bundle
         ``__SAPFX``, donc n'instrumente rien dans la page observée. Les
         fonctions sont écartées de la sérialisation et un cycle d'objets est
-        coupé (``<cycle>``)."""
+        coupé (``<cycle>``).
+
+        Exemple :
+        | ${config}=    `Get Ushell Config`
+        | Dictionary Should Contain Key    ${config}    services
+        | ${renderer}=    `Get Ushell Config`    path=defaultRenderer
+        | Should Be Equal    ${renderer}    fiori2
+        """
         result = self._browser().evaluate_javascript(
             self._eval_scope(), USHELL_CONFIG_PROBE_JS,
             arg=str(path) if path else None)
@@ -149,7 +166,7 @@ class FlpKeywords(FioriBase):
                                      username_selector=None,
                                      password_selector=None,
                                      submit_selector=None, timeout=None):
-        """Déroule le formulaire de connexion d'un **fournisseur d'identité**
+        """Déroule le formulaire de connexion d'un *fournisseur d'identité*
         (IDP) : le passage obligé d'un launchpad d'entreprise, qui redirige
         vers SAP IAS, Azure AD/Entra ou un IDP maison plutôt que d'afficher
         un login SAP classique.
@@ -168,7 +185,12 @@ class FlpKeywords(FioriBase):
         (``-v "IDP_PASSWORD: Secret:<motdepasse>"`` en ligne de commande) :
         la valeur est alors masquée partout, même en TRACE. À appeler après
         ``New Page <url du launchpad>`` ; enchaîner avec ``Wait For UI5
-        Ready``."""
+        Ready``.
+
+        Exemple :
+        | `Log In Via Identity Provider`    ${IDP_USER}    ${IDP_PASSWORD}    preset=sap-ias
+        | `Ui5 Control Should Be Visible`    controlType=sap.m.Button    properties={'text': 'Open Dialog'}
+        """
         idp = resolve_preset(preset, username_selector, password_selector,
                              submit_selector)
         browser = self._browser()
@@ -216,15 +238,17 @@ class FlpKeywords(FioriBase):
         logger.info("IDP login (%s) submitted for user %s." % (idp.name, username))
 
     def lookup_business_term(self, term, domain=None, threshold=0.8):
-        """Résout un **terme métier** (français ou anglais, synonymes compris)
-        vers sa fiche SAP : canonique, champ ABAP, table, domaine::
-
-            ${info}=    Lookup Business Term    fournisseur
-            # -> {'canonical': 'vendor', 'abap_field': 'LIFNR', 'table': 'LFA1', ...}
+        """Résout un *terme métier* (français ou anglais, synonymes compris)
+        vers sa fiche SAP : canonique, champ ABAP, table, domaine.
 
         Vocabulaire partagé ECC↔Fiori (``sapfx_common.vocabulary`` : MM/SD/FI
         + modèle Flight de démo). Ambiguïté ou score sous ``threshold`` =
         échec listant les candidats, jamais de premier-match silencieux.
-        ``domain`` (``MM``/``SD``/``FI``/``FLIGHT``) restreint la recherche.
-        Dict JSON-safe (utilisable à travers rf-mcp)."""
+        ``domain`` (``MM`` / ``SD`` / ``FI`` / ``FLIGHT``) restreint la recherche.
+        Dict JSON-safe (utilisable à travers rf-mcp).
+
+        Exemple :
+        | ${term}=    `Lookup Business Term`    fournisseur
+        | Should Be Equal    ${term}[abap_field]    LIFNR
+        """
         return lookup_as_dict(term, domain=domain, threshold=float(threshold))

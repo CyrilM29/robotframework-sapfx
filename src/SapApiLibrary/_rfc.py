@@ -4,16 +4,14 @@
 dependance dure), la perception du canal (`Get Rfc Channel Status`,
 `Get Rfc Connection Attributes`, `Read Rfc Table`), la classification de ses
 refus par code technique (`Rfc Should Fail With Code`) ou par identifiant de
-message (`Rfc Should Fail With Message Id`), les jobs de fond
-(`Wait For Background Job` : TBTCO via RFC_READ_TABLE, verdicts purs dans
-``sapfx_common.rfc_tables`` ; `Find Background Job Cases` et
-`Get Background Job Status Model` : la perception qui permet d'éprouver
-l'attente sur les jobs que la cible porte déjà, sans en créer ni en annuler
-aucun) et la **surface du canal** (`Write Rfc Surface Artifact` /
-`Compare Rfc Surface Artifacts`, logique pure dans
-``sapfx_common.rfc_surface``).
+message (`Rfc Should Fail With Message Id`). L'attente d'un job de fond
+(`Wait For Background Job` et sa perception) vit dans ``_rfc_jobs.py``, et
+la *surface du canal* (`Write Rfc Surface Artifact` /
+`Compare Rfc Surface Artifacts`) dans ``_rfc_surface_artifact.py`` : deux
+extractions du 2026-10-06, le fichier approchant la limite de 500 lignes
+(convention n°13).
 
-Le pattern **BAPI** (`Call Bapi` jugé par TYPE de BAPIRET2,
+Le pattern *BAPI* (`Call Bapi` jugé par TYPE de BAPIRET2,
 `Commit/Rollback Bapi Transaction`, refus par identifiant de message) vit
 dans le mixin voisin ``_bapi.py``.
 
@@ -21,16 +19,9 @@ Extrait de ``SapApiLibrary.py`` (convention #13).
 """
 from __future__ import annotations
 
-import datetime
-import json
-import time
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any
 
-from robot.api import logger
-from robot.utils import timestr_to_secs
-
-from sapfx_common import background_jobs, rfc_channel, rfc_surface, rfc_tables
-from sapfx_common.polling import poll_until
+from sapfx_common import rfc_channel, rfc_tables
 from sapfx_common.secrets import reveal_secret
 
 from ._core import _ApiCore
@@ -57,7 +48,7 @@ class RfcKeywords(_ApiCore):
     }
 
     def get_rfc_channel_status(self) -> dict[str, Any]:
-        """État du canal RFC sur ce poste, **sans jamais échouer** : le
+        """État du canal RFC sur ce poste, *sans jamais échouer* : le
         préflight à poser avant d'ouvrir quoi que ce soit, et le pendant RFC de
         `Gateway Should Be Active`.
 
@@ -67,7 +58,12 @@ class RfcKeywords(_ApiCore):
         installé, souvent parce que l'interpréteur dépasse 3.12) et
         ``runtime_absent`` (le binding est là, la bibliothèque native NW RFC
         manque). Une suite RFC s'en sert pour se SAUTER proprement là où le
-        canal n'existe pas, au lieu de rougir là où rien n'est cassé."""
+        canal n'existe pas, au lieu de rougir là où rien n'est cassé.
+
+        Exemple :
+        | ${channel}=    `Get Rfc Channel Status`
+        | Skip If    not ${channel}[available]    ${channel}[remediation]
+        """
         try:
             import pyrfc
         except Exception as err:   # ImportError, mais aussi OSError Windows
@@ -81,7 +77,11 @@ class RfcKeywords(_ApiCore):
         """Échoue si le canal RFC n'est pas utilisable sur ce poste, en nommant
         la cause ET son remède. Variante assertive de `Get Rfc Channel
         Status` : à poser quand l'absence du canal EST une anomalie (sinon,
-        lire le statut et sauter)."""
+        lire le statut et sauter).
+
+        Exemple :
+        | `Rfc Channel Should Be Available`
+        """
         status = self.get_rfc_channel_status()
         if not status["available"]:
             raise AssertionError(
@@ -93,7 +93,12 @@ class RfcKeywords(_ApiCore):
         """Ouvre une connexion RFC via `pyrfc` (``ashost=``, ``sysnr=``,
         ``client=``, ``user=``, ``passwd=``...). Échec explicite avec la marche
         à suivre si `pyrfc`/le SDK NW RFC ne sont pas installés : le RFC reste
-        **optionnel**, rien d'autre dans la bibliothèque n'en dépend."""
+        *optionnel*, rien d'autre dans la bibliothèque n'en dépend.
+
+        Exemple :
+        | `Open Rfc Connection`    alias=a4h    ashost=localhost    sysnr=00    client=001
+        | ...    user=DEVELOPER    passwd=${RFC_PASSWORD}    lang=EN
+        """
         pyrfc = self._require_pyrfc()
         self._rfc_connections()[alias] = pyrfc.Connection(
             **{name: reveal_secret(value) for name, value in params.items()})
@@ -121,14 +126,19 @@ class RfcKeywords(_ApiCore):
     def get_rfc_connection_attributes(self, alias: str = "default") -> dict[str, Any]:
         """Les attributs de la connexion RFC ``alias``, tels que le canal les
         rend : ``sysId``, ``client``, ``user``, ``partnerRel`` (release du
-        système joint), ``kernelRel``, ``sysNumber``, ``language``…
+        système joint), ``kernelRel``, ``sysNumber``, ``language`` …
 
-        C'est la **perception d'identité** du canal sans écran : un canal
+        C'est la *perception d'identité* du canal sans écran : un canal
         ouvert ne dit pas encore vers QUOI. Une campagne qui ne prouve pas
         l'identité de sa cible peut être verte contre le mauvais système, ce
         que ce dépôt a déjà vécu côté web avec un nom d'hôte partagé. Les
         valeurs sont converties en chaînes (retour JSON-safe, servable à un
-        agent)."""
+        agent).
+
+        Exemple :
+        | ${attributes}=    `Get Rfc Connection Attributes`    alias=a4h
+        | Should Be Equal    ${attributes}[client]    001
+        """
         connection = self._require_rfc_connection(alias, "Get Rfc Connection Attributes")
         attributes = connection.get_connection_attributes()
         return {str(name): str(value) for name, value in dict(attributes).items()}
@@ -154,7 +164,14 @@ class RfcKeywords(_ApiCore):
 
         Un champ RAW (``TYPE X`` : GUID, ``NODE_KEY``) est REFUSÉ : le module le
         rend tronqué à la moitié de sa valeur, et deux lignes différentes
-        peuvent alors porter la même valeur visible (mesuré sur A4H)."""
+        peuvent alors porter la même valeur visible (mesuré sur A4H).
+
+        Exemple :
+        | ${clients}=    `Read Rfc Table`    T000    MANDT,MTEXT    alias=a4h
+        | ${lufthansa}=    `Read Rfc Table`    SCARR    CARRID,CARRNAME,CURRCODE    alias=a4h
+        | ...    options=CARRID = 'LH'
+        | Should Be Equal    ${lufthansa}[0][CURRCODE]    EUR
+        """
         params = rfc_tables.read_table_params(
             table, rfc_tables.as_field_list(fields),
             rfc_tables.as_clause_list(options),
@@ -167,8 +184,8 @@ class RfcKeywords(_ApiCore):
 
     def rfc_should_fail_with_code(self, expected_code: str, keyword: str,
                                   *args: Any, **params: Any) -> dict[str, Any]:
-        """Vérifie qu'un appel RFC échoue avec le **code technique** attendu
-        (``TABLE_NOT_AVAILABLE``, ``FU_NOT_FOUND``, ``RFC_LOGON_FAILURE``…), et
+        """Vérifie qu'un appel RFC échoue avec le *code technique* attendu
+        (``TABLE_NOT_AVAILABLE``, ``FU_NOT_FOUND``, ``RFC_LOGON_FAILURE`` …), et
         retourne la fiche du refus.
 
         C'est la convention n°3 appliquée au canal RFC : le code est stable
@@ -185,7 +202,13 @@ class RfcKeywords(_ApiCore):
         Deux échecs distincts, à dessein : l'appel a réussi (le refus attendu
         ne se produit plus), ou il a échoué avec un AUTRE code (les deux codes
         sont nommés). Un refus sans code technique, comme les gardes propres à
-        la bibliothèque, n'est jamais confondu avec un refus du serveur."""
+        la bibliothèque, n'est jamais confondu avec un refus du serveur.
+
+        Exemple :
+        | `Rfc Should Fail With Code`    TABLE_NOT_AVAILABLE    `Read Rfc Table`    ZZ_NO_SUCH_TABLE
+        | ...    MANDT    alias=a4h
+        | `Rfc Should Fail With Code`    FU_NOT_FOUND    `Call Rfc`    Z_NO_SUCH_FUNCTION    alias=a4h
+        """
         expected = str(expected_code).strip()
         subject, error = self._provoke_rfc_failure(keyword, expected, args, params)
         if rfc_channel.rfc_error_code(error).upper() != expected.upper():
@@ -196,8 +219,8 @@ class RfcKeywords(_ApiCore):
     def rfc_should_fail_with_message_id(self, expected_message_id: str,
                                         keyword: str, *args: Any,
                                         **params: Any) -> dict[str, Any]:
-        """Vérifie qu'un appel RFC échoue avec l'**identifiant de message**
-        attendu (``DA/E/131``, ``AD/E/718``, ``FL/E/046``…), et retourne la
+        """Vérifie qu'un appel RFC échoue avec l'*identifiant de message*
+        attendu (``DA/E/131``, ``AD/E/718``, ``FL/E/046`` …), et retourne la
         fiche du refus.
 
         Complément FIN de `Rfc Should Fail With Code`, et tout aussi
@@ -212,7 +235,13 @@ class RfcKeywords(_ApiCore):
         (refus du runtime client, garde de la bibliothèque) échoue en le
         disant, plutôt que de se comparer à du vide. Le refus d'une BAPI dans
         sa table ``RETURN`` n'est pas une exception RFC : l'asserter par
-        `Bapi Should Fail With Message Id`."""
+        `Bapi Should Fail With Message Id`.
+
+        Exemple :
+        | `Rfc Should Fail With Message Id`    FL/E/046    `Call Rfc`    Z_NO_SUCH_FUNCTION    alias=a4h
+        | `Rfc Should Fail With Message Id`    DA/E/131    `Read Rfc Table`    ZZ_NO_SUCH_TABLE    MANDT
+        | ...    alias=a4h
+        """
         expected = str(expected_message_id).strip()
         subject, error = self._provoke_rfc_failure(keyword, expected, args, params)
         described = rfc_channel.describe_rfc_error(error)
@@ -273,193 +302,24 @@ class RfcKeywords(_ApiCore):
         en revanche un paramètre NUMÉRIQUE doit être passé comme un vrai
         nombre (``${3}``, pas ``3``), car deviner le type d'après la forme de
         la chaîne corromprait les champs caractère numériques, où ``'0400'``
-        est un numéro de liaison et non l'entier 400."""
+        est un numéro de liaison et non l'entier 400.
+
+        Exemple :
+        | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
+        | Should Be Equal    ${info}[RFCSI_EXPORT][RFCSYSID]    A4H
+        | ${echo}=    `Call Rfc`    STFC_CONNECTION    alias=a4h    REQUTEXT=hello
+        | Should Be Equal    ${echo}[ECHOTEXT]    hello
+        """
         connection = self._require_rfc_connection(alias, "Call Rfc")
         return connection.call(
             function_name, **rfc_channel.plain_rfc_parameters(params))
 
-    def wait_for_background_job(self, jobname: str, alias: str = "default",
-                                timeout: str = "10m", poll: str = "5s",
-                                jobcount: Optional[str] = None) -> dict[str, Any]:
-        """Attend la fin d'un **job de fond** (facturation, IDoc, génération
-        de données…) en lisant la table ``TBTCO`` via ``RFC_READ_TABLE``
-        (remote-enabled partout, aucun écran occupé). Succès quand plus aucun
-        run du job n'est dans le pipeline (P/S/Y/R) et qu'au moins un est
-        ``F`` (fini) : retourne ``{"state": "done", "statuses",
-        "waited_seconds"}``. Un run annulé (``A``) = échec immédiat ; timeout
-        = échec actionnable (statuts vus, suggestion ``jobcount=`` si
-        plusieurs runs portent ce nom, journal SM37). Nécessite une connexion
-        `Open Rfc Connection` sur ``alias``."""
-        if self._rfc_connections().get(alias) is None:
-            raise RuntimeError(
-                "Aucune connexion RFC '%s' : appeler Open Rfc Connection "
-                "d'abord (Wait For Background Job lit TBTCO via "
-                "RFC_READ_TABLE)." % alias)
-        secs = timestr_to_secs(timeout)
-        step = timestr_to_secs(poll)
-        options = ["JOBNAME EQ %s" % rfc_tables.abap_quote(jobname)]
-        if jobcount:
-            options.append("AND JOBCOUNT EQ %s" % rfc_tables.abap_quote(jobcount))
-        params = rfc_tables.read_table_params("TBTCO", ["STATUS"], options)
-        started = time.monotonic()
-        state: dict[str, Any] = {
-            "verdict": {"state": "missing", "detail": "aucune sonde encore"},
-            "counts": {}, "error": None}
-
-        def probe() -> bool:
-            try:
-                result = self.call_rfc("RFC_READ_TABLE", alias=alias, **params)
-            except Exception as err:
-                state["error"] = str(err)
-                return False
-            rows = rfc_tables.parse_read_table(result)
-            counts = rfc_tables.summarize_job_statuses(rows)
-            state["verdict"] = rfc_tables.job_wait_verdict(counts)
-            state["counts"] = counts
-            state["error"] = None
-            return state["verdict"]["state"] in ("done", "aborted")
-
-        poll_until(probe, secs, max(0.1, step))
-        verdict = state["verdict"]
-        waited = round(time.monotonic() - started, 2)
-        if verdict["state"] == "done":
-            return {"state": "done", "statuses": state["counts"],
-                    "waited_seconds": waited}
-        # La marque `issue=<état>` est STABLE (les cinq états de
-        # `Get Background Job Status`, jamais traduits) : une suite juge
-        # l'issue sur elle, pas sur la prose (revue ISTQB du 2026-10-01, qui a
-        # relevé qu'une attente rangeant P en « hors carte » passait).
-        issue = background_jobs.job_state(state["counts"])["state"]
-        if verdict["state"] == "aborted":
-            raise AssertionError(
-                "Le job de fond '%s' a été annulé (statut A, issue=aborted). %s "
-                "Journal détaillé : SM37." % (jobname, verdict["detail"]))
-        raise AssertionError(
-            "Le job de fond '%s' n'a pas fini après %s (issue=%s) : %s%s Préciser "
-            "jobcount= si plusieurs runs portent ce nom ; journal : SM37."
-            % (jobname, timeout, issue, verdict["detail"],
-               " Dernière erreur RFC : %s." % state["error"]
-               if state["error"] else ""))
-
-    def get_background_job_status_model(self) -> dict[str, Any]:
-        """Ce que cette bibliothèque **cartographie** des statuts de job de
-        fond : ``{"labels": {"F": "finished", "A": "cancelled"…}, "pending":
-        ["P", "S", "Y", "R"]}``, c'est-à-dire exactement ce qui fonde le
-        verdict de `Wait For Background Job`.
-
-        Sert à lire un décompte de statuts sans deviner, et surtout à établir
-        qu'un statut rencontré n'est PAS cartographié ici. Le domaine
-        ``BTCSTATUS`` est un ``CHAR1`` sans liste de valeurs dans le
-        dictionnaire : ce que cette table ne contient pas ne s'invente pas, et
-        l'attente le traite en continuant d'attendre plutôt qu'en concluant au
-        succès."""
-        return {"labels": dict(rfc_tables.JOB_STATUS_LABELS),
-                "pending": list(rfc_tables.PENDING_JOB_STATUSES)}
-
-    def find_background_job_cases(self, alias: str = "default",
-                                  rowcount: int = 0) -> dict[str, Any]:
-        """Lit le journal des jobs (``TBTCO``) et le rend comme un **catalogue
-        de cas d'attente** : quels jobs de CETTE cible produiraient chacune des
-        issues de `Wait For Background Job`.
-
-        Retourne ``{"rows", "statuses", "jobs", "cases"}`` : le nombre de runs
-        lus, le décompte global par statut, le décompte par job, et les jobs
-        classés par cas (``done``, ``aborted``, ``aborted_with_finished``,
-        ``pipeline``, ``unmapped``).
-
-        La perception qui manquait à l'attente : elle permet d'éprouver toutes
-        ses issues en **lecture seule**, sur les jobs d'exploitation que le
-        système porte déjà, sans créer ni annuler quoi que ce soit, et sans
-        graver dans une suite des noms de jobs qui sont ceux d'une image donnée.
-
-        ``rowcount`` borne la lecture, et vaut 0 (tout le journal) à dessein :
-        un plafond ne tronque pas seulement le résultat, il **fausse la
-        classification**. Mesuré sur une cible réelle, les 200 premières lignes
-        d'un journal qui en portait 4719 étaient toutes ``F`` et faisaient
-        conclure que le système ne portait que des jobs terminés."""
-        rows = self.read_rfc_table("TBTCO", ["JOBNAME", "STATUS"], alias=alias,
-                                   rowcount=int(rowcount))
-        grouped = rfc_tables.group_job_statuses(rows)
-        return {"rows": len(rows),
-                "statuses": rfc_tables.summarize_job_statuses(rows),
-                "jobs": grouped,
-                "cases": rfc_tables.job_wait_cases(grouped)}
-
-    def write_rfc_surface_artifact(
-            self, path: str, target_id: str, identity: Mapping[str, Any],
-            measures: Mapping[str, Any],
-            components: Optional[Iterable[Mapping[str, Any]]] = None
-    ) -> dict[str, Any]:
-        """Écrit l'artefact déterministe de la **surface du canal RFC** d'une
-        cible et retourne sa preuve : ``{path, sha256, summary}``.
-
-        La surface d'un canal, ce sont ses décomptes (modules ouverts à
-        distance, interfaces métier publiées, objets du modèle de
-        programmation, volumétries des jeux de démonstration) plus l'inventaire
-        des composants logiciels installés. La question « quels modules ici et
-        pas là-bas » ne se répond pas par une note dans un document : elle se
-        répond par un artefact produit sur chaque cible et comparé par
-        `Compare Rfc Surface Artifacts`.
-
-        ``identity`` porte l'identité de la cible (``system_id``, ``client``,
-        ``release``, ``kernel``, ``database``, ``operating_system``,
-        ``host``), et elle n'est pas décorative : sans elle, comparer deux
-        artefacts revient à comparer deux inconnues. Le hash EXCLUT
-        l'horodatage, donc deux exécutions sur la même cible lisant les mêmes
-        chiffres produisent le même hash. Une mesure non entière, un périmètre
-        vide ou un composant sans nom sont refusés à l'écriture plutôt que
-        comparés plus tard. Hors ligne : n'ouvre aucune connexion."""
-        observed = datetime.datetime.now(datetime.timezone.utc).isoformat(
-            timespec="seconds")
-        surface = rfc_surface.build_surface(
-            target_id, identity, measures, observed, components=components)
-        digest = rfc_surface.comparison_hash(surface)
-        with open(str(path), "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(rfc_surface.surface_json(surface))
-        logger.info("Surface RFC écrite dans %s (sha256 %s)." % (path, digest))
-        return {"path": str(path), "sha256": digest,
-                "summary": surface["summary"]}
-
-    def read_rfc_surface_artifact(self, path: str) -> dict[str, Any]:
-        """Relit un artefact écrit par `Write Rfc Surface Artifact` et le rend
-        tel quel (dict JSON-safe : identité, périmètre, mesures, composants).
-
-        Le symétrique de l'écriture, pour qu'une suite n'ait jamais à ouvrir le
-        fichier elle-même : les primitives de cette bibliothèque s'atteignent
-        par un keyword, jamais par un import improvisé dans un test. Hors
-        ligne : ne joint aucune cible."""
-        with open(str(path), encoding="utf-8") as handle:
-            return dict(json.load(handle))
-
-    def compare_rfc_surface_artifacts(self, path_a: str,
-                                      path_b: str) -> dict[str, Any]:
-        """Compare deux artefacts écrits par `Write Rfc Surface Artifact`.
-
-        Charge les deux fichiers, journalise le rapport Markdown et retourne
-        la comparaison JSON-safe : différences d'identité, écarts de mesure, et
-        les composants logiciels rendus dans les trois catégories utiles
-        (communs, propres à la première cible, propres à la seconde), avec les
-        changements de release des communs.
-
-        Le périmètre est une PORTE : deux artefacts dont les ensembles de
-        mesures diffèrent sont marqués non comparables et seules les mesures
-        communes sont chiffrées, parce qu'une mesure absente d'un côté ne vaut
-        pas zéro. Hors ligne : aucune cible n'est jointe, la comparaison se
-        fait sur les fichiers."""
-        with open(str(path_a), encoding="utf-8") as handle:
-            surface_a = json.load(handle)
-        with open(str(path_b), encoding="utf-8") as handle:
-            surface_b = json.load(handle)
-        try:
-            comparison = rfc_surface.compare_surfaces(surface_a, surface_b)
-        except ValueError as error:
-            raise AssertionError(
-                "Compare Rfc Surface Artifacts : %s" % error) from error
-        logger.info(rfc_surface.render_surface_report(comparison))
-        return comparison
-
     def close_rfc_connection(self, alias: str = "default") -> None:
-        """Ferme la connexion RFC ``alias`` (silencieux si absente)."""
+        """Ferme la connexion RFC ``alias`` (silencieux si absente).
+
+        Exemple :
+        | `Close Rfc Connection`    a4h
+        """
         connection = self._rfc_connections().pop(alias, None)
         if connection is not None:
             connection.close()

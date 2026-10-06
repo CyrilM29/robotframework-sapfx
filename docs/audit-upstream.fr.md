@@ -7,7 +7,7 @@ Source auditée : `SapGuiLibrary/SapGuiLibrary.py` (module unique d'environ 780 
 
 ## Verdict
 
-Une base solide et ciblée, qu'il vaut mieux forker que réécrire. La plomberie COM et un
+Une base solide et ciblée, sur laquelle il vaut mieux bâtir que tout réécrire. La plomberie COM et un
 vocabulaire de mots-clés cohérent sont déjà en place et éprouvés. Les lacunes sont
 circonscrites et bien définies : exactement ce que nous ajoutons dans `SapEccLibrary`.
 
@@ -30,20 +30,20 @@ circonscrites et bien définies : exactement ce que nous ajoutons dans `SapEccLi
   erreurs explicites du type « utilisez X à la place ».
 
 > Correction d'une hypothèse antérieure : la grille/ALV **n'est pas** absente ici. Le travail
-> sur la grille dans notre fork relève de l'*ergonomie* (adresser les colonnes par leur titre),
+> sur la grille dans `SapEccLibrary` relève de l'*ergonomie* (adresser les colonnes par leur titre),
 > et non du comblement d'un manque.
 
-## Lacunes traitées dans le fork
+## Lacunes traitées dans `SapEccLibrary`
 
 | # | Lacune | Preuve dans le source | Notre correctif |
 |---|--------|-----------------------|-----------------|
 | 1 | **Pas de synchronisation réelle.** Seulement un `time.sleep(self.explicit_wait)` fixe après chaque mot-clé. Pas de polling `session.Busy`, pas de « attendre jusqu'à présence ». | `explicit_wait` défini par `set_explicit_wait` ; chaque mot-clé se termine par `time.sleep`. | `keywords/_waits.py` : `Wait Until Busy Done`, `Wait Until Element Present`, `Wait Until Element Value Is`. |
-| 2 | **Vérification de transaction dépendante de la locale.** La détection d'une tcode inconnue compare par correspondance de chaîne dans la barre de statut en **néerlandais/anglais/allemand uniquement**. | `run_transaction` compare avec `"Transactie %s bestaat niet"`, `"Transaction %s does not exist"`, `"Transaktion %s existiert nicht"`. | Le remplacement lit `sbar.messageType == "E"` (indépendant de la locale). |
+| 2 | **Vérification de transaction dépendante de la locale.** La détection d'une tcode inconnue compare par correspondance de chaîne dans la barre de statut en **néerlandais/anglais/allemand uniquement**. | `run_transaction` compare avec `"Transactie %s bestaat niet"`, `"Transaction %s does not exist"`, `"Transaktion %s existiert nicht"`. | `Run Transaction` compare la transaction active (`session.Info.Transaction`) au code demandé (indépendant de la locale). |
 | 3 | **Pas de bootstrap de connexion.** Suppose que le Logon Pad est déjà en cours d'exécution ; la documentation demande de le démarrer avec la bibliothèque AutoIt/Process. | `connect_to_session` lève « is Sap Logon Pad open? » si ce n'est pas le cas. | `keywords/_connection.py` : `Open Sap Logon` (lancement de l'exe + attente du moteur), `Close Sap Logon`, `Connect To Session With Retry`. |
 | 4 | **Grille adressée uniquement par identifiant de colonne technique.** Il faut connaître `"MATNR"` etc. (trouvé via le Scripting Tracker externe). | `get_cell_value(table_id, row, col_id)` prend un `col_id` brut. | `keywords/_grid.py` : résolution des colonnes par titre visible, `Read Grid` → liste de dicts. |
 | 5 | **Pas d'utilitaires pour les messages de statut.** | (sans objet) | `Get Status Message`, `Status Message Should Be Success`. |
 
-## Observations mineures (non corrigées, notées pour plus tard)
+## Observations mineures (en partie réglées par l'absorption, voir plus bas)
 
 - `__version__ = '1.2'` dans le code contre le tag de version `1.2.1`.
 - Dépend de `robot.libraries.Screenshot` (fonctionnel, mais ScreenCapLibrary en version
@@ -55,49 +55,46 @@ circonscrites et bien définies : exactement ce que nous ajoutons dans `SapEccLi
   en néerlandais). Acceptable.
 - Classificateurs Python 2.7 dans `setup.py`, supprimés dans notre `pyproject.toml`.
 
-## État de l'héritage (octobre 2026)
+## Absorption (6 octobre 2026)
 
-Sur les 37 mots-clés amont, **16 sont surchargés** dans `SapEccLibrary`
-(`Run Transaction`, `Get Element Type`, `Element Should Be Present`,
-`Get Value`, `Input Password`, `Connect To Session`, les cinq mots-clés de
-grille, `Doubleclick Element`, `Select Context Menu Item`, `Select Node`,
-`Select From List By Label`) et **21 tournent encore avec leur corps amont**.
-Ces 21 reposent déjà sur nos fondations, puisqu'ils appellent par `self`
-`get_element_type` (dont l'échec nomme l'écran réel), `get_value` et `session`
-(routée par alias, avec le rail de thread COM). Trois d'entre eux portent
-l'essentiel de l'usage réel : `Input Text`, `Click Element` et `Send Vkey`.
+Le fichier amont a d'abord été vendorisé tel quel
+(`src/SapEccLibrary/_vendor/sapgui_base.py`, seule la classe renommée) avec
+une règle qui limitait ce diff à une ligne, pour qu'une future version amont
+se recopie en quelques minutes. L'amont n'a plus bougé après mars 2022
+(v1.2.1), et la règle a fini par protéger du code que personne ne relisait :
+21 de ses 37 mots-clés tournaient encore avec leur corps d'origine, sans
+relecture, et sa capture de l'écran entier servait aussi les chemins d'erreur
+de notre propre code. Le 6 octobre 2026, ce code a été absorbé et réécrit dans
+les modules du projet ; le fichier vendorisé, `scripts/check_vendor_drift.py`
+et le workflow hebdomadaire `vendor-drift.yml` ont disparu.
 
-Ce qui reste de l'amont, et reste à surcharger dans une mixin :
+Ce qui reste promis, c'est la **surface** : les 37 mots-clés gardent leur nom
+ainsi que l'ordre, le nom et la valeur par défaut de leurs paramètres, donc une
+suite écrite pour `SapGuiLibrary` tourne sans modification.
+`tests/unit/test_upstream_compatibility.py` tient cette table, relevée par
+`inspect.signature` sur le fichier vendorisé avant son retrait ; un paramètre
+ne peut être ajouté que s'il est optionnel et placé en dernier (`Run
+Transaction` a gagné `skip_if_error` ainsi). Chaque module dérivé le dit dans
+son en-tête, et `NOTICE` garde l'attribution Apache 2.0.
 
-- **La capture d'écran en cas d'erreur.** `take_screenshot` passe par la
-  bibliothèque `Screenshot` de Robot Framework, qui capture l'écran entier et
-  non la fenêtre SAP, et nos propres chemins d'erreur l'appellent aussi. Sur
-  une installation de base sans Pillow, chaque échec ajoute un avertissement
-  « Taking screenshot failed » (l'erreur d'origine n'est pas masquée).
-  `HardCopyToMemory`, déjà utilisé par `Get Screenshot As Base64`, ne capture
-  que la fenêtre SAP.
-- **Des écritures sans relecture.** `Input Text`, `Select Checkbox`,
-  `Unselect Checkbox` et `Select Radio Button` posent la valeur sans la
-  relire, et `Input Text` journalise la valeur saisie au niveau INFO.
-- **`Element Value Should Be` / `Should Contain`** appellent `setfocus()` dans
-  une simple vérification et mélangent `Warning`, `ValueError` et
-  `AssertionError`.
-- **`Set Explicit Wait`** refuse les décimales et `500ms` écrit sans espace :
-  une seconde grammaire de durée à côté de `Set Default Timeout`.
+| Mots-clés de l'amont | Module | Ce qui a changé |
+|---|---|---|
+| `Get Element Type`, `Element Should Be Present`, `Get Value`, `Set Focus`, `Get Element Location`, `Get Window Title`, `Maximize Window` | `keywords/_elements.py` | une absence nomme l'écran réellement affiché ; `Get Value` ne prend plus le focus et refuse le ProgID d'un shell ; un type non pris en charge lève `ValueError` |
+| `Click Element`, `Input Text`, `Input Password`, `Select Checkbox`, `Unselect Checkbox`, `Select Radio Button`, `Send Vkey` | `keywords/_inputs.py` | les écritures sont relues (troncature, champ ou case protégés) ; aucun mot de passe ni `Secret` n'est journalisé ; un `GuiShell` n'accepte du texte qu'en `TextEdit` ; `Send Vkey` envoie l'entier de l'API et résout les combinaisons par `sapfx_common/vkeys.py` |
+| `Element Value Should Be`, `Element Value Should Contain` | `keywords/_value_checks.py` | aucun focus déplacé ; `AssertionError` pour un écart, `ValueError` pour une erreur d'usage |
+| `Get Row Count`, `Get Cell Value`, `Set Cell Value`, `Click Toolbar Button`, `Select Table Row`, `Select Table Column`, `Scroll`, `Get Scroll Position` | `keywords/_grid_cells.py` | la grille est résolue à travers un conteneur qui l'enveloppe ; `Set Cell Value` est relu ; `Select Table Row` sélectionne aussi une ligne de `GuiTableControl` |
+| `Connect To Session`, `Connect To Existing Connection`, `Open Connection` | `keywords/_connection.py` | seul un moteur qui répond est retenu ; toutes les connexions ouvertes sont examinées ; `Open Connection` attend la session |
+| `Take Screenshot`, `Enable Screenshots On Error`, `Disable Screenshots On Error` | `keywords/_screenshots.py` | la fenêtre SAP (modal compris) est capturée en PNG, pas l'écran entier ; une capture impossible ne masque jamais l'erreur d'origine |
+| `Set Explicit Wait` | `keywords/_waits.py` | toute durée Robot Framework, ancienne valeur rendue |
+| `Doubleclick Element`, `Select Context Menu Item` | `keywords/_grid_actions.py` | une grille ALV est visée par cellule au lieu de l'API des arbres |
+| `Select Node`, `Select Node Link` | `keywords/_trees.py` | sélection vérifiée en relisant `SelectedNode` |
+| `Select From List By Label` | `keywords/_combobox.py` | mode affichage et libellé inconnu refusés, sélection relue |
+| `Run Transaction` | `SapEccLibrary.py` | la transaction active est comparée au code demandé, quelle que soit la langue |
 
-L'amont n'a pas bougé depuis mars 2022 (v1.2.1) : ces points se surchargent
-ici, jamais en corrigeant le fichier vendorisé.
-
-## Stratégie de resynchronisation
-
-Le fichier upstream est intégré tel quel à
-`src/SapEccLibrary/_vendor/sapgui_base.py` avec une **seule** modification (renommage de classe
-`SapGuiLibrary` → `SapGuiBase`). Pour intégrer une future version upstream : recopier le
-fichier, réappliquer ce renommage, puis relancer `tests/unit` et le diff libdoc. Limiter
-la modification à une seule ligne est délibéré afin que cela reste une opération de 5 minutes.
-L'amont étant figé depuis mars 2022, la règle tient surtout une promesse de
-compatibilité : chaque mot-clé amont garde son nom et sa signature, et tout
-comportement nouveau va dans une mixin.
+Deux des observations mineures ci-dessus se règlent du même coup : la chaîne
+de version de l'amont a disparu, et plus rien ne dépend de la bibliothèque
+`Screenshot` de Robot. Les appels répétés à `findById` d'une vérification de
+valeur demeurent (sans gravité, toujours bavards par COM).
 
 ## Marques
 

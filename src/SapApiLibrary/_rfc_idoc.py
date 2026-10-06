@@ -61,7 +61,16 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         ``sender_partner`` par défaut : le système logique du mandant ;
         ``sender_port`` : ``SAP`` + identifiant système. ``REFINT`` et
         ``ARCKEY`` n'existent pas ici (le module les refuse) : un marqueur
-        d'exécution se met dans la donnée d'un segment."""
+        d'exécution se met dans la donnée d'un segment.
+
+        Exemple :
+        | &{fields}=    Create Dictionary    TLINE=Hello from an example
+        | &{segment}=    Create Dictionary    segment=E1TXTRW    fields=${fields}
+        | @{segments}=    Create List    ${segment}
+        | ${idoc}=    `Create Outbound Idoc`    TXTRAW    TXTRAW01    A000000001    A4HCLNT001
+        | ...    ${segments}    receiver_partner_type=LS    alias=a4h
+        | Log    ${idoc}[docnum]
+        """
         specs = idoc.parse_segments(segments)
         attributes = self.get_rfc_connection_attributes(alias)
         client = attributes.get("client", "")
@@ -113,7 +122,12 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         ``{"segment", "length", "fields": [{"name", "offset", "length",
         "type"}]}``, offsets en caractères. C'est la source de vérité de
         `Create Outbound Idoc` : un découpage recopié de mémoire écrit la
-        valeur dans le champ voisin sans la moindre erreur."""
+        valeur dans le champ voisin sans la moindre erreur.
+
+        Exemple :
+        | ${segment}=    `Describe Idoc Segment`    E1TXTRW    alias=a4h
+        | Should Be Equal As Integers    ${segment}[length]    72
+        """
         name = str(segment).strip().upper()
         layout = self._segment_layout(name, alias)
         return {"segment": name, "length": idoc.layout_length(layout), "fields": layout}
@@ -121,7 +135,12 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
     def describe_idoc_type(self, idoc_type: str,
                            alias: str = "default") -> list[dict[str, Any]]:
         """L'arbre de segments d'un type d'IDoc (``EDI_IDOC_SYNTAX_GET``) :
-        ``[{"segment", "parent", "min", "max", "mandatory", "level"}]``."""
+        ``[{"segment", "parent", "min", "max", "mandatory", "level"}]``.
+
+        Exemple :
+        | ${syntax}=    `Describe Idoc Type`    TXTRAW01    alias=a4h
+        | Should Be Equal    ${syntax}[0][segment]    E1TXTRW
+        """
         return self._idoc_syntax(idoc_type, alias)
 
     def set_idoc_status(self, docnum: Any, status: Any, alias: str = "default",
@@ -135,7 +154,11 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         REFUSE tout statut de catégorie succès (03, 12, 16, 41, 53) : un test
         qui poserait lui-même son succès ne prouverait rien. Les statuts qui
         se posent sont ceux du pipeline, en pratique 30 (prêt à
-        l'expédition)."""
+        l'expédition).
+
+        Exemple :
+        | ${result}=    `Set Idoc Status`    ${idoc}[docnum]    02    alias=a4h
+        """
         code = idoc_status.refuse_success_status(status)
         number = idoc.normalize_docnum(docnum)
         opened = False
@@ -170,7 +193,12 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         "data"}]``, ``data`` sans les blancs de fin. Avec ``decode``, chaque
         segment porte en plus ``fields`` (champ par champ, découpage du
         dictionnaire). ``EDID4`` n'est pas lisible par ``Read Rfc Table`` (un
-        champ de 1000 caractères), d'où ce chemin."""
+        champ de 1000 caractères), d'où ce chemin.
+
+        Exemple :
+        | ${segments}=    `Read Idoc Segments`    6    alias=a4h    decode=True
+        | Should Be Equal    ${segments}[0][segment]    E1SCU_CHG
+        """
         number = idoc.normalize_docnum(docnum)
         try:
             self.call_rfc("EDI_DOCUMENT_OPEN_FOR_READ", alias=alias,
@@ -214,7 +242,11 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         OBLIGATOIRE (liste blanche, une liste vide refuse tout) : un IDoc d'un
         autre type de message est refusé en nommant les deux. Idempotent : un
         IDoc déjà absent rend ``{"deleted": False}``. Mesuré sur A4H :
-        les statuts 03, 51, 56 et 62 se suppriment sans exception."""
+        les statuts 03, 51, 56 et 62 se suppriment sans exception.
+
+        Exemple :
+        | ${deletion}=    `Delete Idoc`    ${idoc}[docnum]    allowed_message_types=TXTRAW    alias=a4h
+        """
         number = idoc.normalize_docnum(docnum)
         rows = self.read_rfc_table(
             "EDIDC", ["DOCNUM", "STATUS", "DIRECT", "MESTYP"], alias=alias,

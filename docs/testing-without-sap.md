@@ -7,7 +7,7 @@ from "works right now" to "full fidelity".
 
 ## Tier 1: Pure logic, no SAP, no Windows COM (today)
 
-The fork's added logic (waits, retry, grid-by-title, transaction error detection)
+The logic `SapEccLibrary` adds (waits, retry, grid-by-title, transaction error detection)
 is unit-tested against **fake COM objects**:
 
 ```bash
@@ -98,7 +98,7 @@ and tested entirely against public demo pages.
 
 | Need | Use | Cost |
 |------|-----|------|
-| Validate fork logic now | `pytest tests/unit` (fake COM) | free, instant |
+| Validate the added logic now | `pytest tests/unit` (fake COM) | free, instant |
 | Real ECC GUI navigation | ABAP Platform Trial Docker (**discontinued by SAP, see above**) | free + your hardware |
 | Full S/4HANA scenarios | SAP CAL (30-day; the older ABAP editions leave CAL on 2026-09-30) | cloud hosting only |
 | Real Fiori launchpad, real IAS login | SAP BTP trial (90 days, **no SAP GUI**) | free, account required |

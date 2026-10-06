@@ -7,10 +7,10 @@ contrôles réellement présents (parcours de la fenêtre active) contre l'id
 attendu (segment terminal du nom de champ dynpro lourdement pondéré, chemin en
 LCS, type) et :
 
-* `Resolve Element With Healing` **répare** au-dessus d'un seuil, avec un
+* `Resolve Element With Healing` *répare* au-dessus d'un seuil, avec un
   warning journalisé (jamais silencieux : le test passe, la dérive est visible
   et le localisateur à corriger est dans le log) ;
-* `Get Closest Element Ids` alimente des messages d'erreur **auto-corrigibles**
+* `Get Closest Element Ids` alimente des messages d'erreur *auto-corrigibles*
   (un agent rf-mcp, ou un humain, lit les candidats scorés directement dans
   l'erreur au lieu de repartir d'une perception complète).
 
@@ -31,7 +31,12 @@ class HealingKeywords:
         ``element_id`` : liste de paires ``[id, score]``, score décroissant.
 
         Sert aux messages d'erreur enrichis et au diagnostic d'un localisateur
-        périmé (« qu'est-ce qui y ressemble sur l'écran réel ? »). Lecture seule."""
+        périmé (« qu'est-ce qui y ressemble sur l'écran réel ? »). Lecture seule.
+
+        Exemple :
+        | ${candidates}=    `Get Closest Element Ids`    wnd[0]/usr/ctxtDATABROWSE-TABNAME
+        | Should Be Equal    ${candidates}[0][0]    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         scored = closest_gui_ids(element_id, self._present_ids(), limit=int(limit))
         return [[sc.candidate, round(sc.score, 3)] for sc in scored]
 
@@ -47,7 +52,7 @@ class HealingKeywords:
            La réparation est aussi consignée dans le journal JSONL cumulatif si
            ``SAPFX_HEALING_LOG`` est défini (``sapfx_common.healing_telemetry``).
         3. Si ``label`` est fourni et que le score ne suffit pas : tentative par
-           **ancre de libellé** (``sapfx_common.semantic``, grammaire de `Find
+           *ancre de libellé* (``sapfx_common.semantic``, grammaire de `Find
            Element By Label`) : un libellé visible survit aux renumérotations
            d'écran qui pulvérisent les ids. La réparation n'est adoptée que si
            le libellé désigne UN SEUL élément (jamais de premier-match
@@ -55,11 +60,16 @@ class HealingKeywords:
         4. Sinon -> échec avec les ``limit`` candidats les plus proches DANS le
            message (erreur auto-corrigible : un agent peut choisir et réessayer).
 
-        Retourne toujours une **chaîne** (jamais l'objet COM : sûr à travers la
-        frontière rf-mcp). Usage type::
+        Retourne toujours une *chaîne* (jamais l'objet COM : sûr à travers la
+        frontière rf-mcp). L'exemple montre les deux voies : un id proche,
+        réparé par son score, puis un id sans ressemblance, réparé par son
+        libellé.
 
-            ${id}=    Resolve Element With Healing    wnd[0]/usr/ctxtMEPO_TOPLINE-BSART    label=Doc. type
-            Input Text    ${id}    NB
+        Exemple :
+        | ${field}=    `Resolve Element With Healing`    wnd[0]/usr/ctxtDATABROWSE-TABNAME
+        | Should Be Equal    ${field}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        | ${field}=    `Resolve Element With Healing`    wnd[0]/usr/chkQQQ    label=Table Name
+        | Should Be Equal    ${field}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
         """
         if self._find(element_id, raise_on_missing=False) is not None:
             return element_id

@@ -2,8 +2,8 @@
 
 Phase 2 du projet. Une bibliothèque Robot Framework légère qui s'utilise *aux côtés* de
 la bibliothèque Browser (Playwright) : Browser gère la page et effectue les clics/saisies ;
-cette bibliothèque convertit un **sélecteur de contrôle UI5** stable (par type de contrôle
-+ propriétés, ou par un **UI5 XPath** hiérarchique) en cible DOM utilisable par Browser.
+cette bibliothèque convertit un *sélecteur de contrôle UI5* stable (par type de contrôle
++ propriétés, ou par un *UI5 XPath* hiérarchique) en cible DOM utilisable par Browser.
 
 La résolution s'appuie sur un bundle JS injecté (`_ui5_js.py`) qui construit un arbre
 reflétant la hiérarchie des contrôles UI5 et y effectue les correspondances. Les techniques
@@ -40,6 +40,7 @@ from .keywords import (
     FlpKeywords,
     FlpServiceKeywords,
     FlpTileKeywords,
+    FlpTileRefreshKeywords,
     FrameKeywords,
     LocatorKeywords,
     PerceptionKeywords,
@@ -51,7 +52,8 @@ from .keywords import (
 class SapFioriLibrary(FrameKeywords, LocatorKeywords, EngineKeywords,
                       CompositionKeywords, ActionKeywords, TableKeywords,
                       StateKeywords, PerceptionKeywords, FlpKeywords,
-                      FlpServiceKeywords, FlpTileKeywords, FioriBase):
+                      FlpServiceKeywords, FlpTileKeywords,
+                      FlpTileRefreshKeywords, FioriBase):
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 

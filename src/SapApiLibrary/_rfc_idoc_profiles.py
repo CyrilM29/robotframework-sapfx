@@ -22,7 +22,7 @@ from ._rfc_reads import RfcReadKeywords
 
 
 def abap_key(err: BaseException) -> str:
-    """Le code d'exception ABAP d'une erreur pyrfc (``ENTRY_NOT_EXIST``…),
+    """Le code d'exception ABAP d'une erreur pyrfc (``ENTRY_NOT_EXIST`` …),
     vide pour toute autre erreur."""
     return str(getattr(err, "key", "") or "")
 
@@ -39,7 +39,12 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         ``process_code``, ``processing`` côté entrant), triés. C'est
         l'INSTANTANÉ qui permet de prouver qu'une suite rend la configuration
         qu'elle a trouvée : l'utilisateur de service n'y figure pas, il
-        dépend de qui a créé la ligne."""
+        dépend de qui a créé la ligne.
+
+        Exemple :
+        | ${profiles}=    `Get Idoc Partner Profiles`    outbound    alias=a4h
+        | Should Not Be Empty    ${profiles}
+        """
         side = str(direction).strip().lower()
         if side not in ("outbound", "inbound"):
             raise ValueError("direction vaut 'outbound' ou 'inbound', reçu %r." % (direction,))
@@ -71,7 +76,12 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         ``allowed_message_types`` est OBLIGATOIRE (liste blanche, une liste
         vide refuse tout) et les profils livrés avec l'image (``RSRQST``,
         ``RSINFO``, ``RSSEND``) sont refusés même listés. ``output_mode`` :
-        ``2`` transfert immédiat (défaut), ``1`` et ``4`` collecte."""
+        ``2`` transfert immédiat (défaut), ``1`` et ``4`` collecte.
+
+        Exemple :
+        | ${outbound}=    `Ensure Idoc Outbound Profile`    A4HCLNT001    TXTRAW    TXTRAW01    A000000001
+        | ...    allowed_message_types=TXTRAW    alias=a4h
+        """
         wanted_type = idoc_profiles.require_allowed(message_type, allowed_message_types)
         attributes = self.get_rfc_connection_attributes(alias)
         key = idoc_profiles.outbound_key(
@@ -111,7 +121,12 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         modèle de vol, qui poste vraiment ; ``TXT1`` pour un texte, envoyé à la
         boîte de l'utilisateur). ``processing`` : ``1`` tout de suite (défaut),
         ``3`` par programme d'arrière-plan : l'entrant reste alors à 64 (prêt à
-        être passé à l'application) tant qu'aucun programme ne le traite."""
+        être passé à l'application) tant qu'aucun programme ne le traite.
+
+        Exemple :
+        | ${inbound}=    `Ensure Idoc Inbound Profile`    A4HCLNT001    TXTRAW    TXT1
+        | ...    allowed_message_types=TXTRAW    processing=3    alias=a4h
+        """
         wanted_type = idoc_profiles.require_allowed(message_type, allowed_message_types)
         attributes = self.get_rfc_connection_attributes(alias)
         key = idoc_profiles.inbound_key(
@@ -142,7 +157,11 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         """Retire un profil sortant PAR SA CLÉ, seulement pour un type de
         message de la liste blanche et jamais pour un profil livré. Un profil
         déjà absent rend ``{"removed": False}`` (le nettoyage est idempotent) ;
-        retiré, ``{"removed": True}``."""
+        retiré, ``{"removed": True}``.
+
+        Exemple :
+        | `Remove Idoc Outbound Profile`    A4HCLNT001    TXTRAW    allowed_message_types=TXTRAW    alias=a4h
+        """
         wanted_type = idoc_profiles.require_allowed(message_type, allowed_message_types)
         client = self.get_rfc_connection_attributes(alias).get("client", "")
         key = idoc_profiles.outbound_key(client, partner, partner_type, wanted_type)
@@ -154,7 +173,11 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
                                     partner_type: str = "LS",
                                     alias: str = "default") -> dict[str, Any]:
         """Retire un profil entrant PAR SA CLÉ, mêmes garde-fous
-        que `Remove Idoc Outbound Profile`."""
+        que `Remove Idoc Outbound Profile`.
+
+        Exemple :
+        | `Remove Idoc Inbound Profile`    A4HCLNT001    TXTRAW    allowed_message_types=TXTRAW    alias=a4h
+        """
         wanted_type = idoc_profiles.require_allowed(message_type, allowed_message_types)
         client = self.get_rfc_connection_attributes(alias).get("client", "")
         key = idoc_profiles.inbound_key(client, partner, partner_type, wanted_type)

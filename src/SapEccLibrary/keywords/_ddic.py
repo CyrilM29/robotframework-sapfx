@@ -7,9 +7,9 @@ transparente, vue ou structure. Trois réalités d'écran relevées live (A4H,
 2026-08-17) structurent ce mixin :
 
 - ``TABCLASS`` n'est PAS un critère de sélection de DD02L (l'écran généré
-  n'expose que les champs clés ``TABNAME``/``AS4LOCAL``/``AS4VERS``) : on
+  n'expose que les champs clés ``TABNAME`` / ``AS4LOCAL`` / ``AS4VERS``) : on
   sélectionne par NOM et on classe en sortie ;
-- une liste de noms sans préfixe commun passe par la **sélection multiple**
+- une liste de noms sans préfixe commun passe par la *sélection multiple*
   (dialogue standard ``SAPLALDB``, bouton ``%_I1_%_APP_%-VALU_PUSH``), remplie
   fenêtre visible par fenêtre visible : le table control du dialogue est
   DÉFILÉ entre deux fenêtres, et un défilement refusé est un échec
@@ -123,6 +123,11 @@ class DdicKeywords:
         `Use ALV Grid In Data Browser`, et un résultat VIDE est un échec (la
         table est inconnue de DD03L) au lieu d'un contrat de champs vide qui
         passerait pour une table sans champ. Lecture seule.
+
+        Exemple :
+        | ${fields}=    `Read Ddic Table Fields`    SCARR
+        | Should Be Equal    ${fields}[1][FIELDNAME]    CARRID
+        | Should Be Equal    ${fields}[1][KEYFLAG]    X
         """
         name = str(table).strip().upper()
         if not name:
@@ -190,6 +195,12 @@ class DdicKeywords:
         entrent au barème, le reste se classera ``unknown``. ``extra`` :
         surcharge site explicite ``valeur=classe`` (classe cible inconnue =
         échec actionnable). Retourne un dict JSON-safe.
+
+        Exemple :
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW    APPEND
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | Should Be Equal    ${map}[TRANSP]    table
+        | Dictionary Should Not Contain Key    ${map}    APPEND
         """
         try:
             return classification_map(domain_values, extra)
@@ -210,6 +221,11 @@ class DdicKeywords:
         ``prefixes`` et ``object_types`` acceptent une liste OU une valeur
         seule (une variable ``-v`` Robot est un scalaire). Retourne le
         périmètre normalisé (dict JSON-safe), à consigner dans l'artefact.
+
+        Exemple :
+        | ${scope}=    `Validate Ddic Scope`    packages=SAPBC_DATAMODEL    max_objects=20
+        | Should Be Equal As Integers    ${scope}[max_objects]    20
+        | List Should Contain Value    ${scope}[object_types]    TABL
         """
         try:
             return validate_scope(packages, prefixes, max_objects, batch_size,
@@ -237,8 +253,17 @@ class DdicKeywords:
         échec (troncature jamais muette) ; un lot revenu VIDE déclenche une
         sonde canari (``TABNAME=DD02L``) qui distingue l'absence réelle d'un
         écran de sélection dont les critères positionnels ne sont plus
-        ``TABNAME``/``AS4LOCAL`` (le choix des champs persiste par
+        ``TABNAME`` / ``AS4LOCAL`` (le choix des champs persiste par
         utilisateur).
+
+        Exemple :
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | @{names}=    Create List    SCARR    SFL_AUX    ZZ_NO_SUCH
+        | ${entries}=    `Classify Ddic Objects`    ${names}    ${map}
+        | Should Be Equal    ${entries}[SCARR][class]    table
+        | Should Be Equal    ${entries}[SFL_AUX][class]    non_consultable_ddic
+        | Should Not Be True    ${entries}[ZZ_NO_SUCH][ddic][present]
         """
         if isinstance(names, str):
             raise AssertionError(
@@ -277,6 +302,15 @@ class DdicKeywords:
         d'arrivée. ``entries`` accepte le dict retourné par `Classify Ddic
         Objects` ou une liste d'entrées ; ``classes`` accepte une liste ou
         une valeur seule. Retourne la liste des noms à sonder.
+
+        Exemple :
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | @{names}=    Create List    SCARR    SPFLI    SFL_AUX
+        | ${entries}=    `Classify Ddic Objects`    ${names}    ${map}
+        | ${sample}=    `Sample Ddic Objects For Probe`    ${entries}    per_class=1
+        | Length Should Be    ${sample}    2
+        | Should Be Equal    ${sample}[0]    SCARR
         """
         if isinstance(entries, dict):
             entries = list(entries.values())
@@ -293,6 +327,14 @@ class DdicKeywords:
         Dédoublonne, trie par nom technique, applique la borne
         ``max_objects``. Retourne ``[noms, truncated]`` : ``truncated`` vaut
         vrai quand la borne a retiré des objets, jamais un succès silencieux.
+
+        Exemple :
+        | @{flight}=    Create List    SPFLI    SCARR
+        | @{more}=    Create List    SFLIGHT    SPFLI
+        | @{groups}=    Create List    ${flight}    ${more}
+        | ${names}    ${truncated}=    `Merge Ddic Name Lists`    ${groups}    2
+        | Should Be Equal    ${names}[0]    SCARR
+        | Should Be True    ${truncated}
         """
         names, truncated = bounded_union(groups, int(max_objects))
         return [names, truncated]
@@ -303,8 +345,18 @@ class DdicKeywords:
 
         ``status`` : ``selection_screen_reached``, ``rejected``,
         ``authorization_blocked``, ``runtime_error`` ou ``not_probed`` ;
-        ``message_type`` est le TYPE de message (``E``…), jamais un texte
+        ``message_type`` est le TYPE de message (``E`` …), jamais un texte
         localisé. Retourne l'entrée mise à jour (JSON-safe).
+
+        Exemple :
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | @{names}=    Create List    SCARR
+        | ${entries}=    `Classify Ddic Objects`    ${names}    ${map}
+        | `Reach Se16 Selection Screen`    SCARR
+        | ${count}=    `Count Entries On Current Selection Screen`
+        | ${entry}=    `Record Ddic Probe`    ${entries}[SCARR]    selection_screen_reached    entry_count=${count}
+        | Should Be Equal    ${entry}[probe][status]    selection_screen_reached
         """
         try:
             return record_probe(entry, status, message_type, detail,
@@ -322,6 +374,16 @@ class DdicKeywords:
         deux campagnes lisant les mêmes données produisent donc le même hash.
         ``entries`` accepte le dict retourné par `Classify Ddic Objects` ou une
         liste d'entrées.
+
+        Exemple :
+        | ${scope}=    `Validate Ddic Scope`    packages=SAPBC_DATAMODEL    max_objects=20
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | @{names}=    Create List    SCARR    SPFLI
+        | ${entries}=    `Classify Ddic Objects`    ${names}    ${map}
+        | ${proof}=    `Write Ddic Inventory Artifact`    ${OUTPUT DIR}/ddic_a4h.json    A4H    ${scope}    ${entries}
+        | Length Should Be    ${proof}[sha256]    64
+        | Should Be Equal As Integers    ${proof}[summary][table]    2
         """
         if isinstance(entries, dict):
             entries = list(entries.values())
@@ -342,9 +404,21 @@ class DdicKeywords:
         Charge les deux fichiers JSON, vérifie la comparabilité (même schéma ;
         périmètres différents = comparaison marquée non probante, jamais des
         écarts trompeurs), journalise le rapport Markdown et retourne le dict
-        de comparaison JSON-safe (``only_in_a``/``only_in_b``, reclassements,
+        de comparaison JSON-safe (``only_in_a`` / ``only_in_b``, reclassements,
         consultabilité SE16 changée, écarts de volumétrie). Hors ligne : ne
         touche jamais l'écran.
+
+        Exemple :
+        | ${scope}=    `Validate Ddic Scope`    packages=SAPBC_DATAMODEL    max_objects=20
+        | @{values}=    Create List    TRANSP    INTTAB    VIEW
+        | ${map}=    `Get Ddic Classification Map`    ${values}
+        | @{names}=    Create List    SCARR
+        | ${entries}=    `Classify Ddic Objects`    ${names}    ${map}
+        | `Write Ddic Inventory Artifact`    ${OUTPUT DIR}/ddic_a.json    A4H    ${scope}    ${entries}
+        | `Write Ddic Inventory Artifact`    ${OUTPUT DIR}/ddic_b.json    A4H    ${scope}    ${entries}
+        | ${diff}=    `Compare Ddic Inventory Artifacts`    ${OUTPUT DIR}/ddic_a.json    ${OUTPUT DIR}/ddic_b.json
+        | Should Be True    ${diff}[compatible]
+        | Should Be Empty    ${diff}[reclassified]
         """
         with open(str(path_a), encoding="utf-8") as handle:
             inventory_a = json.load(handle)
@@ -412,8 +486,8 @@ class DdicKeywords:
         """Sonde canari des critères positionnels de l'écran DD02L.
 
         Un lot sans AUCUNE ligne a deux explications : les objets sont
-        vraiment absents de DD02L, ou les critères positionnels ``I1``/``I2``
-        ne sont plus ``TABNAME``/``AS4LOCAL`` (le choix des champs de
+        vraiment absents de DD02L, ou les critères positionnels ``I1`` / ``I2``
+        ne sont plus ``TABNAME`` / ``AS4LOCAL`` (le choix des champs de
         sélection PERSISTE par utilisateur et déplace les ``I<n>``). La sonde
         tranche : ``TABNAME=DD02L`` (mêmes critères que le lot) doit ramener
         la ligne de DD02L elle-même. Vérifiée une fois par instance, et

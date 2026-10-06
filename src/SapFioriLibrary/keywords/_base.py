@@ -2,7 +2,7 @@
 
 Le socle que tous les mixins atteignent par composition : acces a la page
 active de Browser (``_browser``), evaluation JS dans la portee de frame
-courante (``_evaluate``/``_eval_scope``), boucle de resolution avec sondage
+courante (``_evaluate`` / ``_eval_scope``), boucle de resolution avec sondage
 (``_resolve``), action avec relance (``_act_with_retry``), choix d'un match
 (``_pick*``), attente de visibilite par enum interne (``_wait_visible`` : la
 conversion d'arguments RF n'existe pas via ``get_library_instance``), capture
@@ -47,15 +47,15 @@ class FioriBase:
         autour d'une app Fiori particulièrement lourde, sans l'imposer à toute
         la suite). Accepte les chaînes de temps Robot (``30s``, ``2 min``).
         L'ancienne valeur est retournée dans le même format, prête à être
-        restaurée en teardown :
-
-        | ${old}= | Set Ui5 Timeout | 45s |
-        | ... étapes sur l'app lente ... | |
-        | Set Ui5 Timeout | ${old} | |
+        restaurée en teardown (voir l'exemple).
 
         Le pendant Fiori de `Set Default Timeout` (SapEccLibrary). Portée :
         l'instance de bibliothèque (scope ``SUITE``) ; le réglage ne déborde
         jamais sur la suite suivante.
+
+        Exemple :
+        | ${previous}=    `Set Ui5 Timeout`    45s
+        | `Set Ui5 Timeout`    ${previous}
         """
         previous = secs_to_timestr(timestr_to_secs(self.ui5_timeout))
         timestr_to_secs(timeout)   # valide la chaîne AVANT de l'adopter
@@ -75,6 +75,10 @@ class FioriBase:
         important les deux bibliothèques, qualifier l'appel
         (``SapFioriLibrary.Set Poll Interval``) ou régler
         `Set Library Search Order`. Portée : l'instance (scope ``SUITE``).
+
+        Exemple :
+        | ${previous}=    `Set Poll Interval`    0.5s
+        | `Set Poll Interval`    ${previous}
         """
         previous = secs_to_timestr(self.poll_interval)
         self.poll_interval = timestr_to_secs(interval)
@@ -230,7 +234,7 @@ class FioriBase:
 
     def _wait_visible(self, selector, timeout=None):
         """Attend qu'un sélecteur soit visible via Browser, en passant l'état
-        sous sa forme **enum** (``ElementState.visible``) : en appel Python
+        sous sa forme *enum* (``ElementState.visible``) : en appel Python
         direct (``get_library_instance``), la conversion d'arguments de Robot
         n'a pas lieu et l'API interne de Browser rejette la chaîne ``"visible"``
         (KeyError, attrapé live par le smoke hybride). ``timeout`` accepte une

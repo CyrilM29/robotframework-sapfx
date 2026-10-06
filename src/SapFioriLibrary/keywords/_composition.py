@@ -42,7 +42,7 @@ class CompositionKeywords:
     # -- sonde de composition (perception des pages hybrides) ------------------
 
     def get_page_composition(self, include_frames=True):
-        """Sonde la **composition technologique** de la page courante : la
+        """Sonde la *composition technologique* de la page courante : la
         perception d'une page HYBRIDE (shell UI5 + iframe WebGUI + widget web
         générique cohabitant dans le même écran).
 
@@ -68,7 +68,12 @@ class CompositionKeywords:
         Respecte `Set Ui5 Frame` / `Push Ui5 Frame` : la sonde part de la
         portée courante. Lecture seule, le pendant hybride de `Get Ui5 Page
         Tree`, à appeler en premier sur un écran inconnu pour savoir QUEL
-        moteur adresser où."""
+        moteur adresser où.
+
+        Exemple :
+        | ${composition}=    `Get Page Composition`
+        | Should Be True    ${composition}[ui5_runtime]
+        """
         composition = self._evaluate(PAGE_COMPOSITION_JS, arg=None)
         if not isinstance(composition, dict):
             raise AssertionError(
@@ -115,7 +120,7 @@ class CompositionKeywords:
           appel ne retourne que les entrées NOUVELLES depuis le précédent,
           l'esprit ``mode=diff`` ; ``full_logs=True`` relit tout. Les listes
           gardent les ``max_log_entries`` plus récentes (troncature annoncée
-          dans ``console_dropped``/``page_errors_dropped``, jamais
+          dans ``console_dropped`` / ``page_errors_dropped``, jamais
           silencieuse) ;
         * ``aria`` : snapshot ARIA YAML (`Get Aria Snapshot`) de
           ``aria_selector`` (défaut ``css=body``, préfixé par la frame
@@ -132,10 +137,11 @@ class CompositionKeywords:
         le diagnostic. Lecture seule. Respecte `Set Ui5 Frame` /
         `Push Ui5 Frame` (composition, arbre et ARIA sondent la portée
         courante ; console et erreurs de page sont PAR PAGE, toutes frames
-        confondues, c'est Playwright qui les collecte). ::
+        confondues, c'est Playwright qui les collecte).
 
-            ${diag}=    Get Fiori Diagnostics
-            Should Be Empty    ${diag}[issues]
+        Exemple :
+        | ${diagnostics}=    `Get Fiori Diagnostics`    sections=composition,console,errors
+        | Log    ${diagnostics}[issues]
         """
         wanted = parse_sections(sections)
         browser = self._browser()
@@ -195,11 +201,14 @@ class CompositionKeywords:
                               tree_timeout="3s", full_logs=False,
                               max_log_entries=50, aria_selector="css=body"):
         """Collecte `Get Fiori Diagnostics` (mêmes paramètres) puis écrit le
-        **rapport Markdown** dans le log Robot : anomalies d'abord, puis chaque
+        *rapport Markdown* dans le log Robot : anomalies d'abord, puis chaque
         section en résumé compact. Retourne le dict complet, pour enchaîner une
-        assertion sur ``issues`` après coup. Le réflexe de fin de test en échec::
+        assertion sur ``issues`` après coup. Le réflexe de fin de test en échec
+        est montré dans l'exemple.
 
-            [Teardown]    Run Keyword If Test Failed    Log Fiori Diagnostics
+        Exemple :
+        | [Teardown]    Run Keyword If Test Failed    `Log Fiori Diagnostics`
+        | `Ui5 Control Should Be Visible`    idSuffix=fe::table::Travel::LineItem-innerTable
         """
         diagnostics = self.get_fiori_diagnostics(
             sections=sections, tree_timeout=tree_timeout, full_logs=full_logs,

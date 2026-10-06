@@ -122,7 +122,7 @@ même façon d'ici là.
   à jour du poste. Fin de support restreint de SAP GUI 8.00 : 31/07/2027. Référence
   API : [SAP GUI Scripting API sur le Help Portal](https://help.sap.com/docs/r/b47d018c3b9b45e897faf66a6c0885a8/latest/en-US).
 - **Écosystème** : l'upstream `robotframework-sapguilibrary` est dormant (dernière
-  release en 2022 : notre fork vendorisé est de facto la ligne de maintenance) ;
+  release en 2022 : `SapEccLibrary`, qui en embarque le code, est de facto la ligne de maintenance) ;
   [playwright-sap](https://github.com/ArpitSureka/playwright-sap) est maintenu
   (v1.1.4, 10/2025), re-diff périodique de notre port `_ui5_js.py` conseillé ;
   [rf-mcp](https://pypi.org/project/rf-mcp/) est en 0.36.0 (les séries

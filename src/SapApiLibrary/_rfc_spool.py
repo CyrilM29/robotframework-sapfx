@@ -1,4 +1,4 @@
-"""Mixin du **spool** d'un job de fond par le canal RFC : du pas de job à la
+"""Mixin du *spool* d'un job de fond par le canal RFC : du pas de job à la
 demande de spool, puis au contenu, par deux voies XBP indépendantes.
 
 Né de la fiche scénario 9 (A4H, 2026-10-01) : la bibliothèque savait
@@ -48,7 +48,13 @@ class RfcSpoolKeywords(RfcJobKeywords):
         indice, jamais une preuve : le programme est ``program``
         (``TBTCP-PROGNAME``). Un numéro de spool non nul ABSENT de ``TSP01``
         (demande supprimée par une réorganisation) ÉCHOUE en le disant, au
-        lieu de passer pour « pas de spool »."""
+        lieu de passer pour « pas de spool ».
+
+        Exemple :
+        | ${run}=    `Get Background Job Run`    SAPFX_JOB_20261001_130542    alias=a4h
+        | ${steps}=    `Get Job Spool Requests`    ${run}[jobname]    ${run}[jobcount]    alias=a4h
+        | Should Be Equal    ${steps}[0][program]    SHOWCOLO
+        """
         options = rfc_reads.build_options([("JOBNAME", str(jobname)),
                                            ("JOBCOUNT", str(jobcount))])
         steps = self.read_rfc_table("TBTCP", list(spool.STEP_FIELDS),
@@ -86,7 +92,13 @@ class RfcSpoolKeywords(RfcJobKeywords):
         produit n'est pas un rapport qui n'avait rien à dire. Un pas ABSENT
         du job lève ``JobStepNotFoundError`` en nommant ``XM/E/220`` et les
         pas existants. ``step`` est converti en entier ici (pyrfc refuse une
-        chaîne pour ``STEP_NUMBER``, et via rf-mcp tout arrive en chaîne)."""
+        chaîne pour ``STEP_NUMBER``, et via rf-mcp tout arrive en chaîne).
+
+        Exemple :
+        | ${run}=    `Get Background Job Run`    SAPFX_JOB_20261001_130542    alias=a4h
+        | ${spool}=    `Read Job Spool`    ${run}[jobname]    ${run}[jobcount]    step=1    alias=a4h
+        | Should Be True    ${spool}[non_blank_lines] > 0
+        """
         step_number = as_optional_int(step, "step") or 1
         user = self._xbp_external_user(alias, external_user)
         with self._xbp_session(alias):
@@ -125,7 +137,12 @@ class RfcSpoolKeywords(RfcJobKeywords):
         le 2026-10-01 : 20 pages, comme la colonne Pages de SP01 ;
         ``TSP01-RQAPPRULE`` porte aussi 20 mais son libellé de dictionnaire
         est « Number of add protection rule », il n'est donc pas une source).
-        Un numéro inexistant lève ``InvalidSpoolRequestError`` (``XM/E/065``)."""
+        Un numéro inexistant lève ``InvalidSpoolRequestError`` (``XM/E/065``).
+
+        Exemple :
+        | ${attributes}=    `Get Spool Request Attributes`    ${steps}[0][spool_id]    alias=a4h
+        | Should Be Equal As Integers    ${attributes}[pages]    1
+        """
         number = spool.spool_id_argument(spool_id)
         user = self._xbp_external_user(alias, external_user)
         with self._xbp_session(alias):
@@ -179,7 +196,12 @@ class RfcSpoolKeywords(RfcJobKeywords):
         plage inversée est refusée AVANT l'appel (XBP rendait sans refus les
         pages 5 à 20 d'une plage « 5 à 3 »), comme une plage qui DÉBORDE la
         dernière page (ramenée sinon en silence) ; une plage qui commence après
-        la dernière page lève ``SpoolPageOutOfRangeError`` (``XM/E/273``)."""
+        la dernière page lève ``SpoolPageOutOfRangeError`` (``XM/E/273``).
+
+        Exemple :
+        | ${spool}=    `Read Spool Request`    ${steps}[0][spool_id]    alias=a4h    verify_complete=True
+        | Should Be True    ${spool}[complete]
+        """
         number = spool.spool_id_argument(spool_id)
         first = as_optional_int(first_page, "first_page")
         first = 1 if first is None else first
@@ -227,7 +249,12 @@ class RfcSpoolKeywords(RfcJobKeywords):
         ``TBTCP-LISTIDENT`` est nul ET XBP refuse la lecture par
         ``XM/E/063``. Rend ``{step, program, message_id}``. Échoue si le pas
         porte un spool, si le pas n'existe pas, ou si XBP rend des lignes (ou
-        refuse autrement)."""
+        refuse autrement).
+
+        Exemple :
+        | ${run}=    `Get Background Job Run`    SAPFX_JOB_20261001_131002    alias=a4h
+        | `Job Step Should Have No Spool`    ${run}[jobname]    ${run}[jobcount]    step=1    alias=a4h
+        """
         step_number = as_optional_int(step, "step") or 1
         entries = self.get_job_spool_requests(jobname, jobcount, alias)
         entry = next((e for e in entries if e["step"] == step_number), None)
@@ -255,7 +282,11 @@ class RfcSpoolKeywords(RfcJobKeywords):
                                        ) -> dict[str, Any]:
         """Vérifie qu'un numéro de spool n'existe pas, par DEUX sources :
         absent de ``TSP01`` ET refusé par XBP avec ``XM/E/065``. Rend
-        ``{spool_id, message_id}``."""
+        ``{spool_id, message_id}``.
+
+        Exemple :
+        | `Spool Request Should Not Exist`    999999999    alias=a4h
+        """
         number = spool.spool_id_argument(spool_id)
         if self.read_rfc_table("TSP01", ["RQIDENT"], alias=alias,
                                options=["RQIDENT EQ %d" % number]):
@@ -278,7 +309,12 @@ class RfcSpoolKeywords(RfcJobKeywords):
         localisé. Chaque marqueur doit être sur une ligne STRICTEMENT plus
         basse que le précédent (une ligne unique portant tous les noms ne
         passe pas) ; ``same_line=True`` lève cette exigence. L'échec dit
-        lequel manque, et s'il est ABSENT ou présent mais dans le DÉSORDRE."""
+        lequel manque, et s'il est ABSENT ou présent mais dans le DÉSORDRE.
+
+        Exemple :
+        | ${spool}=    `Read Job Spool`    ${run}[jobname]    ${run}[jobcount]    alias=a4h
+        | `Lines Should Contain In Order`    ${spool}[lines]    COL_BACKGROUND    COL_HEADING    COL_NORMAL
+        """
         source = lines.get("lines", []) if isinstance(lines, dict) else lines
         wanted: list[str] = []
         for marker in markers:

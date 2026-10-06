@@ -1,37 +1,37 @@
-"""SapApiLibrary, le canal **API** du projet : OData (Gateway/CAP) et RFC.
+"""SapApiLibrary, le canal *API* du projet : OData (Gateway/CAP) et RFC.
 
 Le troisième canal, à côté du GUI desktop (``SapEccLibrary``) et du web
-(``SapFioriLibrary``). Raison d'être : un test SAP robuste **prépare et
-vérifie ses données par l'API** et ne passe par l'écran que pour ce qu'il
+(``SapFioriLibrary``). Raison d'être : un test SAP robuste *prépare et
+vérifie ses données par l'API* et ne passe par l'écran que pour ce qu'il
 teste vraiment : le setup/teardown GUI est lent et fragile, l'API est
 rapide et déterministe. Le keyword métier type croise les canaux :
 compter par SE16 ET par OData, puis exiger l'égalité (voir
 ``tests/robot/flagship_cross_paradigm.robot``).
 
-Volontairement en **stdlib pure** (``urllib`` + ``http.cookiejar``) : aucune
+Volontairement en *stdlib pure* (``urllib`` + ``http.cookiejar``) : aucune
 dépendance nouvelle à épingler (la leçon pywin32 de la convention 6). Couvre :
 
-* OData **v2** (Gateway embarqué ECC/S4 : enveloppe ``{"d": ...}``) et **v4**
+* OData *v2* (Gateway embarqué ECC/S4 : enveloppe ``{"d": ...}``) et *v4*
   (CAP, S/4 moderne : ``{"value": [...]}``), mêmes keywords, détection de
   l'enveloppe ; CRUD complet (POST/PATCH/DELETE avec ``If-Match``), pagination
   server-driven suivie sur demande, function imports/actions, ``$batch``
   multipart (changeset atomique) ;
-* la **fabrique de données de test** : entités créées enregistrées par
+* la *fabrique de données de test* : entités créées enregistrées par
   session (``track=True``), nettoyage garanti en teardown
   (`Delete Created Entities`), création idempotente (`Ensure Odata Entity`) ;
-* la **perception du canal** (il n'a pas d'écran) : ``$metadata`` parsé
+* la *perception du canal* (il n'a pas d'écran) : ``$metadata`` parsé
   (`Get Odata Metadata`, entity sets/clés/libellés ``sap:label``), catalogue
   Gateway (`List Odata Services`), préflight actionnable
   (`Get Gateway Status` / `Gateway Should Be Active` /
   `Wait Until Api Available`) et télémétrie (`Get Api Telemetry`) ;
-* le protocole **CSRF** SAP (``X-CSRF-Token: Fetch`` puis rejeu du token et
+* le protocole *CSRF* SAP (``X-CSRF-Token: Fetch`` puis rejeu du token et
   des cookies sur les écritures, re-fetch et rejeu UNE fois sur 403 CSRF) ;
-* l'authentification **Basic**, **OAuth2 client credentials** (S/4 Cloud,
-  BTP : ``token_url``/``client_id``/``client_secret``) et le **certificat
-  client mTLS** (``client_cert``/``client_key``) ;
-* le **RFC** en option : ``Call Rfc`` s'appuie sur `pyrfc` (SAP NW RFC SDK)
+* l'authentification *Basic*, *OAuth2 client credentials* (S/4 Cloud,
+  BTP : ``token_url`` / ``client_id`` / ``client_secret``) et le *certificat
+  client mTLS* (``client_cert`` / ``client_key``) ;
+* le *RFC* en option : ``Call Rfc`` s'appuie sur `pyrfc` (SAP NW RFC SDK)
   s'il est installé, sinon échoue avec la marche à suivre ; jamais de
-  dépendance dure à un SDK propriétaire. Au-dessus : le pattern **BAPI**
+  dépendance dure à un SDK propriétaire. Au-dessus : le pattern *BAPI*
   (`Call Bapi` vérifie les BAPIRET2 par TYPE, `Commit/Rollback Bapi
   Transaction`) et `Wait For Background Job` (TBTCO via RFC_READ_TABLE).
 
@@ -68,14 +68,14 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
 
     == Sessions ==
     `Open Api Session` mémorise URL de base, authentification (Basic, OAuth2
-    client credentials via ``token_url``/``client_id``/``client_secret``,
-    certificat client mTLS via ``client_cert``/``client_key``, ou clé d'API
+    client credentials via ``token_url`` / ``client_id`` / ``client_secret``,
+    certificat client mTLS via ``client_cert`` / ``client_key``, ou clé d'API
     en en-tête via ``api_key``), client SAP et cookies ; tous les keywords OData s'y réfèrent par ``alias`` (plusieurs
-    systèmes simultanés possibles). Exemple::
+    systèmes simultanés possibles). Par exemple :
 
-        Open Api Session    http://vhcala4hci:50000    user=DEVELOPER
-        ...    password=${SAP_PASSWORD}    sap_client=001
-        ${n}=    Get Odata Count    /sap/opu/odata/sap/SEPMRA_SHOP/Products
+    | `Open Api Session`    http://vhcala4hci:50000    user=DEVELOPER
+    | ...    password=${SAP_PASSWORD}    sap_client=001
+    | ${n}=    `Get Odata Count`    /sap/opu/odata/sap/SEPMRA_SHOP/Products
 
     == OData v2 et v4 ==
     `Get Odata Entities` renvoie la liste quelle que soit l'enveloppe
@@ -106,7 +106,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     == RFC et BAPI (optionnel) ==
     `Open Rfc Connection` / `Call Rfc` utilisent `pyrfc` si installé
     (SAP NW RFC SDK requis) ; sinon l'erreur donne la marche à suivre.
-    `Call Bapi` vérifie les messages ``BAPIRET2`` par TYPE (``E``/``A``/``X``
+    `Call Bapi` vérifie les messages ``BAPIRET2`` par TYPE (``E`` / ``A`` / ``X``
     = échec listant les messages, convention n°3 : jamais le texte localisé) ;
     `Commit Bapi Transaction` / `Rollback Bapi Transaction` ferment la LUW.
     `Wait For Background Job` suit un job de fond (TBTCO via RFC_READ_TABLE).
@@ -204,26 +204,32 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
         ``sap-client`` ajouté à chaque requête, cookies). Retourne l'alias.
 
         ``headers`` : en-têtes par défaut supplémentaires de la session,
-        appliqués en DERNIER (ils peuvent donc surcharger l'``Accept:
-        application/json`` maison). Cas d'usage relevé live (2026-08-26, site
+        appliqués en DERNIER (ils peuvent donc surcharger l'en-tête
+        ``Accept: application/json`` maison). Cas d'usage relevé live (2026-08-26, site
         SAP Build Work Zone) : un approuter BTP arbitre entre page HTML et
         réponse JSON sur l'en-tête ``Accept``, que la session ne permettait
         pas de poser. Les valeurs ne sont jamais journalisées.
 
         Quatre modes d'authentification, cumulables avec ``sap_client`` :
-        **Basic** (``user``/``password``), **OAuth2 client credentials**
-        (``token_url`` + ``client_id`` + ``client_secret`` [+
-        ``oauth_scope``] : token demandé au premier appel, rafraîchi à
+        *Basic* (``user`` / ``password``), *OAuth2 client credentials*
+        (``token_url`` + ``client_id`` + ``client_secret``, plus
+        ``oauth_scope`` au besoin : token demandé au premier appel, rafraîchi à
         expiration et rejoué UNE fois sur 401 ; si Basic est aussi fourni, le
-        Bearer l'emporte), **mTLS** (``client_cert`` [+ ``client_key``] :
-        certificat client présenté au serveur), et **clé d'API**
+        Bearer l'emporte), *mTLS* (``client_cert``, plus ``client_key`` au besoin :
+        certificat client présenté au serveur), et *clé d'API*
         (``api_key``, envoyée dans l'en-tête ``api_key_header``, ``APIKey``
         par défaut : c'est l'authentification du bac à sable SAP Business
         Accelerator Hub, api.sap.com). La clé n'est jamais journalisée, et
         une clé vide est REFUSÉE : l'en-tête partirait sans authentifier et
         l'échec n'arriverait qu'au premier appel, en HTTP 401 muet sur sa
         cause. ``verify_tls=False`` accepte un certificat serveur
-        auto-signé (systèmes de test)."""
+        auto-signé (systèmes de test).
+
+        Exemple :
+        | `Open Api Session`    http://localhost:50000    user=DEVELOPER    password=${SAP_PASSWORD}
+        | ...    sap_client=001    alias=a4h
+        | `Open Api Session`    http://localhost:4004    user=alice    password=${EMPTY}    alias=cap
+        """
         alias = self._validate_alias(alias)
         secs = timestr_to_secs(timeout) if timeout else self.default_timeout
         tls_verified = _as_bool(verify_tls)
@@ -271,7 +277,11 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     def close_api_session(self, alias: str = "default") -> None:
         """Oublie la session ``alias`` (cookies et token CSRF compris).
         Avertit si des entités créées suivies n'ont pas été nettoyées
-        (`Delete Created Entities`) : jamais de fuite silencieuse."""
+        (`Delete Created Entities`) : jamais de fuite silencieuse.
+
+        Exemple :
+        | `Close Api Session`    a4h
+        """
         session = self._api_sessions().pop(alias, None)
         if session is not None and session.created_entities:
             logger.warn(
@@ -281,10 +291,14 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
                    ", ".join(session.created_entities[:5])))
 
     def close_all_api_sessions(self) -> None:
-        """Oublie toutes les sessions API **et ferme les connexions RFC** du
+        """Oublie toutes les sessions API *et ferme les connexions RFC* du
         namespace courant (teardown de suite) : une connexion RFC orpheline
         est une session utilisateur restée ouverte côté serveur SAP, la même
-        leçon que le ``Close All Sap Sessions`` du canal GUI."""
+        leçon que le ``Close All Sap Sessions`` du canal GUI.
+
+        Exemple :
+        | `Close All Api Sessions`
+        """
         namespace = current_execution_namespace()
         sessions = self._sessions_by_namespace.pop(namespace, {})
         leftovers = {alias: len(session.created_entities)
@@ -299,7 +313,11 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
 
     def close_all_rfc_connections(self) -> None:
         """Ferme toutes les connexions RFC du namespace courant (best-effort :
-        une connexion déjà morte n'empêche pas la fermeture des autres)."""
+        une connexion déjà morte n'empêche pas la fermeture des autres).
+
+        Exemple :
+        | `Close All Rfc Connections`
+        """
         namespace = current_execution_namespace()
         connections = self._rfc_by_namespace.pop(namespace, {})
         for alias, connection in connections.items():
@@ -310,7 +328,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
                             % (alias, exc))
 
     def list_api_sessions(self) -> dict[str, Any]:
-        """Retourne l'état **JSON-safe** du canal API dans le namespace
+        """Retourne l'état *JSON-safe* du canal API dans le namespace
         courant : ``{"api_sessions": [{alias, base_url, sap_client,
         authenticated, oauth, csrf_token_cached, requests, errors,
         created_entities}], "rfc_connections": [alias…]}``.
@@ -319,11 +337,16 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
         porte une authentification Basic OU une clé d'API, ``oauth`` si elle
         porte un client OAuth2, ``csrf_token_cached`` si un token CSRF a déjà
         été obtenu ;
-        ``requests``/``errors`` viennent de la télémétrie (détail :
+        ``requests`` / ``errors`` viennent de la télémétrie (détail :
         `Get Api Telemetry`), ``created_entities`` compte les entités suivies
         par la fabrique de données. C'est la perception du canal API (il n'a
         pas d'écran), consommée par le state provider rf-mcp (`SapApiPlugin`)
-        et utile en débogage de suite multi-alias."""
+        et utile en débogage de suite multi-alias.
+
+        Exemple :
+        | ${state}=    `List Api Sessions`
+        | Should Be Equal    ${state}[api_sessions][0][alias]    a4h
+        """
         return {
             "api_sessions": [
                 {"alias": alias,
@@ -344,7 +367,12 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
         """Télémétrie JSON-safe de la session ``alias`` : nombre de requêtes,
         d'erreurs, temps réseau cumulé (secondes), dernier statut, dernière
         URL, dernière erreur. Jamais de credentials ni de corps de réponse :
-        consommable tel quel à travers rf-mcp."""
+        consommable tel quel à travers rf-mcp.
+
+        Exemple :
+        | ${telemetry}=    `Get Api Telemetry`    alias=a4h
+        | Should Be Equal As Integers    ${telemetry}[errors]    0
+        """
         session = self._session(alias)
         data = dict(session.telemetry)
         data["seconds"] = round(float(data["seconds"]), 3)

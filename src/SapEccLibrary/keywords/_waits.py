@@ -1,7 +1,8 @@
 """Keywords d'attente et de synchronisation.
 
-L'upstream `SapGuiBase` ne propose qu'un `time.sleep(explicit_wait)` *fixe* après
-chaque keyword. C'est fragile : soit on perd du temps (attente trop longue), soit
+robotframework-sapguilibrary ne proposait qu'une pause *fixe* après chaque
+keyword (`Set Explicit Wait`, absorbé ici le 2026-10-06, Apache License 2.0,
+voir NOTICE). C'est fragile : soit on perd du temps (attente trop longue), soit
 les tests sont instables (attente trop courte). Ce mixin ajoute une vraie
 synchronisation basée sur deux propriétés de la SAP GUI Scripting API :
 
@@ -13,11 +14,14 @@ Ces keywords sont la méthode recommandée pour attendre ; réservez `Set Explic
 aux démos et au débogage. Les boucles de sondage/relance elles-mêmes vivent dans
 ``sapfx_common.polling`` (partagées avec le canal Fiori).
 """
+import time
+
 from robot.utils import secs_to_timestr, timestr_to_secs
 
 from sapfx_common.com_safety import (
     SessionDisconnectedError,
     describe_com_failure,
+    is_dead_server_error,
     is_disconnected_error,
 )
 from sapfx_common.polling import poll_until, retry_call
@@ -26,7 +30,7 @@ from sapfx_common.polling import poll_until, retry_call
 class WaitKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose que ``self.session`` est une
     GuiSession connectée (définie par `Connect To Session`) et que
-    ``self.default_timeout``/``self.poll_interval`` (secondes, float) existent."""
+    ``self.default_timeout`` / ``self.poll_interval`` (secondes, float) existent."""
 
     def wait_until_busy_done(self, timeout=None):
         """Bloque jusqu'à ce que le serveur SAP ait fini de traiter la requête en cours.
@@ -42,6 +46,10 @@ class WaitKeywords:
         Une session FERMÉE (proxy COM déconnecté : ``/nex``, SAP Logon arrêté)
         échoue tout de suite en le disant, sans capture : elle ne reviendra
         pas, et l'attente sondait jusqu'ici un objet mort pendant tout le délai.
+
+        Exemple :
+        | `Send Vkey`    0
+        | `Wait Until Busy Done`    timeout=30s
         """
         last_error = {}
 
@@ -86,6 +94,9 @@ class WaitKeywords:
         THREAD à la sérialisation). En fin de lot piloté par rf-mcp, préférez
         `Element Should Be Present` (qui n'a pas de valeur de retour) comme dernière
         étape ; les runs Robot classiques ne sont pas concernés.
+
+        Exemple :
+        | `Wait Until Element Present`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    timeout=10s
         """
         element = poll_until(
             lambda: self._find(element_id, raise_on_missing=False),
@@ -102,7 +113,12 @@ class WaitKeywords:
     def wait_until_element_value_is(self, element_id, expected, timeout=None, interval="0.2s"):
         """Attend que la valeur retournée par `Get Value` pour ``element_id`` soit
         égale à ``expected``. Utile pour les panneaux de statut mis à jour après
-        une sauvegarde."""
+        une sauvegarde.
+
+        Exemple :
+        | `Input Text`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    T000
+        | `Wait Until Element Value Is`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    T000    timeout=5s
+        """
         state = {"last": None}
 
         def value_matches():
@@ -128,7 +144,14 @@ class WaitKeywords:
         momentanément indisponible. On vérifie la présence puis on clique, jusqu'à
         ``retries`` fois espacées de ``interval`` ; la dernière erreur est relevée si
         tous les essais échouent. Préférer ce keyword à un `Click Element` nu sur les
-        écrans qui se redessinent (ALV, dialogues asynchrones)."""
+        écrans qui se redessinent (ALV, dialogues asynchrones).
+
+        Exemple :
+        | `Click Element With Retry`    wnd[0]/tbar[1]/btn[7]
+        | `Wait Until Busy Done`
+        | ${screen}=    `Get Current Screen`
+        | Should Be Equal    ${screen}[program]    /1BCDWB/DBT000
+        """
         def attempt():
             element = self._find(element_id, raise_on_missing=False)
             if element is None:
@@ -152,18 +175,54 @@ class WaitKeywords:
         explicite n'est passé, fixé à l'import de la bibliothèque, ajustable
         ici en cours de suite. Accepte les chaînes de temps Robot (``30s``,
         ``2 min``). L'ancienne valeur est retournée dans le même format,
-        prête à être restaurée en teardown :
-
-        | ${old}= | Set Default Timeout | 2 min |
-        | ... étapes lentes (génération de données de démo) ... | |
-        | Set Default Timeout | ${old} | |
+        prête à être restaurée en teardown (voir l'exemple).
 
         Portée : l'instance de bibliothèque (scope ``SUITE``), le réglage ne
         déborde jamais sur la suite suivante.
+
+        Exemple :
+        | ${previous}=    `Set Default Timeout`    2 min
+        | Should Be Equal    ${previous}    30 seconds
+        | `Set Default Timeout`    ${previous}
         """
         previous = secs_to_timestr(self.default_timeout)
         self.default_timeout = timestr_to_secs(timeout)
         return previous
+
+    def set_explicit_wait(self, speed):
+        """Fixe la pause observée APRÈS chaque action SAP GUI (saisie, clic,
+        touche...) et retourne l'ancienne valeur. Réservé aux démonstrations et
+        au débogage : pour attendre l'écran, `Wait Until Busy Done` et `Wait
+        Until Element Present`.
+
+        Accepte un nombre de secondes (``1``, ``1.5``) ou une durée Robot
+        (``3 seconds``, ``500 ms``, ``2 min``) ; une durée négative ou illisible
+        est refusée. L'ancienne valeur est retournée dans le même format,
+        prête à être restaurée en teardown.
+
+        Exemple :
+        | ${previous}=    `Set Explicit Wait`    500 ms
+        | `Input Text`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    T000
+        | `Set Explicit Wait`    ${previous}
+        """
+        try:
+            seconds = timestr_to_secs(str(speed).strip())
+        except ValueError:
+            raise ValueError("Durée '%s' illisible : donner des secondes (1, 1.5) ou "
+                             "une durée Robot (500 ms, 3 seconds, 2 min)." % speed) from None
+        if seconds < 0:
+            raise ValueError("Durée '%s' négative : une pause se compte en secondes "
+                             "positives ou nulles." % speed)
+        previous = secs_to_timestr(getattr(self, "explicit_wait", 0.0))
+        self.explicit_wait = float(seconds)
+        return previous
+
+    def _explicit_pause(self):
+        """La pause de `Set Explicit Wait` après une action ; aucune quand elle
+        vaut zéro (le défaut)."""
+        delay = getattr(self, "explicit_wait", 0.0)
+        if delay > 0:
+            time.sleep(delay)
 
     def set_poll_interval(self, interval):
         """Change le ``poll_interval`` de la bibliothèque et retourne l'ancienne valeur.
@@ -175,6 +234,10 @@ class WaitKeywords:
         les chaînes de temps Robot (``0.5s``, ``250 ms``) ; retourne l'ancienne
         valeur dans le même format, restaurable comme pour `Set Default
         Timeout`. Portée : l'instance de bibliothèque (scope ``SUITE``).
+
+        Exemple :
+        | ${previous}=    `Set Poll Interval`    0.5s
+        | `Set Poll Interval`    ${previous}
         """
         previous = secs_to_timestr(self.poll_interval)
         self.poll_interval = timestr_to_secs(interval)
@@ -190,7 +253,12 @@ class WaitKeywords:
         qu'un popup « facultatif » (connexion multiple, par exemple) laissait
         une capture dans chaque run VERT (relevé le 2026-09-28). Une session
         ILLISIBLE lève au lieu de valoir ``False`` : une absence et une panne
-        ne se confondent pas."""
+        ne se confondent pas.
+
+        Exemple :
+        | ${popup}=    `Element Is Present`    wnd[1]
+        | Should Not Be True    ${popup}
+        """
         try:
             element = self.session.findById(element_id, False)
         except Exception as exc:   # noqa: BLE001 : re-levé en nommant la cause
@@ -215,6 +283,42 @@ class WaitKeywords:
             raise ValueError(self._with_screen_identity(
                 "Cannot find element with id '%s'." % element_id))
         return element
+
+    def _session_is_gone(self):
+        """Vrai si la session active a DISPARU du moteur de scripting : son id
+        (``/app/con[0]/ses[0]``, mémorisé quand la session a été posée) n'y
+        est plus trouvé, ou le moteur lui-même est mort. Faux sans id connu
+        ou sur toute autre panne : jamais « fermée » sans preuve."""
+        slot_of = getattr(self, "_active_slot", None)
+        session_id = slot_of().get("session_id") if slot_of else None
+        engine = getattr(self, "sapapp", None)
+        if not session_id or engine is None or isinstance(engine, int):
+            return False
+        try:
+            return engine.FindById(session_id, False) is None
+        except Exception as exc:  # noqa: BLE001
+            return is_dead_server_error(exc)
+
+    def _wait_until_closed_or_idle(self, timeout=None):
+        """L'attente d'un OK-code qui FERME la session (``/nex``, ``/nend``) :
+        rend la main dès que la session a disparu du moteur ou qu'elle est
+        revenue au repos. Mesuré le 2026-10-06 sur A4H : fermée depuis
+        l'écran de CONNEXION, la session morte répond à la sonde de ``Busy``
+        par une ``AttributeError`` de proxy (« <unknown>.Busy ») et non par
+        ``RPC_E_DISCONNECTED`` ; l'attente ordinaire la sondait 30 s puis
+        échouait en accusant un thread étranger."""
+        def settled():
+            if self._session_is_gone():
+                return True
+            try:
+                return not self.session.Busy
+            except Exception as exc:  # noqa: BLE001
+                return is_disconnected_error(exc) or self._session_is_gone()
+
+        if not poll_until(settled, self._timeout_secs(timeout), step=self.poll_interval):
+            raise AssertionError(
+                "SAP session neither closed nor returned to idle after %s seconds."
+                % self._timeout_secs(timeout))
 
     def _timeout_secs(self, timeout):
         return self.default_timeout if timeout is None else timestr_to_secs(timeout)

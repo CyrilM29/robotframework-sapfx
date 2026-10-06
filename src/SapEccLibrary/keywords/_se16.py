@@ -11,7 +11,7 @@ resources et les campagnes (fin des trois copies divergentes) :
   Entries », independant du plafond de hits et fiable sur table vide, la ou
   une execution F8 resterait sur l'ecran de selection ;
 - `Reach Se16 Selection Screen` : SE16 jusqu'a l'ecran de selection d'une
-  table, verdict structure ``reached``/``rejected``/``dialog``/``modal``,
+  table, verdict structure ``reached`` / ``rejected`` / ``dialog`` / ``modal``,
   modales de generation absorbees (popup « choix des champs », dialogue de
   message SAPMSDYP detecte STRUCTURELLEMENT, jamais par son texte localise) ;
 - `Fill Multiple Selection` : une liste de valeurs dans tout critere d'ecran
@@ -87,7 +87,7 @@ class Se16Keywords:
 
         Retourne un dict JSON-safe : ``reached`` (booléen), ``verdict``
         (``reached`` | ``rejected`` | ``dialog`` | ``modal``),
-        ``message_type`` (type du message de statut, ``E``…),
+        ``message_type`` (type du message de statut, ``E`` …),
         ``status_text`` et ``dialog_text`` (textes localisés, pour le journal
         et les messages d'échec seulement, jamais une assertion).
 
@@ -102,6 +102,11 @@ class Se16Keywords:
         timeout de la bibliothèque) : l'écran de sélection d'une table est
         GÉNÉRÉ au premier accès et la fin du « busy » ne garantit pas qu'il
         est là (vécu SAPLANE, 2026-08-17).
+
+        Exemple :
+        | ${verdict}=    `Reach Se16 Selection Screen`    SCARR
+        | Should Be True    ${verdict}[reached]
+        | Should Be Equal    ${verdict}[verdict]    reached
         """
         self.run_transaction("SE16")
         self.wait_until_busy_done()
@@ -157,7 +162,7 @@ class Se16Keywords:
     @keyword("Use ALV Grid In Data Browser")
     def use_alv_grid_in_data_browser(self):
         """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
-        **grille ALV** (Settings → User Parameters → ALV Grid Display).
+        *grille ALV* (Settings → User Parameters → ALV Grid Display).
 
         Le REMÈDE que trois messages d'échec de cette bibliothèque nomment
         déjà (`Read Grid`, la classification DDIC, le lecteur SE16) : sans ce
@@ -167,18 +172,25 @@ class Se16Keywords:
         hors de portée d'un utilisateur PyPI à qui l'erreur le prescrivait
         pourtant : promu ici au titre de la convention #12.
 
-        **Persistant par utilisateur** (le réglage survit à la session) et
+        *Persistant par utilisateur* (le réglage survit à la session) et
         idempotent : à appeler UNE fois en Suite Setup. Repart de l'écran
         initial SE16, donc utilisable à tout moment. Lecture seule au sens
         métier : ne modifie aucune donnée, seulement une préférence
         d'affichage du compte de service. Son inverse : `Use Standard List
         In Data Browser` ; le réglage courant se lit par `Get Data Browser
-        Output`."""
+        Output`.
+
+        Exemple :
+        | `Use ALV Grid In Data Browser`
+        | `Reach Se16 Selection Screen`    SCARR
+        | `Send Vkey`    8
+        | `Element Should Be Present`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        """
         self.set_data_browser_output("alv_grid")
 
     def use_standard_list_in_data_browser(self):
         """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
-        **liste SE16 standard** (Settings → User Parameters → Standard SE16
+        *liste SE16 standard* (Settings → User Parameters → Standard SE16
         list), l'inverse de `Use ALV Grid In Data Browser`.
 
         Cette sortie est une liste ABAP CLASSIQUE (dynpro ``SAPMSSY0/120``)
@@ -188,7 +200,16 @@ class Se16Keywords:
         poste requis). C'est la cible du registre de capacités pour la lecture
         des listes classiques, et la voie de secours d'un compte qui ne peut
         pas activer la grille ALV. Persistant par utilisateur : restaurer la
-        grille ALV en teardown quand une campagne l'a basculé."""
+        grille ALV en teardown quand une campagne l'a basculé.
+
+        Exemple :
+        | `Use Standard List In Data Browser`
+        | `Reach Se16 Selection Screen`    SCARR
+        | `Send Vkey`    8
+        | ${rows}=    `Read Abap List`
+        | Should Not Be Empty    ${rows}
+        | `Use ALV Grid In Data Browser`
+        """
         self.set_data_browser_output("standard_list")
 
     def set_data_browser_output(self, mode):
@@ -196,7 +217,15 @@ class Se16Keywords:
         ``standard_list`` (les trois radios du dialogue « User-Specific
         Settings »). Mode inconnu = refus listant les trois. Persistant par
         utilisateur, idempotent, validé par Entrée sur le dialogue. Retourne
-        le mode posé."""
+        le mode posé.
+
+        Exemple :
+        | ${previous}=    `Get Data Browser Output`
+        | `Set Data Browser Output`    alv_list
+        | ${mode}=    `Get Data Browser Output`
+        | Should Be Equal    ${mode}    alv_list
+        | `Set Data Browser Output`    ${previous}
+        """
         wanted = str(mode or "").strip().lower()
         radio = _SE16_OUTPUT_RADIOS.get(wanted)
         if radio is None:
@@ -219,7 +248,12 @@ class Se16Keywords:
         « User-Specific Settings », refermé SANS rien changer (`Dismiss Modal
         Window`). C'est la valeur à mémoriser en Suite Setup pour la restaurer
         en teardown. Aucun radio coché, ou plusieurs = échec (le dialogue n'a
-        pas la forme attendue), jamais un mode deviné."""
+        pas la forme attendue), jamais un mode deviné.
+
+        Exemple :
+        | ${mode}=    `Get Data Browser Output`
+        | Should Be Equal    ${mode}    alv_grid
+        """
         self.run_transaction("SE16")
         self.wait_until_busy_done()
         self.click_element(_SE16_SETTINGS_MENU)
@@ -248,7 +282,7 @@ class Se16Keywords:
         via « Number of Entries », puis referme le popup (F12).
 
         La primitive d'écran du comptage SE16, à distinguer d'une exécution
-        F8 : elle compte **toutes** les entrées qui répondent aux critères
+        F8 : elle compte *toutes* les entrées qui répondent aux critères
         saisis, indépendamment de « Maximum No. of Hits », et reste fiable sur
         une table VIDE (retourne 0), là où F8 resterait sur l'écran de
         sélection sans grille. L'écran de sélection est intact après l'appel :
@@ -256,10 +290,14 @@ class Se16Keywords:
 
         Retourne un entier. Le compteur affiché porte les séparateurs de
         milliers du profil utilisateur : la normalisation est locale-safe
-        (``sapfx_common.robot_args.displayed_count``, chiffres seuls). ::
+        (``sapfx_common.robot_args.displayed_count``, chiffres seuls).
 
-            Reach Se16 Selection Screen    SPFLI
-            ${n}=    Count Entries On Current Selection Screen
+        Exemple :
+        | `Reach Se16 Selection Screen`    SCARR
+        | ${n}=    `Count Entries On Current Selection Screen`
+        | `Send Vkey`    8
+        | ${rows}=    `Get Row Count`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | Should Be Equal As Integers    ${rows}    ${n}
         """
         self.click_element(_SE16_COUNT_BUTTON)
         self.wait_until_busy_done()
@@ -290,6 +328,13 @@ class Se16Keywords:
         Robot ; une chaîne seule est refusée (elle serait itérée caractère par
         caractère). La sélection chargée n'étant pas rémanente entre deux
         passages SE16, les lots successifs ne se contaminent pas.
+
+        Exemple :
+        | `Reach Se16 Selection Screen`    SCARR
+        | @{carriers}=    Create List    AA    LH    UA
+        | `Fill Multiple Selection`    ${carriers}
+        | ${n}=    `Count Entries On Current Selection Screen`
+        | Should Be Equal As Integers    ${n}    3
         """
         if isinstance(values, str):
             raise AssertionError(
@@ -325,7 +370,7 @@ class Se16Keywords:
         """Carte ``{CHAMP: localisateur}`` de l'écran de sélection SE16 COURANT.
 
         Les critères d'un écran de sélection SE16 sont POSITIONNELS
-        (``I1-LOW``, ``I2-LOW``…) et leur ordre dépend du choix des champs de
+        (``I1-LOW``, ``I2-LOW`` …) et leur ordre dépend du choix des champs de
         sélection, qui persiste par utilisateur : un dictionnaire écrit à la
         main dérive en silence. Ce keyword le DÉRIVE de la perception
         sémantique de l'écran, où chaque critère porte son nom technique de
@@ -334,6 +379,13 @@ class Se16Keywords:
         Retourne un dict JSON-safe, vide jamais : un écran sans aucun critère
         reconnaissable est un échec actionnable (l'écran de sélection n'est
         probablement pas ouvert). Lecture seule, aucune saisie.
+
+        Exemple :
+        | `Reach Se16 Selection Screen`    SCARR
+        | ${criteria}=    `Get Se16 Selection Criteria`
+        | `Input Text`    ${criteria}[CARRID]    LH
+        | ${n}=    `Count Entries On Current Selection Screen`
+        | Should Be Equal As Integers    ${n}    1
         """
         criteria = selection_criteria(screen_affordances(self._screen_elements()))
         if not criteria:
@@ -476,7 +528,7 @@ class Se16Keywords:
 
     def _first_popup_checkbox(self):
         """Id (relatif à la session) de la première case à cocher de
-        ``wnd[1]``, ou ``None``. Parcours ``Count``/``ElementAt`` : jamais
+        ``wnd[1]``, ou ``None``. Parcours ``Count`` / ``ElementAt`` : jamais
         d'itération Python directe sur une collection COM (motif du dépôt),
         et jamais d'id absolu ``/app/...`` repassé à ``findById``."""
         usr = self.session.findById("wnd[1]/usr", False)

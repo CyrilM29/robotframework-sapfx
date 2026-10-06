@@ -17,6 +17,7 @@ from typing import Any, Optional
 
 from robot.api import logger
 
+from sapfx_common import robot_args
 from sapfx_common.cross_channel import odata_error_code
 from sapfx_common.odata_batch import build_batch, parse_batch_response
 
@@ -32,21 +33,34 @@ class OdataReadKeywords(_ApiCore):
         """GET OData → JSON décodé tel quel (enveloppe v2/v4 comprise). Les
         arguments nommés deviennent des paramètres de requête (``top=5`` →
         ``$top=5`` : le préfixe ``$`` des options système OData est ajouté aux
-        noms connus : top/skip/filter/select/orderby/format/expand/count)."""
+        noms connus : top/skip/filter/select/orderby/format/expand/count).
+
+        Exemple :
+        | ${product}=    `Get Odata`    /sap/opu/odata/sap/SEPMRA_SHOP/Products('AR-FB-1000')    alias=a4h
+        | Should Be Equal    ${product}[d][Name]    Ring Binder - Green
+        """
         status, _, body = self._request(alias, "GET", path, query)
         return self._decode_json(body, status, path)
 
     def get_odata_entities(self, path: str, alias: str = "default",
                            follow_next: Any = False, max_pages: Any = 100,
                            **query: str) -> list:
-        """GET OData → la **liste d'entités**, quelle que soit la version :
+        """GET OData → la *liste d'entités*, quelle que soit la version :
         ``d.results`` (v2), ``value`` (v4), ou l'entité seule dans une liste.
 
         ``follow_next=True`` suit la pagination server-driven (``__next`` v2,
         ``@odata.nextLink`` v4) jusqu'à épuisement : sans lui, un serveur qui
         pagine (S/4 plafonne souvent à 100) renverrait une page PARTIELLE,
         le faux positif silencieux type. ``max_pages`` borne le suivi ; toute
-        troncature est annoncée en WARNING (jamais silencieuse)."""
+        troncature est annoncée en WARNING (jamais silencieuse).
+
+        Exemple :
+        | ${products}=    `Get Odata Entities`    /sap/opu/odata/sap/SEPMRA_SHOP/Products    alias=a4h
+        | ...    top=5    select=Id,Name,Price
+        | Dictionary Should Contain Key    ${products}[0]    Price
+        | ${all}=    `Get Odata Entities`    /sap/opu/odata/sap/SEPMRA_SHOP/Products    alias=a4h
+        | ...    select=Id    follow_next=True    max_pages=5
+        """
         payload = self.get_odata(path, alias=alias, **query)
         entities = self._extract_entities(payload, path)
         if not _as_bool(follow_next):
@@ -103,7 +117,14 @@ class OdataReadKeywords(_ApiCore):
                         **query: str) -> int:
         """``GET <entity_path>/$count`` → entier (v2 et v4). Le chemin est
         celui de l'entity set (``.../Products``) ; les filtres passent en
-        arguments nommés (``filter=Price gt 100``)."""
+        arguments nommés (``filter=Price gt 100``).
+
+        Exemple :
+        | ${count}=    `Get Odata Count`    /sap/opu/odata/sap/SEPMRA_SHOP/Products    alias=a4h
+        | ${expensive}=    `Get Odata Count`    /sap/opu/odata/sap/SEPMRA_SHOP/Products    alias=a4h
+        | ...    filter=Price gt 100
+        | Should Be True    ${expensive} <= ${count}
+        """
         path = "%s/$count" % entity_path.rstrip("/")
         status, _, body = self._request(alias, "GET", path, query,
                                         headers={"Accept": "text/plain"})
@@ -124,7 +145,7 @@ class OdataReadKeywords(_ApiCore):
                             csrf_fetch_path: Optional[str] = None,
                             if_match: Optional[str] = None,
                             **query: str) -> Any:
-        """Appelle un **function import** (v2) ou une **action/fonction**
+        """Appelle un *function import* (v2) ou une *action/fonction*
         (v4) : beaucoup de logique métier SAP n'est accessible que par là.
         ``method=GET`` pour les fonctions de lecture (paramètres en arguments
         nommés, littéraux OData à la charge de l'appelant : ``code='FR'``) ;
@@ -148,7 +169,15 @@ class OdataReadKeywords(_ApiCore):
         (« try using the If-Match header ») et un brouillon orphelin ne se
         nettoie alors par AUCUNE voie de l'API, son ``DELETE`` étant refusé en
         422. ``*`` suffit (mêmes règles que `Patch Odata`), l'ETag exact pour
-        du verrouillage optimiste réel. Sans effet en ``GET``."""
+        du verrouillage optimiste réel. Sans effet en ``GET``.
+
+        Exemple :
+        | ${response}=    `Call Odata Function`    /sap/opu/odata/sap/SEPMRA_PO_MAN/SEPMRA_C_PO_PurOrdGoodsreceipt
+        | ...    method=POST    csrf_fetch_path=/sap/opu/odata/sap/SEPMRA_PO_MAN/    alias=a4h
+        | ...    PurchaseOrder='${purchase_order}'    DraftUUID=guid'00000000-0000-0000-0000-000000000000'
+        | ...    IsActiveEntity=true
+        | Log    ${response}[d][PurchaseOrderOverallStatus]
+        """
         method = str(method).upper().strip()
         if method == "GET":
             return self.get_odata(path, alias=alias, **query)
@@ -177,7 +206,14 @@ class OdataReadKeywords(_ApiCore):
         changeset (échecs indépendants). Retourne la liste ordonnée des
         réponses ``{"status", "reason", "headers", "body", "json"}`` ;
         ``fail_on_error=True`` échoue si une réponse est >= 400 (les échecs
-        partiels silencieux sont l'ennemi d'un jeu de données)."""
+        partiels silencieux sont l'ennemi d'un jeu de données).
+
+        Exemple :
+        | ${responses}=    `Post Odata Batch`    /sap/opu/odata/sap/SEPMRA_SHOP
+        | ...    [{"method": "GET", "path": "Products/$count"}, {"method": "GET", "path": "Suppliers/$count"}]
+        | ...    alias=a4h
+        | Should Be Equal As Integers    ${responses}[0][status]    200
+        """
         if isinstance(operations, str):
             try:
                 operations = json.loads(operations)
@@ -206,7 +242,7 @@ class OdataReadKeywords(_ApiCore):
     def probe_odata_entity_sets(self, service_path: str, entity_sets: Any,
                                 alias: str = "default",
                                 max_entity_sets: Any = 50) -> dict[str, Any]:
-        """**Sonde tolérante** d'existence : compte chaque entity set en UN
+        """*Sonde tolérante* d'existence : compte chaque entity set en UN
         aller-retour ``$batch`` et ENREGISTRE les refus au lieu d'échouer.
 
         C'est le mode qui manquait au canal. `Post Odata Batch` échoue en bloc
@@ -218,8 +254,8 @@ class OdataReadKeywords(_ApiCore):
 
         Retourne ``{"service_path", "probed": [...], "truncated"}`` ; chaque
         entrée porte ``{"entity_set", "status", "reason", "count",
-        "error_code"}``. Le diagnostic est le **statut HTTP** et le **code
-        technique** OData (``error.code``), jamais le message, dépendant de la
+        "error_code"}``. Le diagnostic est le *statut HTTP* et le *code
+        technique* OData (``error.code``), jamais le message, dépendant de la
         langue de la session (convention 3) : c'est ce couple qui distingue un
         refus d'autorisation d'un entity set inexistant. ``count`` vaut
         l'entier lu quand la lecture a abouti, ``None`` sinon : un compte nul
@@ -228,10 +264,19 @@ class OdataReadKeywords(_ApiCore):
         ``max_entity_sets`` borne le lot ; une borne atteinte est rapportée
         (``truncated``), jamais un succès silencieux. Lecture seule, malgré le
         POST que le protocole ``$batch`` impose (et le jeton CSRF qui va avec).
+
+        ``entity_sets`` : une liste, ou une chaîne à virgules
+        (``Products,Suppliers``), la forme qu'un argument prend depuis une
+        ligne Robot ou à travers rf-mcp. Jusqu'au 2026-10-06, une chaîne était
+        sondée comme UN seul entity set : ``Products,Suppliers`` revenait en
+        refus 404 d'un nom qui n'existe pas, sans rien signaler (relevé en
+        rejouant l'exemple de ce keyword).
+
+        Exemple :
+        | ${probe}=    `Probe Odata Entity Sets`    /sap/opu/odata/sap/SEPMRA_SHOP    Products,Suppliers    alias=a4h
+        | Should Be Equal As Integers    ${probe}[probed][0][status]    200
         """
-        names = [str(name).strip() for name in (
-            [entity_sets] if isinstance(entity_sets, str) else entity_sets)
-            if str(name).strip()]
+        names = robot_args.as_name_list(entity_sets, "entity_sets")
         try:
             limit = int(str(max_entity_sets).strip())
         except (TypeError, ValueError):

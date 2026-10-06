@@ -1,4 +1,4 @@
-"""Mixin des lectures de **surface d'attaque** par le canal RFC.
+"""Mixin des lectures de *surface d'attaque* par le canal RFC.
 
 Voisin de `_rfc_security.py` plutôt qu'ajouté dedans (convention #13). Ce que
 ces keywords ajoutent : `_rfc_security.py` lit la CONFIGURATION de sécurité
@@ -10,9 +10,9 @@ Trois pièges d'appel mesurés le 2026-09-14 sur ABAP Platform 2023 (release
 qu'une erreur visible :
 
 1. ``RSAU_READ_LOG`` déclare ``IS_INTV`` OBLIGATOIRE. Appelé sans lui, il rend
-   zéro entrée et zéro fichier **sans lever quoi que ce soit**. Graver ce zéro
+   zéro entrée et zéro fichier *sans lever quoi que ce soit*. Graver ce zéro
    revient à écrire « le journal d'audit est vide » sans l'avoir lu. Et la
-   structure porte ``DAT_FROM``/``DAT_TO``, pas ``DATE_FROM`` : l'orthographe
+   structure porte ``DAT_FROM`` / ``DAT_TO``, pas ``DATE_FROM`` : l'orthographe
    plausible sort en ``RFC_INVALID_PARAMETER`` côté client, donc sans jamais
    atteindre le système.
 2. Les services web se lisent dans DEUX tables : ``ICFSERVLOC`` porte le
@@ -58,15 +58,15 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
                                client: Optional[str] = None,
                                today: Optional[str] = None) -> dict[str, Any]:
         """Lit TOUS les comptes du mandant de connexion et dit lesquels sont
-        réellement **utilisables**.
+        réellement *utilisables*.
 
         Rend le résumé de ``security_surface.summarize_accounts`` :
         ``{"total", "usable", "unusable", "by_status", "accounts"}``, chaque
         fiche portant son statut (``active``, ``locked``, ``expired``,
         ``not_yet_valid``, ``unknown``) et ses raisons.
 
-        **Ce que ce keyword mesure et que la lecture du verrouillage ne mesure
-        pas.** Sur la cible, les six comptes du mandant sont tous non
+        *Ce que ce keyword mesure et que la lecture du verrouillage ne mesure
+        pas.* Sur la cible, les six comptes du mandant sont tous non
         verrouillés, donc `Read Standard Users Status` rapporte « aucun compte
         verrouillé », ce qui est exact. Deux d'entre eux portent une date de
         fin de validité échue depuis vingt mois et ne peuvent plus servir : la
@@ -82,6 +82,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         ``client`` ne CHANGE pas le mandant lu (la lecture porte sur celui de
         la connexion) : il est reporté dans le résumé pour qu'un artefact dise
         de quel mandant il parle.
+
+        Exemple :
+        | ${accounts}=    `Read Account Usability`    alias=a4h
+        | Should Contain    ${accounts}[usable]    DEVELOPER
         """
         rows = self.read_rfc_table(
             "USR02", ["BNAME", "UFLAG", "CLASS", "USTYP", "GLTGV", "GLTGB",
@@ -114,13 +118,13 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     # ------------------------------------------------------------------ #
     def read_icf_exposure(self, alias: str = "default",
                           sensitive_patterns: Any = None) -> dict[str, Any]:
-        """Lit la **surface d'exposition web** : services déclarés, services
+        """Lit la *surface d'exposition web* : services déclarés, services
         actifs, et ce que les actifs exposent.
 
         Rend ``{"declared", "active", "active_without_ssl", "with_stored_user",
         "sensitive_active", "exposure_ratio", "virtual_hosts"}``.
 
-        **Pourquoi deux tables**, et c'est le piège du domaine : le drapeau
+        *Pourquoi deux tables*, et c'est le piège du domaine : le drapeau
         d'activation vit dans ``ICFSERVLOC`` et le nom lisible dans
         ``ICFSERVICE``, jointes par l'identifiant de noeud. Lire la seconde
         seule donne 3410 noeuds sans savoir lesquels répondent ; mesuré sur la
@@ -135,6 +139,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         Le keyword ne juge pas : il RAPPORTE. Ce qui est sensible dépend du
         site, donc ``sensitive_patterns`` n'alimente qu'une liste de rappel à
         côté de l'inventaire complet.
+
+        Exemple :
+        | ${exposure}=    `Read Icf Exposure`    alias=a4h
+        | Should Be Equal As Integers    ${exposure}[unmatched]    0
         """
         actifs = self.read_rfc_table("ICFSERVLOC", ["ICF_NAME", "ICFPARGUID",
                                                     "ICFACTIVE", "ICFSRVGRP"],
@@ -193,14 +201,14 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     # Commandes du système d'exploitation
     # ------------------------------------------------------------------ #
     def read_external_commands(self, alias: str = "default") -> dict[str, Any]:
-        """Inventorie les **commandes du système d'exploitation** déclarées
+        """Inventorie les *commandes du système d'exploitation* déclarées
         dans le système, et distingue celles qui acceptent des arguments
         additionnels.
 
         Rend ``{"total", "accepting_additional", "fixed", "customer_defined",
         "customer_defined_accepting_additional", "by_os"}``.
 
-        **Pourquoi cette distinction porte tout le sens de l'inventaire** :
+        *Pourquoi cette distinction porte tout le sens de l'inventaire* :
         une commande dont l'appelant peut compléter les arguments à
         l'exécution ne donne pas la même surface qu'une commande figée. C'est
         l'écart entre « exécuter une sauvegarde » et « exécuter ce que
@@ -213,6 +221,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         inventaire vide MESURÉ, qui a valeur de résultat.
 
         Le keyword ne lit aucun secret et n'exécute évidemment rien.
+
+        Exemple :
+        | ${commands}=    `Read External Commands`    alias=a4h
+        | Should Be Empty    ${commands}[customer_defined]
         """
         result = self.call_rfc("SXPG_COMMAND_LIST_GET", alias=alias)
         commandes = result.get("COMMAND_LIST") or []
@@ -224,25 +236,25 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     def read_audit_log_coverage(self, alias: str = "default",
                                 window_days: Any = DEFAULT_AUDIT_WINDOW_DAYS,
                                 today: Optional[str] = None) -> dict[str, Any]:
-        """Croise la configuration du journal d'audit et son **contenu réel**,
+        """Croise la configuration du journal d'audit et son *contenu réel*,
         et rend le verdict de couverture.
 
         Rend ``{"verdict", "configuration_verdict", "entries", "files",
         "window_days", "consistent", "note"}``, plus la configuration complète
         sous ``configuration``.
 
-        **Ce que ce keyword prouve et que `Get Audit Configuration` ne peut
-        que déduire.** La configuration dit « armé, dix emplacements déclarés,
+        *Ce que ce keyword prouve et que `Get Audit Configuration` ne peut
+        que déduire.* La configuration dit « armé, dix emplacements déclarés,
         aucun actif », d'où l'on conclut que le journal n'enregistre rien.
         C'était un raisonnement ; la lecture du journal sur la fenêtre le rend
         CONSTATÉ. Mesuré sur la cible : zéro entrée et zéro fichier sur un an
         comme sur quatre.
 
-        **Le piège d'appel, et il est silencieux.** ``RSAU_READ_LOG`` déclare
+        *Le piège d'appel, et il est silencieux.* ``RSAU_READ_LOG`` déclare
         son intervalle OBLIGATOIRE mais ne le vérifie pas : appelé sans lui, il
         rend zéro entrée sans lever la moindre erreur, et ce zéro passe
         parfaitement pour une mesure. La structure attend par ailleurs
-        ``DAT_FROM``/``DAT_TO`` et non ``DATE_FROM``, orthographe qui sort en
+        ``DAT_FROM`` / ``DAT_TO`` et non ``DATE_FROM``, orthographe qui sort en
         ``RFC_INVALID_PARAMETER`` levé côté client, donc sans jamais atteindre
         le système. Le keyword compose l'intervalle lui-même, pour que
         l'appelant ne puisse commettre ni l'un ni l'autre.
@@ -250,6 +262,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         Une lecture qui ÉCHOUE rend ``not_measured`` et jamais zéro : sur un
         contrôle d'audit, confondre « vide » et « non lu » est le faux positif
         que tout ce domaine cherche à éviter.
+
+        Exemple :
+        | ${coverage}=    `Read Audit Log Coverage`    alias=a4h    window_days=365
+        | Should Be Equal    ${coverage}[verdict]    armed_without_filter_and_silent
         """
         configuration = self.get_audit_configuration(alias=alias)
         try:
@@ -297,14 +313,14 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     # Relations de confiance RFC
     # ------------------------------------------------------------------ #
     def read_rfc_trust_surface(self, alias: str = "default") -> dict[str, Any]:
-        """Inventorie les **relations de confiance RFC** et la liste blanche
+        """Inventorie les *relations de confiance RFC* et la liste blanche
         des rappels.
 
         Rend ``{"trusted_systems", "trusting_systems",
         "callback_allowlist_entries", "trusted_ids", "trusting_ids",
         "callback_destinations", "any_trust_configured"}``.
 
-        **Pourquoi cet inventaire vaut d'exister même vide**, et il l'est sur
+        *Pourquoi cet inventaire vaut d'exister même vide*, et il l'est sur
         la cible : sans lui, une campagne ne peut pas distinguer « aucune
         relation de confiance n'est configurée » de « personne n'a regardé ».
         Le jour où une relation apparaît, seule la première situation la rend
@@ -312,12 +328,16 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         jamais lu est un angle mort, et c'est exactement ce qu'était cette
         zone.
 
-        **Le piège de lecture** : ``RFCTRUST`` ne porte PAS de champ
+        *Le piège de lecture* : ``RFCTRUST`` ne porte PAS de champ
         ``RFCSYSID``, contrairement à sa voisine ``RFCSYSACL``. Le demander
         sort en ``TABLE_WITHOUT_DATA``, code qui accuse la table d'être vide,
         et la conclusion « aucune relation de confiance » se trouve être
         exacte sur cette cible, ce qui rend l'erreur invisible. Les champs
         projetés ici sont ceux du contrat réel, relevé dans le dictionnaire.
+
+        Exemple :
+        | ${trust}=    `Read Rfc Trust Surface`    alias=a4h
+        | Should Not Be True    ${trust}[any_trust_configured]
         """
         entrants = self.read_rfc_table(
             "RFCTRUST", ["RFCTRUSTSY", "RFCTRUSTID", "RFCDEST"], alias=alias)
@@ -349,6 +369,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         ce keyword mesure le premier. Mesuré sur la cible, 60793 lignes de
         rôle au total pour seulement neuf attributions effectives, donc lire
         l'un pour l'autre surestime massivement.
+
+        Exemple :
+        | ${usage}=    `Count Authorization Object Usage`    S_TCODE,S_RFC    alias=a4h
+        | Should Be True    ${usage}[S_TCODE] > 0
         """
         noms = robot_args.as_name_list(objects)
         if not noms:
@@ -362,7 +386,7 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         return comptes
 
     def read_role_assignments(self, alias: str = "default") -> dict[str, Any]:
-        """Lit les **attributions de rôles** effectives du mandant de
+        """Lit les *attributions de rôles* effectives du mandant de
         connexion, avec leur date de fin.
 
         Rend ``{"total", "assignments", "without_end_date", "by_user"}``.
@@ -371,6 +395,10 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         cible, les neuf le sont toutes. Ce n'est pas un défaut en soi, c'est
         une propriété à voir, parce qu'une attribution sans fin survit à la
         raison qui l'a justifiée.
+
+        Exemple :
+        | ${assignments}=    `Read Role Assignments`    alias=a4h
+        | Should Be True    ${assignments}[total] > 0
         """
         rows = self.read_rfc_table(
             "AGR_USERS", ["AGR_NAME", "UNAME", "FROM_DAT", "TO_DAT"],
@@ -394,7 +422,7 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         }
 
     def read_forbidden_password_count(self, alias: str = "default") -> int:
-        """Compte les entrées de la **liste des mots de passe interdits**.
+        """Compte les entrées de la *liste des mots de passe interdits*.
 
         Zéro signifie qu'aucun mot de passe trivial n'est refusé par le
         système, ce qui est la mesure sur la cible. La liste ne porte que des
@@ -405,5 +433,9 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         de colonne d'utilisateur, et demander la mauvaise colonne sort en
         ``TABLE_WITHOUT_DATA``, code qui ferait conclure « liste vide » sans
         avoir lu, avec ici la même réponse que la vérité.
+
+        Exemple :
+        | ${count}=    `Read Forbidden Password Count`    alias=a4h
+        | Should Be Equal As Integers    ${count}    0
         """
         return len(self.read_rfc_table("USR40", ["BCODE"], alias=alias))

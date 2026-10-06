@@ -1,20 +1,34 @@
-"""Mixin captures d'ecran : la fenetre SAP active en image, en memoire.
+"""Mixin captures d'écran : la fenêtre SAP active en image.
 
-Le canal VISUEL de la perception, sans fichier intermediaire (MCP-safe) :
-`Get Screenshot As Base64` (``HardCopyToMemory``, MIME re-verifie par magic
+Le canal VISUEL de la perception, sans fichier intermédiaire (MCP-safe) :
+`Get Screenshot As Base64` (``HardCopyToMemory``, MIME re-vérifié par magic
 bytes), `Log Screenshot` (data-URI inline dans le log Robot autoporteur), et
-le **screenshot annote Set-of-Mark** (`Get/Log Annotated Screenshot` : boites
-numerotees sur les cibles actionnables + legende ``numero -> id``, qui
-alimente aussi la table de references ``@N`` de `Get Screen Map`).
+le *screenshot annoté Set-of-Mark* (`Get/Log Annotated Screenshot` : boîtes
+numérotées sur les cibles actionnables + légende ``numéro -> id``, qui
+alimente aussi la table de références ``@N`` de `Get Screen Map`).
+
+Aussi la capture SUR ERREUR (`Take Screenshot`, `Enable/Disable Screenshots
+On Error`), dérivée de robotframework-sapguilibrary 1.2.1 (Copyright Frank
+van der Kuur, Apache License 2.0, voir NOTICE), absorbée et réécrite pour
+SAPFX le 2026-10-06, noms et signatures inchangés. L'amont passait par la
+bibliothèque Screenshot de Robot Framework, qui photographie l'ÉCRAN
+ENTIER : tout ce que le bureau affichait partait dans le log, et la fenêtre
+SAP n'y était pas forcément. La capture vise désormais la fenêtre SAP
+active (`SapWindowScreenshot`), et une capture impossible ne masque jamais
+l'erreur qu'elle accompagne.
 
 Extrait de ``_perception.py`` (convention #13) : la perception texte
-(signature, carte, fenetres) reste la-bas, les assertions visuelles dans
+(signature, carte, fenêtres) reste là-bas, les assertions visuelles dans
 ``_visual.py``, la sentinelle dans ``_watch.py``.
 """
 import base64
+import os
+import re
 
 from pythoncom import com_error
 from robot.api import logger
+from robot.libraries.BuiltIn import BuiltIn, RobotNotRunningError
+from robot.utils import get_link_path
 
 
 # Codes de l'énumération GuiImageType de l'API SAP GUI Scripting. Le format
@@ -28,6 +42,8 @@ _MAGIC_MIMES = (
     (b"BM", "image/bmp"),
     (b"GIF8", "image/gif"),
 )
+_MIME_EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/bmp": "bmp",
+                    "image/gif": "gif"}
 
 
 def _sniff_mime(data, fallback="image/png"):
@@ -47,13 +63,83 @@ def _as_bytes(raw):
     return bytes(b & 0xFF for b in raw)
 
 
+def _robot_variable(name):
+    """Valeur d'une variable Robot, ``None`` hors exécution Robot (tests
+    unitaires, ``--replay`` du recorder)."""
+    try:
+        return BuiltIn().get_variable_value(name)
+    except RobotNotRunningError:
+        return None
+
+
+class SapWindowScreenshot:
+    """La capture sur erreur : la fenêtre SAP ACTIVE (modal compris) écrite en
+    PNG dans le dossier des captures (``screenshot_directory`` à l'import, à
+    défaut ``${OUTPUT DIR}``) et jointe au log. Jamais une exception : une
+    capture impossible (aucune session, SAP GUI sans ``HardCopyToMemory``,
+    disque plein) est journalisée et rend ``None``, parce qu'elle accompagne
+    toujours une autre erreur, qu'elle ne doit pas remplacer."""
+
+    def __init__(self, window_provider, directory=None):
+        self._window_provider = window_provider
+        self.directory = None
+        if directory is not None:
+            self.set_screenshot_directory(directory)
+
+    def set_screenshot_directory(self, path):
+        """Fixe (et crée au besoin) le dossier des captures ; retourne
+        l'ancien, ``None`` pour le dossier de sortie de Robot."""
+        previous = self.directory
+        self.directory = os.path.abspath(str(path))
+        os.makedirs(self.directory, exist_ok=True)
+        return previous
+
+    def take_screenshot(self, name="sap-screenshot"):
+        """Capture la fenêtre active ; chemin du fichier écrit, ou ``None``."""
+        try:
+            raw = self._window_provider().HardCopyToMemory(_IMAGE_TYPE_CODES["png"])
+            data = _as_bytes(raw)
+        except Exception as exc:                # noqa: BLE001 (accompagne une erreur)
+            logger.info("Capture de la fenêtre SAP impossible (%s) : aucune image "
+                        "jointe." % exc)
+            return None
+        extension = _MIME_EXTENSIONS.get(_sniff_mime(data), "png")
+        directory = self.directory or _robot_variable("${OUTPUT DIR}") or os.getcwd()
+        try:
+            path = self._free_path(directory, name, extension)
+            with open(path, "wb") as handle:
+                handle.write(data)
+        except OSError as exc:
+            logger.info("Capture de la fenêtre SAP non écrite (%s)." % exc)
+            return None
+        log_file = _robot_variable("${LOG FILE}")
+        base = os.path.dirname(log_file) if log_file and log_file != "NONE" else directory
+        link = get_link_path(path, base)
+        logger.info('<a href="%s"><img src="%s" width="800px"></a>' % (link, link),
+                    html=True)
+        return path
+
+    @staticmethod
+    def _free_path(directory, name, extension):
+        """``<dossier>/<nom>_<n>.<ext>`` au premier ``n`` libre ; le nom est
+        réduit à des caractères sûrs (aucun chemin ne passe par lui)."""
+        stem = re.sub(r"[^\w.-]", "_", os.path.basename(str(name))).strip("._")
+        stem = stem or "sap-screenshot"
+        os.makedirs(directory, exist_ok=True)
+        index = 1
+        while True:
+            path = os.path.join(directory, "%s_%d.%s" % (stem, index, extension))
+            if not os.path.exists(path):
+                return path
+            index += 1
+
 
 class ScreenshotKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Lecture seule : capture la
     fenêtre active en mémoire, ne modifie aucun écran."""
 
     def get_screenshot_as_base64(self, image_format="png"):
-        """Capture la fenêtre SAP active **en mémoire** et retourne l'image en
+        """Capture la fenêtre SAP active *en mémoire* et retourne l'image en
         base64 (chaîne sûre à travers la frontière rf-mcp, rien n'est écrit
         sur disque).
 
@@ -63,26 +149,35 @@ class ScreenshotKeywords:
         ``bmp``, ``gif``. Le format réellement retourné est re-vérifié par
         magic bytes, pas supposé.
 
-        Complète `Get Screen Signature` (texte) d'un canal **visuel** : un
+        Complète `Get Screen Signature` (texte) d'un canal *visuel* : un
         agent (ou un rapport) peut joindre la preuve d'écran ; voir
         `Log Screenshot` pour l'ancrer dans le log Robot. Échec explicite si
-        l'API est absente (SAP GUI ancien) : `Take Screenshot` (fichier) reste
-        le repli."""
+        l'API est absente (SAP GUI ancien) ou si aucune session n'est ouverte.
+
+        Exemple :
+        | ${image}=    `Get Screenshot As Base64`
+        | Should Start With    ${image}    iVBORw0KGgo
+        """
         fmt = str(image_format).strip().lower()
         type_code = _IMAGE_TYPE_CODES.get(fmt, _IMAGE_TYPE_CODES["png"])
         try:
             raw = self.session.ActiveWindow.HardCopyToMemory(type_code)
         except (AttributeError, com_error) as exc:
             raise AssertionError(
-                "HardCopyToMemory indisponible sur cette session (SAP GUI trop "
-                "ancien ?). Utiliser Take Screenshot (fichier) en repli : %s" % exc)
+                "HardCopyToMemory indisponible (aucune session ouverte, ou SAP GUI "
+                "trop ancien) : %s" % exc) from exc
         return base64.b64encode(_as_bytes(raw)).decode("ascii")
 
     def log_screenshot(self, message=""):
-        """Capture la fenêtre SAP active et l'**incruste dans le log Robot**
+        """Capture la fenêtre SAP active et l'*incruste dans le log Robot*
         (image inline en data-URI : le ``log.html`` reste autoporteur, aucune
         pièce jointe à archiver à côté). ``message`` : texte optionnel affiché
-        au-dessus de l'image. Retourne le MIME réellement incrusté."""
+        au-dessus de l'image. Retourne le MIME réellement incrusté.
+
+        Exemple :
+        | ${mime}=    `Log Screenshot`    SE16 initial screen
+        | Should Be Equal    ${mime}    image/png
+        """
         b64 = self.get_screenshot_as_base64()
         mime = _sniff_mime(base64.b64decode(b64))
         html = '<img src="data:%s;base64,%s" style="max-width:100%%;">' % (mime, b64)
@@ -91,11 +186,65 @@ class ScreenshotKeywords:
         logger.info(html, html=True)
         return mime
 
+    # -- capture sur erreur ------------------------------------------------------
+
+    def take_screenshot(self, screenshot_name="sap-screenshot"):
+        """Capture la fenêtre SAP active dans un fichier PNG joint au log, SI
+        les captures sur erreur sont activées (réglage d'import
+        ``screenshots_on_error``, `Enable Screenshots On Error`) ; sans effet
+        sinon. Retourne le chemin du fichier, ``None`` sans capture.
+
+        C'est la capture que prennent les keywords en échec. Elle photographie
+        la FENÊTRE SAP (``HardCopyToMemory``, modal compris), pas l'écran
+        entier : rien d'autre du bureau ne part dans le log. Le fichier
+        s'écrit dans ``screenshot_directory`` (réglage d'import), à défaut
+        dans le dossier de sortie de Robot, sous ``<nom>_<n>.png``. Une
+        capture impossible (aucune session ouverte, SAP GUI sans cette API)
+        est journalisée et ne fait jamais échouer l'appelant. Pour une image
+        sans fichier : `Log Screenshot`.
+
+        Exemple :
+        | `Enable Screenshots On Error`
+        | ${path}=    `Take Screenshot`    se16-initial
+        | Should End With    ${path}    .png
+        """
+        if not getattr(self, "take_screenshots", False):
+            return None
+        return self.screenshot.take_screenshot(screenshot_name)
+
+    def enable_screenshots_on_error(self):
+        """Active la capture de la fenêtre SAP quand un keyword échoue (voir
+        `Take Screenshot`). C'est le réglage par défaut.
+
+        Exemple :
+        | `Disable Screenshots On Error`
+        | ${absent}=    Run Keyword And Return Status    `Element Should Be Present`    wnd[0]/usr/txtABSENT
+        | `Enable Screenshots On Error`
+        """
+        self.take_screenshots = True
+
+    def disable_screenshots_on_error(self):
+        """Désactive la capture sur erreur : un échec attendu (une sonde) ne
+        laisse alors aucune image dans le log. `Element Is Present` sonde déjà
+        sans capture.
+
+        Exemple :
+        | `Disable Screenshots On Error`
+        | ${absent}=    Run Keyword And Return Status    `Element Should Be Present`    wnd[0]/usr/txtABSENT
+        | `Enable Screenshots On Error`
+        """
+        self.take_screenshots = False
+
+    def _active_window_for_capture(self):
+        """La fenêtre que photographie la capture sur erreur (la plus haute de
+        la pile : un modal ouvert est ce qu'il faut voir)."""
+        return self.session.ActiveWindow
+
     # -- screenshot annoté (Set-of-Mark : boîtes numérotées + légende) ---------
 
     def get_annotated_screenshot(self, include_types=None):
-        """Capture la fenêtre SAP active et y **dessine les cibles
-        actionnables** : une boîte numérotée par champ modifiable /
+        """Capture la fenêtre SAP active et y *dessine les cibles
+        actionnables* : une boîte numérotée par champ modifiable /
         bouton / onglet, plus une légende ``numéro -> id``. Retourne un dict
         MCP-safe : ``image`` (PNG annoté en base64), ``mime``, ``legend``.
 
@@ -112,9 +261,14 @@ class ScreenshotKeywords:
         éléments avec géométrie sont annotés. Nécessite Pillow (extra
         ``visual``).
 
-        La légende est aussi enregistrée comme table de **références ``@N``**
+        La légende est aussi enregistrée comme table de *références* ``@N``
         (voir `Get Screen Map`) : le numéro lu sur l'image se rejoue
-        directement via `Click Screen Ref` / `Fill Screen Ref`."""
+        directement via `Click Screen Ref` / `Fill Screen Ref`.
+
+        Exemple :
+        | ${annotated}=    `Get Annotated Screenshot`
+        | Dictionary Should Contain Value    ${annotated}[legend]    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         elements = self._screen_elements()
         if include_types:
@@ -149,11 +303,16 @@ class ScreenshotKeywords:
                 "mime": "image/png", "legend": legend}
 
     def log_annotated_screenshot(self, message="", include_types=None):
-        """Capture annotée (voir `Get Annotated Screenshot`) **incrustée dans
-        le log Robot** avec sa légende ``numéro -> id`` en tableau, le
+        """Capture annotée (voir `Get Annotated Screenshot`) *incrustée dans
+        le log Robot* avec sa légende ``numéro -> id`` en tableau, le
         débogage de localisateurs d'un coup d'œil : chaque cible actionnable
         est numérotée sur l'image, son id copiable juste en dessous.
-        Retourne la légende (dict)."""
+        Retourne la légende (dict).
+
+        Exemple :
+        | ${legend}=    `Log Annotated Screenshot`    SE16 targets
+        | Dictionary Should Contain Value    ${legend}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         shot = self.get_annotated_screenshot(include_types)
         html = ('<img src="data:%s;base64,%s" style="max-width:100%%;">'
                 % (shot["mime"], shot["image"]))

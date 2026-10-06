@@ -53,16 +53,18 @@ class FlpServiceKeywords:
         return result
 
     def flp_container_is_present(self):
-        """Y a-t-il un **conteneur ushell** (`sap.ushell.Container`) dans la
-        portée courante ? Retourne ``True``/``False``, jamais d'échec : une
+        """Y a-t-il un *conteneur ushell* (`sap.ushell.Container`) dans la
+        portée courante ? Retourne ``True`` / ``False``, jamais d'échec : une
         page injoignable répond ``False``.
 
         C'est la première marche d'attente d'un launchpad : le conteneur est
         présent bien avant que la page soit au repos, donc « conteneur là »
         puis « shell rendu » sont deux attentes distinctes. Lecture pure,
-        aucune injection (même contrat que `Ui5 Runtime Is Present`). ::
+        aucune injection (même contrat que `Ui5 Runtime Is Present`).
 
-            Wait Until Keyword Succeeds    60s    1s    Flp Container Should Be Present
+        Exemple :
+        | ${shell}=    `Flp Container Is Present`
+        | Should Be True    ${shell}
         """
         try:
             return bool(self._evaluate(FLP_CONTAINER_PROBE_JS))
@@ -72,7 +74,11 @@ class FlpServiceKeywords:
     def flp_container_should_be_present(self):
         """Assertion : le conteneur ushell est là. La forme à sonder dans un
         ``Wait Until Keyword Succeeds`` (le prédicat `Flp Container Is
-        Present`, lui, ne peut pas servir de condition d'attente seul)."""
+        Present`, lui, ne peut pas servir de condition d'attente seul).
+
+        Exemple :
+        | Wait Until Keyword Succeeds    60s    1s    `Flp Container Should Be Present`
+        """
         if not self.flp_container_is_present():
             raise AssertionError(
                 "Aucun conteneur ushell (`sap.ushell.Container`) sur la "
@@ -81,15 +87,17 @@ class FlpServiceKeywords:
                 "Stack`).")
 
     def flp_service_is_available(self, service):
-        """Le **service ushell** nommé existe-t-il sur ce launchpad ?
-        Retourne ``True``/``False``, jamais d'échec : c'est un prédicat de
+        """Le *service ushell* nommé existe-t-il sur ce launchpad ?
+        Retourne ``True`` / ``False``, jamais d'échec : c'est un prédicat de
         branchement, pas une assertion, et il vaut mieux qu'un test de
         version (qui supposerait ce que la sonde mesure). Relevé live :
         ``SearchableContent`` est absent du ushell 1.71 (module 404) et
-        présent en 1.120 comme une façade sur ``LaunchPage``. ::
+        présent en 1.120 comme une façade sur ``LaunchPage``.
 
-            ${dispo}=    Flp Service Is Available    SearchableContent
-            IF    ${dispo}    ${apps}=    List Flp Apps
+        Exemple :
+        | ${searchable}=    `Flp Service Is Available`    SearchableContent
+        | ${inventory}=    IF    ${searchable}    `List Flp Apps`    ELSE    `List Flp Catalogs`
+        | Should Not Be Empty    ${inventory}
         """
         try:
             return bool(self._evaluate(FLP_SERVICE_PROBE_JS,
@@ -108,29 +116,45 @@ class FlpServiceKeywords:
         launchpad ne dit que celui qu'on a DEMANDÉ. Vides quand le conteneur
         ne les expose pas (shell d'un autre hébergeur que l'ABAP).
         Conteneur absent = échec actionnable nommant la portée de frame et
-        `Flp Container Is Present`."""
+        `Flp Container Is Present`.
+
+        Exemple :
+        | ${user}=    `Get Flp User`
+        | Should Be Equal    ${user}[id]    DEVELOPER
+        | Should Be Equal    ${user}[client]    001
+        """
         return self._flp_result(self._evaluate(FLP_USER_PROBE_JS))
 
     def list_flp_apps(self):
         """Inventaire des applications du launchpad par le service
-        **SearchableContent** : ce que l'utilisateur a le DROIT d'ouvrir, et
+        *SearchableContent* : ce que l'utilisateur a le DROIT d'ouvrir, et
         non ce que la page affiche. Liste de dicts JSON-safe ``{title,
         viz_title, intent, target_url}`` (``intent`` = le hash sans ``#`` ni
         paramètres, la clé stable ; ``viz_title`` = le titre porté par la
         visualisation quand il diffère du libellé de l'app). Service absent
         (ushell 1.71) = échec actionnable nommant `Flp Service Is Available` ;
-        sur ce ushell-là, passer par `List Flp Catalogs` (LaunchPage)."""
+        sur ce ushell-là, passer par `List Flp Catalogs` (LaunchPage).
+
+        Exemple :
+        | ${apps}=    `List Flp Apps`
+        | Length Should Be    ${apps}    66
+        """
         return self._flp_result(self._evaluate(FLP_APPS_PROBE_JS),
                                 service="SearchableContent") or []
 
     def list_flp_catalogs(self, include_tiles=True):
-        """Catalogues assignés à l'utilisateur, lus au service **LaunchPage**
+        """Catalogues assignés à l'utilisateur, lus au service *LaunchPage*
         (le ushell classique ABAP) : liste de dicts ``{id, tiles}`` où
         ``tiles`` est ``[{intent, target_url}]``. C'est le catalogue de
         DROITS, pas le rendu de la page. ``include_tiles=False`` saute la
         lecture des tuiles (un aller-retour par catalogue en moins quand
         seuls les ids comptent). Les résultats de l'adaptateur ABAP arrivent
-        en ``progress`` : les deux formes de réponse sont acceptées."""
+        en ``progress`` : les deux formes de réponse sont acceptées.
+
+        Exemple :
+        | ${catalogs}=    `List Flp Catalogs`
+        | Length Should Be    ${catalogs}    2
+        """
         include = str(include_tiles).strip().lower() not in ("false", "no", "0", "")
         return self._flp_result(
             self._evaluate(FLP_CATALOGS_PROBE_JS,
@@ -139,22 +163,29 @@ class FlpServiceKeywords:
 
     def list_flp_groups(self):
         """Groupes de l'accueil du launchpad et volume de chacun (service
-        **LaunchPage**) : liste de dicts ``{id, tile_count}``. Même source de
-        vérité que `List Flp Catalogs` (droits, pas rendu)."""
+        *LaunchPage*) : liste de dicts ``{id, tile_count}``. Même source de
+        vérité que `List Flp Catalogs` (droits, pas rendu).
+
+        Exemple :
+        | ${groups}=    `List Flp Groups`
+        | Length Should Be    ${groups}    2
+        """
         return self._flp_result(self._evaluate(FLP_GROUPS_PROBE_JS),
                                 service="LaunchPage") or []
 
     def get_flp_intent_support(self, intents):
         """Résolvabilité d'une LISTE d'intents en un aller-retour, par le
-        service **CrossApplicationNavigation** (``isIntentSupported``) :
+        service *CrossApplicationNavigation* (``isIntentSupported``) :
         liste de dicts ``{intent, supported}`` dans l'ordre donné. ``intents``
         accepte une liste, une chaîne à virgules ou une liste-littérale
         (frontière rf-mcp : tout arrive en chaîne). Un intent assigné mais
         non ouvrable est un ÉCART légitime à rapporter, pas une erreur :
-        c'est l'appelant qui juge. ::
+        c'est l'appelant qui juge.
 
-            ${verdicts}=    Get Flp Intent Support    ${intents}
-            ${non_resolus}=    Evaluate    [v['intent'] for v in $verdicts if not v['supported']]
+        Exemple :
+        | ${verdicts}=    `Get Flp Intent Support`    EPMPurchaseOrder-approve,ApplicationJob-show
+        | Should Be True    ${verdicts}[0][supported]
+        | Should Not Be True    ${verdicts}[1][supported]
         """
         wanted = as_name_list(intents, argument="intents")
         return self._flp_result(

@@ -1,7 +1,7 @@
 """Mixin de diagnostic : préflight du scripting SAP GUI et télémétrie de session.
 
 Le SAP GUI Scripting est désactivé par défaut côté serveur
-(``sapgui/user_scripting = FALSE``) et peut être **dégradé silencieusement** par
+(``sapgui/user_scripting = FALSE``) et peut être *dégradé silencieusement* par
 les paramètres de profil : ``user_scripting_set_readonly`` (l'API ne peut plus
 rien modifier), ``user_scripting_disable_recording`` (plus aucun événement :
 mode record natif du recorder inopérant), ``user_scripting_per_user``
@@ -15,9 +15,9 @@ pour échouer TÔT, avec la cause exacte et le paramètre RZ11 à corriger.
 Également ici : ``TestToolMode`` (supprime les popups de messages I/A au replay,
 update immédiat, pensé par SAP pour les outils de test), la télémétrie de
 ``session.Info`` (temps de réponse, aller-retours) pour instrumenter les runs,
-le préflight du **mode accessibilité**, l'autre réglage silencieux (côté
+le préflight du *mode accessibilité*, l'autre réglage silencieux (côté
 client, celui-là) dont dépend la lecture des listes ABAP classiques, et le
-préflight de **posture de sécurité du poste** (`Get Client Security Status` /
+préflight de *posture de sécurité du poste* (`Get Client Security Status` /
 `Client Security Should Be Hardened` : client patché contre la CVE-2025-0055
 de l'historique de saisie, historique désactivé sur un poste où les tests
 tapent de vraies données ; logique pure dans ``sapfx_common.client_security``).
@@ -61,24 +61,30 @@ def _read(obj, attr, default=None):
 
 class DiagnosticsKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Lecture seule sauf mention contraire.
-    Suppose ``self.sapapp``/``self.connection``/``self.session`` posés par les
+    Suppose ``self.sapapp`` / ``self.connection`` / ``self.session`` posés par les
     keywords de connexion (`Connect To Session`, `Open Connection...`)."""
 
     def get_scripting_status(self):
         """Retourne un dict décrivant l'état réel du support scripting.
 
         Clés (``None`` = information non exposée par cette version de SAP GUI) :
-        - ``gui_version`` : version du client SAP GUI (``8.0 PL6``…) ;
+        - ``gui_version`` : version du client SAP GUI (``8.0 PL6`` …) ;
         - ``disabled_by_server`` : ``sapgui/user_scripting`` absent/FALSE côté serveur ;
         - ``read_only`` : mode lecture seule (``sapgui/user_scripting_set_readonly``) ;
         - ``recording_disabled`` : événements coupés
           (``sapgui/user_scripting_disable_recording``) : le mode record natif du
           recorder et tout spy événementiel sont inopérants ;
         - ``ui_guideline`` : thème/guideline actif (détection Belize/Quartz/Horizon) ;
-        - ``system``/``client``/``user`` : contexte de la session.
+        - ``system`` / ``client`` / ``user`` : contexte de la session.
 
         Lecture seule, indépendant de la locale. Voir aussi
-        `Scripting Should Be Fully Enabled` pour la forme assertion."""
+        `Scripting Should Be Fully Enabled` pour la forme assertion.
+
+        Exemple :
+        | ${scripting}=    `Get Scripting Status`
+        | Should Not Be True    ${scripting}[disabled_by_server]
+        | Should Not Be True    ${scripting}[read_only]
+        """
         sapapp = getattr(self, "sapapp", None)
         connection = getattr(self, "connection", None)
         session = getattr(self, "session", None)
@@ -112,7 +118,11 @@ class DiagnosticsKeywords:
         est silencieux à la connexion et ne se manifeste que par des échecs
         étranges plus tard. ``allow_recording_disabled=True`` tolère le mode
         « événements coupés » (les tests purs marchent, seuls le record natif du
-        recorder et les spys événementiels sont inopérants)."""
+        recorder et les spys événementiels sont inopérants).
+
+        Exemple :
+        | `Scripting Should Be Fully Enabled`
+        """
         status = self.get_scripting_status()
         problems = []
         if status["disabled_by_server"]:
@@ -144,11 +154,16 @@ class DiagnosticsKeywords:
         """Active le mode outil de test de la session (``session.TestToolMode``).
 
         Prévu par SAP pour les outils de test : les messages d'information et
-        d'abandon (types ``I``/``A``) ne s'affichent plus en popup (ils passent
+        d'abandon (types ``I`` / ``A``) ne s'affichent plus en popup (ils passent
         dans la barre d'état), les messages système sont ignorés et le mode
         update du serveur devient immédiat pour cette connexion, trois sources
         classiques de replays instables. À activer en Suite Setup, désactiver
-        avec ``enabled=False``. Nécessite un kernel récent (sinon sans effet)."""
+        avec ``enabled=False``. Nécessite un kernel récent (sinon sans effet).
+
+        Exemple :
+        | `Enable Test Tool Mode`
+        | `Enable Test Tool Mode`    enabled=False
+        """
         value = str(enabled).strip().lower() not in ("false", "0", "no", "non", "")
         try:
             self.session.TestToolMode = 1 if value else 0
@@ -159,17 +174,17 @@ class DiagnosticsKeywords:
 
     def get_list_rendering_status(self):
         """Décrit comment l'écran ACTIF expose son contenu : le préflight du
-        **mode accessibilité** SAP GUI (pendant côté client de
+        *mode accessibilité* SAP GUI (pendant côté client de
         `Get Scripting Status`, qui couvre le côté serveur).
 
         Clés :
         - ``readable_labels`` : nombre de ``GuiLabel`` porteurs de texte ET de
           géométrie (ce que `Read Abap List` sait reconstruire) ;
         - ``shell_rendered`` : l'écran contient un contrôle shell/custom
-          (``GuiShell``/``GuiContainerShell``/``GuiCustomControl``) ;
+          (``GuiShell`` / ``GuiContainerShell`` / ``GuiCustomControl``) ;
         - ``list_readable`` : vrai si le contenu est lisible en labels ;
-        - ``accessibility_mode_needed`` : vrai quand le contenu est **enfermé
-          dans un shell de sous-type inconnu sans aucun label**, la signature
+        - ``accessibility_mode_needed`` : vrai quand le contenu est *enfermé
+          dans un shell de sous-type inconnu sans aucun label*, la signature
           attendue d'une liste ABAP rendue sans le mode accessibilité. NB
           mesuré le 2026-09-07 : la sortie RSPARAM qui avait fondé cette
           règle est une ``GuiShell/GridView`` (lisible par `Read Grid`), et
@@ -179,7 +194,7 @@ class DiagnosticsKeywords:
           en unitaire ;
         - ``hint`` : la marche à suivre, ou ``None`` si rien à corriger.
 
-        Le mode accessibilité est un réglage **du poste** (Options SAP GUI →
+        Le mode accessibilité est un réglage *du poste* (Options SAP GUI →
         Interaction Design → Accessibility) qui exige un redémarrage du client :
         il se provisionne, il ne s'active pas depuis un test : d'où ce keyword
         de constat, exactement comme on ne bascule pas RZ11 depuis une suite.
@@ -196,7 +211,12 @@ class DiagnosticsKeywords:
         sur un éditeur (relevé live SE16/T000 et SE38, fausse alerte sur tout
         poste) : ``accessibility_mode_needed`` n'est vrai que pour un shell
         d'un sous-type inconnu ou vide, la seule signature d'une liste ABAP
-        rendue sans le mode accessibilité."""
+        rendue sans le mode accessibilité.
+
+        Exemple :
+        | ${rendering}=    `Get List Rendering Status`
+        | Should Not Be True    ${rendering}[accessibility_mode_needed]
+        """
         elements = self._screen_elements()
         labels = sum(1 for el in elements
                      if el.type == "GuiLabel" and el.left is not None
@@ -240,7 +260,13 @@ class DiagnosticsKeywords:
         À appeler juste avant `Read Abap List` (ou en Suite Setup d'une suite
         qui lit des sorties de reports) pour transformer un « aucune liste
         détectée » découvert au milieu du run en un échec explicite qui nomme le
-        réglage du poste à provisionner."""
+        réglage du poste à provisionner.
+
+        Exemple :
+        | `Abap List Should Be Readable`
+        | ${lines}=    `Read Abap List`
+        | Should Not Be Empty    ${lines}
+        """
         status = self.get_list_rendering_status()
         if status["list_readable"]:
             return
@@ -259,7 +285,12 @@ class DiagnosticsKeywords:
         Utile pour instrumenter un run (journaliser le coût serveur de chaque
         étape métier) ou détecter une connexion dégradée : ``flushes`` élevés =
         beaucoup d'appels COM synchrones, candidat à l'optimisation. Clés à
-        ``None`` si la propriété n'est pas exposée par cette version."""
+        ``None`` si la propriété n'est pas exposée par cette version.
+
+        Exemple :
+        | ${telemetry}=    `Get Session Telemetry`
+        | Should Be True    ${telemetry}[response_time] >= 0
+        """
         info = _read(self.session, "Info")
         return {
             "response_time": _read(info, "ResponseTime"),
@@ -276,7 +307,7 @@ class DiagnosticsKeywords:
         Complète `Get Scripting Status` (versant serveur) par le versant
         client. Clés :
 
-        - ``gui_version`` : version du client (``8.0 PL6``…) ;
+        - ``gui_version`` : version du client (``8.0 PL6`` …) ;
         - ``input_history_cve`` : ``patched`` / ``vulnerable`` / ``unknown``,
           position du client vis-à-vis de la CVE-2025-0055 (l'historique de
           saisie de SAP GUI for Windows était chiffré par un XOR à clé
@@ -296,7 +327,12 @@ class DiagnosticsKeywords:
         scannés, utile si l'historique a été déplacé via les options SAP GUI.
         Dict JSON-safe (utilisable à travers rf-mcp). Forme assertion :
         `Client Security Should Be Hardened`. Guide complet :
-        docs/hardening-test-environment.md."""
+        docs/hardening-test-environment.md.
+
+        Exemple :
+        | ${posture}=    `Get Client Security Status`
+        | Should Be Equal    ${posture}[input_history_cve]    patched
+        """
         status = self.get_scripting_status()
         sapapp = getattr(self, "sapapp", None)
         cve = input_history_cve_status(
@@ -351,7 +387,11 @@ class DiagnosticsKeywords:
 
         À appeler en Suite Setup, après `Scripting Should Be Fully Enabled`
         (versant serveur) : les deux préflights ensemble couvrent la checklist
-        de docs/hardening-test-environment.md."""
+        de docs/hardening-test-environment.md.
+
+        Exemple :
+        | `Client Security Should Be Hardened`    allow_input_history=True
+        """
         allow_history = _truthy(allow_input_history)
         allow_unknown = _truthy(allow_unknown_patch_level)
         posture = self.get_client_security_status(history_dirs)

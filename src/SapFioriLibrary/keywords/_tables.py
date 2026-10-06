@@ -1,4 +1,4 @@
-"""Mixin **extraction tabulaire du canal web** : ce qu'une table DÉCLARE.
+"""Mixin *extraction tabulaire du canal web* : ce qu'une table DÉCLARE.
 
 Il existe parce que les deux canaux web savent rendre un tableau et ne savent
 pas dire qu'ils n'en ont rendu qu'un morceau.
@@ -62,6 +62,11 @@ class TableKeywords:
         Une table qui n'expose aucun binding rend ``declared_rows`` à ``None``
         et se refuse donc en aval : c'est voulu. Une table non bornée écrite
         dans un fichier est un extrait présenté comme un inventaire.
+
+        Exemple :
+        | ${table}=    `Get Ui5 Table Info`    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Should Be Equal As Integers    ${table}[declared_rows]    4133
+        | Should Not Be True    ${table}[complete]
         """
         selector = build_control_selector(**selector_parts)
         ids = self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector), str(selector))
@@ -79,14 +84,14 @@ class TableKeywords:
     # -- grilles ALV du WebGUI (SAP GUI for HTML) ------------------------------
 
     def read_webgui_grid(self, sid=""):
-        """Lit une grille ALV rendue par le **WebGUI**, avec son contrat.
+        """Lit une grille ALV rendue par le *WebGUI*, avec son contrat.
 
         Le miroir WebGUI de `Read Full Grid` (ECC) et de `Read Ui5 Table`
         (Fiori). Retourne un dict JSON-safe ``{sid, container, columns,
         headers, rows, rendered_rows, declared_rows, visible_rows,
         first_visible_row, scrolling, complete, ...}``.
 
-        Les lignes sont des dicts clés par les identifiants **TECHNIQUES** des
+        Les lignes sont des dicts clés par les identifiants *TECHNIQUES* des
         colonnes (``MANDT``, ``SPRSL``), que la grille publie elle-même dans
         son ``lsdata`` : ce sont les seules clés indépendantes de la langue
         (convention 3). Les titres AFFICHÉS vivent à part, dans ``headers``,
@@ -100,7 +105,7 @@ class TableKeywords:
         cette capacité existe pour empêcher, et le dépôt remonte partout
         ailleurs une ambiguïté avec ses candidats.
 
-        **Ce que le keyword ne fait pas** : défiler. Le serveur n'envoie
+        *Ce que le keyword ne fait pas* : défiler. Le serveur n'envoie
         qu'une PARTIE des lignes et les renumérote à partir de 1, donc une
         lecture de grille peut être PARTIELLE sans que rien dans les lignes ne
         le montre. ``declared_rows`` est là pour ça, et
@@ -113,6 +118,11 @@ class TableKeywords:
         ``client_cell_threshold`` pour qu'une seconde mesure puisse confirmer
         ou démentir, et ces valeurs se journalisent plutôt qu'elles ne
         s'assertent.
+
+        Exemple :
+        | ${extract}=    `Read Webgui Grid`
+        | Should Be True    ${extract}[complete]
+        | Should Be Equal As Integers    ${extract}[declared_rows]    2
         """
         brut = self._evaluate(WEBGUI_GRID_PROBE_JS, arg=str(sid or ""))
         if not isinstance(brut, dict):
@@ -128,6 +138,10 @@ class TableKeywords:
         La même sonde que `Read Webgui Grid`, projetée sur son seul contrat :
         la forme à poser dans une assertion « suis-je devant la bonne grille,
         et combien déclare-t-elle » sans trimballer le relevé.
+
+        Exemple :
+        | ${grid}=    `Get Webgui Grid Info`
+        | Should Be Equal    ${grid}[container]    GRID1
         """
         verdict = dict(self.read_webgui_grid(sid))
         verdict.pop("rows", None)

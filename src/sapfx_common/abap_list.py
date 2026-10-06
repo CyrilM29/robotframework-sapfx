@@ -109,12 +109,19 @@ def _find_header_row(rows: dict[int, list[ListCell]], header: Any,
     de liste), texte (première ligne portant une cellule égale), ou ``auto``.
 
     ``auto`` dans une liste à cases : parmi les lignes SANS case situées
-    au-dessus de la dernière ligne à case, celle qui porte le plus de
-    cellules texte (à égalité, la plus basse). Mesuré sur SM37 : le rappel
-    des critères de sélection en tête de liste porte lui aussi des cases
-    (``chk[65,5]``, ``chk[0,6]``), donc « au-dessus de la première ligne à
-    case » désignait un critère. Sans case : la première ligne d'au moins
-    deux cellules texte."""
+    au-dessus de la dernière ligne à case, celle dont les débuts de cellule
+    coïncident le plus souvent avec ceux des cellules texte des lignes à
+    case qui la SUIVENT (un en-tête est écrit aux colonnes de ses données) ;
+    à égalité, celle qui porte le plus de cellules texte, puis la plus
+    basse. Mesuré sur SM37 : le rappel des critères de sélection en tête de
+    liste porte lui aussi des cases (``chk[65,5]``, ``chk[0,6]``), donc
+    « au-dessus de la première ligne à case » désignait un critère. Mesuré
+    sur la liste SE16 standard (2026-10-06) : la ligne d'information
+    « Displayed Fields: 4 of 5 Fixed Columns: 2 List Width 0250 » porte
+    huit cellules contre quatre à l'en-tête, et « la plus fournie » la
+    prenait pour l'en-tête, chaque ligne rendant alors ses trois premières
+    valeurs fondues dans une seule colonne. Sans case : la première ligne
+    d'au moins deux cellules texte."""
     text = str(header).strip() if header is not None else "auto"
     if text.isdigit():
         number = int(text)
@@ -139,7 +146,15 @@ def _find_header_row(rows: dict[int, list[ListCell]], header: Any,
             % (" au-dessus des lignes sélectionnables" if selectable else ""))
     if last_selectable is None:
         return candidates[0]
-    return max(candidates, key=lambda number: (len(_text_cells(rows[number])), number))
+
+    def rank(number: int) -> tuple[int, int, int]:
+        starts = {cell.column for cell in _text_cells(rows[number])}
+        aligned = sum(1 for below in selectable if below > number
+                      for cell in _text_cells(rows.get(below, []))
+                      if cell.column in starts)
+        return aligned, len(starts), number
+
+    return max(candidates, key=rank)
 
 
 def _titles(header_cells: Sequence[ListCell]) -> list[str]:

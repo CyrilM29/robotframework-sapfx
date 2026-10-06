@@ -1,4 +1,4 @@
-"""Mixin des lectures de **posture de sécurité** par le canal RFC.
+"""Mixin des lectures de *posture de sécurité* par le canal RFC.
 
 Ce que ces keywords ajoutent au canal : la configuration de sécurité d'un
 système ABAP se lit par des paramètres de profil (``login/*``, ``gw/*``,
@@ -51,7 +51,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
 
     def read_profile_parameters(self, parameters: Any,
                                 alias: str = "default") -> list[dict[str, Any]]:
-        """Lit un **lot de paramètres de profil** et rend une fiche par
+        """Lit un *lot de paramètres de profil* et rend une fiche par
         paramètre : ``{"name", "status", "value"}``.
 
         ``status`` vaut ``defined`` (le paramètre a une valeur effective, et
@@ -71,7 +71,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         ``parameters`` accepte une liste, une chaîne à virgules ou une
         liste-littérale sérialisée (la frontière rf-mcp passe tout en chaîne).
         L'ordre demandé est préservé, ce dont dépendent les comparaisons de
-        deux relevés, et la **casse l'est aussi**, ce qui n'est pas un détail :
+        deux relevés, et la *casse l'est aussi*, ce qui n'est pas un détail :
         le module est SENSIBLE À LA CASSE, ``LOGIN/MIN_PASSWORD_LNG`` rend
         ``RC = 4`` et une chaîne vide là où ``login/min_password_lng`` rend la
         valeur. Une normalisation en majuscules, réflexe courant côté ABAP et
@@ -90,6 +90,11 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         La lecture est un aller-retour RFC par paramètre : le module standard
         n'expose pas de lecture en lot. Sur une trentaine de contrôles le coût
         reste négligeable devant l'ouverture de session.
+
+        Exemple :
+        | ${readings}=    `Read Profile Parameters`    login/min_password_lng,login/fails_to_user_lock
+        | ...    alias=a4h
+        | Should Be Equal    ${readings}[0][value]    6
         """
         names = robot_args.as_name_list(parameters)
         if not names:
@@ -116,7 +121,12 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         se ressemblent dans un rapport et ne se corrigent pas au même endroit.
 
         L'échec nomme les paramètres en cause et rappelle les trois causes
-        réelles, dont aucune n'est un défaut de durcissement."""
+        réelles, dont aucune n'est un défaut de durcissement.
+
+        Exemple :
+        | ${readings}=    `Profile Parameters Should Be Defined`    rsau/enable,gw/acl_mode    alias=a4h
+        | Should Be Equal    ${readings}[0][value]    1
+        """
         readings = self.read_profile_parameters(parameters, alias=alias)
         unknown = [r["name"] for r in readings if r["status"] != "defined"]
         if unknown:
@@ -135,7 +145,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
                                    users: Any = None,
                                    client: Optional[str] = None
                                    ) -> list[dict[str, Any]]:
-        """Lit l'état des **comptes standards livrés par SAP** dans le mandant
+        """Lit l'état des *comptes standards livrés par SAP* dans le mandant
         de connexion, et rend une fiche par compte trouvé.
 
         Chaque fiche porte ``{"user", "present", "uflag", "locked", "reasons",
@@ -163,6 +173,10 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         compose la clause et non l'appelant, ce dernier ne pourrait pas la
         découper lui-même, et une liste surchargée d'un nom de trop échouerait
         sur une clause qu'il n'a jamais écrite.
+
+        Exemple :
+        | ${accounts}=    `Read Standard Users Status`    alias=a4h    users=SAP*,DDIC
+        | Should Be True    ${accounts}[0][present]
         """
         wanted = [str(u).strip() for u in
                   (robot_args.as_name_list(users) if users else STANDARD_USERS)]
@@ -195,7 +209,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         return fiches
 
     def get_audit_configuration(self, alias: str = "default") -> dict[str, Any]:
-        """Lit la configuration du **journal d'audit de sécurité** et rend son
+        """Lit la configuration du *journal d'audit de sécurité* et rend son
         verdict : ``{"enabled", "slots_declared", "slots_active", "filtering",
         "verdict", "version", "file_status"}``.
 
@@ -216,19 +230,24 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         date corrompue (année ``0126``) là où l'API moderne rend la bonne.
         Le keyword lit l'ancien, qui est le seul à porter le détail des slots,
         mais n'expose PAS sa date, précisément pour qu'aucune assertion ne
-        s'appuie dessus."""
+        s'appuie dessus.
+
+        Exemple :
+        | ${audit}=    `Get Audit Configuration`    alias=a4h
+        | Should Be Equal    ${audit}[verdict]    armed_without_filter
+        """
         config = self.call_rfc("RSAU_GET_AUDIT_CONFIG", alias=alias)
         return security_inventory.classify_audit_configuration(config)
 
     def read_rfc_destination_inventory(self, alias: str = "default",
                                        types: Any = None) -> list[dict[str, Any]]:
-        """Inventorie les **destinations RFC** et classe chacune : où elle
+        """Inventorie les *destinations RFC* et classe chacune : où elle
         pointe, et si elle conserve un logon ou un mot de passe.
 
         Rend une fiche par destination (``destination``, ``type``,
         ``stored_logon``, ``stored_password``, plus la cible quand elle est
         déclarée). ``types`` restreint aux types voulus (``3`` pour les
-        destinations ABAP, ``H``/``G`` pour HTTP), en liste ou en chaîne à
+        destinations ABAP, ``H`` / ``G`` pour HTTP), en liste ou en chaîne à
         virgules.
 
         Ce que le keyword apporte sur une simple lecture de table : les
@@ -241,7 +260,12 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         conserve un. La valeur reste chiffrée et ce canal ne l'expose pas. Les
         marqueurs dont la signification n'est pas établie sont ignorés plutôt
         que devinés, une interprétation approximative valant moins que rien
-        dans un rapport de sécurité, puisqu'elle serait lue comme un fait."""
+        dans un rapport de sécurité, puisqu'elle serait lue comme un fait.
+
+        Exemple :
+        | ${destinations}=    `Read Rfc Destination Inventory`    alias=a4h    types=3
+        | Should Be Equal    ${destinations}[0][type]    3
+        """
         rows = self.read_rfc_table(
             "RFCDES", ["RFCDEST", "RFCTYPE", "RFCOPTIONS"], alias=alias)
         wanted = {str(t).strip() for t in robot_args.as_name_list(types)} \
@@ -261,15 +285,25 @@ class RfcSecurityKeywords(RfcExtractKeywords):
                                observations: Optional[Mapping[str, Any]] = None
                                ) -> dict[str, Any]:
         """Assemble l'artefact déterministe d'une posture : identité de la
-        cible, mesures, verdicts et résumé, plus un hash calculé **hors
-        horodatage**.
+        cible, mesures, verdicts et résumé, plus un hash calculé *hors
+        horodatage*.
 
         ``identity`` doit porter ce qui PROUVE la cible. Sur un poste qui
         héberge deux conteneurs SAP, l'identifiant système et le nom d'hôte
         applicatif ne le font pas (les deux annoncent la même chose) et
         l'adresse IP est volatile : les ancres sont la release et le kernel.
         Hors ligne : n'ouvre aucune connexion, tout vient des lectures déjà
-        faites."""
+        faites.
+
+        Exemple :
+        | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
+        | ${readings}=    `Read Profile Parameters`    login/min_password_lng    alias=a4h
+        | &{control}=    Create Dictionary    key=password.min_length    parameter=login/min_password_lng
+        | ...    comparison=at_least    expected=6    severity=high
+        | @{controls}=    Create List    ${control}
+        | ${posture}=    `Build Security Posture`    ${info}[RFCSI_EXPORT]    ${readings}    ${controls}
+        | Should Be Equal As Integers    ${posture}[summary][compliant]    1
+        """
         return security_baseline.posture_artifact(
             identity, readings, controls_verdicts(controls, readings),
             observations=observations,
@@ -283,7 +317,12 @@ class RfcSecurityKeywords(RfcExtractKeywords):
 
         Deux exécutions aux mêmes mesures sur la même cible écrivent le même
         contenu au hash près de l'horodatage, donc un artefact committé sert de
-        référence de dérive."""
+        référence de dérive.
+
+        Exemple :
+        | ${proof}=    `Write Security Posture`    ${OUTPUT DIR}/posture-a4h.json    ${posture}
+        | Should Not Be Empty    ${proof}[sha256]
+        """
         payload = dict(artifact)
         blob = json.dumps(payload, sort_keys=True, ensure_ascii=False,
                           indent=2) + "\n"
@@ -308,7 +347,12 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         ``Unexpected UTF-8 BOM`` au lieu de comparer, c'est-à-dire qu'elle
         rougissait pour une raison sans rapport avec la sécurité du système,
         exactement là où elle doit être lisible. Constaté le 2026-08-29 en
-        éprouvant la détection de dérive."""
+        éprouvant la détection de dérive.
+
+        Exemple :
+        | ${posture}=    `Read Security Posture`    ${OUTPUT DIR}/posture-a4h.json
+        | Should Be Equal As Integers    ${posture}[summary][total]    1
+        """
         with open(str(path), encoding="utf-8-sig") as handle:
             return dict(json.load(handle))
 
@@ -316,10 +360,10 @@ class RfcSecurityKeywords(RfcExtractKeywords):
             self, reference_path: str, readings: Iterable[Mapping[str, Any]],
             identity: Optional[Mapping[str, Any]] = None,
             fail_on_drift: Any = True) -> dict[str, Any]:
-        """Compare la posture mesurée à la **référence committée** de la cible,
+        """Compare la posture mesurée à la *référence committée* de la cible,
         et rend le verdict de dérive.
 
-        Sémantique **snapshot**, celle de la sentinelle d'écran du dépôt :
+        Sémantique *snapshot*, celle de la sentinelle d'écran du dépôt :
         au premier passage la référence n'existe pas, elle est ÉCRITE et
         l'appel réussit avec un WARNING nommant le fichier à committer ;
         ensuite, tout écart est rapporté paramètre par paramètre.
@@ -331,7 +375,16 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         binaire, et c'est la dérive non annoncée qui est l'incident.
 
         ``fail_on_drift`` (vrai par défaut) décide si une dérive fait échouer
-        ou se contente d'un rapport. Le verdict retourné est JSON-safe."""
+        ou se contente d'un rapport. Le verdict retourné est JSON-safe.
+
+        Exemple :
+        | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
+        | ${readings}=    `Read Profile Parameters`    login/min_password_lng,login/fails_to_user_lock
+        | ...    alias=a4h
+        | ${verdict}=    `Security Posture Should Not Have Drifted`
+        | ...    ${OUTPUT DIR}/posture-reference-a4h.json    ${readings}    identity=${info}[RFCSI_EXPORT]
+        | Should Not Be True    ${verdict}[drifted]
+        """
         measured = [dict(r) for r in readings]
         reference_path = os.path.normpath(str(reference_path))
         exists = os.path.exists(str(reference_path))

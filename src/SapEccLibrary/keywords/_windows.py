@@ -1,4 +1,4 @@
-"""Mixin **fenêtres modales** : refermer un popup quelle que soit sa forme.
+"""Mixin *fenêtres modales* : refermer un popup quelle que soit sa forme.
 
 Relevé live sur A4H (SAP GUI 8.00) : plusieurs dialogues modaux REFUSENT
 ``sendVKey`` (les SPOP de confirmation dès 2026-07, le popup « Details » d'une
@@ -21,12 +21,22 @@ fenêtre ACTIVE. Avec un seul modal ouvert, rien ne change.
 """
 from pythoncom import com_error
 
+from sapfx_common.status_message import normalize_message_class, normalize_message_number
+
 # Boutons de fermeture d'un modal, du plus neutre au plus spécifique :
 # barre d'outils du modal (btn[12] = Annuler/F12, btn[0] = Entrée) puis les
 # boutons SPOP des dialogues de confirmation (OPTION2 = Non/Annuler,
 # OPTION1 = Oui/Continuer).
 _CANCEL_BUTTONS = ("tbar[0]/btn[12]", "usr/btnSPOP-OPTION2", "usr/btnSPOP-OPTION_CAN")
 _CONFIRM_BUTTONS = ("tbar[0]/btn[0]", "usr/btnSPOP-OPTION1")
+
+# « Function code cannot be selected » : la fonction du bouton pressé est
+# EXCLUE du statut GUI du dialogue. Mesuré le 2026-10-06 sur A4H : après un
+# dialogue qui portait un Annuler (la sélection multiple SAPLALDB), le
+# ``btn[12]`` survit MASQUÉ dans la barre du modal suivant (« Details » d'une
+# grille SE16) : ``findById`` le trouve, l'arbre affiché non, et le presser
+# ne rend que ce message.
+_EXCLUDED_FUNCTION = ("00", "255")
 
 
 # Profondeur maximale de pile de modaux sondée (SAP GUI en ouvre rarement
@@ -61,7 +71,7 @@ class WindowKeywords:
         except (AttributeError, com_error):
             return False
 
-    def _is_informational_modal(self, window):
+    def _is_informational_modal(self, window, excluded=()):
         """Vrai si ``wnd[window]`` n'offre ni bouton Annuler (``tbar[0]/btn[12]``)
         ni question SPOP (``usr/btnSPOP-OPTION1``) mais bien un ``tbar[0]/btn[0]`` :
         une fenêtre d'information, dont la seule fermeture est ce bouton.
@@ -72,14 +82,31 @@ class WindowKeywords:
         ENGAGE quelque chose passerait pour informatif ; `Dismiss Modal Window`
         ne presse ce ``btn[0]`` qu'en dernier recours, après la touche et les
         boutons d'annulation, et jamais en mode ``confirm``. Devant un tel
-        dialogue, fermer par `Click Popup Button` sur le bouton voulu."""
+        dialogue, fermer par `Click Popup Button` sur le bouton voulu.
+
+        ``excluded`` : boutons dont la pression a rendu ``00/S/255`` (fonction
+        exclue du statut GUI), tenus pour absents : un Annuler masqué que
+        ``findById`` trouve encore n'est pas un Annuler."""
         def present(suffix):
+            if suffix in excluded:
+                return False
             try:
                 return self.session.findById("wnd[%s]/%s" % (window, suffix), False) is not None
             except (AttributeError, com_error):
                 return False
         return (present("tbar[0]/btn[0]") and not present("tbar[0]/btn[12]")
                 and not present("usr/btnSPOP-OPTION1"))
+
+    def _function_was_excluded(self):
+        """Vrai si la barre de statut porte ``00/S/255`` : la dernière
+        fonction demandée est exclue du statut GUI de l'écran."""
+        try:
+            status = self.session.findById("wnd[0]/sbar")
+            identity = (normalize_message_class(getattr(status, "MessageId", "")),
+                        normalize_message_number(getattr(status, "MessageNumber", "")))
+        except (AttributeError, com_error):
+            return False
+        return identity == _EXCLUDED_FUNCTION
 
     def _fail_if_covered(self, window, attempts):
         """Échoue si un modal s'est ouvert AU-DESSUS de ``wnd[window]`` pendant
@@ -109,7 +136,12 @@ class WindowKeywords:
         utilisateur), la matière d'un échec de fermeture actionnable.
         ``window`` omis = le modal le PLUS HAUT de la pile (aucun modal :
         ``[]``) ; un modal recouvert par un autre se lit en le nommant
-        (``window=1`` sous un ``wnd[2]``)."""
+        (``window=1`` sous un ``wnd[2]``).
+
+        Exemple :
+        | ${buttons}=    `Get Modal Buttons`
+        | Should Be Equal    ${buttons}[0][id]    wnd[1]/tbar[0]/btn[0]
+        """
         window = self._modal_window_argument(window)
         if window is None:
             return []
@@ -131,13 +163,20 @@ class WindowKeywords:
         pour eux que les replis existent. Aucune fenêtre ouverte = ne fait
         rien et retourne ``False`` ; fenêtre toujours ouverte après toutes
         les voies = échec listant ses boutons. Retourne ``True`` quand une
-        fenêtre a été refermée."""
+        fenêtre a été refermée.
+
+        Exemple :
+        | `Open System Status`
+        | ${closed}=    `Dismiss Modal Window`
+        | Should Be True    ${closed}
+        """
         window = self._modal_window_argument(window)
         if window is None or not self._window_open(window):
             return False
         vkey = 0 if _as_bool(confirm) else 12
         buttons = _CONFIRM_BUTTONS if _as_bool(confirm) else _CANCEL_BUTTONS
         attempts = []
+        excluded = set()
         try:
             self.session.findById("wnd[%s]" % window).sendVKey(vkey)
             attempts.append("vkey %d" % vkey)
@@ -165,11 +204,15 @@ class WindowKeywords:
             if not self._window_open(window):
                 return True
             self._fail_if_covered(window, attempts)
-        if not _as_bool(confirm) and self._is_informational_modal(window):
+            if self._function_was_excluded():
+                excluded.add(suffix)
+                attempts[-1] = "%s exclu (00/S/255)" % element_id
+        if not _as_bool(confirm) and self._is_informational_modal(window, excluded):
             # Un modal SANS bouton Annuler ni question SPOP (le « Details »
             # d'une grille SE16 : seuls « Close window (Enter) » et « Find »,
             # relevé live 2026-09-07) n'a rien à annuler : son btn[0] est sa
-            # seule fermeture, et la presser n'engage rien.
+            # seule fermeture, et la presser n'engage rien. Un Annuler masqué
+            # que SAP refuse par 00/S/255 ne change rien à ce constat.
             try:
                 self.session.findById("wnd[%s]/tbar[0]/btn[0]" % window).press()
                 attempts.append("wnd[%s]/tbar[0]/btn[0] (modal informatif)" % window)

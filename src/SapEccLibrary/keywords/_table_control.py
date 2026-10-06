@@ -1,4 +1,4 @@
-"""Keywords des **GuiTableControl** : les tables de dynpro classiques.
+"""Keywords des *GuiTableControl* : les tables de dynpro classiques.
 
 Un table control (saisie de postes, listes de champs SE11, transactions de
 premiere generation) n'est pas une grille ALV : il ne materialise que ses
@@ -25,7 +25,7 @@ class TableControlKeywords:
     (tables de dynpro classiques), par titre de colonne visible."""
 
     def read_table_control(self, table_id, max_rows=None):
-        """Lit un **GuiTableControl** (table de dynpro classique : saisie de
+        """Lit un *GuiTableControl* (table de dynpro classique : saisie de
         postes, listes de champs SE11…) en liste de dicts
         ``[{titre_de_colonne: texte}]``.
 
@@ -33,22 +33,28 @@ class TableControlKeywords:
         fait défiler la table par fenêtres via la scrollbar verticale et
         ré-acquiert l'objet COM après chaque défilement (un aller-retour
         serveur), le tout transparent pour le test. Colonnes sans titre
-        nommées ``COL<n>``, titres en doublon suffixés ``(2)``… : rien n'est
+        nommées ``COL<n>``, titres en doublon suffixés ``(2)`` … : rien n'est
         perdu en silence. ``max_rows`` plafonne la lecture (journalisé). La
         position de défilement initiale est restaurée à la fin.
 
         Piège vérifié live (SE11) : ``RowCount`` annonce les lignes
-        **réservées** par l'écran (47), pas les lignes remplies (26) ; les
+        *réservées* par l'écran (47), pas les lignes remplies (26) ; les
         lignes non matérialisées lèvent côté COM. Ce keyword retourne donc
         les lignes RÉELLEMENT remplies et s'arrête à la première ligne dont
         aucune cellule n'existe : jamais de lignes fantômes dans le résultat.
 
-        Une colonne **GuiCheckBox** (la colonne « Key » des champs SE11) se
+        Une colonne *GuiCheckBox* (la colonne « Key » des champs SE11) se
         rend en drapeau ABAP : ``X`` cochée, chaîne vide sinon, la convention
         de ``KEYFLAG`` dans DD03L, croisable telle quelle. Son ``Text`` est
         toujours vide : sans cette lecture d'état, la colonne disparaissait
         en silence (relevé live SE11, 2026-09-05).
-        Pour une grille **ALV**, utiliser `Read Grid` (l'erreur redirige)."""
+        Pour une grille *ALV*, utiliser `Read Grid` (l'erreur redirige).
+
+        Exemple :
+        | ${fields}=    `Read Table Control`    wnd[0]/usr/tabsTAB_STRIP/tabpDEF/ssubTS_SCREEN:SAPLSD41:2201/tblSAPLSD41TC0
+        | Should Be Equal    ${fields}[1][Field]    CARRID
+        | Should Be Equal    ${fields}[1][Key]    X
+        """
         table = self._table_control(table_id)
         titles = table_control.unique_titles(self._table_column_titles(table))
         total = int(getattr(table, "RowCount", 0) or 0)
@@ -78,8 +84,13 @@ class TableControlKeywords:
 
     def get_table_control_cell(self, table_id, row, column_title):
         """Texte de la cellule ``(ligne absolue, titre de colonne)`` d'un
-        table control : ``row`` est l'index **absolu** 0-based, le défilement
-        jusqu'à la fenêtre qui contient la ligne est automatique."""
+        table control : ``row`` est l'index *absolu* 0-based, le défilement
+        jusqu'à la fenêtre qui contient la ligne est automatique.
+
+        Exemple :
+        | ${element}=    `Get Table Control Cell`    wnd[0]/usr/tabsTAB_STRIP/tabpDEF/ssubTS_SCREEN:SAPLSD41:2201/tblSAPLSD41TC0    2    Data element
+        | Should Be Equal    ${element}    S_CARRNAME
+        """
         table = self._table_control(table_id)
         column = self._table_column_index(table, column_title, table_id)
         position, local = table_control.window_for_row(
@@ -101,7 +112,13 @@ class TableControlKeywords:
         """Écrit ``value`` dans la cellule ``(ligne absolue, titre de
         colonne)`` d'un table control : la saisie des transactions classiques
         adressée comme l'ALV, par titre visible. Cellule non modifiable =
-        échec actionnable nommant la colonne. Retourne l'id de la table."""
+        échec actionnable nommant la colonne. Retourne l'id de la table.
+
+        Exemple :
+        | `Set Table Control Cell`    wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE    0    field:RSCSEL_255-SLOW_I    LH
+        | ${value}=    `Get Table Control Cell`    wnd[1]/usr/tabsTAB_STRIP/tabpSIVA/ssubSCREEN_HEADER:SAPLALDB:3010/tblSAPLALDBSINGLE    0    field:RSCSEL_255-SLOW_I
+        | Should Be Equal    ${value}    LH
+        """
         table = self._table_control(table_id)
         column = self._table_column_index(table, column_title, table_id)
         position, local = table_control.window_for_row(
@@ -120,7 +137,7 @@ class TableControlKeywords:
 
     def find_table_control_row(self, table_id, column_title, value,
                                ignore_case=False):
-        """Index **absolu** (0-based) de la première ligne dont la colonne
+        """Index *absolu* (0-based) de la première ligne dont la colonne
         ``column_title`` vaut ``value``, ou ``-1`` si aucune (miroir de
         `Find Row By Column Value` côté ALV) : le défilement de recherche à
         travers toutes les fenêtres est automatique, et la recherche s'arrête
@@ -130,7 +147,12 @@ class TableControlKeywords:
         désignée par son NOM technique (le champ de dynpro, ``field:RLTYP``
         pour ``BUT100-RLTYP``), indépendant de la langue là où le titre est
         traduit. Même forme pour `Get Table Control Cell` et
-        `Set Table Control Cell`."""
+        `Set Table Control Cell`.
+
+        Exemple :
+        | ${row}=    `Find Table Control Row`    wnd[0]/usr/tabsTAB_STRIP/tabpDEF/ssubTS_SCREEN:SAPLSD41:2201/tblSAPLSD41TC0    field:DD03D-FIELDNAME    CARRNAME
+        | Should Be Equal As Integers    ${row}    2
+        """
         table = self._table_control(table_id)
         column = self._table_column_index(table, column_title, table_id)
         total = int(getattr(table, "RowCount", 0) or 0)
@@ -199,7 +221,7 @@ class TableControlKeywords:
         « cellule vide » (valeur légitime), ce dont dépendent l'arrêt de la
         lecture et l'échec actionnable de `Get Table Control Cell`.
 
-        Une cellule **GuiCheckBox** n'a pas de texte : son état se lit sur
+        Une cellule *GuiCheckBox* n'a pas de texte : son état se lit sur
         ``Selected`` et se rend en drapeau ABAP (``X``/vide), directement
         comparable à un champ drapeau du dictionnaire (KEYFLAG de DD03L)."""
         try:
@@ -218,7 +240,7 @@ class TableControlKeywords:
         return int(getattr(scrollbar, "Position", 0) or 0)
 
     def _scroll_table_to(self, table_id, position, best_effort=False):
-        """Positionne la scrollbar verticale puis **ré-acquiert** l'objet
+        """Positionne la scrollbar verticale puis *ré-acquiert* l'objet
         table : le défilement d'un table control est un aller-retour serveur
         qui invalide l'objet COM. Position déjà atteinte = aucun aller-retour.
         ``best_effort`` (restauration de fin de lecture) avale une erreur COM."""

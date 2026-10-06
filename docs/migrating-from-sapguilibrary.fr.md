@@ -2,11 +2,13 @@
 
 # Migrer depuis robotframework-sapguilibrary
 
-`SapEccLibrary` est un fork durci de
+`SapEccLibrary` est compatible sans changement avec
 [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary)
-(Apache 2.0, voir `NOTICE`). Le code upstream est vendorisé **à l'identique**
-(`src/SapEccLibrary/_vendor/sapgui_base.py`, seule la classe est renommée) et
-`SapEccLibrary` en hérite ; la migration est donc un simple renommage :
+(Apache 2.0, voir `NOTICE`). Son code, d'abord inclus à l'identique, a été
+absorbé et réécrit dans les modules de SAPFX le 2026-10-06 : l'amont est figé
+depuis mars 2022 (1.2.1). Ses 37 keywords gardent leur nom ainsi que l'ordre,
+le nom et la valeur par défaut de leurs paramètres ; la migration est donc un
+simple renommage :
 
 ```robotframework
 # avant
@@ -15,13 +17,12 @@ Library    SapGuiLibrary
 Library    SapEccLibrary
 ```
 
-**Tous les keywords upstream gardent leur nom et leur signature.** Les
-suites écrites pour SapGuiLibrary tournent telles quelles ; les apports
-s'adoptent ensuite au rythme de l'équipe. Quelques keywords échouent
-désormais franchement là où l'amont rendait une valeur trompeuse : `Get Value`
-sur un shell d'arbre, de grille ou d'éditeur (l'amont rendait le ProgID du
-contrôle), et `Select From List By Label` sur une combo en affichage ou avec un
-libellé inconnu.
+**Tous les keywords de l'amont gardent leur nom et leur signature**, tenus
+par un test unitaire. Les suites écrites pour SapGuiLibrary tournent telles
+quelles ; les apports s'adoptent ensuite au rythme de l'équipe. Ce qu'une
+suite peut remarquer est listé ci-dessous : chaque changement fait échouer
+franchement un keyword là où l'amont acceptait un résultat faux, ou retire un
+effet de bord.
 
 ## Étapes
 
@@ -30,16 +31,28 @@ libellé inconnu.
    la source n°1 de casse COM.
 2. Remplacer l'import `Library` dans les suites/resources.
 3. `robot --dryrun` pour confirmer la résolution des keywords.
-4. Lancer les suites : le comportement est celui d'upstream, plus les
-   surcharges ci-dessous.
+4. Lancer les suites, et lire le tableau ci-dessous devant tout nouvel échec :
+   il nomme un résultat que l'amont acceptait sans le vérifier.
 
-## Ce qui change immédiatement (surcharges sûres)
+## Ce qui change immédiatement
 
-| Comportement upstream | Comportement SapEccLibrary |
+| Comportement de l'amont | Comportement SapEccLibrary |
 |---|---|
-| `Run Transaction` vérifie le texte localisé de la barre d'état | indépendant de la locale : vérifie le **type** de message (`E`/`S`/…), gère les tcodes à namespace (`/BEV1/RCA01`) |
-| `Connect To Session` suppose l'appartement COM initialisé | `CoInitialize` défensif : fonctionne hors du thread principal (rf-mcp, runners threadés) |
-| `Select From List By Label` affecte l'entrée et s'y fie | refuse une combo en affichage ou un libellé inconnu (entrées listées), et relit la sélection sur l'élément ré-acquis par son id : une combo à code fonction reconstruit l'écran pendant la sélection |
+| `Input Text`, `Select Checkbox`, `Unselect Checkbox`, `Select Radio Button`, `Set Cell Value` écrivent sans relire | la valeur ou l'état est **relu** : une valeur tronquée par la longueur du champ, un champ ou une case protégés, une cellule de grille en affichage échouent en nommant la valeur obtenue |
+| `Input Text` et `Input Password` journalisent la valeur saisie au niveau INFO | rien n'est journalisé sur un champ mot de passe ni pour une valeur `Secret` ; les deux acceptent le type `Secret` de Robot Framework 7.4 |
+| `Get Value`, `Element Value Should Be` et `Element Value Should Contain` posent le focus sur l'élément avant de lire | une lecture ne déplace rien |
+| `Get Value` sur un shell d'arbre, de grille ou d'éditeur rend le ProgID du contrôle | refusé, en nommant le keyword qui sait lire ce contrôle |
+| les erreurs mêlent `Warning`, `ValueError` et `AssertionError` | un écart lève `AssertionError` avec la valeur attendue ET la valeur lue ; une erreur d'usage (type d'élément non pris en charge) lève `ValueError` ; un Logon Pad absent lève toujours `Warning` |
+| un élément absent ne nomme que son id | le message nomme aussi l'écran réellement affiché (`# screen <programme>/<transaction>/<numéro>`) |
+| la capture sur erreur photographie **l'écran entier** (bibliothèque `Screenshot` de Robot) | elle photographie la **fenêtre SAP** (modal compris) en PNG dans `screenshot_directory` ou le dossier de sortie ; une capture impossible ne masque jamais l'erreur d'origine |
+| `Send Vkey` envoie le numéro sous forme de texte | envoie l'entier de l'API ; une combinaison (`F8`, `Ctrl+S`, `Shift+F3`) reste acceptée, et une combinaison inconnue nomme les plus proches |
+| `Connect To Session` garde le dernier moteur de scripting trouvé, même celui d'un Logon Pad fermé | ne garde qu'un moteur qui répond ; COM est initialisé d'abord, donc il fonctionne hors du thread principal (rf-mcp, exécuteurs multi-threads) |
+| `Connect To Existing Connection` ne regarde que la première connexion | regarde toutes les connexions ouvertes, et les liste quand aucune ne correspond |
+| `Open Connection` rend la main dès que l'objet connexion existe | attend sa session (jusqu'à `default_timeout`) |
+| `Set Explicit Wait` lit son propre format de durée | accepte toute durée Robot Framework (`1.5`, `500 ms`, `2 min`) et rend l'ancienne valeur |
+| `Run Transaction` vérifie le texte localisé de la barre d'état | compare la transaction active (`session.Info.Transaction`) au code demandé, quelle que soit la langue ; gère les tcodes à namespace (`/BEV1/RCA01`) |
+| `Select From List By Label` affecte l'entrée et lui fait confiance | refuse une combo en affichage ou un libellé inconnu (entrées listées), et relit la sélection sur l'élément ré-acquis par son id : une combo à code fonction reconstruit l'écran pendant la sélection |
+| `Doubleclick Element` et `Select Context Menu Item` appellent l'API des arbres sur une grille ALV | visent la cellule de la grille, puis ouvrent son détail ou son menu contextuel |
 
 ## Ce que vous gagnez (adoption progressive)
 

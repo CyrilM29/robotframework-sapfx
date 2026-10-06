@@ -22,7 +22,7 @@ class VisualKeywords:
     compare, ne modifie aucun écran."""
 
     def get_screen_perceptual_hash(self, hash_size=8, mask_elements=None):
-        """Capture la fenêtre SAP active et retourne son **hash perceptuel**
+        """Capture la fenêtre SAP active et retourne son *hash perceptuel*
         (dHash hexadécimal, ``hash_size²`` bits, voir
         ``sapfx_common.visual_hash``).
 
@@ -33,7 +33,7 @@ class VisualKeywords:
         distance de Hamming faible (`Screen Should Match Baseline` fait
         l'assertion).
 
-        ``mask_elements`` **neutralise les zones légitimement volatiles** avant
+        ``mask_elements`` *neutralise les zones légitimement volatiles* avant
         hachage (remplies de gris neutre) : ``auto`` masque la barre de statut
         et la barre de titre (l'horloge, le titre localisé : les sources
         classiques de faux positifs des snapshots), ou une liste d'ids séparés
@@ -42,7 +42,12 @@ class VisualKeywords:
         assertion).
 
         Nécessite Pillow (``pip install Pillow``, extra ``visual`` du paquet)
-        pour décoder le PNG ; l'algorithme lui-même est pur et testé hors SAP."""
+        pour décoder le PNG ; l'algorithme lui-même est pur et testé hors SAP.
+
+        Exemple :
+        | ${hash}=    `Get Screen Perceptual Hash`    mask_elements=auto
+        | Length Should Be    ${hash}    16
+        """
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         pixels = self._decode_image_to_gray(png)
         regions = self._mask_regions_for(mask_elements)
@@ -53,7 +58,7 @@ class VisualKeywords:
         return dhash_hex(pixels, int(hash_size))
 
     def get_element_perceptual_hash(self, element_id, hash_size=8):
-        """Hash perceptuel de la **région d'UN élément** (dHash hexadécimal),
+        """Hash perceptuel de la *région d'UN élément* (dHash hexadécimal),
         l'assertion visuelle ciblée là où elle a le plus de valeur : la grille
         dHash couvre l'élément seul au lieu de l'écran entier, donc un
         changement DANS un GuiShell opaque ou un GuiChart pèse sur tous les
@@ -64,7 +69,12 @@ class VisualKeywords:
         l'effecteur coordonnées), convertie dans le repère de la capture de
         fenêtre. Échec explicite si l'élément n'existe pas ou sort de la
         capture. Voir `Element Should Match Baseline` pour l'assertion
-        snapshot."""
+        snapshot.
+
+        Exemple :
+        | ${hash}=    `Get Element Perceptual Hash`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | Length Should Be    ${hash}    16
+        """
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         pixels = self._decode_image_to_gray(png)
         region = self._element_image_region(element_id)
@@ -72,15 +82,20 @@ class VisualKeywords:
         return dhash_hex(crop_pixels(pixels, region), int(hash_size))
 
     def get_screen_tile_hashes(self, tiles_x=4, tiles_y=4, hash_size=8):
-        """Empreintes perceptuelles **par tuile** : la fenêtre est découpée en
+        """Empreintes perceptuelles *par tuile* : la fenêtre est découpée en
         grille ``tiles_x × tiles_y`` (défaut 4×4) et chaque tuile reçoit son
         propre dHash. Retourne la liste des hex, ligne par ligne.
 
         Là où le hash global dilue un changement local dans l'écran entier, la
-        grille le **localise** : comparer deux passages tuile à tuile
+        grille le *localise* : comparer deux passages tuile à tuile
         (``sapfx_common.visual_hash.tiled_hamming``) dit *où* l'écran a bougé.
         C'est le canal fin de la sentinelle (`Check Screen Against Watch`
-        l'utilise automatiquement) ; exposé ici pour les diagnostics manuels."""
+        l'utilise automatiquement) ; exposé ici pour les diagnostics manuels.
+
+        Exemple :
+        | ${tiles}=    `Get Screen Tile Hashes`
+        | Length Should Be    ${tiles}    16
+        """
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         pixels = self._decode_image_to_gray(png)
         from sapfx_common.visual_hash import tiled_dhash
@@ -90,7 +105,7 @@ class VisualKeywords:
                                      baseline_directory="visual_baselines",
                                      hash_size=8, mask_elements=None,
                                      per_resolution=False):
-        """Assertion de **non-régression visuelle** de la fenêtre SAP active,
+        """Assertion de *non-régression visuelle* de la fenêtre SAP active,
         sémantique *snapshot testing* :
 
         * premier passage (aucune baseline ``<name>.png``) : la capture devient
@@ -98,7 +113,7 @@ class VisualKeywords:
           rendu fait référence) ;
         * passages suivants : distance de Hamming entre le hash perceptuel de
           l'écran et celui recalculé depuis la baseline ; ``<= threshold``
-          (défaut 5 sur 64 bits) = succès, sinon échec **auto-corrigible** :
+          (défaut 5 sur 64 bits) = succès, sinon échec *auto-corrigible* :
           distance mesurée, chemins de la baseline et de la capture
           ``<name>.actual.png`` sauvegardée à côté pour comparaison, et le
           remède (supprimer la baseline si le changement est voulu).
@@ -108,7 +123,7 @@ class VisualKeywords:
         capture : voir `Get Screen Perceptual Hash`. C'est le remède nominal à
         une baseline qui échoue à cause de l'horloge de la barre de statut.
 
-        ``per_resolution=True`` garde **une baseline par géométrie de capture**
+        ``per_resolution=True`` garde *une baseline par géométrie de capture*
         (``<name>@1920x1032.png``) : la même suite devient comparable sur des
         postes qui n'affichent pas pareil, chacun face à sa propre référence,
         au lieu d'échouer sur une dérive qui n'est que d'échelle (une empreinte
@@ -117,13 +132,17 @@ class VisualKeywords:
         premier passage tout court ; une baseline ``<name>.png`` déjà committée
         reste utilisée telle quelle tant que la géométrie coïncide. Sans cette
         option (le défaut), un échec dont les deux géométries diffèrent le
-        **dit** dans son message plutôt que de se lire comme une régression.
+        *dit* dans son message plutôt que de se lire comme une régression.
 
         ``baseline_directory`` est relatif au répertoire courant du run (le
-        committer avec la suite). Le hash est **recalculé depuis le PNG** de la
+        committer avec la suite). Le hash est *recalculé depuis le PNG* de la
         baseline à chaque assertion : changer ``hash_size`` (ou le masque)
         reste honnête. Retourne la distance mesurée (0 pour une baseline
-        nouvellement créée)."""
+        nouvellement créée).
+
+        Exemple :
+        | `Screen Should Match Baseline`    se16_initial    mask_elements=auto
+        """
         from sapfx_common.visual_baseline import match_baseline
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         regions = self._mask_regions_for(mask_elements)
@@ -144,7 +163,7 @@ class VisualKeywords:
     def element_should_match_baseline(self, name, element_id, threshold=5,
                                       baseline_directory="visual_baselines",
                                       hash_size=8, per_resolution=False):
-        """Assertion de non-régression visuelle de la **région d'UN élément** :
+        """Assertion de non-régression visuelle de la *région d'UN élément* :
         même sémantique snapshot que `Screen Should Match Baseline`, mais la
         baseline est le PNG *recadré* sur l'élément : l'assertion est immune à
         tout ce qui change ailleurs sur l'écran (horloge, messages, autres
@@ -152,17 +171,17 @@ class VisualKeywords:
 
         C'est l'assertion nominale pour les zones que l'API Scripting ne lit
         pas : la grille rendue dans un GuiShell opaque, un GuiChart, une image.
-        Exemple::
-
-            Element Should Match Baseline    grille-resultats
-            ...    wnd[0]/usr/cntlGRID1/shellcont/shell
 
         ``per_resolution=True`` : même sémantique par géométrie que
         `Screen Should Match Baseline`, ici la géométrie de la région recadrée
         (un élément n'occupe pas le même nombre de pixels d'un poste à l'autre).
 
         Retourne la distance mesurée (0 pour une baseline nouvellement créée).
-        Échec auto-corrigible avec ``<name>.actual.png`` sauvé à côté."""
+        Échec auto-corrigible avec ``<name>.actual.png`` sauvé à côté.
+
+        Exemple :
+        | `Element Should Match Baseline`    scarr_grid    wnd[0]/usr/cntlGRID1/shellcont/shell
+        """
         from sapfx_common.visual_baseline import match_baseline
         png = base64.b64decode(self.get_screenshot_as_base64("png"))
         region = self._element_image_region(element_id)

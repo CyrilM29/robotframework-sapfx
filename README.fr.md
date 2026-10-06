@@ -39,7 +39,7 @@ nom `robotframework-sapfx`.
 
 | Bibliothèque | Canal | Pilotée par |
 | --- | --- | --- |
-| **`SapEccLibrary`** | SAP GUI for Windows (backend ECC, S/4HANA) | L'API SAP GUI Scripting via COM (`pywin32`). Un fork renforcé de [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary) : tous les keywords amont gardent leur nom et leur signature, quelques-uns échouent désormais franchement là où l'amont rendait une valeur trompeuse. |
+| **`SapEccLibrary`** | SAP GUI for Windows (backend ECC, S/4HANA) | L'API SAP GUI Scripting via COM (`pywin32`). Compatible sans changement avec [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary) : chacun de ses keywords garde son nom et sa signature, quelques-uns échouent désormais franchement là où elle rendait une valeur trompeuse. |
 | **`SapFioriLibrary`** | SAP Fiori / SAPUI5, UI5 Web Components, SAP GUI for HTML | La [bibliothèque Browser](https://github.com/MarketSquare/robotframework-browser) (Playwright), avec des **sélecteurs de contrôles UI5 stables** au lieu des ids DOM générés. Moteur de localisateurs porté de [playwright-sap](https://github.com/ArpitSureka/playwright-sap). |
 | **`SapApiLibrary`** | OData v2 et v4, RFC / BAPI | La bibliothèque standard Python pour HTTP (protocole CSRF SAP compris) ; RFC optionnel via `pyrfc`. |
 
@@ -269,7 +269,7 @@ de migration de SAP.
 | [docs/hardening-test-environment.fr.md](docs/hardening-test-environment.fr.md) | Liste de contrôle de sécurité : serveur, poste, côté web |
 | [docs/migrating-from-sapguilibrary.fr.md](docs/migrating-from-sapguilibrary.fr.md) | Migrer depuis robotframework-sapguilibrary |
 | [docs/migrating-from-cbta.fr.md](docs/migrating-from-cbta.fr.md) | Migrer depuis SAP CBTA |
-| [docs/audit-upstream.fr.md](docs/audit-upstream.fr.md) | Ce que le fork change à la bibliothèque amont, et pourquoi |
+| [docs/audit-upstream.fr.md](docs/audit-upstream.fr.md) | Ce que SapEccLibrary change au code amont qu'elle embarque, et pourquoi |
 
 Chaque document existe en anglais et en français (`*.fr.md`). Ils ont été
 écrits avec les bibliothèques dans l'atelier du mainteneur : quand ils
@@ -280,8 +280,8 @@ atelier, qui ne fait pas partie de ce dépôt.
 ## Organisation
 
 ```text
-src/SapEccLibrary/      SAP GUI for Windows (COM) ; _vendor/ porte la bibliothèque
-                        amont telle quelle, keywords/ un mixin par capacité
+src/SapEccLibrary/      SAP GUI for Windows (COM) ; keywords/ un mixin par
+                        capacité, y compris ceux de robotframework-sapguilibrary
 src/SapFioriLibrary/    Fiori / UI5 / Web Components / SAP GUI for HTML
                         (bibliothèque Browser) ; JavaScript injecté dans *.js.tpl
 src/SapApiLibrary/      OData v2/v4 et RFC / BAPI optionnels
@@ -296,7 +296,7 @@ Les rapports d'anomalie et les suggestions sont les bienvenus en
 
 ## Licence
 
-Apache 2.0. Inclut du code vendorisé de robotframework-sapguilibrary, des
+Apache 2.0. Inclut du code absorbé de robotframework-sapguilibrary, des
 moteurs de localisateurs portés de playwright-sap et des techniques adaptées de
 RoboSAPiens et de playwright-praman ; voir [LICENSE](LICENSE) et
 [NOTICE](NOTICE).

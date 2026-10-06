@@ -6,8 +6,8 @@ avec l'adressage qu'un utilisateur fonctionnel emploie spontanément : « le cha
 dans ``sapfx_common.semantic`` (portée de RoboSAPiens, Apache-2.0, NOTICE) sur
 la perception structurée ``_screen_elements`` (chemin rapide ``GetObjectTree``).
 
-Deux garanties de la maison : l'ambiguïté n'est **jamais** tranchée en silence
-(échec avec la liste des candidats), et les keywords retournent des **chaînes**
+Deux garanties de la maison : l'ambiguïté n'est *jamais* tranchée en silence
+(échec avec la liste des candidats), et les keywords retournent des *chaînes*
 id (jamais l'objet COM : sûr à travers la frontière rf-mcp).
 """
 import re
@@ -85,7 +85,7 @@ class SemanticKeywords:
 
     def find_element_by_label(self, locator, control_types=None, exact=False,
                               scope_radius=None):
-        """Résout un localisateur **humain** en id SAP GUI (chaîne, collable partout).
+        """Résout un localisateur *humain* en id SAP GUI (chaîne, collable partout).
 
         Grammaire du ``locator`` :
         | ``Table``           | élément ancré au libellé (à droite ou dessous ; les deux à la fois = ambiguïté remontée), sinon élément dont le texte/tooltip correspond |
@@ -96,7 +96,7 @@ class SemanticKeywords:
         | ``Table @ N``       | le N-ième champ (1-based) de la grille horizontale à droite de ``Table`` |
         | ``Ancre >> Reste``  | restreint la résolution de ``Reste`` (n'importe quelle forme ci-dessus) au voisinage du libellé ``Ancre`` (doit être unique sur l'écran) : désambiguïse un libellé répété ailleurs, ou identifie un champ sans libellé propre par son tooltip |
 
-        ``exact=False`` (défaut) compare par **préfixe** insensible à la casse,
+        ``exact=False`` (défaut) compare par *préfixe* insensible à la casse,
         pensé pour les tooltips SAP qui finissent par le raccourci (``Exécuter (F8)``).
         ``control_types`` restreint les types cibles (liste ou ``"GuiButton, GuiTab"``).
         ``scope_radius`` (px) étend le voisinage de ``Ancre >> Reste`` au-delà
@@ -111,7 +111,7 @@ class SemanticKeywords:
         ``Gauche @ Haut``, ``exact=True`` ou ``control_types``). Jamais de
         premier-match silencieux.
 
-        Sans ``control_types``, résolution en **cascade** comme `Read Field By
+        Sans ``control_types``, résolution en *cascade* comme `Read Field By
         Label` : les cibles par défaut d'abord ; puis, si AUCUNE ne
         correspond, les champs en LECTURE SEULE. Un champ texte non modifiable
         sert d'ancre-libellé (c'est ainsi qu'un dynpro affiche du texte
@@ -119,10 +119,11 @@ class SemanticKeywords:
         valeur affichée derrière un libellé restait introuvable alors que
         `Read Field By Label` la lit (mesuré sur le dialogue de condition de
         démarrage de SM36, « System Zone » valant « UTC », le 2026-10-01).
-        Usage type::
 
-            ${id}=    Find Element By Label    Table Name
-            Input Text    ${id}    T000
+        Exemple :
+        | `Run Transaction`    SE16
+        | ${id}=    `Find Element By Label`    Table Name
+        | Should Be Equal    ${id}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
         """
         types = _as_types(control_types)
         return self._resolve_semantic_unique(locator, types, _as_bool(exact),
@@ -131,12 +132,19 @@ class SemanticKeywords:
                                              ).element.id
 
     def fill_field_by_label(self, label, value, exact=False, scope_radius=None):
-        """Saisit ``value`` dans le champ désigné par son **libellé** (même
+        """Saisit ``value`` dans le champ désigné par son *libellé* (même
         grammaire que `Find Element By Label`, cibles restreintes aux champs de
-        saisie **modifiables** ; un champ en lecture seule, comme le « to » d'un
+        saisie *modifiables* ; un champ en lecture seule, comme le « to » d'un
         selection screen, n'est jamais une cible ni une position de grille).
         Retourne l'id résolu, à journaliser dans ``resources/`` si le
-        localisateur a vocation à être stabilisé."""
+        localisateur a vocation à être stabilisé.
+
+        Exemple :
+        | `Run Transaction`    SE16
+        | ${id}=    `Fill Field By Label`    Table Name    SCARR
+        | ${value}=    `Get Value`    ${id}
+        | Should Be Equal    ${value}    SCARR
+        """
         eid = self._resolve_semantic_unique(label, _INPUT_TYPES,
                                             _as_bool(exact),
                                             changeable_only=True,
@@ -146,17 +154,23 @@ class SemanticKeywords:
         return eid
 
     def read_field_by_label(self, label, exact=False, scope_radius=None):
-        """Retourne la **valeur actuelle** du champ désigné par son libellé
+        """Retourne la *valeur actuelle* du champ désigné par son libellé
         (relue via COM à l'instant de l'appel, pas depuis la perception).
 
-        Résolution en **cascade** (même principe que la grammaire : la première
+        Résolution en *cascade* (même principe que la grammaire : la première
         étape qui produit des matches gagne) : d'abord les champs
-        **modifiables**, ainsi une position de grille compte les mêmes champs
+        *modifiables*, ainsi une position de grille compte les mêmes champs
         que `Find Element By Label` et `Fill Field By Label` (jamais le « to »
         en lecture seule d'un selection screen) ; puis, si aucun, les champs en
-        lecture seule : la façon dont un dynpro d'**affichage** montre ses
+        lecture seule : la façon dont un dynpro d'*affichage* montre ses
         valeurs. L'ambiguïté de l'étape gagnante reste remontée, jamais
-        tranchée."""
+        tranchée.
+
+        Exemple :
+        | `Run Transaction`    SM37
+        | ${user}=    `Read Field By Label`    User Name
+        | Should Be Equal    ${user}    DEVELOPER
+        """
         eid = self._resolve_semantic_unique(label, _READ_TYPES,
                                             _as_bool(exact),
                                             prefer_changeable=True,
@@ -170,7 +184,14 @@ class SemanticKeywords:
         (``Enregistrer (Ctrl+S)`` matché par ``Enregistrer``). Les entrées de
         menu sont volontairement hors cible (elles dupliquent le texte des
         boutons de toolbar) : passer par `Find Element By Label` avec
-        ``control_types=GuiMenu`` pour un menu. Retourne l'id résolu."""
+        ``control_types=GuiMenu`` pour un menu. Retourne l'id résolu.
+
+        Exemple :
+        | `Click Button By Label`    Number of Entries
+        | ${windows}=    `Get Open Windows`
+        | Should Be True    ${windows}[-1][modal]
+        | `Dismiss Modal Window`
+        """
         eid = self._resolve_semantic_unique(label, _CLICK_TYPES,
                                             _as_bool(exact),
                                             scope_radius=_as_radius(scope_radius)
@@ -179,20 +200,25 @@ class SemanticKeywords:
         return eid
 
     def pick_f4_value(self, field_id, value, column=None, timeout=None):
-        """Ouvre l'**aide à la recherche** (F4, matchcode) du champ
+        """Ouvre l'*aide à la recherche* (F4, matchcode) du champ
         ``field_id``, choisit l'entrée ``value`` dans le popup de résultats et
         referme le tout : le geste quotidien « F4 puis double-clic » en un
         keyword. Retourne la valeur du champ après sélection.
 
-        Deux formes de popup couvertes : la **grille** de résultats
+        Deux formes de popup couvertes : la *grille* de résultats
         (GuiGridView : la ligne dont une colonne, ou la seule colonne
         ``column`` si son titre est fourni, vaut ``value``, choisie par
-        double-clic) et la **liste à labels** (l'entrée au texte exact,
+        double-clic) et la *liste à labels* (l'entrée au texte exact,
         choisie par F2). Valeur introuvable = popup refermé (F12) puis échec
         listant un échantillon des valeurs disponibles ; popup toujours
         ouvert après le choix (aide F4 à étapes, onglet de restriction) =
         échec nommant `Get Screen Signature` pour piloter ce dialogue par
-        ids. La comparaison est exacte, blancs de bordure ignorés."""
+        ids. La comparaison est exacte, blancs de bordure ignorés.
+
+        Exemple :
+        | ${value}=    `Pick F4 Value`    wnd[0]/usr/ctxtI1-LOW    LH
+        | Should Be Equal    ${value}    LH
+        """
         field = self.session.findById(field_id)
         field.SetFocus()
         self.send_vkey(4)
@@ -243,7 +269,13 @@ class SemanticKeywords:
         Retourne la valeur du champ après sélection (au format de
         l'utilisateur). Vérifié live (SM37, 2026-09-07) : poser
         ``SelectionInterval = "AAAAMMJJ,AAAAMMJJ"`` sélectionne ET referme.
-        Aide F4 qui n'est pas un calendrier = échec nommant `Pick F4 Value`."""
+        Aide F4 qui n'est pas un calendrier = échec nommant `Pick F4 Value`.
+
+        Exemple :
+        | `Run Transaction`    SM37
+        | ${value}=    `Pick Calendar Date`    wnd[0]/usr/ctxtBTCH2170-FROM_DATE    2026-09-01
+        | Should Be Equal    ${value}    01.09.2026
+        """
         match = _ISO_DATE.match(str(iso_date))
         if match is None:
             raise ValueError(
@@ -285,7 +317,12 @@ class SemanticKeywords:
     def select_checkbox_by_label(self, label, exact=False, scope_radius=None):
         """Coche la case désignée par son TEXTE PROPRE (« Sched. ») ou par un
         libellé voisin (même grammaire que `Find Element By Label`, cibles
-        restreintes aux ``GuiCheckBox``). Retourne l'id résolu."""
+        restreintes aux ``GuiCheckBox``). Retourne l'id résolu.
+
+        Exemple :
+        | `Select Checkbox By Label`    Sched.
+        | `Checkbox By Label Should Be`    Sched.    checked
+        """
         eid = self._resolve_semantic_unique(label, _CHECK_TYPES, _as_bool(exact),
                                             scope_radius=_as_radius(scope_radius)
                                             ).element.id
@@ -293,7 +330,12 @@ class SemanticKeywords:
         return eid
 
     def unselect_checkbox_by_label(self, label, exact=False, scope_radius=None):
-        """Décoche la case désignée par son texte ou un libellé voisin."""
+        """Décoche la case désignée par son texte ou un libellé voisin.
+
+        Exemple :
+        | `Unselect Checkbox By Label`    Canceled
+        | `Checkbox By Label Should Be`    Canceled    unchecked
+        """
         eid = self._resolve_semantic_unique(label, _CHECK_TYPES, _as_bool(exact),
                                             scope_radius=_as_radius(scope_radius)
                                             ).element.id
@@ -302,7 +344,13 @@ class SemanticKeywords:
 
     def select_radio_button_by_label(self, label, exact=False, scope_radius=None):
         """Sélectionne le bouton radio désigné par son texte propre
-        (« Professional User Transaction ») ou un libellé voisin. Retourne l'id."""
+        (« Professional User Transaction ») ou un libellé voisin. Retourne l'id.
+
+        Exemple :
+        | `Run Transaction`    SE38
+        | ${id}=    `Select Radio Button By Label`    Attributes
+        | Should Be Equal    ${id}    wnd[0]/usr/radRS38M-FUNC_HEAD
+        """
         eid = self._resolve_semantic_unique(label, _RADIO_TYPES, _as_bool(exact),
                                             scope_radius=_as_radius(scope_radius)
                                             ).element.id
@@ -312,7 +360,12 @@ class SemanticKeywords:
     def checkbox_by_label_should_be(self, label, expected, exact=False,
                                     scope_radius=None):
         """Échoue si la case désignée par son texte n'est pas dans l'état
-        ``expected`` (``checked`` / ``unchecked``, ou un booléen)."""
+        ``expected`` (``checked`` / ``unchecked``, ou un booléen).
+
+        Exemple :
+        | `Select Checkbox By Label`    Finished
+        | `Checkbox By Label Should Be`    Finished    checked
+        """
         eid = self._resolve_semantic_unique(label, _CHECK_TYPES + _RADIO_TYPES,
                                             _as_bool(exact),
                                             scope_radius=_as_radius(scope_radius)
@@ -458,7 +511,7 @@ class SemanticKeywords:
             % (locator, len(matches), candidates))
 
     def lookup_business_term(self, term, domain=None, threshold=0.8):
-        """Résout un **terme métier** (français ou anglais, synonymes compris)
+        """Résout un *terme métier* (français ou anglais, synonymes compris)
         vers sa fiche SAP : canonique, champ ABAP, table de référence, domaine.
 
         Le pont entre la langue d'un plan de test (« le fournisseur », « la
@@ -469,5 +522,11 @@ class SemanticKeywords:
         Apache-2.0, NOTICE) : MM/SD/FI + modèle Flight de démo (nos suites
         SE16). Ambiguïté ou score sous ``threshold`` = échec listant les
         candidats, jamais de premier-match silencieux. ``domain`` restreint
-        au module. Dict JSON-safe (rf-mcp)."""
+        au module. Dict JSON-safe (rf-mcp).
+
+        Exemple :
+        | ${entry}=    `Lookup Business Term`    compagnie aérienne
+        | Should Be Equal    ${entry}[abap_field]    CARRID
+        | Should Be Equal    ${entry}[table]    SCARR
+        """
         return lookup_as_dict(term, domain=domain, threshold=float(threshold))

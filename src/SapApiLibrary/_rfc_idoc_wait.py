@@ -56,7 +56,12 @@ class RfcIdocWaitKeywords(RfcIdocKeywords):
         lever : le cas négatif s'asserte alors sur ``status``, ``category`` et
         ``state``, pas sur un message. L'historique porte, par enregistrement,
         le statut, l'origine, le message par identifiant, ses paramètres et le
-        TID."""
+        TID.
+
+        Exemple :
+        | ${inbound}=    `Wait For Idoc Status`    6    expected=53    timeout=30s    alias=a4h
+        | Should Be Equal    ${inbound}[state]    reached
+        """
         number = idoc.normalize_docnum(docnum)
         idoc_status.parse_expected(expected)
         seconds = timestr_to_secs(timeout)
@@ -118,7 +123,12 @@ class RfcIdocWaitKeywords(RfcIdocKeywords):
 
         Échecs actionnables : IDoc sans TID (il n'a pas été expédié, son
         statut est nommé), aucun entrant après le délai (tRFC, moniteur
-        SM58), plusieurs candidats (listés)."""
+        SM58), plusieurs candidats (listés).
+
+        Exemple :
+        | ${link}=    `Get Idoc Counterpart`    5    alias=a4h
+        | Should Be Equal    ${link}[counterpart_status]    53
+        """
         number = idoc.normalize_docnum(docnum)
         history = self._idoc_history(number, alias)
         tids = idoc_status.tids_of(history)

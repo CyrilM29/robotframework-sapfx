@@ -1,41 +1,43 @@
-"""SapEccLibrary : un fork robuste de robotframework-sapguilibrary pour SAP ECC.
+"""SapEccLibrary : bibliothèque Robot Framework pour SAP GUI (ECC, backend S/4HANA).
 
-Hérite de tous les keywords de l'upstream ``SapGuiBase`` (vendored, Apache 2.0)
-et ajoute :
+Compatible avec robotframework-sapguilibrary 1.2.1 : ses 37 keywords gardent
+leur nom et leur signature (``tests/unit/test_upstream_compatibility.py``).
+Son code, d'abord vendorisé tel quel, a été absorbé et réécrit le 2026-10-06
+(Apache License 2.0, attribution dans NOTICE et en tête de chaque module
+dérivé) : connexion (``keywords/_connection.py``), éléments
+(``keywords/_elements.py``), saisies (``keywords/_inputs.py``),
+vérifications de valeur (``keywords/_value_checks.py``), cellules de grille
+(``keywords/_grid_cells.py``), capture sur erreur
+(``keywords/_screenshots.py``) et pause explicite (``keywords/_waits.py``).
 
-* amorçage autonome de la connexion      -> ``keywords/_connection.py``
-* synchronisation réelle / attentes intelligentes -> ``keywords/_waits.py``
-* ergonomie de grille ALV (lecture par titre)     -> ``keywords/_grid.py``
-* un override de `Run Transaction` indépendant de la locale (ci-dessous)
-* des erreurs d'élément absent qui disent sur quel écran on se trouve
-  (ci-dessous, `Element Should Be Present` et `Get Element Type`)
-
-Il s'agit de la bibliothèque de *bas niveau* qui pilote SAP GUI. Les keywords lisibles
-métier pour les tests se trouvent dans ``resources/ecc_keywords.resource``
-au-dessus de celle-ci.
+Ce module compose les mixins et porte `Run Transaction`, indépendant de la
+locale. Il s'agit de la bibliothèque de *bas niveau* qui pilote SAP GUI ; les
+keywords lisibles métier pour les tests se trouvent dans
+``resources/ecc_keywords.resource`` au-dessus de celle-ci.
 """
 import os
 import threading
 
 from robot.api import logger
-from robot.api.types import Secret
 from robot.utils import timestr_to_secs
 
 from sapfx_common.com_safety import ensure_com_initialized, is_disconnected_error
-from sapfx_common.secrets import reveal_secret
 from sapfx_common.session_context import current_execution_namespace
 
-from ._vendor.sapgui_base import SapGuiBase
 from .keywords import (
     AbapListKeywords,
     ComboBoxKeywords,
     ConnectionKeywords,
+    ConnectionProbeKeywords,
     DdicKeywords,
     DiagnosticsKeywords,
+    ElementKeywords,
     EmbeddedBrowserKeywords,
     GridActionKeywords,
+    GridCellKeywords,
     GridKeywords,
     HealingKeywords,
+    InputKeywords,
     MenuKeywords,
     PerceptionKeywords,
     PointerKeywords,
@@ -49,24 +51,34 @@ from .keywords import (
     TabStripKeywords,
     ToolbarKeywords,
     TreeKeywords,
+    ValueCheckKeywords,
     VisualKeywords,
     WaitKeywords,
     WatchKeywords,
     WindowKeywords,
 )
+from .keywords._screenshots import SapWindowScreenshot
 
 
-class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
-                    GridKeywords, AbapListKeywords, TableControlKeywords,
-                    TreeKeywords, ComboBoxKeywords, MenuKeywords, WindowKeywords,
-                    SystemIdentityKeywords, StatusBarKeywords, TabStripKeywords,
-                    ToolbarKeywords, PerceptionKeywords,
-                    ScreenshotKeywords, VisualKeywords, WatchKeywords,
-                    DiagnosticsKeywords, HealingKeywords,
+class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
+                    GridActionKeywords, GridKeywords, AbapListKeywords,
+                    TableControlKeywords, TreeKeywords, ComboBoxKeywords,
+                    MenuKeywords, WindowKeywords, SystemIdentityKeywords,
+                    StatusBarKeywords, TabStripKeywords, ToolbarKeywords,
+                    PerceptionKeywords, ScreenshotKeywords, VisualKeywords,
+                    WatchKeywords, DiagnosticsKeywords, HealingKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
-                    SessionKeywords, DdicKeywords, Se16Keywords, SapGuiBase):
+                    SessionKeywords, DdicKeywords, Se16Keywords,
+                    GridCellKeywords, ElementKeywords, InputKeywords,
+                    ValueCheckKeywords):
     """Bibliothèque Robot Framework pour automatiser le client bureau SAP GUI (ECC,
-    backend S/4HANA GUI). Superset compatible de SapGuiLibrary.
+    backend S/4HANA GUI).
+
+    Remplace robotframework-sapguilibrary sans changer une suite : ses 37
+    keywords gardent leur nom et leur signature, leur code a été absorbé et
+    réécrit (les écritures sont relues, une vérification ne modifie rien, la
+    capture sur erreur photographie la fenêtre SAP et non l'écran entier ;
+    licence Apache 2.0, voir NOTICE).
 
     == Avant d'exécuter les tests ==
     Le scripting doit être activé côté serveur (transaction ``RZ11`` ->
@@ -82,7 +94,7 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
 
     En complément, les keywords `Find Element By Label`, `Fill Field By Label`,
     `Read Field By Label` et `Click Button By Label` acceptent des localisateurs
-    **humains** (libellé visible, ``Gauche @ Haut``, ``N @ Libellé``/``Libellé
+    *humains* (libellé visible, ``Gauche @ Haut``, ``N @ Libellé`` / ``Libellé
     @ N`` pour une grille, ``Ancre >> Reste`` pour une portée, ``= contenu`` ;
     voir `Find Element By Label`), résolus géométriquement sur l'écran réel ; et
     `Resolve Element With Healing` accepte une ancre ``label=`` de secours.
@@ -129,12 +141,12 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
         return self._session_registry().setdefault(self._active_alias(), {})
 
     def _touch_com_thread(self, slot):
-        """Rail de sûreté **STA** : la session appartient au thread COM qui l'a
+        """Rail de sûreté *STA* : la session appartient au thread COM qui l'a
         bindée, et un proxy COM STA utilisé depuis un AUTRE thread lève
         ``RPC_E_WRONG_THREAD`` (ou une ``AttributeError`` de proxy pywin32),
         que les couches défensives transformaient en perceptions VIDES en PASS
         (relevé live sous rf-mcp le 2026-09-07). Depuis cette date, un accès
-        depuis un thread étranger **ré-attache** la session sur ce thread :
+        depuis un thread étranger *ré-attache* la session sur ce thread :
         moteur de scripting ré-acquis via la ROT puis ``FindById`` de l'id de
         session mémorisé au bind (``/app/con[0]/ses[0]``), proxy mis en cache
         par thread (vérifié live : la transaction se lit depuis le second
@@ -265,7 +277,12 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
 
     def __init__(self, screenshots_on_error=True, screenshot_directory=None,
                  default_timeout="30s", poll_interval="0.1s"):
-        """``default_timeout`` est la valeur de repli utilisée par chaque keyword
+        """``screenshots_on_error`` active la capture de la fenêtre SAP quand un
+        keyword échoue (voir `Take Screenshot`), écrite dans
+        ``screenshot_directory`` (créé au besoin ; à défaut, le dossier de
+        sortie de Robot).
+
+        ``default_timeout`` est la valeur de repli utilisée par chaque keyword
         ``Wait Until ...``. Accepte les chaînes de temps Robot (``30s``, ``500 ms``).
 
         ``poll_interval`` est le délai entre deux sondages de `Wait Until Busy
@@ -274,7 +291,13 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
         connexion à un serveur SAP distant/plus lent peut bénéficier d'un
         intervalle plus large pour réduire le nombre d'accès COM inutiles."""
         self._state_by_namespace = {}
-        SapGuiBase.__init__(self, screenshots_on_error, screenshot_directory)
+        self.explicit_wait = 0.0
+        self.sapapp = -1
+        self.session = -1
+        self.connection = -1
+        self.take_screenshots = screenshots_on_error
+        self.screenshot = SapWindowScreenshot(self._active_window_for_capture,
+                                              screenshot_directory)
         self.default_timeout = timestr_to_secs(default_timeout)
         self.poll_interval = timestr_to_secs(poll_interval)
         self._saplogon_proc = None
@@ -299,33 +322,45 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
     def run_transaction(self, transaction, skip_if_error=False):
         """Exécute une transaction SAP et vérifie qu'elle s'est bien ouverte.
 
-        Remplace le keyword upstream, qui détectait une transaction inconnue en
-        comparant le *texte* de la barre de statut en néerlandais/anglais/allemand
-        uniquement, fragile dans toute autre langue SAP. Ici, on compare la
-        **transaction réellement active** (``session.Info.Transaction``) au code
+        Le keyword de robotframework-sapguilibrary détectait une transaction
+        inconnue en comparant le *texte* de la barre de statut en
+        néerlandais/anglais/allemand uniquement, fragile dans toute autre
+        langue SAP. Ici, on compare la
+        *transaction réellement active* (``session.Info.Transaction``) au code
         demandé : c'est totalement indépendant de la locale et robuste (validé en
         live, où une transaction inexistante renvoie un message de type ``S`` et non
         ``E`` : l'ancienne hypothèse « type ``E`` » était donc fausse).
 
         Préfixe automatiquement ``/n`` pour démarrer la transaction même depuis un
-        autre écran, y compris pour un tcode de **namespace** (``/BEV1/RCA01``),
+        autre écran, y compris pour un tcode de *namespace* (``/BEV1/RCA01``),
         dont le ``/`` initial fait partie du code et n'est pas un préfixe de
         navigation : seul un vrai préfixe déjà présent (``/n``, ``/o``, ``/i``)
         dispense d'en rajouter un, même quand le namespace commence par la même
         lettre qu'un préfixe (``/IWFND/MAINT_SERVICE``), voir `_has_nav_prefix`.
         Définissez ``skip_if_error=True`` pour journaliser au lieu d'échouer
         (étapes de navigation optionnelles).
+
+        Exemple :
+        | `Run Transaction`    SE16
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SE16
         """
         already_prefixed = self._has_nav_prefix(transaction)
         okcode = transaction if already_prefixed else "/n" + transaction
         self.session.findById("wnd[0]/tbar[0]/okcd").text = okcode
+        closing = transaction.lower() in ("/nex", "/nend")
         try:
             self.send_vkey(0)
-            self.wait_until_busy_done()
+            if closing:
+                self._wait_until_closed_or_idle()
+            else:
+                self.wait_until_busy_done()
         except Exception as exc:
-            # /nex et /nend FERMENT la session : la trouver déconnectée est
-            # leur succès (mesuré 2026-09-28 : 30 s d'attente, puis une capture).
-            if transaction.lower() in ("/nex", "/nend") and is_disconnected_error(exc):
+            # /nex et /nend FERMENT la session : la trouver déconnectée, ou
+            # absente du moteur, est leur succès (mesuré 2026-09-28 : 30 s
+            # d'attente puis une capture ; 2026-10-06 : depuis l'écran de
+            # connexion, la session morte ne répond pas RPC_E_DISCONNECTED).
+            if closing and (is_disconnected_error(exc) or self._session_is_gone()):
                 return
             raise
 
@@ -351,132 +386,15 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
             self.take_screenshot()
             raise ValueError(message)
 
-    def input_password(self, element_id, password: "str | Secret"):
-        """Saisit un mot de passe dans le champ identifié, sans le journaliser.
-
-        Remplace le keyword upstream pour accepter, en plus d'une chaîne, le
-        type ``Secret`` de Robot Framework 7.4 ; créez la variable typée dès la
-        ligne de commande (``-v "SAP_PASSWORD: Secret:<motdepasse>"``) : sa
-        valeur est alors masquée partout, y compris en niveau de log TRACE. Le
-        secret n'est déballé qu'ici, juste avant la frontière COM ; le
-        comportement pour une chaîne ordinaire est inchangé.
-        """
-        return super().input_password(element_id, reveal_secret(password))
-
-    def element_should_be_present(self, element_id, message=None):
-        """Échoue si ``element_id`` est absent de l'écran courant.
-
-        Comportement upstream inchangé : seul le message d'échec est
-        enrichi de l'identité de l'écran réel (voir `_absence_message`).
-        Un ``message`` explicite fourni par l'appelant est respecté tel
-        quel : c'est sa phrase, pas la nôtre.
-        """
-        try:
-            return super().element_should_be_present(element_id, message)
-        except ValueError as absent:
-            if message is not None:
-                raise
-            raise ValueError(self._absence_message(str(absent))) from absent
-
-    def get_element_type(self, element_id):
-        """Retourne le type SAP de ``element_id`` (``GuiButton``, ``GuiTab``...).
-
-        Comportement upstream inchangé, message d'absence enrichi de
-        l'écran courant. C'est le chemin par lequel passe `Click Element`,
-        qui résout le type avant d'agir : sans cet enrichissement, un clic
-        sur un écran inattendu ne rapporte que l'id manquant.
-        """
-        try:
-            return super().get_element_type(element_id)
-        except ValueError as absent:
-            raise ValueError(self._absence_message(str(absent))) from absent
-
-    def element_is_changeable(self, element_id):
-        """``True`` si ``element_id`` est MODIFIABLE (propriété ``Changeable``
-        de l'API Scripting), ``False`` sinon. Sur un bouton, elle dit s'il est
-        actif. Lève si l'élément est absent, avec l'écran réel nommé (même
-        message que `Element Should Be Present`), et si la propriété est
-        ILLISIBLE (voir plus bas).
-
-        C'est le témoin locale-safe du MODE d'une transaction à bascule
-        Affichage/Modification (BP, SU01, ...) : le titre de la fenêtre
-        (« Display Organization » / « Change Organization ») est traduit, et
-        la bascule (F6) est un interrupteur, donc la presser sans savoir où
-        l'on est ramène en affichage. Mesuré sur BP (A4H, 2026-09-28) : le nom
-        d'une organisation n'est pas modifiable en affichage, il l'est en
-        modification et en création, et BP rouvre le dernier partenaire DANS
-        son dernier mode.
-
-        Une propriété ILLISIBLE lève au lieu de valoir ``False`` : sinon
-        `Element Should Not Be Changeable` passerait à vide sur un proxy COM
-        inutilisable (thread étranger, élément sans cette propriété), relevé
-        par la revue indépendante du 2026-09-28."""
-        self.element_should_be_present(element_id)
-        element = self.session.findById(element_id)
-        try:
-            changeable = element.Changeable
-        except Exception as exc:   # noqa: BLE001 : re-levé en nommant l'élément
-            raise AssertionError(
-                "La modifiabilité de '%s' (%s) est illisible : %s. Rien ne peut "
-                "en être conclu, ni affichage ni modification."
-                % (element_id, getattr(element, "Type", "type inconnu"), exc)) from exc
-        return bool(changeable)
-
-    def element_should_be_changeable(self, element_id, message=None):
-        """Échoue si ``element_id`` n'est pas modifiable (voir `Element Is
-        Changeable`) : l'écran est en affichage, ou le champ est protégé.
-        ``message`` remplace le message par défaut."""
-        if not self.element_is_changeable(element_id):
-            self.take_screenshot()
-            raise AssertionError(message or (
-                "L'élément '%s' n'est pas modifiable (Changeable=False) : écran en "
-                "affichage, ou champ protégé.\n%s"
-                % (element_id, self._absence_message("").strip())))
-
-    def element_should_not_be_changeable(self, element_id, message=None):
-        """Échoue si ``element_id`` est modifiable (voir `Element Is
-        Changeable`) : la garde qu'un écran est bien en AFFICHAGE avant d'y
-        lire une valeur qu'une saisie accidentelle ne doit pas toucher."""
-        if self.element_is_changeable(element_id):
-            self.take_screenshot()
-            raise AssertionError(message or (
-                "L'élément '%s' est modifiable (Changeable=True) alors qu'il ne "
-                "devait pas l'être : l'écran est en modification ou en création.\n%s"
-                % (element_id, self._absence_message("").strip())))
-
-    def _absence_message(self, message):
-        """Suffixe un message d'élément absent par l'IDENTITÉ de l'écran actif.
-
-        « Cannot find element with id 'wnd[0]/tbar[1]/btn[31]' » ne
-        distingue pas les trois causes possibles : localisateur périmé,
-        élément pas encore matérialisé, ou écran qui n'est pas celui
-        qu'on croit. La troisième est la plus fréquente en ECC (une
-        transaction qui refuse une saisie reste sur l'écran précédent) et
-        c'est la seule que l'id seul ne peut pas révéler. Une ligne
-        ``# screen <Programme>/<Transaction>/<Numéro>`` tranche
-        immédiatement, pour un humain comme pour un agent.
-
-        Mesuré le 2026-08-17 : le même `Click Element` avait réussi
-        vingt étapes plus tôt dans la session, puis échoué sur la table
-        suivante ; sans l'écran, le diagnostic généré a conclu à un
-        problème de synchronisation et a été rejeté par le juge.
-
-        Best-effort, comme `_closest_matches_hint` : le calcul ne masque
-        jamais l'erreur d'origine, et le mixin de perception peut être
-        absent (usage isolé en tests unitaires).
-        """
-        header = getattr(self, "_screen_header", None)
-        if header is None:
-            return message
-        try:
-            return "%s\n%s" % (message, header())
-        except Exception:                       # noqa: BLE001 (best-effort)
-            return message
-
     def get_current_transaction(self):
-        """Retourne le **code de la transaction active** (``session.Info.Transaction``),
+        """Retourne le *code de la transaction active* (``session.Info.Transaction``),
         p.ex. ``SE16`` ou ``SESSION_MANAGER`` sur l'écran SAP Easy Access.
-        Indépendant de la langue, idéal pour les assertions de navigation."""
+        Indépendant de la langue, idéal pour les assertions de navigation.
+
+        Exemple :
+        | ${transaction}=    `Get Current Transaction`
+        | Should Be Equal    ${transaction}    SE16
+        """
         return self.session.Info.Transaction
 
     def get_status_message(self):
@@ -484,12 +402,24 @@ class SapEccLibrary(ConnectionKeywords, WaitKeywords, GridActionKeywords,
 
         ``message_type`` vaut ``S`` (succès), ``W`` (avertissement), ``E`` (erreur),
         ``I`` (info), ``A`` (abandon), ou ``""`` quand la barre est vide ; tous
-        indépendants de la locale."""
+        indépendants de la locale.
+
+        Exemple :
+        | ${type}    ${text}=    `Get Status Message`
+        | Should Be Equal    ${type}    E
+        """
         status = self.session.findById("wnd[0]/sbar")
         return status.messageType, status.text
 
     def status_message_should_be_success(self):
-        """Échoue si la barre de statut n'affiche pas actuellement un message de succès (``S``)."""
+        """Échoue si la barre de statut n'affiche pas actuellement un message de succès (``S``).
+
+        Exemple :
+        | `Run Transaction`    SE38
+        | `Input Text`    wnd[0]/usr/ctxtRS38M-PROGRAMM    RSPARAM
+        | `Send Vkey`    26
+        | `Status Message Should Be Success`
+        """
         msg_type, text = self.get_status_message()
         if msg_type not in ("S", ""):
             self.take_screenshot()

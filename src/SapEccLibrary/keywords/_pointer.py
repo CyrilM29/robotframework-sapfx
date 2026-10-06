@@ -1,11 +1,11 @@
-"""Effecteur **coordonnées** : agir là où l'API Scripting est aveugle.
+"""Effecteur *coordonnées* : agir là où l'API Scripting est aveugle.
 
 Certaines zones de SAP GUI sont officiellement hors de portée du scripting :
 l'intérieur des GuiShell opaques (listes modernes sans mode accessibilité),
 GuiChart/GuiMap (record-only), le drag & drop (jamais scriptable, position
-officielle SAP). La stratégie du projet y est **hybride, déterministe
-d'abord** : l'API pour tout ce qu'elle voit (rapide, fiable), et en repli un
-**clic matériel** aux coordonnées écran, le geste qu'un humain ferait.
+officielle SAP). La stratégie du projet y est *hybride, déterministe
+d'abord* : l'API pour tout ce qu'elle voit (rapide, fiable), et en repli un
+*clic matériel* aux coordonnées écran, le geste qu'un humain ferait.
 
 Le partage des rôles avec un agent (rf-mcp) : l'agent obtient l'image
 (`Get Screenshot As Base64`) et la géométrie de la zone aveugle
@@ -35,12 +35,17 @@ class PointerKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
     def get_element_screen_region(self, element_id):
-        """Région **écran** (pixels physiques) d'un élément : dict ``left`` /
+        """Région *écran* (pixels physiques) d'un élément : dict ``left`` /
         ``top`` / ``width`` / ``height``, les propriétés ``ScreenLeft`` /
         ``ScreenTop`` de l'API (position absolue à l'écran, pas relative à la
         fenêtre). C'est la moitié « perception » du repli coordonnées : un
         agent la croise avec la capture d'écran pour choisir un point dans une
-        zone opaque."""
+        zone opaque.
+
+        Exemple :
+        | ${region}=    `Get Element Screen Region`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | Should Be True    ${region}[width] > 0 and ${region}[height] > 0
+        """
         try:
             element = self.session.findById(element_id)
             region = {"left": int(element.ScreenLeft),
@@ -55,21 +60,23 @@ class PointerKeywords:
 
     def click_element_at_offset(self, element_id, x_pct=0.5, y_pct=0.5,
                                 button="left", focus=True):
-        """Clic **matériel** à une position relative DANS un élément, le repli
+        """Clic *matériel* à une position relative DANS un élément, le repli
         pour les zones que l'API ne scripte pas (intérieur d'un GuiShell,
         GuiChart, cibles de drag & drop).
 
-        ``x_pct``/``y_pct`` : position dans l'élément, de 0.0 (bord gauche/haut)
+        ``x_pct`` / ``y_pct`` : position dans l'élément, de 0.0 (bord gauche/haut)
         à 1.0 (bord droit/bas), défaut le centre. ``button`` : ``left`` /
         ``right`` / ``double``. ``focus=True`` met d'abord la fenêtre SAP au
         premier plan (un clic matériel atterrit sur ce qui est VISIBLE à ces
         coordonnées). Retourne le point cliqué ``{"x": ..., "y": ...}``,
         journalisé, jamais silencieux.
 
-        Exemple (croiser avec la perception visuelle)::
+        À croiser avec la perception visuelle (`Get Element Screen Region`).
 
-            ${region}=    Get Element Screen Region    wnd[0]/usr/cntlGRID1/shellcont/shell
-            Click Element At Offset    wnd[0]/usr/cntlGRID1/shellcont/shell    0.1    0.15
+        Exemple :
+        | ${point}=    `Click Element At Offset`    wnd[0]/usr/cntlGRID1/shellcont/shell    0.1    0.15
+        | ${region}=    `Get Element Screen Region`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | Should Be True    ${region}[left] <= ${point}[x] <= ${region}[left] + ${region}[width]
         """
         x_pct = float(x_pct)
         y_pct = float(y_pct)

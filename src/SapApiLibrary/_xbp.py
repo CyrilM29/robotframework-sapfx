@@ -1,4 +1,4 @@
-"""Mixin de la **session XBP** partagée : l'interface officielle des
+"""Mixin de la *session XBP* partagée : l'interface officielle des
 ordonnanceurs externes (``BAPI_XMI_LOGON`` / ``BAPI_XMI_LOGOFF``), ouverte
 une fois autour d'une lecture ou d'une écriture de job.
 
@@ -75,19 +75,29 @@ class XbpSessionMixin(BapiKeywords):
         raise AssertionError(bapi_return.format_bapi_failure("BAPI_XMI_LOGON", failing))
 
     def open_xbp_session(self, alias: str = "default") -> dict[str, Any]:
-        """Ouvre la session **XBP** (``BAPI_XMI_LOGON``, interface 3.0) de la
+        """Ouvre la session *XBP* (``BAPI_XMI_LOGON``, interface 3.0) de la
         connexion RFC ``alias`` et rend ``{"opened": bool}`` : ``False`` quand
         elle était déjà ouverte (``XM/E/022``), sans erreur. Les keywords de
         jobs et de spool ouvrent et referment la leur seuls ; celui-ci sert à
         appeler soi-même un module XBP, et à éprouver une preuve de fermeture
         (`Xbp Session Should Be Closed`) sur une session laissée ouverte. À
-        refermer par `Close Xbp Session`."""
+        refermer par `Close Xbp Session`.
+
+        Exemple :
+        | ${xbp}=    `Open Xbp Session`    alias=a4h
+        | Should Be True    ${xbp}[opened]
+        """
         return {"opened": self._xbp_logon(alias)}
 
     def close_xbp_session(self, alias: str = "default") -> dict[str, Any]:
         """Referme la session XBP de ``alias`` (``BAPI_XMI_LOGOFF``) et rend
         ``{"closed": bool}`` : ``False`` quand aucune n'était ouverte
-        (``XM/E/028``, mesuré), sans erreur ; tout autre refus lève."""
+        (``XM/E/028``, mesuré), sans erreur ; tout autre refus lève.
+
+        Exemple :
+        | ${xbp}=    `Close Xbp Session`    alias=a4h
+        | Should Be True    ${xbp}[closed]
+        """
         result = self.call_rfc("BAPI_XMI_LOGOFF", alias=alias, INTERFACE="XBP") or {}
         failing = bapi_return.failing_messages(
             bapi_return.iter_bapi_messages(result, "RETURN"))
@@ -108,7 +118,12 @@ class XbpSessionMixin(BapiKeywords):
         second logon ``XM/E/022``, logoff sans session ``XM/E/028``). Né de la
         revue ISTQB de la campagne du scénario 9 : la session XBP étant
         désormais partagée, le refus ``XM/E/022`` qui trahissait une session
-        oubliée a disparu, et une fuite ne rougissait plus nulle part."""
+        oubliée a disparu, et une fuite ne rougissait plus nulle part.
+
+        Exemple :
+        | ${xbp}=    `Get Xbp Session State`    alias=a4h
+        | Should Not Be True    ${xbp}[open]
+        """
         if self._xbp_logon(alias):
             self.close_xbp_session(alias)
             return {"open": False, "evidence": "logon accepté puis refermé"}
@@ -118,7 +133,11 @@ class XbpSessionMixin(BapiKeywords):
         """Échoue si une session XBP est restée ouverte sur la connexion RFC
         ``alias`` (voir `Get Xbp Session State`) : la moitié XBP d'une preuve
         de fermeture, à poser AVANT de fermer la connexion RFC (une session
-        XMI ne survit pas à sa connexion)."""
+        XMI ne survit pas à sa connexion).
+
+        Exemple :
+        | `Xbp Session Should Be Closed`    alias=a4h
+        """
         state = self.get_xbp_session_state(alias)
         if state["open"]:
             raise AssertionError(

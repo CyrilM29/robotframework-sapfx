@@ -1,7 +1,7 @@
 """Bundle JavaScript en page pour la résolution et la capture de contrôles UI5.
 
 Porté (et simplifié pour fonctionner comme un bundle injecté unique, sans fork de Playwright)
-depuis **playwright-sap** par Arpit Sureka, https://github.com/ArpitSureka/playwright-sap
+depuis *playwright-sap* par Arpit Sureka, https://github.com/ArpitSureka/playwright-sap
 Sous licence Apache-2.0. Voir le fichier NOTICE du projet.
 
 Techniques adoptées depuis ce projet :
@@ -14,7 +14,7 @@ Techniques adoptées depuis ce projet :
   * une liste de propriétés autorisées ordonnée par priorité, utilisée par le Spy pour
     choisir un sélecteur stable.
 
-Le bundle définit l'espace de noms `window.__SAPFX`, **versionné par le contenu** : une
+Le bundle définit l'espace de noms `window.__SAPFX`, *versionné par le contenu* : une
 réinstallation de la MÊME version ne fait rien (le cas courant, à chaque appel de keyword),
 une version différente REMPLACE celle qui est en place. Sans ce numéro, une page gardait à
 vie le premier bundle reçu, et une bibliothèque mise à jour en cours de session (hot-swap
@@ -150,8 +150,8 @@ def build_call(method):
     Double forme d'appel (même fonction) :
     * sans sélecteur Browser  -> Playwright appelle ``fn(arg)`` ;
     * avec sélecteur Browser (support iframe Work Zone/cFLP) -> Playwright
-      appelle ``fn(element, arg)`` et exécute la fonction **dans le contexte de
-      la frame de l'élément** : ``window`` y est la fenêtre de la frame, donc le
+      appelle ``fn(element, arg)`` et exécute la fonction *dans le contexte de
+      la frame de l'élément* : ``window`` y est la fenêtre de la frame, donc le
       bundle s'installe et résout dans l'app embarquée, pas dans le shell.
     On détecte la forme au nombre d'arguments réellement reçus."""
     return ("(first, second) => { const arg = (second === undefined) ? first : second; "

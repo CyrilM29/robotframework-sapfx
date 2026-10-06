@@ -7,7 +7,7 @@ du « fonctionne immédiatement » à la « haute fidélité complète ».
 
 ## Niveau 1 : logique pure, sans SAP, sans COM Windows (aujourd'hui)
 
-La logique ajoutée par le fork (attentes, réessais, grille par titre, détection d'erreurs de transaction)
+La logique ajoutée par `SapEccLibrary` (attentes, réessais, grille par titre, détection d'erreurs de transaction)
 est testée unitairement contre des **faux objets COM** :
 
 ```bash
@@ -100,7 +100,7 @@ et testées entièrement sur des pages de démonstration publiques.
 
 | Besoin | Utiliser | Coût |
 |--------|----------|------|
-| Valider la logique du fork maintenant | `pytest tests/unit` (faux COM) | gratuit, instantané |
+| Valider la logique ajoutée maintenant | `pytest tests/unit` (faux COM) | gratuit, instantané |
 | Navigation ECC GUI réelle | ABAP Platform Trial Docker (**arrêté par SAP, voir plus haut**) | gratuit + votre matériel |
 | Scénarios S/4HANA complets | SAP CAL (30 jours ; les anciennes éditions ABAP quittent CAL le 2026-09-30) | hébergement cloud uniquement |
 | Launchpad Fiori réel, login IAS réel | Trial SAP BTP (90 jours, **pas de SAP GUI**) | gratuit, compte requis |

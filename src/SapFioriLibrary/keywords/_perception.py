@@ -43,11 +43,11 @@ class PerceptionKeywords:
 
         Chaque nœud = un contrôle : balise = type court (``Button``), attributs =
         ``id``, ``controlType`` plein, et les propriétés primitives autorisées
-        (``text``, ``value``…). C'est le pendant Fiori de `Get Screen Signature`
+        (``text``, ``value`` …). C'est le pendant Fiori de `Get Screen Signature`
         (ECC) : une vue de l'écran qu'un agent IA (plugin rf-mcp) lit pour *voir*
         les contrôles disponibles avant d'en déduire un sélecteur role/xpath stable.
 
-        ``mode=diff`` retourne le **différentiel** depuis l'appel précédent de ce
+        ``mode=diff`` retourne le *différentiel* depuis l'appel précédent de ce
         keyword sur cette instance (balises ``- `` disparues / ``+ `` apparues,
         inchangé résumé) : après une action, « ce qui a changé » suffit à l'agent
         pour une fraction des tokens. Premier appel en diff : arbre complet.
@@ -55,7 +55,13 @@ class PerceptionKeywords:
 
         Lecture seule. Sonde jusqu'à ``ui5_timeout`` que le noyau UI5 soit prêt.
         Respecte `Set Ui5 Frame` (arbre de l'app embarquée, pas du shell).
-        Lève une exception si la page n'est pas une application UI5."""
+        Lève une exception si la page n'est pas une application UI5.
+
+        Exemple :
+        | ${tree}=    `Get Ui5 Page Tree`
+        | Should Contain    ${tree}    sap.m.Table
+        | ${changes}=    `Get Ui5 Page Tree`    mode=diff
+        """
         def _dump_tree():
             try:
                 return self._evaluate(DUMP_TREE_JS, arg=None)
@@ -85,16 +91,16 @@ class PerceptionKeywords:
     # action contre le registre UI5 rendu.
 
     def get_ui5_page_map(self, include_types=None):
-        """Retourne la **carte numérotée** de la page UI5 courante : une ligne
+        """Retourne la *carte numérotée* de la page UI5 courante : une ligne
         par cible actionnable : champs saisissables (``* ``, valeur courante
         affichée) et cibles cliquables, avec libellé humain (text/title/
-        placeholder/tooltip, ``?`` à défaut), id de contrôle et type court ::
+        placeholder/tooltip, ``?`` à défaut), id de contrôle et type court :
 
-            # ui5 page map : 2 actionable target(s)
-            @1\t* Search\tcontainer---app--searchField\tSearchField\t=
-            @2\t  Go\tcontainer---app--goBtn\tButton
+        | # ui5 page map : 2 actionable target(s)
+        | @1\t* Search\tcontainer---app--searchField\tSearchField\t=
+        | @2\t  Go\tcontainer---app--goBtn\tButton
 
-        Chaque numéro devient une **référence éphémère** pour `Resolve Ui5
+        Chaque numéro devient une *référence éphémère* pour `Resolve Ui5
         Ref`, `Click Ui5 Ref` et `Fill Ui5 Ref` : l'agent lit la carte puis
         agit par ``@N`` sans recopier l'id (la résolution re-vérifie que le
         contrôle est toujours rendu). ``include_types`` (types courts séparés
@@ -103,7 +109,12 @@ class PerceptionKeywords:
         Respecte `Set Ui5 Frame`. Lecture seule ; ne touche pas la mémoire du
         ``mode=diff`` de `Get Ui5 Page Tree`. Dans une SUITE, rester sur les
         localisateurs de ``resources/`` (convention #1) : les ``@N`` sont
-        réservés au pilotage interactif."""
+        réservés au pilotage interactif.
+
+        Exemple :
+        | ${map}=    `Get Ui5 Page Map`
+        | Should Contain    ${map}    actionable target
+        """
         def _dump_tree():
             try:
                 return self._evaluate(DUMP_TREE_JS, arg=None)
@@ -124,7 +135,7 @@ class PerceptionKeywords:
         return "\n".join([header] + lines)
 
     def _validate_ui5_ref(self, ref):
-        """Valide une référence ``@N``/``N`` contre la dernière carte :
+        """Valide une référence ``@N`` / ``N`` contre la dernière carte :
         échec IMMÉDIAT (hors budget de retry) si aucune carte n'a été relevée
         ou si le numéro est inconnu. Retourne ``(numéro, id de contrôle)``."""
         refs = getattr(self, "_ui5_refs", None)
@@ -142,11 +153,17 @@ class PerceptionKeywords:
 
     def resolve_ui5_ref(self, ref):
         """Résout une référence ``@N`` de la dernière `Get Ui5 Page Map` en
-        **sélecteur Browser** (``css=[id="…"]``, préfixé par la frame active),
+        *sélecteur Browser* (``css=[id="…"]``, préfixé par la frame active),
         jamais en silence : échec actionnable si aucune carte n'a été
         relevée, si le numéro est inconnu, ou si le contrôle n'est plus rendu
         (page naviguée, vue redessinée ; le remède est nommé : re-percevoir
-        avec `Get Ui5 Page Map`). Accepte ``3`` ou ``@3``."""
+        avec `Get Ui5 Page Map`). Accepte ``3`` ou ``@3``.
+
+        Exemple :
+        | ${map}=    `Get Ui5 Page Map`
+        | ${selector}=    `Resolve Ui5 Ref`    @10
+        | Should Start With    ${selector}    css=
+        """
         number, control_id = self._validate_ui5_ref(ref)
         try:
             ids = self._evaluate(
@@ -166,7 +183,12 @@ class PerceptionKeywords:
         `Resolve Ui5 Ref` (fraîcheur re-vérifiée) puis clic Browser, avec la
         même absorption des *stale elements* que `Click Ui5 Control`
         (re-résolution à chaque tentative). Retourne le sélecteur cliqué
-        (journalisé : la trace reste rejouable dans une suite)."""
+        (journalisé : la trace reste rejouable dans une suite).
+
+        Exemple :
+        | ${map}=    `Get Ui5 Page Map`
+        | `Click Ui5 Ref`    @10
+        """
         number, _control_id = self._validate_ui5_ref(ref)
 
         def _do():
@@ -180,9 +202,14 @@ class PerceptionKeywords:
     def fill_ui5_ref(self, ref, text):
         """Saisit ``text`` dans la cible ``@N`` de la dernière carte : même
         chemin composite que `Fill Ui5 Input` (l'élément interne
-        ``<input>``/``<textarea>`` du contrôle, jamais son ``<div>`` racine),
+        ``<input>`` / ``<textarea>`` du contrôle, jamais son ``<div>`` racine),
         fraîcheur re-vérifiée avant chaque tentative. Retourne le sélecteur
-        du contrôle rempli. La valeur saisie n'est jamais un localisateur."""
+        du contrôle rempli. La valeur saisie n'est jamais un localisateur.
+
+        Exemple :
+        | ${map}=    `Get Ui5 Page Map`
+        | `Fill Ui5 Ref`    @5    Aussie
+        """
         number, _control_id = self._validate_ui5_ref(ref)
 
         def _do():
@@ -220,14 +247,14 @@ class PerceptionKeywords:
         return result
 
     def get_ui5_control_info(self, model=None, **selector_parts):
-        """Fiche JSON-safe de CHAQUE contrôle **rendu** qui matche le
+        """Fiche JSON-safe de CHAQUE contrôle *rendu* qui matche le
         sélecteur (mêmes clés que `Resolve Ui5 Control`) : liste de dicts
         ``{id, type, rendered, properties, property_keys, binding}``.
 
         ``type`` est le nom PLEIN de métadonnées (``sap.m.Avatar``) : la
         lecture qui prouve la TECHNOLOGIE d'un contrôle, là où l'arbre de
         `Get Ui5 Page Tree` n'en donne que la forme courte. ``binding`` porte
-        le **contexte de liaison** (``{path, object, object_keys}``, ``None``
+        le *contexte de liaison* (``{path, object, object_keys}``, ``None``
         sans contexte ; ``model=`` en vise un nommé) : la voie des items dont
         l'identifiant est GÉNÉRÉ mais dont la clé technique vit dans le
         modèle (rubriques de paramètres d'un shell, thèmes : relevés live
@@ -238,18 +265,20 @@ class PerceptionKeywords:
         primitives, et ``property_keys`` liste TOUTES les propriétés lues,
         y compris celles dont la valeur est un tableau (``fieldGroupIds``) :
         la réduction s'annonce, elle ne se devine pas. Pour l'inventaire
-        DÉCLARÉ (types, défauts, provenance), voir `Get Ui5 Control Metadata`. ::
-
-            ${fiches}=    Get Ui5 Control Info    idSuffix=userActionsMenuHeaderButton
-            Should Be Equal    ${fiches}[0][type]    sap.m.Avatar
+        DÉCLARÉ (types, défauts, provenance), voir `Get Ui5 Control Metadata`.
 
         Lecture, pas assertion : aucune correspondance rend une liste vide.
-        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`)."""
+        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`).
+
+        Exemple :
+        | ${info}=    `Get Ui5 Control Info`    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Should Be Equal    ${info}[0][type]    sap.m.Table
+        """
         return list(self._control_info(selector_parts, model=model) or [])
 
     def get_ui5_aggregation_info(self, aggregation, index=0, model=None,
                                  **selector_parts):
-        """Fiche JSON-safe des **enfants d'une agrégation** du contrôle
+        """Fiche JSON-safe des *enfants d'une agrégation* du contrôle
         résolu (``index``, base 0) : liste de dicts ``{id, type, rendered,
         properties, binding}``, rendus OU NON.
 
@@ -258,14 +287,16 @@ class PerceptionKeywords:
         et les items réservés d'une liste restent non rendus ; ils sont
         pourtant DÉCLARÉS dans l'agrégation, avec leur clé, leur contexte de
         liaison et leur position. ``rendered`` distingue les deux
-        populations. ::
-
-            ${items}=    Get Ui5 Aggregation Info    items
-            ...    controlType=List    idSuffix=--settingsList
+        populations.
 
         Agrégation inconnue du contrôle = échec la nommant ; agrégation
         déclarée mais vide = liste vide (les deux cas restent distincts).
-        Sélecteur sans correspondance = échec (il faut UN contrôle hôte)."""
+        Sélecteur sans correspondance = échec (il faut UN contrôle hôte).
+
+        Exemple :
+        | ${columns}=    `Get Ui5 Aggregation Info`    columns    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Should Be Equal    ${columns}[0][type]    sap.m.Column
+        """
         result = self._control_info(selector_parts, aggregation=aggregation,
                                     index=index, model=model)
         if isinstance(result, dict) and "__out_of_range" in result:
@@ -286,7 +317,7 @@ class PerceptionKeywords:
         return list(result or [])
 
     def get_ui5_control_metadata(self, **selector_parts):
-        """Inventaire de **MÉTADONNÉES** de chaque contrôle qui matche le
+        """Inventaire de *MÉTADONNÉES* de chaque contrôle qui matche le
         sélecteur (mêmes clés que `Resolve Ui5 Control`) : le contrat DÉCLARÉ
         par la classe, indépendant des valeurs courantes. Liste de dicts
         ``{id, type, lineage, properties, aggregations, associations,
@@ -305,14 +336,15 @@ class PerceptionKeywords:
         contrôle VIVANT : relevé 2026-09-05 sur le Demo Kit, la fiche réduite
         aux primitives rendait 17 clés là où la doc de ``sap.m.Button`` en
         documente 18 (``fieldGroupIds``, valeur tableau), et la notion
-        « borrowed » de la doc correspond exactement à ``borrowed`` ici. ::
-
-            ${inventaires}=    Get Ui5 Control Metadata    controlType=Button
-            Length Should Be    ${inventaires}[0][properties]    18
-            Should Be Equal    ${inventaires}[0][properties][text][type]    string
+        « borrowed » de la doc correspond exactement à ``borrowed`` ici.
 
         Lecture, pas assertion : aucune correspondance rend une liste vide.
-        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`)."""
+        N'attend pas le rendu (percevoir d'abord, cf. `Get Ui5 Page Tree`).
+
+        Exemple :
+        | ${metadata}=    `Get Ui5 Control Metadata`    idSuffix=fe::table::Travel::LineItem-innerTable
+        | Should Be Equal    ${metadata}[0][properties][growingThreshold][type]    int
+        """
         payload = {"selector": json.loads(
             selector_to_json(build_control_selector(**selector_parts)))}
         result = self._evaluate(CONTROL_METADATA_JS, arg=json.dumps(payload))
@@ -328,12 +360,17 @@ class PerceptionKeywords:
 
     def get_ui5_perceptual_hash(self, hash_size=8):
         """Capture la page courante (bibliothèque Browser) et retourne son
-        **hash perceptuel** (dHash hexadécimal, ``hash_size²`` bits) : le
+        *hash perceptuel* (dHash hexadécimal, ``hash_size²`` bits) : le
         pendant Fiori de `Get Screen Perceptual Hash` (ECC), même cœur pur
         ``sapfx_common.visual_hash``.
 
         Couvre ce que l'arbre UI5 ne dit pas : un canvas, une image, un
-        thème/rendu globalement altéré. Nécessite Pillow (extra ``visual``)."""
+        thème/rendu globalement altéré. Nécessite Pillow (extra ``visual``).
+
+        Exemple :
+        | ${hash}=    `Get Ui5 Perceptual Hash`
+        | Should Not Be Empty    ${hash}
+        """
         pixels = self._decode_image_to_gray(self._page_png())
         from sapfx_common.visual_hash import dhash_hex
         return dhash_hex(pixels, int(hash_size))
@@ -341,7 +378,7 @@ class PerceptionKeywords:
     def ui5_screen_should_match_baseline(self, name, threshold=5,
                                          baseline_directory="visual_baselines",
                                          hash_size=8, per_resolution=False):
-        """Assertion de **non-régression visuelle** de la page Fiori courante,
+        """Assertion de *non-régression visuelle* de la page Fiori courante,
         même sémantique *snapshot* que `Screen Should Match Baseline` (ECC),
         même module partagé (``sapfx_common.visual_baseline``) :
 
@@ -351,14 +388,18 @@ class PerceptionKeywords:
           baseline ; au-delà de ``threshold`` (défaut 5 sur 64 bits), échec
           auto-corrigible avec ``<name>.actual.png`` sauvé à côté.
 
-        ``per_resolution=True`` garde **une baseline par géométrie de capture**
+        ``per_resolution=True`` garde *une baseline par géométrie de capture*
         (``<name>@1440x900.png``), miroir exact de l'option ECC : la taille de
         viewport fait partie de l'empreinte, donc deux postes (ou deux réglages
         de `New Browser`) comparent chacun à leur propre référence au lieu
         d'échouer sur une dérive d'échelle. Sans l'option, un échec dont les
-        deux géométries diffèrent le **dit** dans son message.
+        deux géométries diffèrent le *dit* dans son message.
 
-        Retourne la distance mesurée (0 pour une baseline nouvellement créée)."""
+        Retourne la distance mesurée (0 pour une baseline nouvellement créée).
+
+        Exemple :
+        | `Ui5 Screen Should Match Baseline`    travel_list    threshold=8
+        """
         from sapfx_common.visual_baseline import (format_geometry,
                                                   match_baseline)
         outcome = match_baseline(name, self._page_png(),

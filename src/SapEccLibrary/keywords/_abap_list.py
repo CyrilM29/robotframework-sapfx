@@ -1,4 +1,4 @@
-"""Mixin des **listes ABAP classiques adressées par ligne** : les lire
+"""Mixin des *listes ABAP classiques adressées par ligne* : les lire
 alignées sur leur en-tête et cocher la ligne d'un contenu donné.
 
 Né de la fiche scénario 9 (A4H, 2026-10-01), sur les listes de SM37 (jobs),
@@ -25,18 +25,21 @@ class AbapListKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
     def read_abap_list_rows(self, header="auto", rows="auto"):
-        """Lit la liste classique affichée en **lignes alignées sur l'en-tête** :
+        """Lit la liste classique affichée en *lignes alignées sur l'en-tête* :
         une liste de dicts ``{titre d'en-tête: valeur}`` où chaque cellule est
         rattachée à sa colonne par la COLONNE de son identifiant
         (``lbl[64,13]``), une cellule absente valant ``""``, plus ``_row``
         (ligne de liste), ``_selectable`` et ``_checkbox`` (identifiant de la
         case de sélection, vide sans case).
 
-        ``header`` : ``auto`` (dans une liste à cases, la ligne SANS case la
-        plus fournie au-dessus des lignes à case : le rappel des critères de
-        SM37 porte lui aussi des cases ; sans case, la première ligne d'au
-        moins deux cellules), le TEXTE d'une cellule d'en-tête, ou le numéro
-        de sa ligne de liste. ``rows`` :
+        ``header`` : ``auto`` (dans une liste à cases, la ligne SANS case,
+        au-dessus des lignes à case, dont les cellules commencent aux mêmes
+        colonnes que celles des lignes à case qui la suivent, puis la plus
+        fournie : le rappel des critères de SM37 porte lui aussi des cases,
+        et la ligne d'information de la liste SE16 standard porte plus de
+        cellules que l'en-tête ; sans case, la première ligne d'au moins
+        deux cellules), le TEXTE d'une cellule d'en-tête, ou le numéro de sa
+        ligne de liste. ``rows`` :
         ``selectable`` (seules les lignes à case : une liste sélectionnable
         SANS donnée rend ``[]``), ``all``, ou ``auto`` (``selectable`` si la
         liste porte des cases, sinon toutes les lignes sous l'en-tête moins
@@ -44,7 +47,13 @@ class AbapListKeywords:
         qui recouvre plusieurs colonnes).
 
         Les titres d'en-tête sont des textes LOCALISÉS : les nommer appartient
-        au page object, jamais à une suite. Lecture seule."""
+        au page object, jamais à une suite. Lecture seule.
+
+        Exemple :
+        | ${rows}=    `Read Abap List Rows`
+        | Should Be Equal    ${rows}[0][CARRID]    AA
+        | Should Be True    ${rows}[0][_selectable]
+        """
         result = aligned_rows(self._screen_elements(), header=header, rows=rows)
         for skipped in result["ignored"]:
             logger.info("Ligne %s de la liste ignorée (une cellule sur "
@@ -62,7 +71,12 @@ class AbapListKeywords:
         colonne, ou des premières cellules) ; plusieurs lignes = échec les
         listant, jamais la première venue ; ligne sans case = échec. Le
         préalable des actions de liste (« Job > Delete » de SM37, « Display
-        contents » de SP01), qui agissent sur les lignes COCHÉES."""
+        contents » de SP01), qui agissent sur les lignes COCHÉES.
+
+        Exemple :
+        | ${row}=    `Select Abap List Row`    LH    column=CARRID
+        | Should Be Equal    ${row}[CARRNAME]    Lufthansa
+        """
         rows = self.read_abap_list_rows(header=header, rows="selectable")
         found = matching_rows(rows, text, column)
         if not found:

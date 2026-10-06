@@ -230,8 +230,8 @@ _MAP_LABEL_ATTRIBUTES = ("text", "title", "placeholder", "tooltip")
 
 def ui5_page_map(tree_xml: str,
                  include_types: Any = None) -> tuple[list[str], dict[str, str]]:
-    """Réduit l'arbre XML des contrôles (``Get Ui5 Page Tree``) à la **carte
-    numérotée** des cibles actionnables : ``(lignes, refs)``.
+    """Réduit l'arbre XML des contrôles (``Get Ui5 Page Tree``) à la *carte
+    numérotée* des cibles actionnables : ``(lignes, refs)``.
 
     Chaque ligne : ``@N\\t<marque><libellé ou ?>\\t<id>\\t<TypeCourt>``, avec la
     marque ``* `` pour un champ saisissable (suivi de ``= <valeur>``) et deux
@@ -393,7 +393,7 @@ def build_intent_hash(intent: str, params: dict[str, Any] | None = None) -> str:
 
 def parse_location(url: str) -> dict[str, Any]:
     """Décompose une adresse en dict JSON-safe ``{url, scheme, host, path,
-    query, fragment, intent, intent_params}``.
+    query, fragment, intent, intent_params, app_route}``.
 
     L'inverse de `build_intent_hash` : ce qu'une page a réellement ATTEINT.
     ``intent`` n'est renseigné que si le fragment porte la forme
@@ -403,15 +403,24 @@ def parse_location(url: str) -> dict[str, Any]:
     un fournisseur d'identité du site lui-même : sans ce constat, une page de
     connexion servie par le site rendrait vert un test censé prouver la
     redirection (leçon live 2026-08-26, campagnes Work Zone).
+
+    Le hash du shell sépare la route PROPRE à l'application par ``&/``
+    (``#EPMPurchaseOrder-approve&/PurchaseOrder/300001997``, relevé live le
+    2026-10-06 sur A4H) : elle est rendue telle quelle dans ``app_route`` et
+    n'entre ni dans l'intent ni dans ses paramètres. Avant, toute application
+    maître-détail rendait ``intent`` à ``None``. ``app_route`` reste vide sans
+    intent reconnu.
     """
     parsed = urlsplit(str(url or ""))
     fragment = parsed.fragment or ""
     intent: str | None = None
     params: dict[str, str] = {}
-    head, _, tail = fragment.partition("?")
-    head = head.lstrip("#")
+    app_route = ""
+    shell, has_route, route = fragment.lstrip("#").partition("&/")
+    head, _, tail = shell.partition("?")
     if _INTENT_RE.match(head):
         intent = head
+        app_route = "/" + route if has_route else ""
         for pair in tail.split("&"):
             if not pair:
                 continue
@@ -420,14 +429,15 @@ def parse_location(url: str) -> dict[str, Any]:
     return {"url": str(url or ""), "scheme": parsed.scheme,
             "host": parsed.netloc, "path": parsed.path,
             "query": parsed.query, "fragment": fragment,
-            "intent": intent, "intent_params": params}
+            "intent": intent, "intent_params": params,
+            "app_route": app_route}
 
 
 def choose_app_frame(frames: list[dict[str, Any]]) -> int | None:
     """Index de l'iframe qui porte l'APPLICATION dans un launchpad, ou ``None``.
 
     Un cFLP (SAP Build Work Zone, FLP classique) ouvre chaque application dans
-    une iframe dont l'identifiant est **généré** par UI5 : mesuré live le
+    une iframe dont l'identifiant est *généré* par UI5 : mesuré live le
     2026-08-23, la même application reçoit ``__container1`` à une exécution et
     ``__container4`` à la suivante, le compteur dépendant du nombre de
     composants instanciés depuis le chargement. Aucun identifiant, aucune

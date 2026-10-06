@@ -57,19 +57,26 @@ Product Count Is The Same On Screen And Through The API
 
 ## ECC library internals (`src/SapEccLibrary`)
 
-Composition by mixins over the vendored upstream class:
+Composition by mixins, without a base class (abridged):
 
 ```
 SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
               PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
-              SemanticKeywords, EmbeddedBrowserKeywords, SapGuiBase)
+              SemanticKeywords, EmbeddedBrowserKeywords, ...,
+              GridCellKeywords, ElementKeywords, InputKeywords,
+              ValueCheckKeywords)
 ```
 
-- **`_vendor/sapgui_base.py`**: upstream `SapGuiLibrary`, renamed `SapGuiBase`,
-  Apache 2.0 (see `NOTICE`). Treated as read-only; never edited except on re-sync.
-- **Mixins** (`keywords/_*.py`) are listed *before* the base in the MRO, so a mixin
-  method overrides a same-named base method, and mixins can call inherited keywords
-  via `self`:
+- **The 37 keywords of robotframework-sapguilibrary** (Apache 2.0, see
+  `NOTICE`) live in our own mixins since 6 October 2026: `_elements`,
+  `_inputs`, `_value_checks`, `_grid_cells`, plus connection, waits and the
+  on-error screenshot. Their code, first vendored verbatim, was absorbed and
+  rewritten (writes read back, no focus moved by a check, the SAP window
+  captured instead of the whole screen); their names and signatures are
+  pinned by a unit test, so suites written for the upstream library run
+  unchanged. See [audit-upstream.md](audit-upstream.md).
+- **Mixins** (`keywords/_*.py`) each carry one capability and call each other
+  through `self`; the four mixins of the absorbed keywords sit last in the MRO:
   - `_connection`: autonomous bootstrap (Logon Pad, retry connect, `CoInitialize`
     for off-main-thread execution such as rf-mcp).
   - `_waits`: real synchronisation (`session.Busy` + element polling); failures
@@ -237,8 +244,8 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
   receive isolated instances. rf-mcp concurrency limits are documented separately.
 
 Why mixins and not a subclass with everything in one file: each concern (connect,
-wait, grid, perceive, diagnose, heal) is independently testable and independently
-re-syncable, and the diff against upstream stays obvious.
+wait, grid, perceive, diagnose, heal) is independently testable, and a file never
+grows past the repository's size limit by accumulating unrelated keywords.
 
 **`src/sapfx_common/`** is the shared layer used by *both* channels: `polling`
 (all wait/retry loops), `com_safety` (`ensure_com_initialized`), `healing` (the
@@ -331,7 +338,8 @@ same route (see `NOTICE`).
    universal half is `src/`, the libraries, which carry the capabilities.
 2. Never `time.sleep` to wait for SAP; use the `Wait Until ...` keywords.
 3. Locale-independent assertions only (message *type*, not message *text*).
-4. Keep the upstream vendor diff to one line.
+4. Keep the robotframework-sapguilibrary surface: its 37 keywords keep their
+   names and signatures.
 
 ## Trademarks
 

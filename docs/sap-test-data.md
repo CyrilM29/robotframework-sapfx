@@ -113,7 +113,7 @@ it; `fiori_sflight_smoke.robot` is equally affected until then.
   risk-free; re-run `ecc_smoke.robot` after upgrading. SAP GUI 8.00 restricted
   support ends 2027-07-31. API reference: [SAP GUI Scripting API on the Help Portal](https://help.sap.com/docs/r/b47d018c3b9b45e897faf66a6c0885a8/latest/en-US).
 - **Ecosystem**: upstream `robotframework-sapguilibrary` is dormant (last release
-  2022; our vendored fork is the de-facto maintenance line);
+  2022; `SapEccLibrary`, which embeds its code, is the de facto maintenance line);
   [playwright-sap](https://github.com/ArpitSureka/playwright-sap) is maintained
   (v1.1.4, 2025-10): periodically re-diff our `_ui5_js.py` port against it;
   [rf-mcp](https://pypi.org/project/rf-mcp/) latest is 0.36.0 (there is no

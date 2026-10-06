@@ -1,4 +1,4 @@
-"""Mixin **onglets** (``GuiTabStrip`` / ``GuiTab``) : lister, lire l'onglet actif,
+"""Mixin *onglets* (``GuiTabStrip`` / ``GuiTab``) : lister, lire l'onglet actif,
 en choisir un par CLÉ technique ou par libellé.
 
 Avant ce mixin, une suite cliquait un id d'onglet gravé ; or le jeu d'onglets
@@ -53,7 +53,12 @@ class TabStripKeywords:
         ``{id, key, text, selected}`` dans l'ordre d'affichage, ``key`` étant la
         clé TECHNIQUE (``LOGO`` pour ``tabpLOGO``, locale-safe) et ``text`` le
         libellé localisé ; ``selected`` marque l'onglet actif (``SelectedTab``
-        relu). Tabstrip sans onglet perçu = échec."""
+        relu). Tabstrip sans onglet perçu = échec.
+
+        Exemple :
+        | ${tabs}=    `List Tabs`    wnd[0]/usr/tabsTABSTRIP1
+        | Should Be Equal    ${tabs}[2][key]    LOGO
+        """
         strip = self._tabstrip(tabstrip_id)
         tabs = describe_tabs(self._screen_elements(), tabstrip_id, self._selected_tab_id(strip))
         if not tabs:
@@ -65,7 +70,13 @@ class TabStripKeywords:
 
     def get_selected_tab(self, tabstrip_id):
         """L'onglet ACTIF du tabstrip (dict ``{id, key, text, selected}``) ;
-        échec nommant les onglets si aucun n'est marqué actif."""
+        échec nommant les onglets si aucun n'est marqué actif.
+
+        Exemple :
+        | `Select Tab`    wnd[0]/usr/tabsTABSTRIP1    DEFA
+        | ${tab}=    `Get Selected Tab`    wnd[0]/usr/tabsTABSTRIP1
+        | Should Be Equal    ${tab}[key]    DEFA
+        """
         tabs = self.list_tabs(tabstrip_id)
         selected = [tab for tab in tabs if tab["selected"]]
         if len(selected) != 1:
@@ -90,7 +101,12 @@ class TabStripKeywords:
         """Active l'onglet de CLÉ technique ``key`` (``LOGO``, ``DEFA``... le
         suffixe ``tabp<CLÉ>`` de son id, insensible à la casse) et VÉRIFIE
         qu'il est devenu l'onglet actif. Clé absente = échec listant les
-        onglets réels (clé, libellé, actif). Retourne l'onglet actif."""
+        onglets réels (clé, libellé, actif). Retourne l'onglet actif.
+
+        Exemple :
+        | ${tab}=    `Select Tab`    wnd[0]/usr/tabsTABSTRIP1    LOGO
+        | Should Be True    ${tab}[selected]
+        """
         tabs = self.list_tabs(tabstrip_id)
         tab = find_tab_by_key(tabs, key)
         if tab is None:
@@ -105,7 +121,12 @@ class TabStripKeywords:
         casse, ``exact=True`` pour l'égalité) et vérifie la sélection. Le
         libellé est LOCALISÉ : c'est un choix de lisibilité pour un page
         object, jamais une ancre de suite ; préférer `Select Tab` par clé.
-        Ambiguïté remontée avec les candidats, jamais tranchée en silence."""
+        Ambiguïté remontée avec les candidats, jamais tranchée en silence.
+
+        Exemple :
+        | ${tab}=    `Select Tab By Label`    wnd[0]/usr/tabsTABSTRIP1    Logon
+        | Should Be Equal    ${tab}[key]    LOGO
+        """
         tabs = self.list_tabs(tabstrip_id)
         matches = find_tabs_by_label(tabs, label, exact=_as_bool(exact))
         if len(matches) != 1:

@@ -35,7 +35,7 @@ class RfcReadKeywords(XbpSessionMixin):
                               tcode: Optional[str] = None,
                               include_items: Any = True,
                               rowcount: int = 0) -> list[dict[str, Any]]:
-        """Lit les **documents de modification** (CDHDR, postes CDPOS) d'une
+        """Lit les *documents de modification* (CDHDR, postes CDPOS) d'une
         classe d'objet : l'assertion d'audit « la modification a bien été
         journalisée », sans écran. Retourne une liste d'en-têtes JSON-safe
         (``OBJECTCLAS``, ``OBJECTID``, ``CHANGENR``, ``USERNAME``, ``UDATE``,
@@ -44,7 +44,7 @@ class RfcReadKeywords(XbpSessionMixin):
         ``VALUE_OLD``) quand ``include_items`` est vrai.
 
         ``object_class`` est la classe de documents (``IDENTITY``,
-        ``ADRESSE``, ``MATERIAL``…), ``object_id``/``username``/``tcode``
+        ``ADRESSE``, ``MATERIAL`` …), ``object_id`` / ``username`` / ``tcode``
         restreignent, ``date_from`` (``YYYYMMDD`` ou ``YYYY-MM-DD``) borne
         dans le temps, ``rowcount`` plafonne les EN-TÊTES lus.
 
@@ -56,7 +56,12 @@ class RfcReadKeywords(XbpSessionMixin):
         (``sapfx_common.rfc_reads.merge_change_items``). NB : sur un ECC
         classique pré-S/4, CDPOS vit dans le cluster CDCLS et n'est pas
         lisible par ``RFC_READ_TABLE`` ; sur S/4 (mesuré : release 754) les
-        deux tables sont transparentes."""
+        deux tables sont transparentes.
+
+        Exemple :
+        | ${documents}=    `Read Change Documents`    BUPA_BUP    object_id=0000000001    alias=a4h
+        | Should Not Be Empty    ${documents}
+        """
         options = rfc_reads.build_options([
             ("OBJECTCLAS", str(object_class).strip()),
             ("OBJECTID", object_id), ("USERNAME", username),
@@ -93,18 +98,17 @@ class RfcReadKeywords(XbpSessionMixin):
         En-tête : ``since`` (numéro de document, comparaison numérique),
         ``tcode``, ``change_ind``. Postes : ``table``, ``key_suffix`` (la clé
         CDPOS commence par le mandant, d'où un SUFFIXE), ``fields`` (liste ou
-        chaîne à virgules), ``indicator`` (``I``/``U``/``E``/``D``) ;
+        chaîne à virgules), ``indicator`` (``I`` / ``U`` / ``E`` / ``D``) ;
         ``all_fields=True`` exige que TOUS les ``fields`` soient journalisés
         (le retrait d'une ligne porte ``VALID_FROM`` ET ``VALID_TO`` en
         ``E``). Rend la liste des documents retenus. Aussi
-        `Latest Change Number`, le point de départ d'un tel constat. ::
+        `Latest Change Number`, le point de départ d'un tel constat.
 
-            ${depuis}=    Latest Change Number    ${documents}
-            ...    (le geste)
-            ${docs}=    Read Change Documents    BUPA_BUP    object_id=${numero}
-            ${ajout}=    Filter Change Documents    ${docs}    since=${depuis}
-            ...    table=BUT100    key_suffix=${numero}BUP002    fields=KEY    indicator=I
-            Length Should Be    ${ajout}    1"""
+        Exemple :
+        | ${documents}=    `Read Change Documents`    BUPA_BUP    object_id=0000000001    alias=a4h
+        | ${roles_added}=    `Filter Change Documents`    ${documents}    table=BUT100    indicator=I
+        | Should Not Be Empty    ${roles_added}
+        """
         return rfc_reads.select_change_documents(
             documents, since=since, tcode=tcode, change_ind=change_ind,
             table=table, key_suffix=key_suffix,
@@ -113,7 +117,13 @@ class RfcReadKeywords(XbpSessionMixin):
 
     def latest_change_number(self, documents: Any) -> int:
         """Le plus grand numéro parmi des documents de `Read Change
-        Documents`, 0 s'il n'y en a aucun. Hors ligne."""
+        Documents`, 0 s'il n'y en a aucun. Hors ligne.
+
+        Exemple :
+        | ${documents}=    `Read Change Documents`    BUPA_BUP    object_id=0000000001    alias=a4h
+        | ${latest}=    `Latest Change Number`    ${documents}
+        | Should Be True    ${latest} > 0
+        """
         return rfc_reads.latest_change_number(documents)
 
     def get_idoc_status(self, alias: str = "default",
@@ -124,7 +134,7 @@ class RfcReadKeywords(XbpSessionMixin):
                         date_from: Optional[str] = None,
                         include_history: Any = False,
                         rowcount: int = 0) -> dict[str, Any]:
-        """Lit le **statut des IDocs** (EDIDC) et le juge par CODE : le test
+        """Lit le *statut des IDocs* (EDIDC) et le juge par CODE : le test
         d'intégration classique (« l'IDoc est parti / a été intégré »), sans
         écran WE02. Retourne ``{"idocs": [...], "counts": {...}}`` : chaque
         IDoc porte ``DOCNUM``, ``STATUS``, sa ``category`` (``success`` /
@@ -138,8 +148,8 @@ class RfcReadKeywords(XbpSessionMixin):
         que l'attente des jobs de fond. On juge le code numérique, jamais le
         texte localisé de TEDS1 (convention n°3).
 
-        ``message_type``/``idoc_type``/``direction`` (``1`` sortant, ``2``
-        entrant)/``date_from``/``docnum`` restreignent ; ``include_history``
+        ``message_type`` / ``idoc_type`` / ``direction`` (``1`` sortant, ``2``
+        entrant), ``date_from`` / ``docnum`` restreignent ; ``include_history``
         accroche à chaque IDoc son historique EDIDS sous ``history`` (une
         clause ``OR`` par numéro trouvé) ; chaque enregistrement porte le
         statut, l'origine, le message par IDENTIFIANT, ses paramètres, le TID
@@ -147,7 +157,12 @@ class RfcReadKeywords(XbpSessionMixin):
         du banc ne portent aucun IDoc à la livraison ; le barème est verrouillé
         hors SAP et éprouvé live depuis la fiche scénario 8 (2026-10-01), qui
         a mesuré 01, 30, 03 sur un sortant et 50, 64, 62, 53, 51, 56 sur un
-        entrant."""
+        entrant.
+
+        Exemple :
+        | ${status}=    `Get Idoc Status`    alias=a4h    docnum=5    include_history=True
+        | Should Be Equal    ${status}[idocs][0][STATUS]    03
+        """
         options = rfc_reads.build_options([
             ("DOCNUM", docnum), ("MESTYP", message_type),
             ("IDOCTP", idoc_type), ("DIRECT", direction)])
@@ -188,7 +203,7 @@ class RfcReadKeywords(XbpSessionMixin):
                              date_from: Optional[str] = None,
                              with_problems_only: Any = False,
                              rowcount: int = 0) -> dict[str, Any]:
-        """Lit les **journaux applicatifs** (BALHDR, transaction SLG1 sans
+        """Lit les *journaux applicatifs* (BALHDR, transaction SLG1 sans
         écran) : ce qu'écrivent les traitements. Retourne ``{"headers":
         [...], "totals": {...}}`` : chaque en-tête porte l'objet, le
         sous-objet, le numéro externe, l'auteur, l'horodatage, le programme
@@ -205,7 +220,12 @@ class RfcReadKeywords(XbpSessionMixin):
 
         ``with_problems_only`` ne rapporte que les journaux portant au moins
         une erreur ou un abandon ; ``date_from`` borne dans le temps,
-        ``rowcount`` plafonne."""
+        ``rowcount`` plafonne.
+
+        Exemple :
+        | ${logs}=    `Read Application Log`    log_object=RSTT    alias=a4h    rowcount=3
+        | Should Not Be Empty    ${logs}[headers]
+        """
         options = rfc_reads.build_options([
             ("OBJECT", log_object), ("SUBOBJECT", subobject),
             ("EXTNUMBER", external_number), ("ALUSER", user)])
@@ -228,12 +248,12 @@ class RfcReadKeywords(XbpSessionMixin):
     def get_job_log(self, jobname: str, jobcount: str,
                     alias: str = "default",
                     external_user: Optional[str] = None) -> list[dict[str, str]]:
-        """Lit le **journal d'un job de fond** (le complément de `Wait For
+        """Lit le *journal d'un job de fond* (le complément de `Wait For
         Background Job`, qui n'a que le statut TBTCO) : lignes JSON-safe
-        avec identifiant de message (``MSGID``/``MSGNO``, le critère stable),
+        avec identifiant de message (``MSGID`` / ``MSGNO``, le critère stable),
         horodatage et texte pour le lecteur.
 
-        Passe par la chaîne **XBP**, l'interface officielle des ordonnanceurs
+        Passe par la chaîne *XBP*, l'interface officielle des ordonnanceurs
         externes : ``BAPI_XMI_LOGON`` (interface ``XBP`` 3.0) puis
         ``BAPI_XBP_JOB_JOBLOG_READ`` (table ``JOB_PROTOCOL``), chaque étape
         jugée par TYPE de BAPIRET2, et ``BAPI_XMI_LOGOFF`` TOUJOURS exécuté
@@ -248,7 +268,13 @@ class RfcReadKeywords(XbpSessionMixin):
         ``external_user`` est le nom d'utilisateur externe annoncé à XBP
         (défaut : l'utilisateur de la connexion RFC). ``jobcount`` désigne le
         RUN exact ; il se lit dans TBTCO (`Read Rfc Table`) ou dans
-        `Find Background Job Cases`."""
+        `Find Background Job Cases`.
+
+        Exemple :
+        | ${run}=    `Get Background Job Run`    SAPFX_JOB_20261001_130542    alias=a4h
+        | ${log}=    `Get Job Log`    ${run}[jobname]    ${run}[jobcount]    alias=a4h
+        | Should Not Be Empty    ${log}
+        """
         external_user = self._xbp_external_user(alias, external_user)
         with self._xbp_session(alias):
             result = self.call_bapi(

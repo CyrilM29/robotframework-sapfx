@@ -25,7 +25,7 @@ class WatchKeywords:
     def check_screen_against_watch(self, name, directory="screen_watch",
                                    fail_on_drift=False, visual_threshold=5,
                                    tiles_x=4, tiles_y=4, per_resolution=False):
-        """**Sentinelle** : compare l'écran SAP actif à sa référence mémorisée,
+        """*Sentinelle* : compare l'écran SAP actif à sa référence mémorisée,
         la détection de dérive SANS test scripté (voir
         ``sapfx_common.screen_watch``).
 
@@ -34,23 +34,23 @@ class WatchKeywords:
         présent) devient la référence dans ``directory`` : WARNING journalisé,
         statut ``baseline-created``. Ensuite, TROIS canaux :
 
-        * **structurel** : diff *intelligent* ligne à ligne (les ids qui se
+        * *structurel* : diff *intelligent* ligne à ligne (les ids qui se
           ressemblent sont appariés en ``~ ancien -> nouveau`` par le scoring
           de healing : un sous-écran renuméroté se lit comme un renommage) ;
-        * **visuel global** : distance de Hamming du hash plein écran ;
-        * **visuel localisé** : comparaison tuile à tuile (grille ``tiles_x ×
+        * *visuel global* : distance de Hamming du hash plein écran ;
+        * *visuel localisé* : comparaison tuile à tuile (grille ``tiles_x ×
           tiles_y``, défaut 4×4) : une dérive locale trop diluée pour le hash
           global est rattrapée par SA tuile, nommée avec sa position, son
           rectangle et les éléments qui la recouvrent.
 
-        Toute dérive est **nommée** et la perception courante sauvée en
+        Toute dérive est *nommée* et la perception courante sauvée en
         ``<name>.actual.*`` à côté de la référence. ``fail_on_drift=True``
         transforme la dérive en échec (sentinelle-assertion) ; par défaut la
-        sentinelle **rapporte** et retourne le verdict (dict : ``status``,
+        sentinelle *rapporte* et retourne le verdict (dict : ``status``,
         ``structural_diff``, ``visual_distance``, ``visual_tiles``) ; c'est au
         run de veille d'agréger.
 
-        ``per_resolution=True`` donne à chaque **géométrie de capture** sa
+        ``per_resolution=True`` donne à chaque *géométrie de capture* sa
         propre référence VISUELLE (``<name>@1920x1032.dhash.txt`` et
         ``.tiles.txt``), le canal structurel restant partagé : une signature
         d'écran ne dépend pas de la résolution, une empreinte perceptuelle si.
@@ -59,11 +59,16 @@ class WatchKeywords:
         au lieu de rapporter une dérive qui n'est qu'un changement d'échelle.
         Une référence déjà committée reste utilisée tant que sa géométrie
         coïncide. Sans l'option, une dérive visuelle dont les géométries
-        diffèrent le **dit** dans le verdict (``geometry_note``).
+        diffèrent le *dit* dans le verdict (``geometry_note``).
 
         La référence est faite pour être committée : la supprimer revalide
         l'écran au passage suivant (même sémantique snapshot que
-        `Screen Should Match Baseline`, ici sur TOUS les canaux)."""
+        `Screen Should Match Baseline`, ici sur TOUS les canaux).
+
+        Exemple :
+        | ${verdict}=    `Check Screen Against Watch`    se16_initial
+        | Should Not Be Equal    ${verdict}[status]    drifted
+        """
         import os
         from sapfx_common.screen_watch import (WatchOutcome, annotate_geometry,
                                                apply_tile_verdict,
@@ -140,7 +145,7 @@ class WatchKeywords:
 
         Sans ``per_resolution`` : les fichiers historiques, partagés. Avec : la
         variante de la géométrie courante si elle existe, sinon les fichiers
-        historiques **à condition** que leur géométrie coïncide (ou soit
+        historiques *à condition* que leur géométrie coïncide (ou soit
         inconnue : une référence d'avant l'ajout du champ reste utilisée telle
         quelle, comme avant), sinon la variante, qui sera créée."""
         import os
@@ -196,7 +201,7 @@ class WatchKeywords:
                                                 8, (width, height)))
 
     def _try_visual_fingerprint(self):
-        """Empreinte visuelle **best-effort** : ``(hash, (largeur, hauteur))``
+        """Empreinte visuelle *best-effort* : ``(hash, (largeur, hauteur))``
         en UNE capture, ou ``None``. La sentinelle reste utilisable sans Pillow
         (canal structurel seul) et sur les SAP GUI sans HardCopyToMemory ; la
         géométrie voyage avec l'empreinte parce que c'est elle qui dit à quel
@@ -211,7 +216,7 @@ class WatchKeywords:
             return None
 
     def _try_tile_capture(self, tiles_x, tiles_y, hash_size=8):
-        """Grille de tuiles **best-effort** : ``(hashes, largeur, hauteur)`` ou
+        """Grille de tuiles *best-effort* : ``(hashes, largeur, hauteur)`` ou
         ``None``, même politique que ``_try_visual_fingerprint`` (le canal tuiles
         est un raffinement, jamais une condition de fonctionnement)."""
         try:
@@ -225,7 +230,7 @@ class WatchKeywords:
 
     def _tile_drift_report(self, tiles_path, visual_threshold):
         """Compare l'écran courant à la grille de tuiles de la référence, avec
-        le découpage ET le hash_size **de la référence** (un changement de
+        le découpage ET le hash_size *de la référence* (un changement de
         configuration ne fabrique jamais une fausse dérive). Retourne le
         rapport localisé (tuiles au-delà du seuil + éléments recouvrants) ou
         ``None``, best-effort intégral."""

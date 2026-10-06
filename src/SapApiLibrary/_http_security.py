@@ -1,4 +1,4 @@
-"""Mixin des observations de **sécurité du transport** du canal API.
+"""Mixin des observations de *sécurité du transport* du canal API.
 
 Ce que ces keywords ajoutent, et pourquoi ils ne font pas doublon avec les
 lectures de configuration : les autres canaux LISENT ce que le système
@@ -12,8 +12,8 @@ ne porte le drapeau, ticket d'authentification compris, et aucun ne porte
 ``Secure`` même servi en HTTPS. Un audit qui s'arrête à la valeur du paramètre
 conclut à une protection qui n'existe pas.
 
-L'enseignement transposable dépasse ce paramètre : **la valeur d'un paramètre
-de sécurité n'est pas un curseur**. Lire ``3`` comme « plus durci que ``0`` »
+L'enseignement transposable dépasse ce paramètre : *la valeur d'un paramètre
+de sécurité n'est pas un curseur*. Lire ``3`` comme « plus durci que ``0`` »
 est un réflexe, et l'observation le dément. Un contrôle « au moins 3 » serait
 vert et faux.
 
@@ -36,7 +36,7 @@ class HttpSecurityKeywords(RfcSurfaceKeywords):
     def get_api_cookie_security(self, alias: str = "default",
                                 probe_path: Optional[str] = None
                                 ) -> dict[str, Any]:
-        """Observe les **propriétés de transport des cookies** que la cible
+        """Observe les *propriétés de transport des cookies* que la cible
         pose, et rend ``{"total", "names", "without_httponly",
         "without_secure", "without_samesite", "all_protected", "over_https",
         "cookies"}``.
@@ -47,9 +47,14 @@ class HttpSecurityKeywords(RfcSurfaceKeywords):
         cookie non protégé ». C'est le faux positif le plus facile à commettre
         ici, donc le keyword rend ``total`` et l'appelant peut le garder.
 
-        **Aucune valeur de cookie n'est lue ni rendue.** Le keyword constate
+        *Aucune valeur de cookie n'est lue ni rendue.* Le keyword constate
         des propriétés de transport ; un identifiant de session recopié dans
         un rapport ou un artefact committé serait un secret exposé.
+
+        Exemple :
+        | ${cookies}=    `Get Api Cookie Security`    alias=a4h    probe_path=/sap/opu/odata/iwfnd/catalogservice;v=2/ServiceCollection/$count
+        | Should Be True    ${cookies}[total] > 0
+        | Log    ${cookies}[without_httponly]
         """
         session = self._session(alias)
         if probe_path:
@@ -83,7 +88,7 @@ class HttpSecurityKeywords(RfcSurfaceKeywords):
 
     def get_api_security_headers(self, path: str, alias: str = "default",
                                  expected: Any = None) -> dict[str, Any]:
-        """Observe les **en-têtes de sécurité** de la réponse à une lecture, et
+        """Observe les *en-têtes de sécurité* de la réponse à une lecture, et
         rend ``{"present", "missing", "values", "count_present",
         "count_expected"}``.
 
@@ -94,6 +99,10 @@ class HttpSecurityKeywords(RfcSurfaceKeywords):
 
         La comparaison est insensible à la casse, comme les en-têtes HTTP :
         une lecture sensible à la casse déclarerait absent un en-tête présent.
+
+        Exemple :
+        | ${headers}=    `Get Api Security Headers`    /sap/opu/odata/iwfnd/catalogservice;v=2/ServiceCollection/$count    alias=a4h
+        | Log    ${headers}[missing]
         """
         _, headers, _ = self._request(alias, "GET", str(path), None)
         return http_security.assess_security_headers(headers, expected)
@@ -114,9 +123,14 @@ class HttpSecurityKeywords(RfcSurfaceKeywords):
         ou ``undetermined``. Une observation absente rend toujours
         ``undetermined`` et jamais une conformité.
 
-        La valeur déclarée est rapportée telle quelle et **jamais interprétée
-        comme un niveau** : lire une échelle numérique comme un curseur de
+        La valeur déclarée est rapportée telle quelle et *jamais interprétée
+        comme un niveau* : lire une échelle numérique comme un curseur de
         durcissement est précisément l'erreur que l'observation a démentie.
+
+        Exemple :
+        | ${cookies}=    `Get Api Cookie Security`    alias=a4h    probe_path=/sap/opu/odata/iwfnd/catalogservice;v=2/ServiceCollection/$count
+        | ${verdict}=    `Confront Security Control`    cookies.httponly    1    ${cookies}[all_protected]
+        | Should Be Equal    ${verdict}[verdict]    declared_without_effect
         """
         vu: Optional[bool]
         if observed is None or str(observed).strip() == "":

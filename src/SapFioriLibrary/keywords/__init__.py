@@ -5,6 +5,7 @@ from ._composition import CompositionKeywords
 from ._engines import EngineKeywords
 from ._flp import FlpKeywords
 from ._flp_services import FlpServiceKeywords
+from ._flp_tile_refresh import FlpTileRefreshKeywords
 from ._flp_tiles import FlpTileKeywords
 from ._frames import FrameKeywords
 from ._locators import LocatorKeywords
@@ -14,6 +15,6 @@ from ._tables import TableKeywords
 
 __all__ = ["ActionKeywords", "CompositionKeywords", "EngineKeywords",
            "FioriBase", "FlpKeywords", "FlpServiceKeywords", "FlpTileKeywords",
-           "FrameKeywords",
+           "FlpTileRefreshKeywords", "FrameKeywords",
            "LocatorKeywords", "PerceptionKeywords", "StateKeywords",
            "TableKeywords"]

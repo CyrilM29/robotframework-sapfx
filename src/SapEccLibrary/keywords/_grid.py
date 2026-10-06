@@ -1,9 +1,9 @@
 """Keywords pratiques pour les tables ALV GridView.
 
-L'upstream expose déjà les opérations primitives sur les grilles (`Get Cell Value`,
-`Set Cell Value`, `Get Row Count`, `Select Table Row`, `Click Toolbar Button`).
-Toutes nécessitent de connaître l'*identifiant technique* de la colonne (ex. ``"MATNR"``),
-habituellement obtenu via l'enregistreur Scripting Tracker.
+Les opérations primitives sur les grilles (`Get Cell Value`, `Set Cell Value`,
+`Get Row Count`, `Select Table Row`, `Click Toolbar Button`) vivent dans
+``_grid_cells.py``. Toutes nécessitent de connaître l'*identifiant technique* de
+la colonne (ex. ``"MATNR"``), habituellement obtenu via l'enregistreur.
 
 Ce mixin ajoute la couche ergonomique par-dessus : résoudre les colonnes par leur
 *titre visible*, et lire une grille entière dans une liste de dicts compatible
@@ -18,6 +18,7 @@ from sapfx_common.abap_list import reconstruct_rows
 from sapfx_common.com_safety import shell_subtype
 from sapfx_common.object_tree import LEAF_SHELL_SUBTYPES
 from sapfx_common.robot_args import as_name_list, as_optional_int
+from sapfx_common.table_control import unique_titles
 
 # Le remède joint à l'erreur de conversion de `max_rows` : l'incident vécu est
 # une liste de colonnes passée en POSITION (donc dans le trou de max_rows).
@@ -29,12 +30,17 @@ class GridKeywords:
     (plus `Read Abap List` pour les sorties liste classiques, sans objet grille)."""
 
     def get_grid_column_ids(self, table_id):
-        """Retourne la liste des identifiants techniques des colonnes d'une grille ALV, dans l'ordre d'affichage."""
+        """Retourne la liste des identifiants techniques des colonnes d'une grille ALV, dans l'ordre d'affichage.
+
+        Exemple :
+        | ${ids}=    `Get Grid Column Ids`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | List Should Contain Value    ${ids}    CARRID
+        """
         grid = self._grid(table_id)
         return [col for col in grid.ColumnOrder]
 
     def count_blank_grid_rows(self, rows, columns=None):
-        """Combien de lignes d'un relevé de grille sont **entièrement vides**.
+        """Combien de lignes d'un relevé de grille sont *entièrement vides*.
 
         La garde que le nombre de lignes ne donne PAS. Une ALV ne matérialise
         ses lignes qu'au fil du défilement, et `Read Grid` lit les lignes non
@@ -53,11 +59,13 @@ class GridKeywords:
 
         Employer `Read Full Grid` (qui fait défiler) pour une lecture
         exhaustive, PUIS ce keyword pour vérifier que le défilement a suffi :
-        les deux sont complémentaires, le premier agit, le second constate. ::
+        les deux sont complémentaires, le premier agit, le second constate.
 
-            ${lignes}=    Read Full Grid    ${GRID}    columns=${colonnes}
-            ${vides}=    Count Blank Grid Rows    ${lignes}    ${colonnes}
-            Should Be Equal As Integers    ${vides}    0
+        Exemple :
+        | @{columns}=    Create List    CARRID    CARRNAME
+        | ${rows}=    `Read Full Grid`    wnd[0]/usr/cntlGRID1/shellcont/shell    columns=${columns}
+        | ${blank}=    `Count Blank Grid Rows`    ${rows}    ${columns}
+        | Should Be Equal As Integers    ${blank}    0
         """
         return blank_rows(rows, as_name_list(columns, "columns") or None)
 
@@ -77,15 +85,17 @@ class GridKeywords:
         Un titre peut être vide (colonne sans en-tête) ou répété (deux colonnes
         au même libellé) : la carte les rend TELS QUELS, sans rien inventer ni
         dédoublonner. C'est à la couche de rendu de décider, et elle ne peut
-        décider que si elle voit le cas.
+        décider que si elle voit le cas. `Read Grid` sans ``columns``, lui,
+        rend des clés uniques (``Capacity (2)``, ``COL<n>``).
 
-        Exemple (RSPARAM, ABAP Platform 2023) : ``NAME`` -> ``Parameter Name``,
+        Sur RSPARAM (ABAP Platform 2023) : ``NAME`` -> ``Parameter Name``,
         ``USER_VALUE`` -> ``User-Defined Value``,
-        ``DEFAULT_VALUE`` -> ``System Default Value``. ::
+        ``DEFAULT_VALUE`` -> ``System Default Value``.
 
-            ${titres}=    Get Grid Column Titles    ${GRID}
-            ${lignes}=    Read Grid    ${GRID}    columns=${titres}
-            Write Table Xlsx    releve.xlsx    ${lignes}    headers=${titres}
+        Exemple :
+        | ${titles}=    `Get Grid Column Titles`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell
+        | Should Be Equal    ${titles}[PRICE]    Airfare
+        | Should Be Equal    ${titles}[SEATSMAX_B]    Capacity
         """
         grid = self._grid(table_id)
         return {str(cid): grid.GetDisplayedColumnTitle(cid)
@@ -97,23 +107,54 @@ class GridKeywords:
         La correspondance est insensible à la casse et ignore les espaces en bordure.
         Lève une exception si aucune colonne ne correspond : l'erreur liste les
         titres disponibles pour faciliter le débogage des localisateurs.
+
+        Un titre porté par PLUSIEURS colonnes est ambigu : échec qui nomme
+        leurs ids techniques, jamais la première prise en silence (mesuré sur
+        la grille du programme de démonstration ``BCALV_GRID_DEMO`` : trois
+        colonnes s'intitulent « Capacity »). La forme dédoublonnée que rend
+        `Read Grid` (``Capacity (2)``, ``COL<n>`` pour un titre vide) désigne
+        une colonne précise et reste acceptée.
+
+        Exemple :
+        | ${column}=    `Get Column Id By Title`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    Airfare
+        | Should Be Equal    ${column}    PRICE
+        | ${column}=    `Get Column Id By Title`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    Capacity (2)
+        | Should Be Equal    ${column}    SEATSMAX_B
         """
         grid = self._grid(table_id)
+        col_ids = list(grid.ColumnOrder)
+        raw = [grid.GetDisplayedColumnTitle(col_id) for col_id in col_ids]
         wanted = title.strip().lower()
-        available = {}
-        for col_id in grid.ColumnOrder:
-            col_title = grid.GetDisplayedColumnTitle(col_id)
-            available[col_id] = col_title
-            if col_title.strip().lower() == wanted:
-                return col_id
+        matches = [col_id for col_id, col_title in zip(col_ids, raw, strict=True)
+                   if (col_title or "").strip().lower() == wanted]
+        if len(matches) > 1:
+            self.take_screenshot()
+            raise ValueError(
+                "Column title '%s' is ambiguous in grid '%s': columns %s carry it. "
+                "Address the column by its technical id, or by the deduplicated "
+                "title Read Grid returns ('%s (2)'...)."
+                % (title, table_id, ", ".join(str(c) for c in matches),
+                   raw[col_ids.index(matches[0])].strip()))
+        if not matches:
+            titles = unique_titles(raw)
+            matches = [col_id for col_id, col_title in zip(col_ids, titles, strict=True)
+                       if col_title.lower() == wanted]
+        if matches:
+            return matches[0]
         self.take_screenshot()
         raise ValueError(
             "No column titled '%s' in grid '%s'. Available: %s"
-            % (title, table_id, available)
+            % (title, table_id, dict(zip(col_ids, unique_titles(raw), strict=True)))
         )
 
     def get_cell_value_by_column_title(self, table_id, row_num, title):
-        """Comme `Get Cell Value` mais adresse la colonne par son titre visible."""
+        """Comme `Get Cell Value` mais adresse la colonne par son titre visible.
+
+        Exemple :
+        | ${fare}=    `Get Cell Value By Column Title`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    0    Airfare
+        | ${same}=    `Get Cell Value`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    0    PRICE
+        | Should Be Equal    ${fare}    ${same}
+        """
         col_id = self.get_column_id_by_title(table_id, title)
         return self.get_cell_value(table_id, row_num, col_id)
 
@@ -121,19 +162,32 @@ class GridKeywords:
         """Comme `Set Cell Value` mais adresse la colonne par son titre visible.
 
         Le pendant en écriture de `Get Cell Value By Column Title` : évite d'avoir à
-        connaître l'identifiant technique de colonne dans le test."""
+        connaître l'identifiant technique de colonne dans le test.
+
+        Exemple :
+        | `Set Cell Value By Column Title`    wnd[1]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    0    Airfare    999.00
+        | ${price}=    `Get Cell Value`    wnd[1]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    0    PRICE
+        | Should Be Equal    ${price}    999.00
+        """
         col_id = self.get_column_id_by_title(table_id, title)
         self.set_cell_value(table_id, row_num, col_id, text)
 
     def find_row_by_column_value(self, table_id, title, value, ignore_case=False):
-        """Retourne l'index (base 0) de la **première** ligne dont la cellule de la
+        """Retourne l'index (base 0) de la *première* ligne dont la cellule de la
         colonne ``title`` vaut ``value``, ou ``-1`` si aucune.
 
         Ne lit que les lignes actuellement chargées (cf. `Read Grid`) ; pour une
         grande table, appeler `Read Full Grid` au préalable ou paginer. La
         comparaison est exacte par défaut ; ``ignore_case`` la rend insensible à la
         casse. Retourne ``-1`` plutôt que de lever, pour permettre un test
-        d'existence : voir `Select Row By Column Value` pour la variante qui agit."""
+        d'existence : voir `Select Row By Column Value` pour la variante qui agit.
+
+        Exemple :
+        | ${row}=    `Find Row By Column Value`    wnd[0]/usr/cntlGRID1/shellcont/shell    CARRID    LH
+        | Should Be True    ${row} >= 0
+        | ${absent}=    `Find Row By Column Value`    wnd[0]/usr/cntlGRID1/shellcont/shell    CARRID    ZZ
+        | Should Be Equal As Integers    ${absent}    -1
+        """
         grid = self._grid(table_id)
         col_id = self.get_column_id_by_title(table_id, title)
         wanted = value.lower() if ignore_case else value
@@ -147,7 +201,13 @@ class GridKeywords:
         """Sélectionne la première ligne dont la colonne ``title`` vaut ``value``.
 
         Lève si aucune ligne ne correspond (l'erreur nomme la colonne et la valeur).
-        Retourne l'index de la ligne sélectionnée pour permettre l'enchaînement."""
+        Retourne l'index de la ligne sélectionnée pour permettre l'enchaînement.
+
+        Exemple :
+        | ${row}=    `Select Row By Column Value`    wnd[0]/usr/cntlGRID1/shellcont/shell    CARRID    LH
+        | ${carrier}=    `Get Cell Value`    wnd[0]/usr/cntlGRID1/shellcont/shell    ${row}    CARRID
+        | Should Be Equal    ${carrier}    LH
+        """
         row = self.find_row_by_column_value(table_id, title, value, ignore_case)
         if row < 0:
             self.take_screenshot()
@@ -159,15 +219,17 @@ class GridKeywords:
 
     def get_cell_value_by_row_content(self, table_id, anchor_title, anchor_value,
                                       target_title, ignore_case=False):
-        """Lit la cellule ``target_title`` de la ligne repérée par son **contenu** :
+        """Lit la cellule ``target_title`` de la ligne repérée par son *contenu* :
         « la ligne dont ``anchor_title`` vaut ``anchor_value`` », l'adressage
         ``contenu @ colonne`` (à la RoboSAPiens) appliqué à l'ALV. Aucun index de
         ligne dans le test : l'adressage survit au tri, au filtre et aux insertions.
 
         Lève si aucune ligne ne porte cette valeur (mêmes limites de chargement
-        différé que `Find Row By Column Value`). Usage type::
+        différé que `Find Row By Column Value`).
 
-            ${prix}=    Get Cell Value By Row Content    ${GRID}    Carrier    LH    Price
+        Exemple :
+        | ${name}=    `Get Cell Value By Row Content`    wnd[0]/usr/cntlGRID1/shellcont/shell    CARRID    LH    CARRNAME
+        | Should Be Equal    ${name}    Lufthansa
         """
         row = self.find_row_by_column_value(table_id, anchor_title, anchor_value,
                                             ignore_case)
@@ -181,7 +243,7 @@ class GridKeywords:
 
     def read_full_grid(self, table_id, page_step=None, max_rows=None,
                        columns=None):
-        """Comme `Read Grid` mais **fait défiler** la grille pour forcer le chargement
+        """Comme `Read Grid` mais *fait défiler* la grille pour forcer le chargement
         différé de toutes les lignes avant de lire.
 
         SAP ne matérialise les lignes d'une ALV GridView qu'au fur et à mesure du
@@ -189,7 +251,13 @@ class GridKeywords:
         (ou ``page_step`` si fourni) en repositionnant ``FirstVisibleRow``, puis on
         lit l'ensemble. ``max_rows`` plafonne le total lu (journalisé) ;
         ``columns`` restreint la lecture à des colonnes TECHNIQUES (voir
-        `Read Grid`). Restaure la position de défilement initiale à la fin."""
+        `Read Grid`). Restaure la position de défilement initiale à la fin.
+
+        Exemple :
+        | ${rows}=    `Read Full Grid`    wnd[0]/usr/cntlGRID1/shellcont/shell    columns=CARRID,CARRNAME
+        | ${count}=    `Get Row Count`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | Length Should Be    ${rows}    ${count}
+        """
         grid = self._grid(table_id)
         total = grid.RowCount
         max_rows = as_optional_int(max_rows, "max_rows", hint=_COLUMNS_HINT)
@@ -218,7 +286,7 @@ class GridKeywords:
         (voir `Scroll`) ou passez un plafond ``max_rows``. Le plafond est journalisé
         pour qu'une lecture tronquée ne soit jamais confondue avec une lecture complète.
 
-        ``columns`` (liste d'ids TECHNIQUES, ``CARRID``… ; une valeur seule,
+        ``columns`` (liste d'ids TECHNIQUES, ``CARRID`` … ; une valeur seule,
         une chaîne à virgules ``CARRID,CONNID`` ou une liste-littérale
         ``"['CARRID', 'CONNID']"`` sont acceptées : via rf-mcp tout argument
         arrive en chaîne, et un id technique ne contient pas de virgule)
@@ -228,7 +296,19 @@ class GridKeywords:
         que quand le profil montre les noms de champs), et beaucoup moins
         d'appels COM quand la grille est large. Colonne inconnue = échec
         listant les colonnes disponibles. Sans ``columns``, les clés restent
-        les titres affichés (comportement historique).
+        les titres affichés (comportement historique), rendus uniques : un
+        titre vide devient ``COL<n>`` et un titre répété est suffixé
+        (``Capacity (2)``), la forme qu'accepte `Get Column Id By Title`.
+        Une colonne n'est jamais perdue en silence : mesuré sur la grille de
+        ``BCALV_GRID_DEMO``, trois colonnes « Capacity » se fondaient en une
+        seule clé, et le relevé rendait 11 colonnes pour 13 affichées.
+
+        Exemple :
+        | `Reach Se16 Selection Screen`    SCARR
+        | `Send Vkey`    8
+        | ${rows}=    `Read Grid`    wnd[0]/usr/cntlGRID1/shellcont/shell    max_rows=3    columns=CARRID,CARRNAME
+        | Length Should Be    ${rows}    3
+        | Should Be Equal    ${rows}[0][CARRID]    AA
         """
         grid = self._grid(table_id)
         row_count = grid.RowCount
@@ -250,15 +330,16 @@ class GridKeywords:
                     % (table_id, ", ".join(missing), ", ".join(available)))
             pairs = [(cid, cid) for cid in wanted]
         else:
-            pairs = [(cid, grid.GetDisplayedColumnTitle(cid))
-                     for cid in grid.ColumnOrder]
+            col_ids = list(grid.ColumnOrder)
+            pairs = list(zip(col_ids, unique_titles(
+                [grid.GetDisplayedColumnTitle(cid) for cid in col_ids]), strict=True))
         rows = []
         for row in range(row_count):
             rows.append({key: grid.GetCellValue(row, cid) for cid, key in pairs})
         return rows
 
     def read_abap_list(self):
-        """Lit la **liste ABAP classique** affichée (sortie SE38, SE16 sans ALV,
+        """Lit la *liste ABAP classique* affichée (sortie SE38, SE16 sans ALV,
         protocoles…) : lignes de cellules texte ``[[cellule, ...], ...]``, de
         haut en bas, cellules de gauche à droite.
 
@@ -269,7 +350,7 @@ class GridKeywords:
         forcer `Use ALV Grid In Data Browser` pour une simple assertion de
         contenu.
 
-        **Ce qui est mesuré (A4H, SAP GUI 8.00, 2026-09-07)** : la liste SE16
+        *Ce qui est mesuré (A4H, SAP GUI 8.00, 2026-09-07)* : la liste SE16
         STANDARD (`Use Standard List In Data Browser`, dynpro ``SAPMSSY0/120``)
         est rendue en ``GuiLabel`` et se lit ici SANS le mode accessibilité
         SAP GUI. Une sortie rendue dans un shell de sous-type connu (la
@@ -279,7 +360,17 @@ class GridKeywords:
         Interaction Design → Accessibility) corrigerait, n'a pas été observé
         sur le poste de laboratoire. L'échec le signale explicitement (même
         diagnostic que `Get List Rendering Status` / `Abap List Should Be
-        Readable`, à appeler en préflight pour échouer plus tôt). Lecture seule."""
+        Readable`, à appeler en préflight pour échouer plus tôt). Lecture seule.
+
+        Exemple :
+        | `Use Standard List In Data Browser`
+        | `Reach Se16 Selection Screen`    SCARR
+        | `Send Vkey`    8
+        | ${lines}=    `Read Abap List`
+        | Should Be Equal    ${lines}[2][1]    CARRID
+        | Should Be Equal    ${lines}[3][1]    AA
+        | `Use ALV Grid In Data Browser`
+        """
         rows = reconstruct_rows(self._screen_elements())
         if not rows:
             # Même diagnostic (et même message) que le préflight : une seule
@@ -371,7 +462,7 @@ class GridKeywords:
         Rend l'identifiant INCHANGÉ dans les deux cas où il ne faut pas
         intervenir : le chemin porte déjà la grille (cas du 1909 et de toutes
         les suites vertes), ou rien qui ressemble à une grille n'existe en
-        dessous (un GuiTableControl, par exemple). La primitive amont produit
+        dessous (un GuiTableControl, par exemple). La primitive produit
         alors son propre message d'erreur, qui reste le plus juste.
         """
         try:
@@ -387,39 +478,6 @@ class GridKeywords:
             "Grid '%s' porte un conteneur : grille réelle '%s' utilisée."
             % (table_id, found_id))
         return found_id
-
-    # Primitives de grille héritées du code vendorisé : elles appellent
-    # `findById(table_id)` en direct, donc elles ne passent pas par `_grid`.
-    # On ne modifie pas le fichier amont (convention 4) : on résout
-    # l'identifiant ici, puis on délègue le comportement inchangé.
-
-    def get_row_count(self, table_id):
-        """Nombre de lignes d'une grille, y compris quand le localisateur vise
-        le conteneur qui l'enveloppe (releases récentes)."""
-        return super().get_row_count(self._resolved_grid_id(table_id))
-
-    def get_cell_value(self, table_id, row_num, col_id):
-        """Valeur d'une cellule, localisateur de conteneur toléré."""
-        return super().get_cell_value(
-            self._resolved_grid_id(table_id), row_num, col_id)
-
-    def set_cell_value(self, table_id, row_num, col_id, text):
-        """Écrit une cellule, localisateur de conteneur toléré."""
-        return super().set_cell_value(
-            self._resolved_grid_id(table_id), row_num, col_id, text)
-
-    def click_toolbar_button(self, table_id, button_id):
-        """Clique un bouton de la barre d'outils d'une grille, localisateur de
-        conteneur toléré."""
-        return super().click_toolbar_button(
-            self._resolved_grid_id(table_id), button_id)
-
-    def select_table_row(self, table_id, row_num):
-        """Sélectionne une ligne. Sur un GuiTableControl l'identifiant est rendu
-        inchangé, donc le comportement amont (qui gère les deux types) est
-        strictement préservé."""
-        return super().select_table_row(
-            self._resolved_grid_id(table_id), row_num)
 
     @staticmethod
     def _children_of(node):

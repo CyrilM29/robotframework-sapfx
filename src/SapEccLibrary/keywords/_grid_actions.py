@@ -1,11 +1,14 @@
-"""Mixin **actions de grille ALV** : double-clic de cellule, menu contextuel par
+"""Mixin *actions de grille ALV* : double-clic de cellule, menu contextuel par
 code fonction, inventaire de la barre d'outils, tri.
 
 Relevé live le 2026-09-07 (SE16 sur T000, SAP GUI 8.00) : le `Doubleclick
-Element` hérité appelle ``doubleClickItem`` (l'API des ARBRES) sur une grille
-et échoue par ``AttributeError`` ; `Select Context Menu Item` hérité refuse
-une grille par son type (il cherche ``nodeContextMenu``/``pressContextButton``)
-; `Click Toolbar Button` échoue sur un code absent sans dire ce qui existe.
+Element` de robotframework-sapguilibrary appelait ``doubleClickItem`` (l'API
+des ARBRES) sur une grille et échouait par ``AttributeError`` ; son `Select
+Context Menu Item` refusait une grille par son type (il cherche
+``nodeContextMenu`` / ``pressContextButton``) ; son `Click Toolbar Button`
+échouait sur un code absent sans dire ce qui existe. Les branches arbre et
+barre de ces keywords, absorbées le 2026-10-06, vivent ici avec la branche
+grille (Apache License 2.0, voir NOTICE).
 Les chemins API vérifiés : ``SetCurrentCell`` + ``DoubleClickCurrentCell``
 (ouvre le modal « Details » de SE16), ``ContextMenu()`` puis
 ``CurrentContextMenu`` (entrées ``&LOCAL&COPY``, ``&OPTIMIZE``, ``&FIND``,
@@ -37,7 +40,14 @@ class GridActionKeywords:
         technique de colonne) d'une grille ALV : ``SetCurrentCell`` puis
         ``DoubleClickCurrentCell``, le geste qui ouvre le détail d'une ligne
         (modal « Details » de SE16, navigation dans un rapport ALV). Attend la
-        fin de l'aller-retour."""
+        fin de l'aller-retour.
+
+        Exemple :
+        | `Double Click Grid Cell`    wnd[0]/usr/cntlGRID1/shellcont/shell    0    CARRID
+        | ${screen}=    `Get Current Screen`
+        | Should Be Equal    ${screen}[program]    SAPLSLVC_SERVICES
+        | `Dismiss Modal Window`
+        """
         grid = self._grid(table_id)
         try:
             grid.SetCurrentCell(int(row_num), column)
@@ -51,23 +61,45 @@ class GridActionKeywords:
         self.wait_until_busy_done()
 
     def doubleclick_element(self, element_id, item_id, column_id):
-        """Surcharge du keyword hérité : sur une GRILLE (``ColumnOrder``), le
-        double-clic passe par `Double Click Grid Cell` (l'hérité appelait
-        ``doubleClickItem``, l'API des arbres, et échouait par
-        ``AttributeError``) ; sur tout autre shell, comportement hérité."""
+        """Double-clique un item : sur une GRILLE (``ColumnOrder``), la cellule
+        (ligne ``item_id``, colonne ``column_id``) par `Double Click Grid
+        Cell` ; sur un autre shell (un arbre), l'item par ``doubleClickItem``.
+        Le keyword de robotframework-sapguilibrary appelait l'API des arbres
+        sur une grille et échouait par ``AttributeError`` (relevé le
+        2026-09-07). Un élément qui n'est pas un shell est refusé.
+
+        Exemple :
+        | `Doubleclick Element`    wnd[0]/usr/cntlGRID1/shellcont/shell    0    CARRID
+        | ${windows}=    `Get Open Windows`
+        | Should Be True    ${windows}[-1][modal]
+        | `Dismiss Modal Window`
+        """
         try:
             element = self.session.findById(element_id)
         except com_error:
             element = None
         if element is not None and hasattr(element, "ColumnOrder"):
             return self.double_click_grid_cell(element_id, item_id, column_id)
-        return super().doubleclick_element(element_id, item_id, column_id)
+        element_type = self.get_element_type(element_id)
+        if element_type != "GuiShell":
+            self.take_screenshot()
+            raise ValueError(
+                "You cannot use 'doubleclick element' on element type '%s', maybe use "
+                "'click element' instead?" % element_type)
+        self.session.findById(element_id).doubleClickItem(item_id, column_id)
+        self._explicit_pause()
 
     def list_grid_context_menu(self, table_id):
         """Ouvre le menu contextuel d'une grille et le REFERME (touche
         Échap par ``Escape`` non nécessaire : le menu se ferme au prochain
         appel), retourne ses entrées ``{code, text, level}`` : le code fonction
-        (``&FILTER``) est la donnée stable, le texte est localisé."""
+        (``&FILTER``) est la donnée stable, le texte est localisé.
+
+        Exemple :
+        | ${entries}=    `List Grid Context Menu`    wnd[0]/usr/cntlGRID1/shellcont/shell
+        | ${codes}=    Evaluate    [entry['code'] for entry in $entries]
+        | List Should Contain Value    ${codes}    &FILTER
+        """
         grid = self._grid(table_id)
         try:
             grid.ContextMenu()
@@ -96,7 +128,14 @@ class GridActionKeywords:
         """Ouvre le menu contextuel de la grille et choisit l'entrée de code
         fonction ``code`` (``&FILTER``, ``&FIND``, ``&XXL``...) par
         ``SelectContextMenuItem`` ; code absent = échec listant les codes du
-        menu réel. Attend la fin de l'aller-retour."""
+        menu réel. Attend la fin de l'aller-retour.
+
+        Exemple :
+        | `Select Grid Context Menu Item`    wnd[0]/usr/cntlGRID1/shellcont/shell    &FIND
+        | ${windows}=    `Get Open Windows`
+        | Should Be True    ${windows}[-1][modal]
+        | `Dismiss Modal Window`
+        """
         items = self.list_grid_context_menu(table_id)
         codes = [item["code"] for item in items if item["code"]]
         wanted = str(code).strip()
@@ -110,21 +149,47 @@ class GridActionKeywords:
         self.wait_until_busy_done()
 
     def select_context_menu_item(self, element_id, menu_or_button_id, item_id):
-        """Surcharge du keyword hérité : sur une GRILLE, passe par `Select Grid
-        Context Menu Item` (l'hérité refusait le type ``GuiShell``) ; sur un
-        arbre ou une barre, comportement hérité."""
+        """Choisit l'entrée ``item_id`` (code fonction) d'un menu contextuel.
+        Sur une GRILLE, passe par `Select Grid Context Menu Item` (le
+        deuxième argument est alors ignoré ; le keyword de
+        robotframework-sapguilibrary refusait une grille) ; sur un arbre,
+        ouvre le menu du nœud ``menu_or_button_id`` ; sur une barre d'outils,
+        presse le bouton à menu ``menu_or_button_id``.
+
+        Exemple :
+        | `Select Context Menu Item`    wnd[0]/usr/cntlGRID1/shellcont/shell    ${EMPTY}    &FIND
+        | ${windows}=    `Get Open Windows`
+        | Should Be True    ${windows}[-1][modal]
+        | `Dismiss Modal Window`
+        """
         try:
             element = self.session.findById(element_id)
         except com_error:
             element = None
         if element is not None and hasattr(element, "ColumnOrder"):
             return self.select_grid_context_menu_item(element_id, item_id)
-        return super().select_context_menu_item(element_id, menu_or_button_id, item_id)
+        self.element_should_be_present(element_id)
+        target = self.session.findById(element_id)
+        if hasattr(target, "nodeContextMenu"):
+            target.nodeContextMenu(menu_or_button_id)      # arbre : menu d'un nœud
+        elif hasattr(target, "pressContextButton"):
+            target.pressContextButton(menu_or_button_id)  # barre : bouton à menu
+        else:
+            self.take_screenshot()
+            raise ValueError("Cannot use keyword 'select context menu item' for element "
+                             "type '%s'" % self.get_element_type(element_id))
+        target.selectContextMenuItem(item_id)
+        self._explicit_pause()
 
     def list_grid_toolbar_buttons(self, table_id):
         """Les boutons de la barre d'outils PROPRE d'une grille : liste de
         dicts ``{id, tooltip, type}``. Vide quand la grille n'a pas de barre
-        (SE16 : les fonctions vivent dans la barre d'application)."""
+        (SE16 : les fonctions vivent dans la barre d'application).
+
+        Exemple :
+        | ${buttons}=    `List Grid Toolbar Buttons`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell
+        | Should Be Equal    ${buttons}[0][id]    &DETAIL
+        """
         grid = self._grid(table_id)
         buttons = []
         try:
@@ -143,10 +208,18 @@ class GridActionKeywords:
         return buttons
 
     def click_toolbar_button(self, table_id, button_id):
-        """Surcharge : même comportement hérité, mais un bouton ABSENT échoue
+        """Clique le bouton ``button_id`` de la barre d'outils propre d'une
+        grille ; un bouton ABSENT échoue
         en listant les boutons de la barre de la grille (vide = la grille n'a
         pas de barre propre : les fonctions vivent dans la barre d'application,
-        `Click Button By Label` par tooltip)."""
+        `Click Button By Label` par tooltip).
+
+        Exemple :
+        | `Click Toolbar Button`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    &FIND
+        | ${windows}=    `Get Open Windows`
+        | Should Be True    ${windows}[-1][modal]
+        | `Dismiss Modal Window`
+        """
         try:
             return super().click_toolbar_button(table_id, button_id)
         except ValueError as exc:
@@ -175,10 +248,16 @@ class GridActionKeywords:
     def sort_grid_by_column(self, table_id, column, descending=False):
         """Trie la grille sur la colonne ``column`` (id technique) : sélection
         de la colonne puis bouton de tri de la barre de la grille
-        (``&SORT_UP``/``&SORT_DOWN``), à défaut entrée de tri du menu
+        (``&SORT_UP`` / ``&SORT_DOWN``), à défaut entrée de tri du menu
         contextuel. Grille sans l'un ni l'autre (SE16 : le tri vit dans la
         barre d'application) = échec nommant les voies disponibles, jamais un
-        tri silencieusement absent."""
+        tri silencieusement absent.
+
+        Exemple :
+        | `Sort Grid By Column`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    PRICE    descending=True
+        | ${first}=    `Get Cell Value`    wnd[0]/usr/cntlBCALV_GRID_DEMO_0100_CONT1/shellcont/shell    0    CARRID
+        | Should Be Equal    ${first}    SQ
+        """
         grid = self._grid(table_id)
         grid.SelectColumn(column)
         desc = _as_bool(descending)

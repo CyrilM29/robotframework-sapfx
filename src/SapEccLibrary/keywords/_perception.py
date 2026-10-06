@@ -8,7 +8,7 @@ Sert deux usages :
 La même idée de signature structurelle existe dans l'enregistreur desktop
 (``tools/recorder/recorder_poll.py:screen_signature``) ; on la ré-implémente ici
 en autonomie pour ne pas faire dépendre ``src/`` de ``tools/``. Les ids surfacés
-sont **relatifs à la session** (``wnd[0]/usr/txt...``), donc directement collables
+sont *relatifs à la session* (``wnd[0]/usr/txt...``), donc directement collables
 dans un test ou ``resources/``.
 """
 import re
@@ -21,7 +21,6 @@ from sapfx_common.com_safety import describe_com_failure, is_wrong_thread_error
 from sapfx_common.object_tree import (OBJECT_TREE_PROPERTIES, ScreenElement,
                                       flatten_object_tree)
 from sapfx_common.perception_diff import diff_perception
-from sapfx_common.tree_nodes import is_progid
 
 
 class ScreenUnreadableError(RuntimeError):
@@ -43,21 +42,6 @@ _TRUTHY = ("1", "true", "yes", "on")
 
 # Le keyword qui sait LIRE chaque sous-type de shell : la matière du refus
 # actionnable de `Get Value` sur un shell.
-_SHELL_READERS = {
-    "GridView": "Lire la grille avec Read Grid / Get Cell Value.",
-    "Tree": "Lire l'arbre avec Read Tree Nodes / Get Selected Tree Node.",
-    "Calendar": "Choisir une date avec Pick Calendar Date.",
-    "AbapEditor": "Le source d'un éditeur ABAP est hors de l'API Scripting : "
-                  "aucune lecture possible (Click Element At Offset pour agir).",
-    "HTMLViewer": "Le contenu d'un HTMLViewer est hors de l'API Scripting.",
-    "Picture": "Une image n'a pas de valeur lisible.",
-    "Toolbar": "Lister les boutons avec List Grid Toolbar Buttons sur la grille "
-               "porteuse, ou Get Screen Signature.",
-}
-_SHELL_READERS_DEFAULT = ("Percevoir le contrôle avec Get Screen Signature "
-                          "(colonne type GuiShell/<SubType>).")
-
-
 def _safe(node, attr):
     try:
         return getattr(node, attr)
@@ -114,7 +98,7 @@ class PerceptionKeywords:
     def _screen_elements(self, window=None):
         """Contrôles de la fenêtre active (ou de ``wnd[window]``, pour lire un
         modal recouvert par un autre) en liste de :class:`ScreenElement`
-        (ids **relatifs à la session**, ordre du document).
+        (ids *relatifs à la session*, ordre du document).
 
         Chemin rapide : ``session.GetObjectTree``, un seul appel COM pour tout
         le sous-arbre, avec texte, éditabilité et géométrie (voir
@@ -223,40 +207,12 @@ class PerceptionKeywords:
         Une session illisible échoue (``ScreenUnreadableError``) au lieu de
         rendre des champs vides en succès.
 
-        | ${screen}=    Get Current Screen
-        | Should Be Equal    ${screen}[program]    RSWF_CST_AUTOCUST
-        | Should Be Equal    ${screen}[screen_number]    100
+        Exemple :
+        | ${screen}=    `Get Current Screen`
+        | Should Be Equal    ${screen}[program]    SAPLSETB
+        | Should Be Equal    ${screen}[screen_number]    230
         """
         return self._screen_info()
-
-    def get_value(self, element_id):
-        """Comme `Get Value` de la base, avec un REFUS actionnable sur un
-        ``GuiShell`` dont la « valeur » serait son ProgID.
-
-        Le keyword hérité rend ``element.text`` pour tout shell ; or le
-        ``Text`` d'un arbre, d'une grille, d'un éditeur ABAP ou d'un
-        calendrier est le ProgID du contrôle (``SAP.TableTreeControl.1``,
-        ``SAPGUI.AbapEditor.1``), une valeur plausible qui n'a rien lu :
-        relevé live sur SE38 et l'accueil le 2026-09-07. Ici le sous-type
-        est nommé avec le keyword qui sait lire ce contrôle. Un shell dont le
-        texte est une vraie donnée (un ``TextEdit``) reste lu tel quel."""
-        value = super().get_value(element_id)
-        if isinstance(value, str) and is_progid(value):
-            subtype = self._shell_subtype(element_id)
-            raise ValueError(
-                "Get Value sur '%s' rendrait le ProgID '%s' du contrôle, pas une "
-                "donnée d'écran (GuiShell%s). %s"
-                % (element_id, value.strip(),
-                   "/%s" % subtype if subtype else "",
-                   _SHELL_READERS.get(subtype, _SHELL_READERS_DEFAULT)))
-        return value
-
-    def _shell_subtype(self, element_id):
-        """Sous-type d'un shell (``Tree``, ``GridView``...), ou ``""``."""
-        try:
-            return str(self.session.findById(element_id).SubType or "").strip()
-        except (AttributeError, com_error):
-            return ""
 
     def get_screen_signature(self, mode="full", include_geometry=False,
                              pair_renames=False):
@@ -267,26 +223,26 @@ class PerceptionKeywords:
         éditables (saisie, cases, radios, listes) sont préfixés ``* `` pour qu'un
         agent les repère immédiatement.
 
-        ``mode=diff`` retourne le **différentiel** depuis l'appel précédent de ce
+        ``mode=diff`` retourne le *différentiel* depuis l'appel précédent de ce
         keyword sur cette instance (lignes ``- `` disparues / ``+ `` apparues,
         inchangé résumé en ``= N unchanged line(s)``) : après une action, c'est
         « ce qui a changé » qui intéresse l'agent, pour une fraction des tokens.
         Le premier appel en diff retourne la vue complète (rien à comparer).
         L'écran est TOUJOURS relu en entier (jamais de cache d'état) ; seul le
         rendu diffère. ``pair_renames=True`` (avec ``mode=diff``) active le
-        **diff intelligent** : les lignes disparues/apparues dont les ids se
+        *diff intelligent* : les lignes disparues/apparues dont les ids se
         ressemblent (scoring de ``sapfx_common.healing``) sont appariées en
         ``~ ancien -> nouveau`` : un sous-écran renuméroté se lit comme un
         renommage, pas comme deux blocs de lignes.
 
-        ``mode=semantic`` retourne la vue **formulaire** de l'écran : une ligne
+        ``mode=semantic`` retourne la vue *formulaire* de l'écran : une ligne
         par cible actionnable (champ modifiable ou bouton/onglet) portant son
         localisateur humain *vérifié* (émis seulement s'il re-résout vers ce
         seul élément, sinon ``?``), l'id technique, le type et la valeur
         courante : ``* Table Name\\twnd[0]/usr/ctxtDATABROWSE-TABLENAME\\t
         GuiCTextField\\t= T000``. C'est la perception la plus directement
         actionnable pour un agent (chaque ligne se rejoue en ``Fill Field By
-        Label``/``Click Button By Label``, ou par id) et la moins chère en
+        Label`` ou ``Click Button By Label``, ou par id) et la moins chère en
         tokens. Cette vue ne participe pas à la mémoire du ``mode=diff``.
 
         ``include_geometry=True`` ajoute une 4e colonne ``@gauche,haut LxH``
@@ -300,7 +256,13 @@ class PerceptionKeywords:
 
         Lecture seule et indépendant de la locale (on n'expose que types et ids,
         pas de message localisé). C'est le keyword de perception consommé par le
-        plugin rf-mcp pour que l'agent *voie* l'écran avant d'agir."""
+        plugin rf-mcp pour que l'agent *voie* l'écran avant d'agir.
+
+        Exemple :
+        | ${screen}=    `Get Screen Signature`
+        | Should Contain    ${screen}    SAPLSETB/SE16/230
+        | Should Contain    ${screen}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         header = self._screen_header()
 
         mode_normalized = str(mode).strip().lower()
@@ -346,21 +308,26 @@ class PerceptionKeywords:
         self._screen_refs_header = header
 
     def get_screen_map(self):
-        """Retourne la **carte numérotée** de l'écran SAP actif : une ligne
+        """Retourne la *carte numérotée* de l'écran SAP actif : une ligne
         par cible actionnable, ``@N`` suivi de la ligne d'affordance de
-        ``mode=semantic`` (libellé humain vérifié, id, type, valeur) ::
+        ``mode=semantic`` (libellé humain vérifié, id, type, valeur) :
 
-            # screen SAPLSE16/SE16/0102
-            @1\t* Table Name\twnd[0]/usr/ctxtDATABROWSE-TABLENAME\tGuiCTextField\t= T000
-            @2\t  Number of Entries\twnd[0]/tbar[1]/btn[31]\tGuiButton
+        | # screen SAPLSE16/SE16/0102
+        | @1\t* Table Name\twnd[0]/usr/ctxtDATABROWSE-TABLENAME\tGuiCTextField\t= T000
+        | @2\t  Number of Entries\twnd[0]/tbar[1]/btn[31]\tGuiButton
 
-        Chaque numéro devient une **référence éphémère** utilisable par
+        Chaque numéro devient une *référence éphémère* utilisable par
         `Resolve Screen Ref`, `Click Screen Ref` et `Fill Screen Ref` : l'agent
         lit la carte puis agit par ``@N`` sans recopier l'id (la résolution
         re-vérifie l'écran avant d'agir). Même numérotation que la légende de
         `Get Annotated Screenshot` quand tous les éléments ont une géométrie.
         Lecture seule ; les références vivent sur l'instance (dernière
-        perception numérotée)."""
+        perception numérotée).
+
+        Exemple :
+        | ${map}=    `Get Screen Map`
+        | Should Contain    ${map}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         from sapfx_common.semantic import actionable_targets, screen_affordances
         header = self._screen_header()
         elements = self._screen_elements()
@@ -379,12 +346,18 @@ class PerceptionKeywords:
 
     def resolve_screen_ref(self, ref):
         """Résout une référence ``@N`` de la dernière perception numérotée
-        (`Get Screen Map` ou `Get Annotated Screenshot`) en **id d'élément**,
+        (`Get Screen Map` ou `Get Annotated Screenshot`) en *id d'élément*,
         jamais en silence : échec actionnable si aucune perception n'a été
         faite, si la référence est inconnue, si l'écran a changé depuis la
         perception, ou si l'élément a disparu (dans ces deux derniers cas le
         remède est nommé : re-percevoir). Accepte ``3`` ou ``@3``. Retourne
-        l'id (chaîne, MCP-safe)."""
+        l'id (chaîne, MCP-safe).
+
+        Exemple :
+        | ${map}=    `Get Screen Map`
+        | ${field}=    `Resolve Screen Ref`    @13
+        | Should Be Equal    ${field}    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
+        """
         refs = getattr(self, "_screen_refs", None)
         if not refs:
             raise AssertionError(
@@ -419,8 +392,14 @@ class PerceptionKeywords:
         """Clique la cible ``@N`` de la dernière perception numérotée : la
         référence est résolue en id (`Resolve Screen Ref` : fraîcheur et
         présence re-vérifiées), puis le clic passe par le keyword
-        **déterministe** `Click Element`. Retourne l'id cliqué (journalisé :
-        la trace reste rejouable par id dans une suite)."""
+        *déterministe* `Click Element`. Retourne l'id cliqué (journalisé :
+        la trace reste rejouable par id dans une suite).
+
+        Exemple :
+        | ${map}=    `Get Screen Map`
+        | ${button}=    `Click Screen Ref`    @9
+        | Should Be Equal    ${button}    wnd[0]/tbar[1]/btn[7]
+        """
         element_id = self.resolve_screen_ref(ref)
         logger.info("Click Screen Ref @%s -> %s"
                     % (str(ref).strip().lstrip("@"), element_id))
@@ -431,7 +410,13 @@ class PerceptionKeywords:
         """Saisit ``text`` dans la cible ``@N`` de la dernière perception
         numérotée : résolution `Resolve Screen Ref` puis `Input Text`
         déterministe. Retourne l'id rempli. La valeur saisie n'est jamais
-        utilisée comme localisateur (même règle que le recorder sémantique)."""
+        utilisée comme localisateur (même règle que le recorder sémantique).
+
+        Exemple :
+        | ${map}=    `Get Screen Map`
+        | ${field}=    `Fill Screen Ref`    @13    T000
+        | `Element Value Should Be`    ${field}    T000
+        """
         element_id = self.resolve_screen_ref(ref)
         logger.info("Fill Screen Ref @%s -> %s"
                     % (str(ref).strip().lstrip("@"), element_id))
@@ -439,20 +424,26 @@ class PerceptionKeywords:
         return element_id
 
     def get_open_windows(self):
-        """Retourne la pile de **fenêtres ouvertes** de la session : une liste de
+        """Retourne la pile de *fenêtres ouvertes* de la session : une liste de
         dicts JSON-safe ``{id, type, title, modal}`` dans l'ordre de la session
         (``wnd[0]`` d'abord ; ``modal`` vaut ``True`` pour les ``GuiModalWindow``).
 
         C'est le garde-fou du piège constaté live sur SESSION_MANAGER :
         ``Run Transaction`` peut rapporter un succès (``Info.Transaction`` porte
-        déjà le tcode) alors qu'un **modal d'erreur est resté affiché** et
+        déjà le tcode) alors qu'un *modal d'erreur est resté affiché* et
         neutralise le champ OK-code. Vérifier ``modal`` ici (ou ``modal_open``
         dans l'état applicatif rf-mcp, qui appelle ce keyword) avant d'enchaîner.
         Lecture seule, indépendant de la locale (le titre est du contexte humain,
         jamais une ancre d'assertion). Une fenêtre illisible est ignorée ; une
         SESSION illisible lève :class:`ScreenUnreadableError` (une liste vide
         en succès ferait conclure « aucune fenêtre ouverte » à un agent, relevé
-        live sous rf-mcp le 2026-09-07)."""
+        live sous rf-mcp le 2026-09-07).
+
+        Exemple :
+        | ${windows}=    `Get Open Windows`
+        | Should Be Equal    ${windows}[0][id]    wnd[0]
+        | Should Not Be True    ${windows}[0][modal]
+        """
         windows = []
         try:
             children = self.session.Children

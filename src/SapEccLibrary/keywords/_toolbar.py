@@ -1,4 +1,4 @@
-"""Mixin **barres d'outils de la fenêtre** : inventorier la barre d'application
+"""Mixin *barres d'outils de la fenêtre* : inventorier la barre d'application
 (``wnd[0]/tbar[1]``) et la barre système (``tbar[0]``), et y cliquer un bouton
 en échouant avec l'inventaire.
 
@@ -33,7 +33,12 @@ class ToolbarKeywords:
         liste de dicts ``{id, text, tooltip, icon}`` dans l'ordre d'affichage,
         ``icon`` étant le nom d'icône SAP (``ICON_EXECUTE``...), l'ancre
         locale-safe là où ``tooltip`` est localisé. Barre sans bouton perçu =
-        liste vide (un écran peut n'en avoir aucun)."""
+        liste vide (un écran peut n'en avoir aucun).
+
+        Exemple :
+        | ${buttons}=    `List Toolbar Buttons`
+        | Should Be Equal    ${buttons}[0][icon]    B_LIST
+        """
         prefix = toolbar_id.rstrip("/") + "/"
         buttons = []
         for element in self._screen_elements():
@@ -48,7 +53,12 @@ class ToolbarKeywords:
         (``wnd[0]/tbar[1]/btn[31]``), son segment (``btn[31]``) ou son nom
         d'icône (``ICON_COUNT``, locale-safe). Bouton absent = échec listant
         l'inventaire réel (id, icône, tooltip), jamais un « Cannot find » nu.
-        Attend la fin de l'aller-retour ; retourne l'id cliqué."""
+        Attend la fin de l'aller-retour ; retourne l'id cliqué.
+
+        Exemple :
+        | ${clicked}=    `Click Application Toolbar Button`    B_LIST
+        | Should Be Equal    ${clicked}    wnd[0]/tbar[1]/btn[7]
+        """
         buttons = self.list_toolbar_buttons(toolbar_id)
         wanted = str(button).strip()
         for candidate in buttons:

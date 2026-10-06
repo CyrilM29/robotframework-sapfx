@@ -1,4 +1,4 @@
-"""Mixin d'**extraction tabulaire** du canal RFC (2026-09-16).
+"""Mixin d'*extraction tabulaire* du canal RFC (2026-09-16).
 
 Le quatrième canal rejoint le contrat commun de
 :mod:`sapfx_common.table_extract`, celui que l'écran SAP GUI, le WebGUI et
@@ -21,14 +21,14 @@ from robot.api import logger
 
 from sapfx_common import rfc_channel, rfc_extract, rfc_tables, table_extract
 
-from ._rfc_spool import RfcSpoolKeywords
+from ._rfc_surface_artifact import RfcSurfaceArtifactKeywords
 
 
-class RfcExtractKeywords(RfcSpoolKeywords):
+class RfcExtractKeywords(RfcSurfaceArtifactKeywords):
     """Mixin de :class:`SapApiLibrary` : extraire un tableau par le canal RFC."""
 
     def count_rfc_table_rows(self, table: str, alias: str = "default") -> int:
-        """Compte les lignes d'une table **sans en rapatrier aucune**, par un
+        """Compte les lignes d'une table *sans en rapatrier aucune*, par un
         module DIFFÉRENT de celui qui lit.
 
         C'est le total déclaré du canal RFC, et son intérêt tient entièrement
@@ -58,7 +58,12 @@ class RfcExtractKeywords(RfcSpoolKeywords):
         (`Read Rfc Table`), ou se borne par le total d'un canal tiers
         (`declared_rows=` d'`Extract Rfc Table`). Un zéro, lui, désigne une
         table réellement vide, que seul un plancher de lignes distingue d'un
-        relevé intègre."""
+        relevé intègre.
+
+        Exemple :
+        | ${total}=    `Count Rfc Table Rows`    SNWD_PD    alias=a4h
+        | Should Be Equal As Integers    ${total}    205
+        """
         nom = str(table or "").strip().upper()
         if not nom:
             raise ValueError(
@@ -78,7 +83,7 @@ class RfcExtractKeywords(RfcSpoolKeywords):
                           headers: Optional[Mapping[str, Any]] = None,
                           declared_rows: Any = None,
                           delimiter: str = "|") -> dict[str, Any]:
-        """Extrait un tableau par RFC et rend le relevé **avec son contrat**,
+        """Extrait un tableau par RFC et rend le relevé *avec son contrat*,
         dans la forme commune aux quatre canaux.
 
         Le miroir sans écran d'`Extract Displayed Report` (SAP GUI),
@@ -95,7 +100,7 @@ class RfcExtractKeywords(RfcSpoolKeywords):
         comptage n'y participent.
 
         Ce que le canal ne sait pas faire, et qui doit se lire ici plutôt que
-        se découvrir à l'usage : il n'expose **aucun libellé affiché**. Les
+        se découvrir à l'usage : il n'expose *aucun libellé affiché*. Les
         colonnes sont des noms de champs ABAP, stables et indépendants de la
         langue, donc le contraire exact du canal UI5, dont les seules clés
         disponibles sont des titres traduits. Passer ``headers`` permet à la
@@ -115,7 +120,12 @@ class RfcExtractKeywords(RfcSpoolKeywords):
         ``DATA_BUFFER_EXCEEDED`` / ``AD/E/559``). Le refus est relayé INTACT,
         pour rester assertable par son code, et son remède est journalisé en
         avertissement, parce que la sortie de secours (lire en deux
-        projections qui partagent la clé, puis recoller) ne se devine pas."""
+        projections qui partagent la clé, puis recoller) ne se devine pas.
+
+        Exemple :
+        | ${extract}=    `Extract Rfc Table`    T000    MANDT,MTEXT    alias=a4h    key=MANDT
+        | Should Be True    ${extract}[complete]
+        """
         nom = str(table or "").strip().upper()
         projection = rfc_tables.as_field_list(fields)
         if not projection:

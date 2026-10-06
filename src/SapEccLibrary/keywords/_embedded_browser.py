@@ -62,7 +62,7 @@ class EmbeddedBrowserKeywords:
         """Active le débogage distant CDP des contrôles WebView2 embarqués.
 
         Positionne ``WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`` dans l'environnement
-        du **process courant**. WebView2 ne lit cette variable qu'à la création
+        du *process courant*. WebView2 ne lit cette variable qu'à la création
         du contrôle : ce keyword doit donc être appelé AVANT `Open Sap Logon`
         (ou tout lancement de SAP Logon/Business Client héritant de cet
         environnement, p.ex. via la bibliothèque Process) : l'appeler après
@@ -73,14 +73,12 @@ class EmbeddedBrowserKeywords:
         défaut). Idempotent : les arguments déjà présents dans la variable sont
         conservés, les nouveaux leur sont concaténés plutôt que de les écraser.
 
-        Exemple::
-
-            Enable Embedded Browser Debugging
-            Open Sap Logon
-            Connect To Session
-            # ... naviguer jusqu'à l'écran qui affiche le contrôle embarqué ...
-            Switch To Embedded Browser Page    Help
-            Click    text=Continue
+        Exemple :
+        | `Enable Embedded Browser Debugging`
+        | `Open Sap Logon`
+        | `Connect To Session With Retry`
+        | # navigate to the screen that shows the embedded control, then:
+        | ${page}=    `Switch To Embedded Browser Page`    Help
         """
         port = int(port)
         flags = _CDP_ARGS_TEMPLATE % port
@@ -103,7 +101,12 @@ class EmbeddedBrowserKeywords:
         ``exact=False`` (défaut) : correspondance par sous-chaîne insensible à
         la casse (les titres de page WebView2 embarquent souvent un suffixe
         dynamique). Échoue en listant les titres de page réellement ouverts si
-        aucun ne correspond, erreur auto-corrigible."""
+        aucun ne correspond, erreur auto-corrigible.
+
+        Exemple :
+        | ${page}=    `Get Embedded Browser Page Id`    Help    port=4711
+        | Should Not Be Empty    ${page}
+        """
         browser = self._browser()
         timeout_secs = self._timeout_secs(timeout)
         exact = _as_bool(exact)
@@ -132,7 +135,12 @@ class EmbeddedBrowserKeywords:
         """Comme `Get Embedded Browser Page Id`, puis active cette page dans la
         bibliothèque Browser (``Switch Page``) : tous les keywords Browser
         suivants (``Click``, ``Fill Text``, ``Get Text``...) agissent alors sur
-        le contrôle embarqué. Retourne l'id de la page désormais active."""
+        le contrôle embarqué. Retourne l'id de la page désormais active.
+
+        Exemple :
+        | ${page}=    `Switch To Embedded Browser Page`    Help
+        | Should Not Be Empty    ${page}
+        """
         page_id = self.get_embedded_browser_page_id(title, port=port, exact=exact,
                                                      timeout=timeout)
         self._browser().switch_page(page_id)

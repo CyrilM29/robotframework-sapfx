@@ -1,4 +1,4 @@
-"""Sondes PURES du canal **WebGUI** (SAP GUI for HTML / ITS).
+"""Sondes PURES du canal *WebGUI* (SAP GUI for HTML / ITS).
 
 Un chapitre à part (convention #13) : ces sondes n'ont rien à voir avec le
 bundle ``__SAPFX``, qui est le socle des pages UI5. Une page WebGUI n'a pas de

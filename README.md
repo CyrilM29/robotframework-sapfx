@@ -37,7 +37,7 @@ the **keyword reference**. The libraries are distributed on PyPI as
 
 | Library | Channel | Driven through |
 | --- | --- | --- |
-| **`SapEccLibrary`** | SAP GUI for Windows (ECC, S/4HANA backend) | SAP GUI Scripting API over COM (`pywin32`). A hardened fork of [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary): every upstream keyword keeps its name and signature, a few now fail loudly where upstream returned a misleading value. |
+| **`SapEccLibrary`** | SAP GUI for Windows (ECC, S/4HANA backend) | SAP GUI Scripting API over COM (`pywin32`). Drop-in compatible with [robotframework-sapguilibrary](https://github.com/frankvanderkuur/robotframework-sapguilibrary): each of its keywords keeps its name and signature, a few now fail loudly where it returned a misleading value. |
 | **`SapFioriLibrary`** | SAP Fiori / SAPUI5, UI5 Web Components, SAP GUI for HTML | The [Browser library](https://github.com/MarketSquare/robotframework-browser) (Playwright), with **UI5-stable control selectors** instead of generated DOM ids. Locator engine ported from [playwright-sap](https://github.com/ArpitSureka/playwright-sap). |
 | **`SapApiLibrary`** | OData v2 and v4, RFC / BAPI | Python standard library for HTTP (SAP CSRF protocol included); optional RFC through `pyrfc`. |
 
@@ -252,7 +252,7 @@ migration tools.
 | [docs/hardening-test-environment.md](docs/hardening-test-environment.md) | Security checklist for the server, the workstation and the web side |
 | [docs/migrating-from-sapguilibrary.md](docs/migrating-from-sapguilibrary.md) | Moving from robotframework-sapguilibrary |
 | [docs/migrating-from-cbta.md](docs/migrating-from-cbta.md) | Moving from SAP CBTA |
-| [docs/audit-upstream.md](docs/audit-upstream.md) | What the fork changes in the upstream library, and why |
+| [docs/audit-upstream.md](docs/audit-upstream.md) | What SapEccLibrary changes in the upstream code it embeds, and why |
 
 Every document exists in English and in French (`*.fr.md`). They were written
 alongside the libraries in the maintainer's workbench: when they mention a
@@ -263,8 +263,8 @@ this repository.
 ## Layout
 
 ```text
-src/SapEccLibrary/      SAP GUI for Windows (COM); _vendor/ holds the upstream
-                        library verbatim, keywords/ one mixin per capability
+src/SapEccLibrary/      SAP GUI for Windows (COM); keywords/ one mixin per
+                        capability, robotframework-sapguilibrary's included
 src/SapFioriLibrary/    Fiori / UI5 / Web Components / SAP GUI for HTML
                         (Browser library); injected JavaScript in *.js.tpl
 src/SapApiLibrary/      OData v2/v4 and optional RFC / BAPI
@@ -279,7 +279,7 @@ Bug reports and suggestions are welcome as
 
 ## License
 
-Apache 2.0. Includes vendored code from robotframework-sapguilibrary, locator
+Apache 2.0. Includes code absorbed from robotframework-sapguilibrary, locator
 engines ported from playwright-sap and techniques adapted from RoboSAPiens and
 playwright-praman; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 

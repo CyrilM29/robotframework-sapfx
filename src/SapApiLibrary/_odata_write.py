@@ -34,17 +34,23 @@ class OdataWriteKeywords(_ApiCore):
 
     def post_odata(self, path: str, payload: Any, alias: str = "default",
                    track: bool = False, **query: str) -> Any:
-        """POST OData avec le protocole **CSRF** SAP : un GET préalable avec
+        """POST OData avec le protocole *CSRF* SAP : un GET préalable avec
         ``X-CSRF-Token: Fetch`` obtient le token (mémorisé avec les cookies de
         session), rejoué sur l'écriture ; token expiré (403 CSRF) = re-fetch
         et rejeu UNE fois. ``payload`` : dict (sérialisé JSON) ou chaîne déjà
         sérialisée. Retourne le JSON de la réponse (``{}`` si 204).
 
-        ``track=True`` enregistre l'entité créée dans la **fabrique de
-        données** de la session (URI lue dans ``__metadata.uri`` v2,
+        ``track=True`` enregistre l'entité créée dans la *fabrique de
+        données* de la session (URI lue dans ``__metadata.uri`` v2,
         ``@odata.id`` v4 ou l'en-tête ``Location``) : `Delete Created
         Entities` la supprimera en teardown. Réponse sans URI identifiable =
-        WARNING invitant à `Register Created Entity` (jamais silencieux)."""
+        WARNING invitant à `Register Created Entity` (jamais silencieux).
+
+        Exemple :
+        | ${travel}=    `Post Odata`    /processor/Travel    {"Description": "Created by an example"}
+        | ...    alias=cap
+        | Should Not Be Empty    ${travel}[TravelUUID]
+        """
         body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
         status, headers, raw = self._write_request(alias, "POST", path, query, body)
         result: Any = {}
@@ -72,7 +78,13 @@ class OdataWriteKeywords(_ApiCore):
         d'entity sets SAP l'exigent ; passer l'ETag exact pour du verrouillage
         optimiste réel, ou ``${NONE}`` pour ne pas l'envoyer). ``path`` vise
         l'entité avec sa clé (``.../Products('X')``). Retourne le JSON de la
-        réponse (``{}`` si 204, le cas nominal)."""
+        réponse (``{}`` si 204, le cas nominal).
+
+        Exemple :
+        | `Patch Odata`    ${path}    {"Description": "Changed by an example"}    alias=cap
+        | ${travel}=    `Get Odata`    ${path}    alias=cap
+        | Should Be Equal    ${travel}[Description]    Changed by an example
+        """
         body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
         status, _, raw = self._write_request(
             alias, "PATCH", path, query, body,
@@ -88,8 +100,13 @@ class OdataWriteKeywords(_ApiCore):
         Retourne ``{}`` (204, le cas nominal) ou le JSON de la réponse.
 
         Avec `Post Odata` ``track=True`` et `Delete Created Entities`, ferme
-        le cycle de données **réversible** par l'API : créer, tester, tout
-        remettre en l'état sans passer par l'écran."""
+        le cycle de données *réversible* par l'API : créer, tester, tout
+        remettre en l'état sans passer par l'écran.
+
+        Exemple :
+        | `Delete Odata`    ${path}    alias=cap
+        | Run Keyword And Expect Error    *    `Get Odata`    ${path}    alias=cap
+        """
         status, _, raw = self._write_request(
             alias, "DELETE", path, query, None,
             extra_headers=self._if_match_header(if_match))
@@ -107,13 +124,19 @@ class OdataWriteKeywords(_ApiCore):
                             alias: str = "default",
                             create_path: Optional[str] = None,
                             track: bool = False) -> dict[str, Any]:
-        """Création **idempotente** : GET sur ``entity_path`` (l'entité avec
+        """Création *idempotente* : GET sur ``entity_path`` (l'entité avec
         sa clé, ``.../Products('X')``) ; si elle existe, ne touche à rien ;
         si 404, POST ``payload`` sur ``create_path`` (défaut : ``entity_path``
         privé de son suffixe de clé ``(...)``). Retourne ``{"created": bool,
         "entity": <JSON>}``. ``track=True`` suit l'entité créée pour
         `Delete Created Entities` (une entité qui existait déjà n'est JAMAIS
-        suivie : on ne supprime pas ce qu'on n'a pas créé)."""
+        suivie : on ne supprime pas ce qu'on n'a pas créé).
+
+        Exemple :
+        | ${result}=    `Ensure Odata Entity`    /sap/opu/odata/sap/SEPMRA_SHOP/Products('AR-FB-1000')
+        | ...    {"Id": "AR-FB-1000"}    alias=a4h
+        | Should Not Be True    ${result}[created]
+        """
         status, _, body = self._request(alias, "GET", entity_path, None,
                                         allowed_errors=(404,))
         if status != 404:
@@ -130,10 +153,14 @@ class OdataWriteKeywords(_ApiCore):
 
     def register_created_entity(self, entity_path: str,
                                 alias: str = "default") -> None:
-        """Enregistre manuellement une entité dans la **fabrique de données**
+        """Enregistre manuellement une entité dans la *fabrique de données*
         de la session (quand `Post Odata` ``track=True`` n'a pas pu identifier
         l'URI, ou pour une entité créée autrement). ``entity_path`` : le
-        chemin de l'entité avec sa clé, tel que `Delete Odata` l'accepte."""
+        chemin de l'entité avec sa clé, tel que `Delete Odata` l'accepte.
+
+        Exemple :
+        | `Register Created Entity`    ${path}    alias=cap
+        """
         path = str(entity_path).strip()
         if not path:
             raise ValueError("Register Created Entity : chemin vide.")
@@ -143,7 +170,7 @@ class OdataWriteKeywords(_ApiCore):
                                 key_value: str,
                                 active: str = "false") -> str:
         """Chemin ADRESSABLE d'une entité d'un service OData v4
-        **draft-enabled** : ``<set>(<clé>=<valeur>,IsActiveEntity=<actif>)``.
+        *draft-enabled* : ``<set>(<clé>=<valeur>,IsActiveEntity=<actif>)``.
 
         Sur un service draft-enabled, la clé est COMPOSITE : l'identifiant
         seul ne désigne rien, il faut lui adjoindre l'état actif ou brouillon.
@@ -156,11 +183,11 @@ class OdataWriteKeywords(_ApiCore):
         ACTIVES), donc un compte inchangé ne prouve AUCUN nettoyage ; et l'URI
         que le serveur annonce en ``Location`` (``…Travel.drafts('…')``) n'est
         pas adressable, d'où le chemin construit ici et confié à
-        `Register Created Entity`. ::
+        `Register Created Entity`.
 
-            ${chemin}=    Build Draft Entity Path    /processor/Travel
-            ...    TravelUUID    ${uuid}
-            Register Created Entity    ${chemin}
+        Exemple :
+        | ${path}=    `Build Draft Entity Path`    /processor/Travel    TravelUUID    ${travel}[TravelUUID]
+        | Should End With    ${path}    IsActiveEntity=false)
         """
         path = str(entity_set).strip().rstrip("/")
         if not path:
@@ -173,18 +200,28 @@ class OdataWriteKeywords(_ApiCore):
 
     def get_created_entities(self, alias: str = "default") -> list[str]:
         """Les entités actuellement suivies par la fabrique de données de la
-        session (copie JSON-safe, ordre de création)."""
+        session (copie JSON-safe, ordre de création).
+
+        Exemple :
+        | ${created}=    `Get Created Entities`    alias=cap
+        | Length Should Be    ${created}    1
+        """
         return list(self._session(alias).created_entities)
 
     def delete_created_entities(self, alias: str = "default",
                                 strict: bool = False) -> dict[str, Any]:
         """Supprime toutes les entités suivies de la session, en ordre
-        **inverse** de création (LIFO : les dépendants d'abord), best-effort :
+        *inverse* de création (LIFO : les dépendants d'abord), best-effort :
         un échec n'empêche pas les suivantes. Retourne le rapport JSON-safe
         ``{"deleted": [...], "failed": [{"uri", "error"}]}`` et le journalise.
 
         Pensé pour un teardown de suite (jamais bloquant par défaut) ;
-        ``strict=True`` échoue à la fin si au moins une suppression a échoué."""
+        ``strict=True`` échoue à la fin si au moins une suppression a échoué.
+
+        Exemple :
+        | ${report}=    `Delete Created Entities`    alias=cap    strict=True
+        | Log    ${report}
+        """
         session = self._session(alias)
         report: dict[str, Any] = {"deleted": [], "failed": []}
         while session.created_entities:
@@ -226,7 +263,7 @@ class OdataWriteKeywords(_ApiCore):
         (v4) ou en-tête ``Location`` ; ramenée en chemin relatif quand son
         origine diffère de la session (reverse-proxy).
 
-        Une URI **relative** se résout contre l'URL de la REQUÊTE (RFC 3986),
+        Une URI *relative* se résout contre l'URL de la REQUÊTE (RFC 3986),
         jamais contre la base de session : un service OData v4 répond
         ``Location: Travel.drafts('…')``, relatif au service. Recollée à la
         base, elle perdait son préfixe de service et la suppression partait
