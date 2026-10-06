@@ -31,15 +31,28 @@ Framework, where a keyword is the abstraction:
    SAP GUI Scripting API      SAPUI5 runtime (sap.ui.*)   OData v2/v4, RFC
 ```
 
-The three channels are peers: same vocabulary above, nothing shared below. The
+The three channels are peers, and they share no locator. Each library keeps the
+locator of its technology: a SAP GUI scripting id
+(`wnd[0]/usr/ctxtDATABROWSE-TABLENAME`), a UI5 control selector
+(`controlType=sap.m.SearchField`), an OData entity set. That is deliberate. The
 API channel has no screen at all, which is exactly why it is worth having,
-since the cheapest way to set up or cross-check data is not to drive a screen.
+since the cheapest way to set up or cross-check data is not to drive a screen;
+and a lowest-common-denominator locator, the displayed label, would change with
+the logon language. What is shared below are contracts, in `sapfx_common`: one
+completeness rule for extracting a table whatever the channel, one message
+identity (`MO/E/402`) on the screen and over RFC, and, for the two screen
+channels, the same perception → action loop and one locator-repair log.
 
-A test reads the same regardless of channel:
+The channel then becomes a choice of business keyword. In this cross-channel
+test, each keyword is written in a resource file on top of one library (SE16
+through SAP GUI scripting for the first, an OData `$count` for the second), and
+the test only names the fact it checks:
 
 ```robotframework
-Go To Transaction    VA01          # ECC
-Open App             Sales Order    # Fiori (phase 2): same intent, different lib
+Product Count Is The Same On Screen And Through The API
+    ${on_screen}=    Count Table Entries        ${EPM_PRODUCTS_TABLE}    # SAP GUI, SE16
+    ${via_api}=      Count Business Entities    ${EPM_PRODUCTS}          # OData $count
+    Should Be Equal As Integers    ${via_api}    ${on_screen}
 ```
 
 ## ECC library internals (`src/SapEccLibrary`)

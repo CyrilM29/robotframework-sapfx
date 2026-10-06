@@ -14,10 +14,17 @@
 pip install robotframework-sapfx
 ```
 
-SAPFX automates SAP tests in Robot Framework through **three libraries that
-share one business vocabulary**: the SAP GUI desktop client, SAP Fiori and SAPUI5
-apps in the browser, and the OData/RFC API channel. A test reads the same whichever channel
-it drives, and one run can cross all three (prepare data through the API, drive
+SAPFX automates SAP tests in Robot Framework through **three libraries, one per
+channel**: the SAP GUI desktop client, SAP Fiori and SAPUI5 apps in the browser,
+and the OData/RFC API channel. Each keeps the locators of its technology (a SAP
+GUI scripting id, a UI5 control selector, an OData entity set); what they share
+is **the same contracts and the same method**: one completeness rule for
+extracting a table, whether it comes from an ALV grid, a UI5 table or an RFC
+call; one message identity (`MO/E/402`) on the screen and over RFC; and, on the
+two screen channels, the same perception → action loop and one locator-repair
+log. The business vocabulary is built above, in your project's Robot Framework
+keywords: that is where a test stops depending on the channel. One run can
+cross all three (prepare data through the API, drive
 the screen for what you actually test, check the result through another
 channel). Because they also write, delete and cross-check their own writes
 through two channels, the same libraries are heading beyond testing, towards
@@ -207,7 +214,7 @@ Teams that test UI5 apps with JavaScript tooling will know
 [wdi5](https://github.com/ui5-community/wdi5), the reference outside Robot
 Framework. SAPFX does not replace it: its scope is SAP test automation in Robot
 Framework, where the desktop client, the API channel and Fiori share one
-vocabulary, one runner and one report.
+runner, one report and the same contracts.
 
 ## Beyond testing
 

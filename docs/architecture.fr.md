@@ -31,16 +31,29 @@ Framework, où un keyword constitue l'abstraction :
    SAP GUI Scripting API      SAPUI5 runtime (sap.ui.*)   OData v2/v4, RFC
 ```
 
-Les trois canaux sont des pairs : même vocabulaire au-dessus, rien de partagé
-en dessous. Le canal API n'a aucun écran, et c'est bien pour cela qu'il compte :
-la façon la moins coûteuse de préparer ou de recouper des données n'est pas de
-piloter un écran.
+Les trois canaux sont des pairs, et ils ne partagent aucun localisateur. Chaque
+bibliothèque garde le localisateur de sa technologie : un id de scripting SAP GUI
+(`wnd[0]/usr/ctxtDATABROWSE-TABLENAME`), un sélecteur de contrôle UI5
+(`controlType=sap.m.SearchField`), un entity set OData. C'est voulu. Le canal API
+n'a aucun écran, et c'est bien pour cela qu'il compte : la façon la moins
+coûteuse de préparer ou de recouper des données n'est pas de piloter un écran ;
+et un localisateur de plus petit dénominateur commun, le libellé affiché,
+changerait avec la langue de connexion. Ce qui se partage en dessous, ce sont
+des contrats, dans `sapfx_common` : une seule règle de complétude pour extraire
+un tableau quel que soit le canal, une même identité de message (`MO/E/402`) à
+l'écran et en RFC, et, pour les deux canaux à écran, la même boucle perception →
+action et un même journal de réparation des localisateurs.
 
-Un test se lit de la même façon quel que soit le canal :
+Le canal devient alors un choix de keyword métier. Dans ce test cross-canal,
+chaque keyword est écrit dans un fichier de resources au-dessus d'une seule
+bibliothèque (SE16 par le scripting SAP GUI pour le premier, un `$count` OData
+pour le second), et le test ne nomme que le fait qu'il vérifie :
 
 ```robotframework
-Go To Transaction    VA01          # ECC
-Open App             Sales Order    # Fiori (phase 2) : même intention, bibliothèque différente
+Product Count Is The Same On Screen And Through The API
+    ${on_screen}=    Count Table Entries        ${EPM_PRODUCTS_TABLE}    # SAP GUI, SE16
+    ${via_api}=      Count Business Entities    ${EPM_PRODUCTS}          # OData $count
+    Should Be Equal As Integers    ${via_api}    ${on_screen}
 ```
 
 ## Internals de la bibliothèque ECC (`src/SapEccLibrary`)

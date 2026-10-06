@@ -14,10 +14,18 @@
 pip install robotframework-sapfx
 ```
 
-SAPFX automatise les tests SAP dans Robot Framework avec **trois bibliothèques
-qui partagent un même vocabulaire métier** : le client lourd SAP GUI, les applications
-SAP Fiori et SAPUI5 dans le navigateur, et le canal API OData/RFC. Un test se lit de la même façon
-quel que soit le canal qu'il pilote, et un même run peut traverser les trois
+SAPFX automatise les tests SAP dans Robot Framework avec **trois bibliothèques,
+une par canal** : le client lourd SAP GUI, les applications SAP Fiori et SAPUI5
+dans le navigateur, et le canal API OData/RFC. Chacune garde les localisateurs
+de sa technologie (un id de scripting SAP GUI, un sélecteur de contrôle UI5, un
+entity set OData) ; elles partagent **les mêmes contrats et la même méthode** :
+une seule règle de complétude pour extraire un tableau, qu'il vienne d'une
+grille ALV, d'une table UI5 ou d'un appel RFC ; une même identité de message
+(`MO/E/402`) à l'écran et en RFC ; et, sur les deux canaux à écran, la même
+boucle perception → action et un même journal de réparation des localisateurs.
+Le vocabulaire métier se construit au-dessus, dans les keywords Robot Framework
+de votre projet : c'est là qu'un test cesse de dépendre du canal. Un même run
+peut traverser les trois
 (préparer les données par l'API, piloter l'écran pour ce qu'on teste vraiment,
 vérifier le résultat par un autre canal). Comme elles savent aussi écrire,
 supprimer et recouper leurs propres écritures par deux canaux, les mêmes
@@ -222,7 +230,7 @@ Les équipes qui testent des applications UI5 avec un outillage JavaScript
 connaissent [wdi5](https://github.com/ui5-community/wdi5),
 la référence hors de Robot Framework. SAPFX ne le remplace pas : son périmètre
 est l'automatisation de tests SAP dans Robot Framework, où le client lourd, le
-canal API et Fiori partagent un vocabulaire, un exécuteur et un rapport.
+canal API et Fiori partagent un exécuteur, un rapport et les mêmes contrats.
 
 ## Au-delà du test
 

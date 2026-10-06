@@ -55,6 +55,39 @@ circonscrites et bien définies : exactement ce que nous ajoutons dans `SapEccLi
   en néerlandais). Acceptable.
 - Classificateurs Python 2.7 dans `setup.py`, supprimés dans notre `pyproject.toml`.
 
+## État de l'héritage (octobre 2026)
+
+Sur les 37 mots-clés amont, **16 sont surchargés** dans `SapEccLibrary`
+(`Run Transaction`, `Get Element Type`, `Element Should Be Present`,
+`Get Value`, `Input Password`, `Connect To Session`, les cinq mots-clés de
+grille, `Doubleclick Element`, `Select Context Menu Item`, `Select Node`,
+`Select From List By Label`) et **21 tournent encore avec leur corps amont**.
+Ces 21 reposent déjà sur nos fondations, puisqu'ils appellent par `self`
+`get_element_type` (dont l'échec nomme l'écran réel), `get_value` et `session`
+(routée par alias, avec le rail de thread COM). Trois d'entre eux portent
+l'essentiel de l'usage réel : `Input Text`, `Click Element` et `Send Vkey`.
+
+Ce qui reste de l'amont, et reste à surcharger dans une mixin :
+
+- **La capture d'écran en cas d'erreur.** `take_screenshot` passe par la
+  bibliothèque `Screenshot` de Robot Framework, qui capture l'écran entier et
+  non la fenêtre SAP, et nos propres chemins d'erreur l'appellent aussi. Sur
+  une installation de base sans Pillow, chaque échec ajoute un avertissement
+  « Taking screenshot failed » (l'erreur d'origine n'est pas masquée).
+  `HardCopyToMemory`, déjà utilisé par `Get Screenshot As Base64`, ne capture
+  que la fenêtre SAP.
+- **Des écritures sans relecture.** `Input Text`, `Select Checkbox`,
+  `Unselect Checkbox` et `Select Radio Button` posent la valeur sans la
+  relire, et `Input Text` journalise la valeur saisie au niveau INFO.
+- **`Element Value Should Be` / `Should Contain`** appellent `setfocus()` dans
+  une simple vérification et mélangent `Warning`, `ValueError` et
+  `AssertionError`.
+- **`Set Explicit Wait`** refuse les décimales et `500ms` écrit sans espace :
+  une seconde grammaire de durée à côté de `Set Default Timeout`.
+
+L'amont n'a pas bougé depuis mars 2022 (v1.2.1) : ces points se surchargent
+ici, jamais en corrigeant le fichier vendorisé.
+
 ## Stratégie de resynchronisation
 
 Le fichier upstream est intégré tel quel à
@@ -62,6 +95,9 @@ Le fichier upstream est intégré tel quel à
 `SapGuiLibrary` → `SapGuiBase`). Pour intégrer une future version upstream : recopier le
 fichier, réappliquer ce renommage, puis relancer `tests/unit` et le diff libdoc. Limiter
 la modification à une seule ligne est délibéré afin que cela reste une opération de 5 minutes.
+L'amont étant figé depuis mars 2022, la règle tient surtout une promesse de
+compatibilité : chaque mot-clé amont garde son nom et sa signature, et tout
+comportement nouveau va dans une mixin.
 
 ## Marques
 

@@ -54,6 +54,38 @@ narrow and well-defined: exactly the things we add in `SapEccLibrary`.
   Dutch). Acceptable.
 - Python 2.7 classifiers in `setup.py`, dropped in our `pyproject.toml`.
 
+## State of the inheritance (October 2026)
+
+Of the 37 upstream keywords, **16 are overridden** in `SapEccLibrary`
+(`Run Transaction`, `Get Element Type`, `Element Should Be Present`,
+`Get Value`, `Input Password`, `Connect To Session`, the five grid keywords,
+`Doubleclick Element`, `Select Context Menu Item`, `Select Node`,
+`Select From List By Label`) and **21 still run with their upstream body**.
+Those 21 already stand on our foundations, because they call
+`get_element_type` (whose failure names the actual screen), `get_value` and
+`session` (routed by alias, with the COM thread rail) through `self`. Three of
+them carry most of the real usage: `Input Text`, `Click Element` and
+`Send Vkey`.
+
+What remains of upstream, and is still to be overridden in a mixin:
+
+- **The screenshot on error.** `take_screenshot` goes through Robot
+  Framework's `Screenshot` library, which captures the whole screen rather than
+  the SAP window, and our own error paths call it too. On a base install
+  without Pillow, each failure adds a "Taking screenshot failed" warning (the
+  original error is not masked). `HardCopyToMemory`, already used by
+  `Get Screenshot As Base64`, captures the SAP window only.
+- **Writes without read-back.** `Input Text`, `Select Checkbox`,
+  `Unselect Checkbox` and `Select Radio Button` set the value without reading
+  it back, and `Input Text` logs the typed value at INFO level.
+- **`Element Value Should Be` / `Should Contain`** call `setfocus()` in a
+  plain check and mix `Warning`, `ValueError` and `AssertionError`.
+- **`Set Explicit Wait`** rejects decimals and `500ms` written without a space,
+  a second duration grammar next to `Set Default Timeout`.
+
+Upstream has not moved since March 2022 (v1.2.1), so these are overridden here,
+never patched in the vendored file.
+
 ## Re-sync strategy
 
 The upstream file is vendored verbatim at
@@ -61,6 +93,9 @@ The upstream file is vendored verbatim at
 `SapGuiLibrary` → `SapGuiBase`). To pull a future upstream release: re-copy the
 file, re-apply that rename, and re-run `tests/unit` + the libdoc diff. Keeping the
 modification to one line is deliberate so this stays a 5-minute operation.
+With upstream frozen since March 2022, the rule mostly keeps a compatibility
+promise: every upstream keyword keeps its name and signature, and new behaviour
+lands in a mixin.
 
 ## Trademarks
 
