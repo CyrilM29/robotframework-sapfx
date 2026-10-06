@@ -167,7 +167,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     « la configuration a-t-elle bougé » plutôt que « ce système est-il durci ».
     """
 
-    __version__ = "0.8.3"
+    __version__ = "0.8.4"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
