@@ -21,7 +21,13 @@ from sapfx_common.combo_box import (
     find_by_label,
     format_entries,
 )
-from sapfx_common.user_formats import describe_formats, format_date, format_number
+from sapfx_common.user_formats import (
+    describe_formats,
+    format_date,
+    format_number,
+    parse_date,
+    parse_time,
+)
 
 _TRUTHY = ("1", "true", "yes", "on")
 
@@ -264,6 +270,70 @@ class ComboBoxKeywords:
         text = format_date(str(iso_date), key)
         self.input_text(element_id, text)
         return text
+
+    def read_date_field(self, element_id, date_format=None):
+        """Lit la date AFFICHÉE dans ``element_id`` au format de l'utilisateur
+        (``01.01.2038`` pour ``DD.MM.YYYY``) et la rend en ISO 8601
+        (``2038-01-01``) : le miroir d'`Input Date`, pour qu'une suite compare
+        une date d'écran sans dépendre du format de l'utilisateur.
+        ``date_format`` = clé ``DATFM`` (``1`` à ``6``) ; sans lui, celle
+        mémorisée par `Get User Formats`.
+
+        Un champ VIDE échoue (une date absente n'est jamais une date) ; une
+        forme qui ne suit pas le format de l'utilisateur échoue en le nommant.
+
+        Exemple :
+        | `Get User Formats`
+        | `Run Transaction`    STRUST
+        | `Double Click Tree Node`    wnd[0]/shellcont/shell    SSLSDFAULT
+        | `Set Focus`    wnd[0]/usr/txtPSE-OWNCERT-SUBJECT
+        | `Send Vkey`    2
+        | ${valid_to}=    `Read Date Field`    wnd[0]/usr/txtCERT-DATETO
+        | Should Be Equal    ${valid_to}    2038-01-01
+        """
+        if date_format in (None, "", "None"):
+            key = self._known_user_formats("Read Date Field")["date_format"]
+        else:
+            key = date_format
+        shown = str(self.get_value(element_id) or "").strip()
+        if not shown:
+            raise AssertionError("Le champ de date %s est vide : aucune date n'y est affichée."
+                                 % element_id)
+        return parse_date(shown, key)
+
+    def read_time_field(self, element_id, time_format=None):
+        """Lit l'heure AFFICHÉE dans ``element_id`` au format ``TIMEFM`` de
+        l'utilisateur et la rend en ``HH:MM:SS`` sur 24 heures : le pendant
+        de `Read Date Field` pour les heures. ``time_format`` = clé ``TIMEFM``
+        (``0`` 24 heures, ``1`` à ``4`` 12 heures avec suffixe AM/PM) ; sans
+        lui, celle mémorisée par `Get User Formats` (vide = ``0``).
+
+        Un champ VIDE échoue ; une forme qui ne suit pas le format échoue en
+        le nommant. L'heure est rendue telle que l'écran la montre : son
+        fuseau (utilisateur, système, UTC) dépend de l'écran, pas de ce
+        keyword. Le suffixe AM/PM est accepté quelle que soit sa casse : les
+        clés 1 et 2 (comme 3 et 4) ne diffèrent que par elle, et la branche
+        12 heures n'a été éprouvée qu'hors SAP (seul le format 24 heures a été
+        relevé en direct, sur STRUST).
+
+        Exemple :
+        | `Get User Formats`
+        | `Run Transaction`    STRUST
+        | `Double Click Tree Node`    wnd[0]/shellcont/shell    SSLSDFAULT
+        | `Set Focus`    wnd[0]/usr/txtPSE-OWNCERT-SUBJECT
+        | `Send Vkey`    2
+        | ${time_to}=    `Read Time Field`    wnd[0]/usr/txtCERT-TIMETO
+        | Should Be Equal    ${time_to}    00:00:01
+        """
+        if time_format in (None, "", "None"):
+            key = self._known_user_formats("Read Time Field")["time_format"]
+        else:
+            key = time_format
+        shown = str(self.get_value(element_id) or "").strip()
+        if not shown:
+            raise AssertionError("Le champ d'heure %s est vide : aucune heure n'y est affichée."
+                                 % element_id)
+        return parse_time(shown, key)
 
     def input_number(self, element_id, value, decimal_notation=None, decimals=None):
         """Saisit un nombre donné en notation TECHNIQUE (``1234.5``) dans le

@@ -188,8 +188,10 @@ class FlpKeywords(FioriBase):
         Ready``.
 
         Exemple :
-        | `Log In Via Identity Provider`    ${IDP_USER}    ${IDP_PASSWORD}    preset=sap-ias
-        | `Ui5 Control Should Be Visible`    controlType=sap.m.Button    properties={'text': 'Open Dialog'}
+        | `Log In Via Identity Provider`    DEVELOPER    ${ABAP_FLP_PASSWORD}    preset=generic
+        | ...    username_selector=${ICF_USER_FIELD}    password_selector=${ICF_PASSWORD_FIELD}
+        | ...    submit_selector=${ICF_SUBMIT}
+        | Wait Until Keyword Succeeds    120s    2s    `Flp Container Should Be Present`
         """
         idp = resolve_preset(preset, username_selector, password_selector,
                              submit_selector)

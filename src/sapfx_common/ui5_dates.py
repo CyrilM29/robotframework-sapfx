@@ -50,6 +50,15 @@ def date_text_error(info: Mapping[str, Any], iso: str, description: str) -> str:
     if error == "not_a_date_type":
         return ("Fill Ui5 Date %s : la valeur est liée à un type %s (date ET heure, "
                 "ou heure) ; ce keyword ne saisit qu'une DATE." % (description, type_name))
+    if error == "not_a_date_control":
+        return ("Fill Ui5 Date %s : le contrôle est un %s (sélecteur de date ET "
+                "heure, ou d'heure) ; ce keyword ne saisit qu'une DATE dans un "
+                "champ date." % (description, type_name))
+    if error == "not_editable":
+        return ("Fill Ui5 Date %s : le champ (%s) n'est pas éditable ou est "
+                "désactivé ; rien n'a été saisi. Passer l'objet en édition, ou "
+                "viser un objet dont l'état autorise la modification."
+                % (description, type_name))
     if error == "no_date_format":
         return ("Fill Ui5 Date %s : ni type de liaison formatant une date (type de "
                 "liaison : %s) ni format d'affichage de date sur le contrôle ; ce "

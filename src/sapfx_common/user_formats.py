@@ -189,3 +189,43 @@ def describe_formats(date_format_key: object, decimal_format_key: object,
         "time_format": str(time_format_key if time_format_key is not None else "").strip(),
         "gregorian": date_key in DATE_FORMATS,
     }
+
+
+# TIMEFM (USR01-TIMEFM) : 0 = 24 heures ; 1 et 2 = 12 heures (1 à 12, suffixe
+# AM/PM en majuscules ou minuscules) ; 3 et 4 = heures de 0 à 11 avec suffixe.
+TIME_FORMAT_LABELS: Mapping[str, str] = {
+    "0": "HH:MM:SS (24 h)", "1": "HH:MM:SS AM/PM (1-12)", "2": "HH:MM:SS am/pm (1-12)",
+    "3": "HH:MM:SS AM/PM (0-11)", "4": "HH:MM:SS am/pm (0-11)",
+}
+_TIME = re.compile(r"^\s*(\d{1,2}):(\d{2}):(\d{2})\s*([AaPp][Mm])?\s*$")
+
+
+def parse_time(text: str, time_format_key: object = "0") -> str:
+    """Une heure affichée au format ``TIMEFM`` de l'utilisateur en
+    ``HH:MM:SS`` sur 24 heures. Clé vide = ``0`` (24 heures, le défaut).
+    Vide rend vide ; une forme qui ne suit pas le format est REFUSÉE en le
+    nommant (un suffixe AM/PM attendu et absent, ou présent en 24 heures).
+    La casse du suffixe n'est pas contrôlée (les clés 1 et 2, comme 3 et 4,
+    ne diffèrent que par elle)."""
+    key = str(time_format_key if time_format_key is not None else "").strip() or "0"
+    if key not in TIME_FORMAT_LABELS:
+        raise ValueError("Format d'heure TIMEFM %r non pris en charge." % (key,))
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    match = _TIME.match(raw)
+    twelve = key != "0"
+    if not match or bool(match.group(4)) != twelve:
+        raise ValueError("Heure %r ne suit pas le format de l'utilisateur %s (TIMEFM %s)."
+                         % (raw, TIME_FORMAT_LABELS[key], key))
+    hour, minute, second = int(match.group(1)), int(match.group(2)), int(match.group(3))
+    if twelve:
+        pm = match.group(4).upper() == "PM"
+        low, high = (1, 12) if key in ("1", "2") else (0, 11)
+        if not low <= hour <= high:
+            raise ValueError("Heure %r hors de la plage %d-%d du format TIMEFM %s."
+                             % (raw, low, high, key))
+        hour = hour % 12 + (12 if pm else 0)
+    if hour > 23 or minute > 59 or second > 59:
+        raise ValueError("Heure %r impossible." % raw)
+    return "%02d:%02d:%02d" % (hour, minute, second)

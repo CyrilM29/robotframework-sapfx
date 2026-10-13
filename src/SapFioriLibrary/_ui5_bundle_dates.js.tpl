@@ -90,6 +90,24 @@
     const owner = dateOwner(c);
     const info = dateBinding(owner);
     if (info.kind.unsupported) return { error: 'not_a_date_type', type: info.kind.name };
+    // Un sélecteur de date ET heure, ou d'heure, se refuse par sa CLASSE, lié
+    // ou non : non lié, il n'a pas de type à juger, et la saisie d'une date
+    // seule y était tapée puis refusée par le contrôle, avec un message qui
+    // accusait la valeur (mesuré live sur le Demo Kit le 2026-10-13).
+    try {
+      if (c.isA && (c.isA('sap.m.DateTimePicker') || c.isA('sap.m.TimePicker'))) {
+        return { error: 'not_a_date_control', type: c.getMetadata().getName() };
+      }
+    } catch (e) {}
+    // Un champ non éditable ou désactivé se refuse AVANT la saisie : sinon la
+    // frappe attendait tout son délai sur un <input readonly> puis échouait sur
+    // une erreur de localisateur (mesuré live sur cap-sflight le 2026-10-13 :
+    // date d'un voyage accepté, éditable=false en mode édition).
+    try {
+      const ro = (typeof c.getEditable === 'function' && c.getEditable() === false)
+        || (typeof c.getEnabled === 'function' && c.getEnabled() === false);
+      if (ro) return { error: 'not_editable', type: c.getMetadata().getName() };
+    } catch (e) {}
     const before = modelIso(owner, info);
     if (info.type && typeof info.type.formatValue === 'function') {
       const asDate = info.kind.utc ? new Date(Date.UTC(parts.y, parts.m - 1, parts.d))

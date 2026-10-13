@@ -41,8 +41,13 @@ __all__ = [
 ]
 
 #: La forme d'un identifiant d'icône dans une cellule d'ALV : ``@07@``,
-#: ``@5B\\QTexte@``… Seule la partie identifiante est retenue.
-ICON_PATTERN = re.compile(r"^@([0-9A-Za-z]{1,4})(?:\\\\Q.*)?@$")
+#: ``@5B\\QTexte@``, ``@S_TL_G\\Q Service is active @`` (UNE barre oblique
+#: inverse, puis ``Q`` et l'info-bulle). L'identifiant est un code court ou un
+#: nom symbolique à soulignés ; seule la partie identifiante est retenue.
+#: Corrigé le 2026-10-07 (scénario 11) : le motif exigeait DEUX barres
+#: obliques et refusait les soulignés, donc rendait ``None`` sur toute cellule
+#: à info-bulle, l'exemple de sa propre documentation compris.
+ICON_PATTERN = re.compile(r"^@([0-9A-Za-z_]{1,30})(?:\\Q.*)?@$")
 
 
 def icon_code(value: Any) -> Optional[str]:

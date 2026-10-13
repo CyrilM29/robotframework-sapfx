@@ -18,13 +18,13 @@ case de la ligne voulue (le préalable de « Job > Delete » dans SM37 et de
 from pythoncom import com_error
 from robot.api import logger
 
-from sapfx_common.abap_list import aligned_rows, matching_rows
+from sapfx_common.abap_list import aligned_rows, attach_icons, list_cells, matching_rows
 
 
 class AbapListKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
-    def read_abap_list_rows(self, header="auto", rows="auto"):
+    def read_abap_list_rows(self, header="auto", rows="auto", icons=False):
         """Lit la liste classique affichée en *lignes alignées sur l'en-tête* :
         une liste de dicts ``{titre d'en-tête: valeur}`` où chaque cellule est
         rattachée à sa colonne par la COLONNE de son identifiant
@@ -46,6 +46,18 @@ class AbapListKeywords:
         les lignes de MESSAGE, reconnues à leur forme : une seule cellule
         qui recouvre plusieurs colonnes).
 
+        ``icons=True`` ajoute à chaque ligne ``_icons`` : ``{titre d'en-tête:
+        nom d'icône}`` des cellules SANS texte qui portent une icône. Une liste
+        classique rend souvent un état par une icône seule (la colonne
+        « Actv » de SMICM : ``S_OKAY`` sur un service actif, rien sur un
+        inactif), que le texte de la cellule, vide dans les deux cas, ne
+        distingue pas ; le nom d'icône est technique, donc locale-safe. Un
+        appel COM par CHAQUE cellule vide des lignes rendues, toutes colonnes
+        confondues (une cellule vide sans icône rend simplement ``""``) ; une
+        icône ILLISIBLE fait échouer toute la lecture en nommant la cellule,
+        même hors de la colonne qui intéresse l'appelant, jamais lue comme une
+        absence.
+
         Les titres d'en-tête sont des textes LOCALISÉS : les nommer appartient
         au page object, jamais à une suite. Lecture seule.
 
@@ -53,13 +65,43 @@ class AbapListKeywords:
         | ${rows}=    `Read Abap List Rows`
         | Should Be Equal    ${rows}[0][CARRID]    AA
         | Should Be True    ${rows}[0][_selectable]
+        | `Run Transaction`    SMICM
+        | `Click Application Toolbar Button`    B_INTF
+        | ${services}=    `Read Abap List Rows`    icons=True
+        | Should Be Equal    ${services}[1][_icons][Actv]    S_OKAY
         """
-        result = aligned_rows(self._screen_elements(), header=header, rows=rows)
+        elements = self._screen_elements()
+        result = aligned_rows(elements, header=header, rows=rows)
         for skipped in result["ignored"]:
             logger.info("Ligne %s de la liste ignorée (une cellule sur "
                         "plusieurs colonnes : message, pas une donnée) : %r"
                         % (skipped["_row"], skipped["text"]))
-        return result["rows"]
+        if str(icons).strip().lower() not in ("true", "yes", "1"):
+            return result["rows"]
+        wanted_rows = {int(row["_row"]) for row in result["rows"]}
+        found = {}
+        unreadable = []
+        for cell in list_cells(elements):
+            if cell.kind != "lbl" or cell.text or cell.row not in wanted_rows:
+                continue
+            try:
+                # la PROPRIÉTÉ est lue dans le try, jamais par un getattr à
+                # défaut : un proxy sur un thread étranger lève AttributeError
+                # sur IconName, et ce défaut se lirait « aucune icône »
+                icon = str(self.session.findById(cell.id).IconName or "")
+            except (AttributeError, com_error) as exc:
+                # une icône illisible n'est jamais « aucune icône » : l'absence
+                # d'icône PORTE une valeur (« Actv » vide = service inactif)
+                unreadable.append("%s (%s)" % (cell.id, exc))
+                continue
+            if icon:
+                found[cell.id] = icon
+        if unreadable:
+            raise AssertionError(
+                "Read Abap List Rows icons=True : %d cellule(s) dont l'icône n'a pas pu être "
+                "lue, donc impossible à distinguer d'une cellule sans icône : %s"
+                % (len(unreadable), ", ".join(unreadable[:10])))
+        return attach_icons(result, found)
 
     def select_abap_list_row(self, text, column=None, header="auto"):
         """Coche la case de sélection de la ligne dont une cellule vaut

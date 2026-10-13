@@ -20,6 +20,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Optional
 
+from sapfx_common.policy_gate import gate_for
 from sapfx_common.secrets import reveal_secret
 
 from ._http import (
@@ -101,14 +102,21 @@ class _ApiCore:
                  headers: Optional[dict] = None,
                  body: Any = None,
                  allowed_errors: tuple = (),
-                 _retried_auth: bool = False) -> tuple[int, dict, bytes]:
+                 _retried_auth: bool = False,
+                 _policy_checked: bool = False) -> tuple[int, dict, bytes]:
         """Requête HTTP d'une session : retourne (statut, en-têtes, corps).
         >= 400 → AssertionError auto-corrigible (statut, URL, extrait du
         corps), SAUF les statuts listés dans ``allowed_errors`` (retournés
         avec l'extrait du corps : le GET d'existence d'`Ensure Odata Entity`
         attend son 404). Session OAuth2 : token Bearer garanti avant l'appel,
         renouvelé et rejoué UNE fois sur 401. La télémétrie de session est
-        alimentée ici (compteurs, durées, dernier statut)."""
+        alimentée ici (compteurs, durées, dernier statut). Une écriture passe
+        d'abord par la politique de session (`Set Api Policy`) ; celles du
+        protocole CSRF y sont passées dans `_write_request`, AVANT le GET du
+        jeton, et arrivent ici avec ``_policy_checked``."""
+        if not (_retried_auth or _policy_checked):
+            gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_http(
+                method, path, body)
         session = self._session(alias)
         url = self._build_url(session, path, query)
         merged = dict(session.headers)
@@ -230,7 +238,13 @@ class _ApiCore:
         DELETE / $batch : token obtenu au besoin, re-fetch et rejeu UNE fois
         sur le 403 CSRF, jugé sur l'en-tête ``x-csrf-token: Required`` de la
         réponse avec repli texte (timeout de sécurité Gateway, ~30 min).
-        Toute autre erreur remonte telle quelle."""
+        Toute autre erreur remonte telle quelle.
+
+        La politique de session est consultée ICI, avant le GET du jeton : un
+        refus ne laisse partir aucune requête (mesuré le 2026-10-08 : gardée
+        au seul envoi final, l'écriture refusée laissait partir son GET de
+        jeton)."""
+        gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_http(method, path, body)
         session = self._session(alias)
         try:
             return self._send_with_csrf(session, alias, method, path, query,
@@ -267,7 +281,8 @@ class _ApiCore:
             extra.update(extra_headers)
         if session.csrf_token:
             extra["X-CSRF-Token"] = session.csrf_token
-        return self._request(alias, method, path, query, headers=extra, body=body)
+        return self._request(alias, method, path, query, headers=extra, body=body,
+                             _policy_checked=True)
 
     def _ensure_oauth_token(self, session: _ApiSession) -> str:
         """Token OAuth2 client credentials valide de la session : réutilisé

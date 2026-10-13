@@ -63,7 +63,17 @@ class WaitKeywords:
                 # sortait en « still busy » sur un écran au repos). Une session
                 # FERMÉE, elle, arrête la sonde : rien ne la ramènera.
                 last_error["exc"] = exc
-                return is_disconnected_error(exc)
+                if is_disconnected_error(exc):
+                    return True
+                # Une session DISPARUE du moteur (connexion fermée par F12 sur
+                # le dialogue de connexion, mesuré le 2026-10-07) répond par une
+                # AttributeError de proxy : sans ce constat, l'échec accusait
+                # un thread étranger au bout de tout le délai.
+                if self._session_is_gone():
+                    last_error["exc"] = SessionDisconnectedError(
+                        "the session is no longer in the scripting engine")
+                    return True
+                return False
             last_error.pop("exc", None)
             return not busy
 
@@ -319,6 +329,77 @@ class WaitKeywords:
             raise AssertionError(
                 "SAP session neither closed nor returned to idle after %s seconds."
                 % self._timeout_secs(timeout))
+
+    #: Écrans de départ d'une session : un ``/n`` qui y reste n'a rien ignoré.
+    _START_TRANSACTIONS = ("SESSION_MANAGER", "S000", "SMEN")
+
+    def _screen_identity_or_none(self):
+        """``(programme, dynpro, transaction)`` de la session, ``None`` si
+        elle est illisible (fermée, déconnectée)."""
+        try:
+            info = self.session.Info
+            return (str(info.Program), str(info.ScreenNumber), str(info.Transaction))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _modal_open(self):
+        try:
+            return str(self.session.ActiveWindow.Type) == "GuiModalWindow"
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _logoff_confirmation_open(self):
+        """La confirmation de ``/nend`` reconnue à sa STRUCTURE (mesurée sur la
+        758) : dialogue ``SAPLSPO1`` (``POPUP_TO_CONFIRM``) avec son bouton
+        ``SPOP-OPTION1``, jamais n'importe quelle modale (une erreur en est une
+        aussi)."""
+        if not self._modal_open():
+            return False
+        try:
+            program = str(self.session.Info.Program)
+            # la modale du DESSUS : /nend lancé sous une modale déjà ouverte
+            # empile sa confirmation en wnd[2] (ou plus haut), jamais en wnd[1]
+            top = str(self.session.ActiveWindow.Id).rsplit("/", 1)[-1]
+            button = self.session.findById("%s/usr/btnSPOP-OPTION1" % top, False)
+        except Exception:  # noqa: BLE001
+            return False
+        return program == "SAPLSPO1" and button is not None
+
+    def _require_session_closed(self, okcode, settle=None):
+        """Après ``/nex`` (ou ``/nend``) : la session doit avoir DISPARU, ou,
+        pour ``/nend``, montrer SA confirmation de déconnexion. Une session
+        restée ouverte et au repos est un OK-code IGNORÉ, jamais un succès.
+        La disparition est attendue jusqu'au délai de la bibliothèque (10 s au
+        plus) : une fermeture lente n'est pas un OK-code ignoré."""
+        wait = min(self._timeout_secs(None), 10.0) if settle is None else settle
+        if okcode.lower() == "/nend" and self._logoff_confirmation_open():
+            return
+        if poll_until(lambda: self._session_is_gone()
+                      or self._screen_identity_or_none() is None
+                      or (okcode.lower() == "/nend" and self._logoff_confirmation_open()),
+                      wait, step=self.poll_interval):
+            return
+        identity = self._screen_identity_or_none()
+        raise AssertionError(
+            "OK-code %s was not processed: the SAP session is still open on "
+            "%s. Some screens ignore system OK-codes (SU25 Step 1's selection "
+            "screen on release 758); close the connection instead, or leave "
+            "the screen with its own button first."
+            % (okcode, "/".join(identity) if identity else "an unreadable screen"))
+
+    def _require_left_screen(self, before):
+        """Après ``/n`` : la session doit avoir quitté l'écran de départ de
+        la commande, sauf si elle y était déjà (écran d'accueil) ou qu'un
+        dialogue s'est ouvert (« les données seront perdues »)."""
+        after = self._screen_identity_or_none()
+        if before is None or after is None or after != before:
+            return
+        if after[2].upper() in self._START_TRANSACTIONS or self._modal_open():
+            return
+        raise AssertionError(
+            "OK-code /n was not processed: the SAP session is still on %s. "
+            "Some screens ignore system OK-codes (SU25 Step 1's selection "
+            "screen on release 758)." % "/".join(after))
 
     def _timeout_secs(self, timeout):
         return self.default_timeout if timeout is None else timestr_to_secs(timeout)

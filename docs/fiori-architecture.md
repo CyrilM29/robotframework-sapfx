@@ -120,8 +120,10 @@ among them that the engine could not see):
   `Fill Wc Input` targets the internal `<input>`).
 
 The web recorder captures/records WC hosts on registry-less pages too
-(`Click Wc Control`, Alt+click assertions). Proven offline against a local
-fixture with a genuine scoped tag (`tests/robot/fiori_wc_smoke.robot`).
+(`Click Wc Control`, Alt+click assertions). Proven live
+(`tests/robot/fiori_wc_smoke.robot`) on the OpenUI5 Demo Kit shell, built in
+UI5 Web Components with genuine scoped tags, and on a registry-less UI5 Web
+Components for React story page.
 
 ### Launchpad iframes: `Set Ui5 Frame` (Work Zone / cFLP)
 
@@ -131,8 +133,10 @@ the shell. `Set Ui5 Frame    iframe#application-...` switches the library: the
 bundle is injected and evaluated **in the frame's context**, and every returned
 selector is prefixed with the frame + Playwright's `>>>` piercing combinator
 (which crosses origins). `Set Ui5 Frame` without argument switches back to the
-main page. Proven against a genuinely cross-origin fixture
-(`tests/robot/fiori_frame_smoke.robot`).
+main page. Proven live on the OpenUI5 Demo Kit sample iframe, which carries its
+own UI5 runtime (`tests/robot/fiori_frame_smoke.robot`: scoping, actions,
+frame reload, frame navigation); it was also exercised on a real SAP Build
+Work Zone cFLP on 2026-08-23. Not re-verified live: two app frames at once.
 
 ### Hybrid pages: composition probe, frame stack, `dom` engine
 
@@ -171,8 +175,11 @@ transaction in another + a React/vanilla widget in a portlet) mixes technologies
   accessible. On a SAP region, the dedicated engine always wins; `dom` is
   the last resort by design.
 
-Proven offline against `fixtures/hybrid_fixture.html` (four technologies, two
-genuinely nested frame levels; `tests/robot/fiori_hybrid_smoke.robot`).
+Proven live on the OpenUI5 Demo Kit sample page (UI5 runtime, UI5 Web
+Components shell, a non-SAP consent banner, a sample iframe with its own
+runtime; `tests/robot/fiori_hybrid_smoke.robot`). Not verified live: a WebGUI
+`lsdata` element in the same page and two nested frame levels, which no
+public target carries.
 
 ### Selector fallback chain: `Resolve Ui5 With Fallback`
 
@@ -219,10 +226,13 @@ re-implemented as a single injected bundle (no Playwright fork) for Robot Framew
 (Robot Framework 7.4.2, Browser 20.0.0): resolve a control by type to its stable id,
 fill its inner input, and confirm a missing control fails with a clear message.
 
-Version coverage beyond the current runtime (all live-validated):
+Version coverage beyond the current runtime:
 
-- **UI5 1.60** (pre-`Element.registry`): `fiori_legacy_smoke.robot` proves the
-  `registryForEach` DOM fallback against a real 1.60.14 runtime.
+- **UI5 < 1.67** (pre-`Element.registry`): the `registryForEach` DOM fallback
+  is still in the bundle and locked by `tests/unit/test_ui5_compat.py`, but it
+  is **no longer proven live**: its smoke ran a 1.60 runtime inside a
+  synthetic page and was retired on 2026-10-13 (live validation only, and no
+  live target serves a runtime older than 1.67 any more).
 - **UI5 2.0 nightly**: `fiori_ui5v2_smoke.robot` proves the `ElementRegistry`
   module branch and zero dependency on APIs removed in 2.x (`sap.ui.getCore()`,
   `Element.registry`, `sap.ui.version`). NB: at UI5con (July 2026) SAP
@@ -287,8 +297,8 @@ resolution; a unit test guards the sync. SAP's built-in **UI5 Test Recorder**
       inner input, match count, shortest-xpath round-trip, both engines fail clearly.
 - [x] Web Recorder: hover-highlight, in-app panel, record mode + `.robot` export,
       generated from the bundle (snippet + MV3 extension).
-- [x] **Multi-version**: UI5 1.60 → 2.0 nightly proven live (registry fallback
-      chain), `Get Ui5 Page Tree mode=diff`, perception for rf-mcp.
+- [x] **Multi-version**: UI5 1.71 → 2.0 nightly proven live (registry fallback
+      chain; the < 1.67 DOM fallback stays in the bundle, unit-locked, no longer proven live), `Get Ui5 Page Tree mode=diff`, perception for rf-mcp.
 - [x] **0.2.0**: `Set Ui5 Frame` (Work Zone/cFLP iframes), `Resolve Ui5 With
       Fallback` (role→xpath→sid, logged healing), Fiori Elements `idSuffix`,
       `Ui5 Text Should Be` (+ recorder assertion capture).

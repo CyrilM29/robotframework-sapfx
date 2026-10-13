@@ -139,9 +139,9 @@ même façon d'ici là.
 | S/4HANA on-premise (GUI) | ✅ Prouvé live (A4H 1909, `ecc_smoke` + `ecc_data_smoke`). |
 | SAP GUI for Windows 8.10 (16/07/2026) | ✅ API COM inchangée : migration sans risque attendue. |
 | UI5 ≥ 1.67 + Fiori Elements v4 | ✅ Prouvé live (OpenUI5 Demo Kit, cap-sflight). |
-| UI5 < 1.67 (launchpads pré-2019 : S/4 1610/1709, UI5 1.44/1.52/1.60) | ✅ Repli DOM `registryForEach`, **prouvé live contre un vrai OpenUI5 1.60.14** (`fiori_legacy_smoke.robot`, miroir npm jsDelivr). |
+| UI5 < 1.67 (launchpads pré-2019 : S/4 1610/1709, UI5 1.44/1.52/1.60) | 🟠 Repli DOM `registryForEach` gardé dans le bundle et verrouillé par `tests/unit/test_ui5_compat.py`, **non prouvé en live** : son smoke 1.60 (page synthétique) a été retiré le 2026-10-13, et aucune cible live ne sert plus de runtime antérieur à 1.67. |
 | UI5 2.x (**abandonné** depuis la keynote UI5con de juillet 2026 : aucune release 2.0 prévue ; la voie officielle SAP est la ligne 1.x legacy-free) | ✅ **Prouvé live contre le CDN nightly 2.0** (`fiori_ui5v2_smoke.robot`, `sdk.openui5.org/nightly/2`) : branche module `ElementRegistry`, zéro dépendance aux APIs supprimées en 2.x (`sap.ui.getCore()`, `Element.registry`, `sap.ui.version`). Également verrouillé par `tests/unit/test_ui5_compat.py`. Le smoke reste une **sentinelle non bloquante** tant que le CDN nightly/2 est servi (il peut être gelé ou retiré) ; le smoke 1.136-legacy-free ci-dessous est la cible d'avenir. |
-| Iframes de launchpad (SAP Build Work Zone / cFLP) | ✅ `Set Ui5 Frame` : bundle évalué dans la frame, sélecteurs à perçage de frame `>>>` ; prouvé contre une fixture réellement cross-origin (`fiori_frame_smoke.robot`). |
+| Iframes de launchpad (SAP Build Work Zone / cFLP) | ✅ `Set Ui5 Frame` : bundle évalué dans la frame, sélecteurs à perçage de frame `>>>` ; prouvé en live sur l'iframe d'échantillon du Demo Kit OpenUI5 (`fiori_frame_smoke.robot`) et éprouvé sur un vrai cFLP Work Zone (2026-08-23). |
 | S/4HANA Cloud (édition publique) | ✅ Fiori + moteur WebGUI `sid` (pas de SAP GUI desktop) ; noter que la page de login IAS/SAML n'est **pas** du UI5 → la piloter avec des keywords Browser purs. |
 
 ## Marques

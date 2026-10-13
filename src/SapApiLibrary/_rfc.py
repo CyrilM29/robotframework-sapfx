@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sapfx_common.policy_gate import gate_for
 from sapfx_common import rfc_channel, rfc_tables
 from sapfx_common.secrets import reveal_secret
 
@@ -311,8 +312,35 @@ class RfcKeywords(_ApiCore):
         | Should Be Equal    ${echo}[ECHOTEXT]    hello
         """
         connection = self._require_rfc_connection(alias, "Call Rfc")
+        gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_rfc(function_name)
         return connection.call(
             function_name, **rfc_channel.plain_rfc_parameters(params))
+
+    def reset_rfc_server_context(self, alias: str = "default") -> None:
+        """Remet à zéro le CONTEXTE SERVEUR de la connexion RFC ``alias`` sans
+        la fermer : les tampons des groupes de fonctions déjà appelés sur cette
+        connexion sont vidés, comme pour une nouvelle connexion.
+
+        Mesuré le 2026-10-07 sur la 758 (scénario 10) : sur une connexion qui a
+        déjà lu une commande EPM par ``BAPI_EPM_SO_GET_DETAIL``, la même BAPI
+        rend ENCORE la commande après sa suppression par un autre canal ; la
+        lecture n'est fidèle qu'après une remise à zéro (ou sur une connexion
+        neuve). À appeler entre un geste fait ailleurs et sa relecture par BAPI.
+        Un binding RFC qui n'expose pas cette remise à zéro échoue en le disant.
+
+        Exemple :
+        | `Reset Rfc Server Context`    alias=abap2023
+        | ${detail}=    `Call Rfc`    BAPI_EPM_SO_GET_DETAIL    alias=abap2023
+        | ...    SO_ID=${{ {'SO_ID': '0500010039'} }}
+        """
+        connection = self._require_rfc_connection(alias, "Reset Rfc Server Context")
+        reset = getattr(connection, "reset_server_context", None)
+        if reset is None:
+            raise AssertionError(
+                "Le binding RFC de la connexion '%s' n'expose pas "
+                "reset_server_context : fermer puis rouvrir la connexion pour "
+                "repartir d'un contexte serveur vide." % alias)
+        reset()
 
     def close_rfc_connection(self, alias: str = "default") -> None:
         """Ferme la connexion RFC ``alias`` (silencieux si absente).

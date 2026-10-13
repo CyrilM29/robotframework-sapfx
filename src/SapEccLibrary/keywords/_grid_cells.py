@@ -20,6 +20,8 @@ dans ``_grid.py`` ; les actions (double-clic, menu contextuel, tri) dans
 from pythoncom import com_error
 from robot.api import logger
 
+from sapfx_common import alv_cells
+
 
 class GridCellKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`."""
@@ -52,6 +54,23 @@ class GridCellKeywords:
         except com_error:
             self.take_screenshot()
             raise ValueError("Cannot find Column_id '%s'." % col_id) from None
+
+    def get_grid_cell_icon(self, table_id, row_num, col_id):
+        """Le code d'icône d'une cellule d'ALV (``S_TL_G`` pour la cellule
+        ``@S_TL_G\\Q Service is active @``, ``07`` pour ``@07@``), ou ``None``
+        quand la cellule porte une donnée et non une icône. L'info-bulle
+        (``Service is active``) est traduite : elle n'est jamais rendue, le
+        code est la valeur locale-safe (convention n°3). Ce qu'un code SIGNIFIE
+        se prouve par contraste, voir ``sapfx_common.alv_cells``.
+
+        Né du scénario 11 (2026-10-07) : le voyant ICF d'un service dans
+        ``/IWFND/MAINT_SERVICE`` est une cellule d'icône.
+
+        Exemple :
+        | ${icon}=    `Get Grid Cell Icon`    wnd[0]/usr/cntlGUI_AREA/shellcont/shell/shellcont[1]/shell/shellcont[0]/shell    0    ICON
+        | Should Be Equal    ${icon}    S_TL_G
+        """
+        return alv_cells.icon_code(self.get_cell_value(table_id, int(row_num), col_id))
 
     def set_cell_value(self, table_id, row_num, col_id, text):
         """Écrit ``text`` dans une cellule d'une grille modifiable puis RELIT

@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 from .object_tree import ScreenElement
 
@@ -254,3 +254,31 @@ def matching_rows(rows: Sequence[dict[str, Any]], text: Any,
         if any(str(value).strip() == wanted for value in values):
             found.append(row)
     return found
+
+
+def attach_icons(result: Mapping[str, Any], icons: Mapping[str, str]) -> list[dict[str, Any]]:
+    """Ajoute à chaque ligne de :func:`aligned_rows` une clé ``_icons``
+    ``{titre d'en-tête: nom d'icône}`` à partir de ``icons`` (identifiant de
+    label -> ``IconName`` non vide). Une liste classique rend un état par une
+    ICÔNE dans un label sans texte (« Actv » de SMICM : ``S_OKAY`` sur un
+    service actif, rien sur un inactif, mesuré le 2026-10-08) : le texte de la
+    cellule est vide dans les deux cas. Le nom d'icône est technique, donc
+    locale-safe. Une icône à gauche de la première colonne prend
+    ``_col<c>``."""
+    starts = [column["column"] for column in result.get("columns", [])]
+    titles = [column["title"] for column in result.get("columns", [])]
+    by_row: dict[int, dict[str, str]] = {}
+    for element_id, icon in icons.items():
+        match = _LIST_CELL.search(element_id or "")
+        if not match or not icon:
+            continue
+        column, row = int(match.group(2)), int(match.group(3))
+        index = max((i for i, start in enumerate(starts) if start <= column), default=None)
+        key = titles[index] if index is not None else "_col%d" % column
+        by_row.setdefault(row, {})[key] = str(icon)
+    rows = []
+    for record in result.get("rows", []):
+        enriched = dict(record)
+        enriched["_icons"] = by_row.get(int(record["_row"]), {})
+        rows.append(enriched)
+    return rows

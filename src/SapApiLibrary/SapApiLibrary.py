@@ -61,9 +61,11 @@ from ._http import (  # noqa: F401  (re-exports : surface historique du module)
 from ._odata_read import OdataReadKeywords
 from ._odata_write import OdataWriteKeywords
 from ._http_security import HttpSecurityKeywords
+from ._governance import ApiGovernanceKeywords
 
 class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
-                    OdataReadKeywords, HttpSecurityKeywords, _ApiCore):
+                    OdataReadKeywords, HttpSecurityKeywords,
+                    ApiGovernanceKeywords, _ApiCore):
     """Bibliothèque Robot Framework pour parler aux APIs SAP (OData v2/v4, RFC).
 
     == Sessions ==
@@ -167,7 +169,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     « la configuration a-t-elle bougé » plutôt que « ce système est-il durci ».
     """
 
-    __version__ = "0.8.4"
+    __version__ = "0.8.5"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 

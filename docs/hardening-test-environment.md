@@ -111,8 +111,8 @@ rf-mcp).
   it. Test workstations only, never on shared machines; unset for normal use.
 - **CSP**: the `__SAPFX` bundle is injected through Playwright's evaluate
   (CDP), which page CSP does not block: no CSP relaxation is needed on the
-  system under test (verified by the strict-CSP fixture smoke,
-  `fiori_csp_smoke.robot`).
+  system under test (verified live on the ABAP launchpad logon page, which
+  serves `default-src 'self'`: `fiori_csp_smoke.robot`).
 
 ## 5. AI agents / MCP side
 
@@ -126,6 +126,49 @@ rf-mcp).
   retention rules as run artifacts.
 - Prompt-injection containment: an agent acts with the test user's rights, so
   the least-privilege test account of §1 is also your blast-radius limiter.
+- **Session policy (since 2026-10-08): an operational guardrail, not a
+  security control.** `Set Session Policy` (screen) and `Set Api Policy`
+  (HTTP and RFC) decide BEFORE the gesture, so a refusal sends nothing to SAP:
+  `read_only` refuses every write, `explore` requires an explicit approval
+  (`Approve Next Write`, `Approve Next Api Write`) consumed by one gesture,
+  `full` (the default) lets writes through and logs them. A write is the save
+  gesture on the screen (virtual key 11, button `tbar[0]/btn[11]`), an HTTP
+  method other than `GET`/`HEAD`, or an RFC module outside the read allowlist
+  (a synchronous RFC call commits when it returns, so refusing the commit
+  alone would protect nothing). A policy file named by the
+  `SAPFX_SESSION_POLICY` environment variable is locked: a keyword can tighten
+  it, never relax it, and its SHA-256 fingerprint goes into every entry of the
+  audit log (`Get Audit Trail`, `Get Api Audit Trail`, cumulative JSONL file
+  with `SAPFX_AUDIT_LOG`, decisions and named targets only, never a value).
+  Whoever controls the workstation can bypass it, and a button that commits
+  without the save gesture is not recognised: the barrier remains the SAP
+  authorization of the test user, which this guardrail complements and never
+  replaces.
+- **Who approves (since 2026-10-09).** In `explore` mode the approval keyword
+  is within reach of the agent about to write. A policy with
+  `approval=human` refuses it: the approval then has to come from a channel
+  where a human answers: for a suite run by `robot` in front of a screen,
+  the keywords `Ask Human To Approve Next Write` and `Ask Human To Approve
+  Next Api Write` (shipped in the PyPI packages), which open a dialog box on
+  the workstation; in an agent session, the `sapfx_approve_write` tool of the
+  `sapfx-mcp` MCP overlay (part of the SAPFX workbench, not of the PyPI
+  packages), which asks through an MCP elicitation. Both show the reason, the
+  target covered, the system, client, user and screen, and record the
+  approval as `human` only on an explicit yes (on the workstation, the word
+  `approuver` typed, never a click); a refusal, a cancellation, a client that
+  cannot elicit or a workstation without a display (a CI) leaves nothing
+  approved. An approval can also
+  be bound to a target (`target=SE16 *`, `target=BAPI_TRANSACTION_COMMIT`):
+  any other gesture is refused and the approval dropped. Put
+  `{"mode": "explore", "approval": "human"}` in the file named by
+  `SAPFX_SESSION_POLICY` so that an agent cannot set it back to `agent`. Check
+  that your MCP client really displays elicitation requests (measured on
+  2026-10-09: Claude Code in VS Code declines them on its own, without showing
+  anything; the keyword `Ask Human To Approve Next Write`, called through the
+  MCP server, then opens its input box on the workstation running the server
+  and is the way): one that declines them on its own makes every approval
+  fail, which is safe but blocks the
+  work.
 
 ## 6. Supply chain
 

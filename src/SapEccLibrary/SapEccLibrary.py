@@ -22,10 +22,12 @@ from robot.api import logger
 from robot.utils import timestr_to_secs
 
 from sapfx_common.com_safety import ensure_com_initialized, is_disconnected_error
+from sapfx_common.policy_gate import gate_for
 from sapfx_common.session_context import current_execution_namespace
 
 from .keywords import (
     AbapListKeywords,
+    AuthorizationFailureKeywords,
     ComboBoxKeywords,
     ConnectionKeywords,
     ConnectionProbeKeywords,
@@ -33,6 +35,7 @@ from .keywords import (
     DiagnosticsKeywords,
     ElementKeywords,
     EmbeddedBrowserKeywords,
+    GovernanceKeywords,
     GridActionKeywords,
     GridCellKeywords,
     GridKeywords,
@@ -64,9 +67,11 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
                     GridActionKeywords, GridKeywords, AbapListKeywords,
                     TableControlKeywords, TreeKeywords, ComboBoxKeywords,
                     MenuKeywords, WindowKeywords, SystemIdentityKeywords,
-                    StatusBarKeywords, TabStripKeywords, ToolbarKeywords,
+                    StatusBarKeywords, AuthorizationFailureKeywords,
+                    TabStripKeywords, ToolbarKeywords,
                     PerceptionKeywords, ScreenshotKeywords, VisualKeywords,
-                    WatchKeywords, DiagnosticsKeywords, HealingKeywords,
+                    WatchKeywords, DiagnosticsKeywords, GovernanceKeywords,
+                    HealingKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
                     SessionKeywords, DdicKeywords, Se16Keywords,
                     GridCellKeywords, ElementKeywords, InputKeywords,
@@ -106,7 +111,7 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.8.4"
+    __version__ = "0.8.5"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
 
@@ -296,7 +301,8 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
         self.session = -1
         self.connection = -1
         self.take_screenshots = screenshots_on_error
-        self.screenshot = SapWindowScreenshot(self._active_window_for_capture,
+        self._error_screenshots = []
+        self.screenshot =SapWindowScreenshot(self._active_window_for_capture,
                                               screenshot_directory)
         self.default_timeout = timestr_to_secs(default_timeout)
         self.poll_interval = timestr_to_secs(poll_interval)
@@ -337,6 +343,12 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
         navigation : seul un vrai préfixe déjà présent (``/n``, ``/o``, ``/i``)
         dispense d'en rajouter un, même quand le namespace commence par la même
         lettre qu'un préfixe (``/IWFND/MAINT_SERVICE``), voir `_has_nav_prefix`.
+        Les OK-codes système sont jugés sur leur EFFET (mesuré le 2026-10-07 :
+        l'écran de sélection de SU25 Step 1 les ignore) : après ``/nex`` la
+        session doit avoir disparu, après ``/nend`` aussi ou montrer sa
+        confirmation de déconnexion (reconnue à sa structure), après ``/n``
+        elle doit avoir quitté le dynpro de départ, sauf depuis l'écran
+        d'accueil ou si un dialogue s'ouvre ; sinon l'échec nomme l'écran réel.
         Définissez ``skip_if_error=True`` pour journaliser au lieu d'échouer
         (étapes de navigation optionnelles).
 
@@ -345,8 +357,10 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
         | ${transaction}=    `Get Current Transaction`
         | Should Be Equal    ${transaction}    SE16
         """
+        gate_for(self, "SapEccLibrary", "Approve Next Write").check_transaction(transaction)
         already_prefixed = self._has_nav_prefix(transaction)
         okcode = transaction if already_prefixed else "/n" + transaction
+        before = self._screen_identity_or_none() if transaction.lower() == "/n" else None
         self.session.findById("wnd[0]/tbar[0]/okcd").text = okcode
         closing = transaction.lower() in ("/nex", "/nend")
         try:
@@ -362,10 +376,27 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
             # connexion, la session morte ne répond pas RPC_E_DISCONNECTED).
             if closing and (is_disconnected_error(exc) or self._session_is_gone()):
                 return
+            if closing and skip_if_error and isinstance(exc, AssertionError):
+                logger.warn(str(exc))
+                return
             raise
 
-        # Les OK-codes système (fermer session/fenêtre) ne démarrent pas de transaction.
-        if transaction.lower() in ("/nex", "/n", "/i", "/o", "/nend"):
+        # Les OK-codes système ne démarrent pas de transaction, mais leur EFFET
+        # se vérifie : mesuré le 2026-10-07 sur la 758, l'écran de sélection de
+        # SU25 Step 1 ignore /n, /nex et F8, et le succès était annoncé quand
+        # même (pour /nex, « revenue au repos » valait fermeture).
+        if closing or transaction.lower() == "/n":
+            try:
+                if closing:
+                    self._require_session_closed(transaction)
+                else:
+                    self._require_left_screen(before)
+            except AssertionError as exc:
+                if not skip_if_error:
+                    raise
+                logger.warn(str(exc))
+            return
+        if transaction.lower() in ("/i", "/o"):
             return
 
         expected = transaction.upper()

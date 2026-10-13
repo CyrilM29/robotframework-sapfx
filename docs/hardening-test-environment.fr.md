@@ -122,8 +122,8 @@ vulnérable à la CVE ou si des bases d'historique sont présentes
   machine partagée ; retirer la variable pour l'usage normal.
 - **CSP** : le bundle `__SAPFX` est injecté via l'evaluate de Playwright
   (CDP), que la CSP de la page ne bloque pas : aucun assouplissement CSP n'est
-  requis sur le système testé (prouvé par le smoke à CSP stricte,
-  `fiori_csp_smoke.robot`).
+  requis sur le système testé (prouvé en live sur la page de connexion du
+  launchpad ABAP, qui sert `default-src 'self'` : `fiori_csp_smoke.robot`).
 
 ## 5. Versant agents IA / MCP
 
@@ -138,6 +138,50 @@ vulnérable à la CVE ou si des bases d'historique sont présentes
 - Contenir l'injection de prompt : un agent agit avec les droits de
   l'utilisateur de test : le compte de test à moindre privilège du §1 est
   aussi votre limiteur de rayon d'explosion.
+- **Politique de session (depuis le 2026-10-08) : un garde-fou
+  d'exploitation, pas un contrôle de sécurité.** `Set Session Policy` (écran)
+  et `Set Api Policy` (HTTP et RFC) décident AVANT le geste, donc un refus
+  n'envoie rien à SAP : `read_only` refuse toute écriture, `explore` exige une
+  approbation explicite (`Approve Next Write`, `Approve Next Api Write`)
+  consommée par un seul geste, `full` (le défaut) laisse passer les écritures
+  et les journalise. Une écriture est le geste d'enregistrement à l'écran
+  (touche virtuelle 11, bouton `tbar[0]/btn[11]`), une méthode HTTP autre que
+  `GET`/`HEAD`, ou un module RFC hors de la liste blanche de lecture (un appel
+  RFC synchrone valide en base à son retour, donc refuser le seul commit ne
+  protégerait rien). Un fichier de politique nommé par la variable
+  d'environnement `SAPFX_SESSION_POLICY` est verrouillé : un keyword peut le
+  durcir, jamais le relâcher, et son empreinte SHA-256 accompagne chaque
+  entrée du journal d'audit (`Get Audit Trail`, `Get Api Audit Trail`, fichier
+  JSONL cumulatif avec `SAPFX_AUDIT_LOG`, décisions et cibles nommées
+  seulement, jamais une valeur). Qui tient le poste peut le contourner, et un
+  bouton qui valide sans le geste d'enregistrement n'est pas reconnu : la
+  barrière reste l'autorisation SAP de l'utilisateur de test, que ce garde-fou
+  complète sans jamais la remplacer.
+- **Qui approuve (depuis le 2026-10-09).** En mode `explore`, le keyword
+  d'approbation est à la portée de l'agent qui va écrire. Une politique
+  `approval=human` le refuse : l'approbation doit alors venir d'un canal où un
+  humain répond : pour une suite lancée par `robot` devant un écran, les
+  keywords `Ask Human To Approve Next Write` et `Ask Human To Approve Next Api
+  Write` (livrés dans les paquets PyPI), qui ouvrent une boîte de dialogue sur
+  le poste ; dans une session d'agent, l'outil `sapfx_approve_write` de la
+  surcouche MCP `sapfx-mcp` (dans l'atelier SAPFX, absente des paquets PyPI),
+  qui pose la question par une élicitation MCP. Les deux montrent la raison,
+  la cible couverte, le système, le mandant, l'utilisateur et l'écran, et
+  n'enregistrent l'approbation au nom de `human` que sur un oui explicite (sur
+  le poste, le mot `approuver` tapé, jamais un clic) ; un refus, une
+  annulation, un client qui ne sait pas éliciter ou un poste sans écran (une
+  CI) ne laissent rien d'approuvé. Une approbation
+  peut aussi être liée à une cible (`target=SE16 *`,
+  `target=BAPI_TRANSACTION_COMMIT`) : tout autre geste est refusé et
+  l'approbation tombe. Mettre `{"mode": "explore", "approval": "human"}` dans
+  le fichier désigné par `SAPFX_SESSION_POLICY` pour qu'un agent ne puisse pas
+  revenir à `agent`. Vérifier que le client MCP affiche réellement les
+  demandes d'élicitation (mesuré le 2026-10-09 : Claude Code dans VS Code les
+  décline de lui-même, sans rien afficher ; le keyword `Ask Human To Approve
+  Next Write`, appelé à travers le serveur MCP, ouvre alors sa boîte de saisie
+  sur le poste qui fait tourner le serveur, et c'est la voie) : un client qui
+  les décline de lui-même fait échouer chaque approbation, ce qui est sûr mais
+  bloque le travail.
 
 ## 6. Chaîne d'approvisionnement
 

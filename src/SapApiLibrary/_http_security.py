@@ -27,10 +27,10 @@ from typing import Any, Optional
 
 from sapfx_common import http_security
 
-from ._rfc_surface import RfcSurfaceKeywords
+from ._service_nature import ServiceNatureKeywords
 
 
-class HttpSecurityKeywords(RfcSurfaceKeywords):
+class HttpSecurityKeywords(ServiceNatureKeywords):
     """Mixin de :class:`SapApiLibrary` : la sécurité observée du transport."""
 
     def get_api_cookie_security(self, alias: str = "default",

@@ -219,10 +219,27 @@ Count The Products
   message, lectures de tables RFC, jobs de fond et leur spool, IDocs sortants
   (création, attente sur le code de statut, lien avec l'IDoc entrant par son
   TID), documents de modification.
+- **Des écritures gouvernées** sur les trois canaux : une politique de session
+  (`Set Session Policy`, `Set Api Policy`) place une session en mode `full`,
+  `explore` ou `read_only`, avec transactions permises ou bloquées et une
+  piste d'audit, et une écriture peut exiger l'approbation d'une personne (un
+  outil MCP, ou un mot tapé sur le poste) ; une écriture refusée n'atteint
+  jamais SAP. C'est un garde-fou d'exploitation : les autorisations SAP restent
+  le vrai contrôle.
+- **Des lectures de sécurité et d'exploitation** : utilisateurs et rôles de
+  test créés et supprimés derrière une liste blanche (`Ensure Test User`,
+  `Ensure Test Role`), les échecs d'autorisation d'un autre utilisateur lus
+  dans SU53, le journal d'erreurs et le registre de services de la Gateway, le
+  certificat TLS que STRUST déclare confronté à celui que l'ICM sert, la
+  nature d'un service OData (RAP, BOPF, Gateway ou CAP) prouvée par son
+  `$metadata` (`Get Odata Service Nature`), et l'impact d'une requête de
+  transport sur les objets et les suites (`Get Change Impact`, un niveau
+  d'utilisation, ses limites dites).
 - **Plusieurs sessions SAP GUI** par alias dans une même suite, la navigation
   dans le launchpad SAP Fiori par intent et la connexion par un fournisseur
   d'identité, les compteurs de tuiles lus comme des nombres
-  (`Get Flp Tile Counter`), et des lectures d'identité (release, kernel,
+  (`Get Flp Tile Counter`), le mode Espaces et Pages lu de trois façons
+  (`Get Flp Spaces Mode`), et des lectures d'identité (release, kernel,
   mandant ; par HTTP seul avec `Get Abap Software Components`) qui prouvent à
   quel système un test parle réellement.
 
@@ -269,7 +286,7 @@ de migration de SAP.
 | [docs/hardening-test-environment.fr.md](docs/hardening-test-environment.fr.md) | Liste de contrôle de sécurité : serveur, poste, côté web |
 | [docs/migrating-from-sapguilibrary.fr.md](docs/migrating-from-sapguilibrary.fr.md) | Migrer depuis robotframework-sapguilibrary |
 | [docs/migrating-from-cbta.fr.md](docs/migrating-from-cbta.fr.md) | Migrer depuis SAP CBTA |
-| [docs/audit-upstream.fr.md](docs/audit-upstream.fr.md) | Ce que SapEccLibrary change au code amont qu'elle embarque, et pourquoi |
+| [docs/audit-upstream.fr.md](docs/audit-upstream.fr.md) | Les keywords de robotframework-sapguilibrary absorbés par SapEccLibrary, et ce qui a changé |
 
 Chaque document existe en anglais et en français (`*.fr.md`). Ils ont été
 écrits avec les bibliothèques dans l'atelier du mainteneur : quand ils

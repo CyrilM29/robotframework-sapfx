@@ -1,5 +1,6 @@
 """Mixins de keywords composés dans :class:`SapEccLibrary.SapEccLibrary`."""
 from ._abap_list import AbapListKeywords
+from ._authorization_failures import AuthorizationFailureKeywords
 from ._combobox import ComboBoxKeywords
 from ._connection import ConnectionKeywords
 from ._connection_probe import ConnectionProbeKeywords
@@ -7,6 +8,7 @@ from ._ddic import DdicKeywords
 from ._diagnostics import DiagnosticsKeywords
 from ._elements import ElementKeywords
 from ._embedded_browser import EmbeddedBrowserKeywords
+from ._governance import GovernanceKeywords
 from ._grid import GridKeywords
 from ._grid_actions import GridActionKeywords
 from ._grid_cells import GridCellKeywords
@@ -33,6 +35,7 @@ from ._windows import WindowKeywords
 
 __all__ = [
     "AbapListKeywords",
+    "AuthorizationFailureKeywords",
     "ComboBoxKeywords",
     "ConnectionKeywords",
     "ConnectionProbeKeywords",
@@ -40,6 +43,7 @@ __all__ = [
     "DiagnosticsKeywords",
     "ElementKeywords",
     "EmbeddedBrowserKeywords",
+    "GovernanceKeywords",
     "GridActionKeywords",
     "GridCellKeywords",
     "GridKeywords",

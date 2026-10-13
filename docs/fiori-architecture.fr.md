@@ -128,8 +128,10 @@ en profondeur, dont trois `ui5-button` que le moteur ne voyait pas) :
   réels (`Click Wc Control`, `Fill Wc Input` cible l'`<input>` interne).
 
 Le recorder web capture/enregistre aussi les hôtes WC sur les pages sans
-registre (`Click Wc Control`, assertions Alt+clic). Prouvé hors ligne contre
-une fixture locale avec un vrai tag scopé (`tests/robot/fiori_wc_smoke.robot`).
+registre (`Click Wc Control`, assertions Alt+clic). Prouvé en live
+(`tests/robot/fiori_wc_smoke.robot`) sur le shell du Demo Kit OpenUI5, bâti en
+UI5 Web Components avec de vrais tags scopés, et sur une page de story UI5 Web
+Components for React sans registre.
 
 ### Iframes de launchpad : `Set Ui5 Frame` (Work Zone / cFLP)
 
@@ -139,8 +141,11 @@ SAP Build Work Zone et le cFLP classique embarquent chaque application dans une
 bascule la bibliothèque : le bundle est injecté et évalué **dans le contexte de la
 frame**, et chaque sélecteur retourné est préfixé par la frame + le combinateur de
 perçage `>>>` de Playwright (qui traverse les origines). `Set Ui5 Frame` sans
-argument revient à la page principale. Prouvé contre une fixture réellement
-cross-origin (`tests/robot/fiori_frame_smoke.robot`).
+argument revient à la page principale. Prouvé en live sur l'iframe d'échantillon
+du Demo Kit OpenUI5, qui porte son propre runtime UI5
+(`tests/robot/fiori_frame_smoke.robot` : portée, actions, rechargement et
+navigation de la frame) ; éprouvé aussi sur un vrai cFLP SAP Build Work Zone le
+2026-08-23. Non revérifié en live : deux applications en frames à la fois.
 
 ### Pages hybrides : sonde de composition, pile de frames, moteur `dom`
 
@@ -183,9 +188,12 @@ des citoyens de première classe :
   préserve l'accessibilité du widget. Sur une région SAP, le moteur dédié
   gagne toujours ; `dom` est le dernier recours par conception.
 
-Prouvé hors ligne contre `fixtures/hybrid_fixture.html` (quatre technologies,
-deux niveaux de frames réellement imbriqués, voir
-`tests/robot/fiori_hybrid_smoke.robot`).
+Prouvé en live sur la page d'échantillon du Demo Kit OpenUI5 (runtime UI5,
+shell en UI5 Web Components, bannière de consentement non SAP, iframe
+d'échantillon portant son propre runtime ; voir
+`tests/robot/fiori_hybrid_smoke.robot`). Non vérifié en live : un élément
+WebGUI `lsdata` dans la même page et deux niveaux de frames imbriqués, qu'aucune
+cible publique ne porte.
 
 ### Chaîne de repli de sélecteurs : `Resolve Ui5 With Fallback`
 
@@ -234,10 +242,13 @@ ré-implémentés sous la forme d'un bundle injecté unique (sans fork de Playwr
 (Robot Framework 7.4.2, Browser 20.0.0) : résoudre un contrôle par type vers son id stable,
 remplir son champ de saisie interne, et confirmer qu'un contrôle manquant échoue avec un message clair.
 
-Couverture de versions au-delà du runtime courant (toutes validées en live) :
+Couverture de versions au-delà du runtime courant :
 
-- **UI5 1.60** (avant `Element.registry`) : `fiori_legacy_smoke.robot` prouve le
-  repli DOM `registryForEach` contre un vrai runtime 1.60.14.
+- **UI5 < 1.67** (avant `Element.registry`) : le repli DOM `registryForEach`
+  reste dans le bundle et verrouillé par `tests/unit/test_ui5_compat.py`, mais
+  il **n'est plus prouvé en live** : son smoke faisait tourner un runtime 1.60
+  dans une page synthétique et a été retiré le 2026-10-13 (validation live
+  seulement, et aucune cible live ne sert plus de runtime antérieur à 1.67).
 - **UI5 2.0 nightly** : `fiori_ui5v2_smoke.robot` prouve la branche module
   `ElementRegistry` et l'absence de dépendance aux APIs supprimées en 2.x
   (`sap.ui.getCore()`, `Element.registry`, `sap.ui.version`). NB : à UI5con
@@ -302,8 +313,8 @@ option complémentaire plus lourde.
       du champ interne, comptage des correspondances, aller-retour xpath-le-plus-court, les deux moteurs échouent clairement.
 - [x] Recorder web : mise en évidence au survol, panneau in-app, mode record + export
       `.robot`, généré depuis le bundle (snippet + extension MV3).
-- [x] **Multi-versions** : UI5 1.60 → 2.0 nightly prouvé en live (chaîne de repli du
-      registre), `Get Ui5 Page Tree mode=diff`, perception pour rf-mcp.
+- [x] **Multi-versions** : UI5 1.71 → 2.0 nightly prouvé en live (chaîne de repli du
+      registre ; le repli DOM < 1.67 reste dans le bundle, verrouillé hors ligne, plus prouvé en live), `Get Ui5 Page Tree mode=diff`, perception pour rf-mcp.
 - [x] **0.2.0** : `Set Ui5 Frame` (iframes Work Zone/cFLP), `Resolve Ui5 With
       Fallback` (role→xpath→sid, réparation journalisée), `idSuffix` Fiori Elements,
       `Ui5 Text Should Be` (+ capture d'assertion au recorder).

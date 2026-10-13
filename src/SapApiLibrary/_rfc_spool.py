@@ -27,10 +27,10 @@ from robot.api import logger
 from sapfx_common import bapi_return, rfc_reads, spool
 from sapfx_common.robot_args import as_optional_int
 
-from ._rfc_jobs import RfcJobKeywords
+from ._rfc_job_schedule import RfcJobScheduleKeywords
 
 
-class RfcSpoolKeywords(RfcJobKeywords):
+class RfcSpoolKeywords(RfcJobScheduleKeywords):
     """Mixin de :class:`SapApiLibrary` : le spool d'un job, lu par RFC."""
 
     def get_job_spool_requests(self, jobname: str, jobcount: str,

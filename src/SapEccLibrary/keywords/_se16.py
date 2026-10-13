@@ -88,8 +88,12 @@ class Se16Keywords:
         Retourne un dict JSON-safe : ``reached`` (booléen), ``verdict``
         (``reached`` | ``rejected`` | ``dialog`` | ``modal``),
         ``message_type`` (type du message de statut, ``E`` …),
-        ``status_text`` et ``dialog_text`` (textes localisés, pour le journal
-        et les messages d'échec seulement, jamais une assertion).
+        ``message_identity`` (classe/type/numéro lus juste après le type, sans
+        geste entre les deux lectures, ``MO/E/419`` pour un refus
+        d'autorisation ; vide sans message, ``None`` quand la barre de statut
+        est illisible ; la forme de `Get Status Message Identity`), ``status_text`` et
+        ``dialog_text`` (textes localisés, pour le journal et les messages
+        d'échec seulement, jamais une assertion).
 
         - ``rejected`` : message de statut de type ``E`` (structure, include
           ou table inconnue) ;
@@ -107,6 +111,9 @@ class Se16Keywords:
         | ${verdict}=    `Reach Se16 Selection Screen`    SCARR
         | Should Be True    ${verdict}[reached]
         | Should Be Equal    ${verdict}[verdict]    reached
+        | `Switch Sap Session`    restricted
+        | ${refused}=    `Reach Se16 Selection Screen`    T000
+        | Should Be Equal    ${refused}[message_identity]    MO/E/419
         """
         self.run_transaction("SE16")
         self.wait_until_busy_done()
@@ -116,6 +123,7 @@ class Se16Keywords:
         message_type, status_text = self.get_status_message()
         state = {"reached": False, "verdict": "reached",
                  "message_type": str(message_type or ""),
+                 "message_identity": self._se16_message_identity(),
                  "status_text": str(status_text or ""), "dialog_text": ""}
         if message_type == "E":
             state["verdict"] = "rejected"
@@ -154,6 +162,15 @@ class Se16Keywords:
             self.wait_until_element_present(_SE16_MAX_HITS, timeout=timeout)
         state["reached"] = True
         return state
+
+    def _se16_message_identity(self):
+        # Une barre illisible ne doit pas coûter le verdict, porté par le type
+        # du message, mais elle ne se confond pas avec « aucun message » :
+        # ``None`` (illisible) contre ``""`` (rien d'affiché).
+        try:
+            return str(self.get_status_message_identity().get("identity") or "")
+        except (AttributeError, com_error):
+            return None
 
     # Nom EXPOSÉ forcé : la conversion automatique rendrait « Use Alv Grid In
     # Data Browser », alors que trois messages d'échec de cette bibliothèque

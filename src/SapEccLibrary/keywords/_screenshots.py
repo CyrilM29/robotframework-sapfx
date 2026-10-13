@@ -30,6 +30,9 @@ from robot.api import logger
 from robot.libraries.BuiltIn import BuiltIn, RobotNotRunningError
 from robot.utils import get_link_path
 
+from sapfx_common.caller_context import (current_keyword_frames, is_direct_call,
+                                         swallowing_wrapper)
+
 
 # Codes de l'énumération GuiImageType de l'API SAP GUI Scripting. Le format
 # RÉEL du buffer retourné est re-vérifié par magic bytes (_sniff_mime) : le
@@ -203,6 +206,16 @@ class ScreenshotKeywords:
         est journalisée et ne fait jamais échouer l'appelant. Pour une image
         sans fichier : `Log Screenshot`.
 
+        Un échec ATTENDU ne laisse pas d'image (depuis le 2026-10-08) : un
+        keyword qui échoue sous `Run Keyword And Return Status`,
+        `Run Keyword And Ignore Error` ou `Run Keyword And Expect Error`
+        (BuiltIn) ne capture pas, parce que ces trois keywords avalent
+        l'échec et que le run reste vert. `Run Keyword And Warn On Failure`,
+        `Wait Until Keyword Succeeds` et un bloc ``TRY`` gardent la capture.
+        Appelé lui-même, `Take Screenshot` capture toujours (si le réglage
+        est actif). Les captures prises sur erreur se relisent par
+        `Get Error Screenshots`.
+
         Exemple :
         | `Enable Screenshots On Error`
         | ${path}=    `Take Screenshot`    se16-initial
@@ -210,7 +223,67 @@ class ScreenshotKeywords:
         """
         if not getattr(self, "take_screenshots", False):
             return None
-        return self.screenshot.take_screenshot(screenshot_name)
+        frames = current_keyword_frames()
+        on_error = not is_direct_call(frames, "Take Screenshot")
+        if on_error:
+            wrapper = swallowing_wrapper(frames or [])
+            if wrapper:
+                logger.debug("Capture sur erreur omise : l'échec est attendu par "
+                             "`%s`." % wrapper)
+                return None
+        path = self.screenshot.take_screenshot(screenshot_name)
+        if path and on_error:
+            self._error_screenshot_paths().append(path)
+        return path
+
+    def _error_screenshot_paths(self):
+        paths = getattr(self, "_error_screenshots", None)
+        if paths is None:
+            paths = self._error_screenshots = []
+        return paths
+
+    def get_error_screenshots(self):
+        """Les fichiers PNG que les keywords de cette bibliothèque ont écrits
+        en échouant, dans l'ordre, depuis l'import (portée de la suite). Les
+        captures demandées par `Take Screenshot` lui-même n'y sont pas, ni les
+        échecs attendus, qui n'en écrivent pas (voir `Take Screenshot`).
+
+        La garde d'une campagne qui promet un run vert sans image : une
+        capture sur erreur dans une suite verte est un échec rattrapé quelque
+        part (un ``TRY``, une sonde écrite avec un keyword qui échoue), donc
+        une image écrite pour rien et une sonde à revoir. Né du constat du
+        2026-10-07 : le registre de capacités de la 754
+        passait 21/21 en laissant 9 captures.
+
+        Exemple :
+        | ${captures}=    `Get Error Screenshots`
+        | IF    '${SUITE STATUS}' == 'PASS'
+        |     Should Be Empty    ${captures}
+        | END
+        """
+        return list(self._error_screenshot_paths())
+
+    def set_screenshot_directory(self, path):
+        """Fixe le dossier où `Take Screenshot` et les captures sur erreur
+        écrivent leurs PNG (créé au besoin) et retourne l'ancien, vide pour le
+        dossier de sortie de Robot : restaurable en teardown.
+
+        Né du scénario 11 (2026-10-07) : sous rf-mcp, le dossier de sortie de
+        Robot est un dossier temporaire du serveur, et un agent qui devait
+        ranger ses captures ailleurs n'avait que ``screenshot_directory`` à
+        l'import, figé pour toute la session.
+
+        Exemple :
+        | ${previous}=    `Set Screenshot Directory`    ${OUTPUT DIR}/captures
+        | `Enable Screenshots On Error`
+        | ${path}=    `Take Screenshot`    se16-initial
+        | `Set Screenshot Directory`    ${previous}
+        """
+        if not str(path or "").strip():
+            previous = self.screenshot.directory
+            self.screenshot.directory = None
+            return previous or ""
+        return self.screenshot.set_screenshot_directory(path) or ""
 
     def enable_screenshots_on_error(self):
         """Active la capture de la fenêtre SAP quand un keyword échoue (voir
@@ -224,9 +297,11 @@ class ScreenshotKeywords:
         self.take_screenshots = True
 
     def disable_screenshots_on_error(self):
-        """Désactive la capture sur erreur : un échec attendu (une sonde) ne
-        laisse alors aucune image dans le log. `Element Is Present` sonde déjà
-        sans capture.
+        """Désactive la capture sur erreur. Inutile pour un échec attendu
+        sous `Run Keyword And Return Status`, `Run Keyword And Ignore Error`
+        ou `Run Keyword And Expect Error`, qui ne capture plus (voir
+        `Take Screenshot`) ; utile autour d'un ``TRY`` qui rattrape un échec
+        prévu. `Element Is Present` sonde sans capture.
 
         Exemple :
         | `Disable Screenshots On Error`

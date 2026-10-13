@@ -393,6 +393,7 @@
     if (!isUI5()) return null;
     const sel = JSON.parse(selJson);
     const shortWant = sel.controlType ? shortType(sel.controlType) : null;
+    const qualifiedWant = !!sel.controlType && String(sel.controlType).indexOf('.') !== -1;
     // Conteneur résolu UNE fois pour toute la passe : le chercher par contrôle
     // coûterait un parcours de registre par candidat. Conteneur absent ou non
     // rendu = aucune correspondance, jamais un périmètre élargi en silence.
@@ -407,8 +408,20 @@
         if (sel.id && c.getId() !== sel.id) return;
         if (sel.idSuffix && String(c.getId()).slice(-String(sel.idSuffix).length) !== String(sel.idSuffix)) return;
         if (sel.controlType) {
+          // Un nom QUALIFIÉ (avec des points) désigne UNE classe : le type
+          // plein exact, ou une sous-classe qui porte le même nom court
+          // (`isA`). Le nom court SEUL ne suffit plus : il faisait compter le
+          // `sap.m.Page` du tableau de bord classique pour
+          // `sap.ushell.ui.launchpad.Page` (mesuré sur un launchpad 1.120,
+          // 2026-10-13), alors que la sous-classe `sap.ui.documentation.
+          // ObjectPageSection` du Demo Kit reste trouvée par
+          // `sap.uxap.ObjectPageSection` (mesuré le même jour). Un nom COURT
+          // (sans point) garde la comparaison courte.
           const full = c.getMetadata().getName();
-          if (full !== sel.controlType && shortType(full) !== shortWant) return;
+          if (qualifiedWant) {
+            if (full !== sel.controlType && !(shortType(full) === shortWant
+                && typeof c.isA === 'function' && c.isA(sel.controlType))) return;
+          } else if (shortType(full) !== shortWant) return;
         }
         if (sel.viewId && !viewIdMatches(c, sel.viewId)) return;
         if (sel.properties && !matchProps(c, sel.properties)) return;

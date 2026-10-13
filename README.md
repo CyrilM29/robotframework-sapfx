@@ -204,9 +204,24 @@ Count The Products
   refusals asserted by message identifier, RFC table reads, background jobs
   and their spool, outbound IDocs (create, wait on the status code, link to
   the inbound IDoc by its TID), change documents.
+- **Governed writes** on the three channels: a session policy (`Set Session
+  Policy`, `Set Api Policy`) puts a session in `full`, `explore` or
+  `read_only` mode, with allowed or blocked transactions and an audit trail,
+  and a write can require the approval of a person (an MCP tool, or a word
+  typed on the workstation); a refused write never reaches SAP. It is an
+  operational guardrail: SAP authorizations remain the real control.
+- **Security and operations readings**: test users and roles created and
+  removed behind an allowlist (`Ensure Test User`, `Ensure Test Role`),
+  another user's authorization failures read from SU53, the Gateway error log
+  and service registry, the TLS certificate STRUST declares compared with the
+  one the ICM serves, the nature of an OData service (RAP, BOPF, Gateway or
+  CAP) proven by its `$metadata` (`Get Odata Service Nature`), and the impact
+  of a transport request on objects and suites (`Get Change Impact`, one
+  level of usage, its limits stated).
 - **Several SAP GUI sessions** by alias in one suite, SAP Fiori launchpad
   navigation by intent and login through an identity provider, tile counters
-  read as numbers (`Get Flp Tile Counter`), and identity readings (release,
+  read as numbers (`Get Flp Tile Counter`), the Spaces and Pages mode read
+  three ways (`Get Flp Spaces Mode`), and identity readings (release,
   kernel, client; over HTTP alone with `Get Abap Software Components`) that
   prove which system a test is really talking to.
 
@@ -252,7 +267,7 @@ migration tools.
 | [docs/hardening-test-environment.md](docs/hardening-test-environment.md) | Security checklist for the server, the workstation and the web side |
 | [docs/migrating-from-sapguilibrary.md](docs/migrating-from-sapguilibrary.md) | Moving from robotframework-sapguilibrary |
 | [docs/migrating-from-cbta.md](docs/migrating-from-cbta.md) | Moving from SAP CBTA |
-| [docs/audit-upstream.md](docs/audit-upstream.md) | What SapEccLibrary changes in the upstream code it embeds, and why |
+| [docs/audit-upstream.md](docs/audit-upstream.md) | The robotframework-sapguilibrary keywords SapEccLibrary absorbed, and what changed |
 
 Every document exists in English and in French (`*.fr.md`). They were written
 alongside the libraries in the maintainer's workbench: when they mention a

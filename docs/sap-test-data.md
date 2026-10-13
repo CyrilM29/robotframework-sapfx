@@ -130,9 +130,9 @@ it; `fiori_sflight_smoke.robot` is equally affected until then.
 | S/4HANA on-prem GUI | ✅ Proven live (A4H 1909, `ecc_smoke` + `ecc_data_smoke`). |
 | SAP GUI for Windows 8.10 (2026-07-16) | ✅ COM API unchanged: risk-free migration expected. |
 | UI5 ≥ 1.67 + Fiori Elements v4 | ✅ Proven live (OpenUI5 Demo Kit, cap-sflight). |
-| UI5 < 1.67 (pre-2019 launchpads: S/4 1610/1709, UI5 1.44/1.52/1.60) | ✅ `registryForEach` DOM fallback: **proven live vs real OpenUI5 1.60.14** (`fiori_legacy_smoke.robot`, jsDelivr npm mirror). |
+| UI5 < 1.67 (pre-2019 launchpads: S/4 1610/1709, UI5 1.44/1.52/1.60) | 🟠 `registryForEach` DOM fallback kept in the bundle and locked by `tests/unit/test_ui5_compat.py`, **not proven live**: its 1.60 smoke (synthetic page) was retired on 2026-10-13, and no live target serves a runtime older than 1.67. |
 | UI5 2.x (**cancelled**, UI5con keynote, July 2026: no 2.0 release planned; SAP's official path is the legacy-free 1.x line) | ✅ **Proven live vs the 2.0 nightly CDN** (`fiori_ui5v2_smoke.robot`, `sdk.openui5.org/nightly/2`): `ElementRegistry` module branch, zero dependency on the APIs removed in 2.x (`sap.ui.getCore()`, `Element.registry`, `sap.ui.version`). Also locked by `tests/unit/test_ui5_compat.py`. The smoke stays a **non-blocking sentinel** for as long as the nightly/2 CDN is served (it may be frozen or withdrawn); the 1.136-legacy-free smoke below is the forward-looking target. |
-| Launchpad iframes (SAP Build Work Zone / cFLP) | ✅ `Set Ui5 Frame`: bundle evaluated inside the frame, `>>>` frame-piercing selectors; proven vs a genuinely cross-origin fixture (`fiori_frame_smoke.robot`). |
+| Launchpad iframes (SAP Build Work Zone / cFLP) | ✅ `Set Ui5 Frame`: bundle evaluated inside the frame, `>>>` frame-piercing selectors; proven live on the OpenUI5 Demo Kit sample iframe (`fiori_frame_smoke.robot`) and exercised on a real Work Zone cFLP (2026-08-23). |
 | S/4HANA Cloud (public edition) | ✅ Fiori + WebGUI `sid` engine (no desktop SAP GUI there); note the IAS/SAML login page is **not** UI5 → drive it with plain Browser keywords. |
 
 ## Trademarks

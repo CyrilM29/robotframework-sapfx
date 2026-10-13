@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 from robot.utils import timestr_to_secs
 
-from sapfx_common import abap_components, cds_source, gateway_status, odata_metadata
+from sapfx_common import abap_components, cds_source, gateway_status, odata_error, odata_metadata
 from sapfx_common.polling import poll_until
 from sapfx_common.vocabulary import lookup_as_dict
 
@@ -249,6 +249,30 @@ class DiscoveryKeywords(OdataReadKeywords):
         return gateway_status.classify_http_response(
             response.get("status"), response.get("headers"),
             response.get("body") or "")
+
+    def get_odata_error(self, response: dict) -> dict[str, Any]:
+        """Lit le corps d'erreur OData d'une réponse de `Get Http Response`
+        et rend ``{status, code, message_identity, transaction_id, timestamp,
+        service_id, service_version, message}``.
+
+        ``transaction_id`` et ``timestamp`` sont ceux que la Gateway écrit
+        dans son journal d'erreurs pour CETTE requête (mesuré sur la 754) :
+        `Read Gateway Error Log` avec ``transaction_id=`` retrouve l'entrée,
+        le lien le plus fort entre ce que le client a reçu et ce que le
+        système a journalisé. ``message_identity`` n'est rempli que pour un
+        code ``CLASSE/NUMÉRO`` (``/IWFND/MED/170`` d'un service inexistant,
+        servi en HTTP 403) : le 404 d'une ressource absente porte un
+        identifiant de texte. ``message`` est localisé, pour le lecteur
+        seulement (convention n°3). Corps JSON ou XML ; un statut de succès
+        (inférieur à 400) et un corps qui n'est pas une erreur OData (page
+        HTML, corps tronqué) échouent en le disant.
+
+        Exemple :
+        | ${response}=    `Get Http Response`    /sap/opu/odata/sap/ZZ_SAPFX11_20261007165335/$metadata    alias=gw11
+        | ${error}=    `Get Odata Error`    ${response}
+        | Should Be Equal    ${error}[message_identity]    /IWFND/MED/170
+        """
+        return odata_error.parse_odata_error(response)
 
     def get_gateway_status(self, alias: str = "default",
                            catalog_path: Optional[str] = None) -> dict[str, Any]:

@@ -30,7 +30,9 @@ from robot.api import logger
 from robot.api.types import Secret
 
 from sapfx_common.secrets import reveal_secret
-from sapfx_common.vkeys import resolve_vkey
+from sapfx_common.vkeys import resolve_vkey, vkey_name
+
+from ._governance import check_save_gesture
 
 _TEXT_FIELDS = ("GuiTextField", "GuiCTextField", "GuiPasswordField", "GuiOkCodeField")
 _TEXT_SHELL_SUBTYPES = ("TextEdit",)
@@ -63,6 +65,7 @@ class InputKeywords:
         if element_type in ("GuiTab", "GuiMenu"):
             element.select()
         elif element_type == "GuiButton":
+            check_save_gesture(self, element_id=element_id)
             element.press()
         else:
             self.take_screenshot()
@@ -174,12 +177,27 @@ class InputKeywords:
         | `Element Should Be Present`    wnd[0]/usr/cntlGRID1/shellcont/shell
         """
         number = resolve_vkey(vkey_id)
+        check_save_gesture(self, vkey=number)
         try:
-            self.session.findById("wnd[%s]" % window).sendVKey(number)
+            target = self.session.findById("wnd[%s]" % window)
         except com_error:
             self.take_screenshot()
             raise ValueError("Cannot send Vkey to given window, is window wnd[%s] "
                              "actually open?" % window) from None
+        try:
+            target.sendVKey(number)
+        except com_error:
+            # La fenêtre existe : c'est l'ÉCRAN qui refuse la touche, la
+            # fonction n'y étant pas active (mesuré le 2026-10-08 : Ctrl+S sur
+            # l'écran initial de SE16, l'accueil ou SM37). L'ancien message
+            # accusait une fenêtre fermée.
+            self.take_screenshot()
+            identity = getattr(self, "_screen_identity_or_none", lambda: None)()
+            where = (" (écran %s/%s, transaction %s)" % identity) if identity else ""
+            raise ValueError(
+                "L'écran a refusé la touche virtuelle %s (%s) sur wnd[%s] : la "
+                "fonction n'y est pas active%s." % (
+                    number, vkey_name(number) or vkey_id, window, where)) from None
         self._explicit_pause()
 
     # -- relecture --------------------------------------------------------------
