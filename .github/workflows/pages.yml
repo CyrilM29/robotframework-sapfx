@@ -44,10 +44,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Fail-closed : mieux vaut un run rouge qu'un site publié amputé d'une
-      # page (l'accueil relie les trois, un lien mort se voit chez le lecteur).
+      # page (l'accueil relie les quatre, un lien mort se voit chez le lecteur).
       - name: Every documentation page is present
         run: |
-          for page in index.html SapEccLibrary.html SapFioriLibrary.html SapApiLibrary.html; do
+          for page in index.html SapEccLibrary.html SapFioriLibrary.html SapApiLibrary.html sapfx_common.html; do
             test -f "docs/libdoc/$page" || { echo "manquant : docs/libdoc/$page"; exit 1; }
           done
 

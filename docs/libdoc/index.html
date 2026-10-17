@@ -138,6 +138,8 @@
     text-decoration: none;
   }
   .card a:hover { text-decoration: underline; }
+  /* The shared modules sit under the three channels, across the whole row. */
+  .card.wide { grid-column: 1 / -1; }
   .note {
     margin-top: 2.2rem;
     background: var(--card);
@@ -168,8 +170,8 @@
         <span class="accent">keyword by keyword</span></h1>
       <p class="sub">Three channels, the same contracts: SAP GUI,
          Fiori/UI5 and OData API. These pages are the complete keyword
-         reference of the three libraries shipped on PyPI, generated with
-         Libdoc from the released code.</p>
+         reference of the three libraries shipped on PyPI and of their
+         shared modules, generated with Libdoc from the released code.</p>
       <div class="chips">
         <span class="chip">Apache 2.0</span>
         <span class="chip">Robot Framework 7</span>
@@ -227,12 +229,28 @@
          preflight, and the BAPI pattern on top of optional RFC.</p>
       <a href="SapApiLibrary.html">Open the keyword reference &rarr;</a>
     </div>
+    <div class="card wide">
+      <div class="badge purple">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3 2.5 8 12 13l9.5-5L12 3z"/>
+          <path d="M2.5 12.5 12 17.5l9.5-5M2.5 17 12 22l9.5-5"/>
+        </svg>
+      </div>
+      <h3>sapfx_common</h3>
+      <div class="canal">Shared modules · imported one by one</div>
+      <p>The channel-independent keywords that chain after any channel:
+         table extraction and its completeness guard, exports (CSV, JSON,
+         Excel, SVG, Parquet), deterministic artifacts, cross-channel checks,
+         security posture, change impact, release verdict.</p>
+      <a href="sapfx_common.html">Open the keyword reference &rarr;</a>
+    </div>
   </div>
   <div class="note">
-    These pages document the low-level keywords of the libraries. The
-    repository also ships a layer of ready-to-use business keywords
-    (the <code>resources/</code> directory): that is the layer test suites
-    call in practice, so tests contain no raw locators.
+    These pages document the keywords of the libraries. A test suite usually
+    calls them through a layer of business keywords (one resource file per
+    screen or flow), so that tests contain no raw locators; the
+    <code>sapfx_common</code> modules are how that layer reaches pure logic
+    without <code>Evaluate</code>.
   </div>
 </main>
 <footer>
