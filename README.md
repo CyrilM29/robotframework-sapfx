@@ -43,9 +43,9 @@ the **keyword reference**. The libraries are distributed on PyPI as
 
 A fourth package, `sapfx_common`, holds the pure logic the three share
 (polling, healing scores, perception diff, human-locator engine, table
-extraction contract, visual hashing...). Some of its modules are Robot
-libraries in their own right, documented in their docstrings rather than in
-the keyword reference: `Library    sapfx_common.table_csv` (also `table_json`,
+extraction contract, visual hashing...). About twenty of its modules are
+Robot libraries in their own right, imported one by one and documented on
+their own page of the keyword reference: `Library    sapfx_common.table_csv` (also `table_json`,
 `table_xlsx`, `table_svg`, `table_parquet`) writes an extraction and reads it
 back, `sapfx_common.table_extract` carries the shared
 `Table Extract Should Be Complete` guard, `sapfx_common.artifacts` writes and
@@ -53,7 +53,9 @@ re-reads deterministic JSON artifacts, and `sapfx_common.rap_preview` builds
 the Fiori Elements preview path of a RAP service.
 
 📖 **[Keyword documentation](https://cyrilm29.github.io/robotframework-sapfx/)**:
-one reference page per library, every keyword with its arguments and examples.
+one reference page per library and one for the `sapfx_common` modules, every
+keyword with its arguments; each keyword of the three libraries also ends with
+a usage example.
 
 ## Install
 
@@ -258,7 +260,7 @@ migration tools.
 
 | Document | Topic |
 | --- | --- |
-| [Keyword reference](https://cyrilm29.github.io/robotframework-sapfx/) | Every keyword of the three libraries |
+| [Keyword reference](https://cyrilm29.github.io/robotframework-sapfx/) | Every keyword of the three libraries and of the `sapfx_common` modules |
 | [docs/architecture.md](docs/architecture.md) | How the libraries are built and how they fit together |
 | [docs/fiori-architecture.md](docs/fiori-architecture.md) | The web side: UI5 selectors, engines, frames, hybrid pages |
 | [docs/testing-without-sap.md](docs/testing-without-sap.md) | A free local SAP system, SAP-side prerequisites |

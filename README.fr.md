@@ -45,9 +45,9 @@ nom `robotframework-sapfx`.
 
 Un quatrième paquet, `sapfx_common`, porte la logique pure que les trois
 partagent (attente, scores de réparation, diff de perception, moteur de
-localisateurs humains, contrat d'extraction de tableaux, empreinte visuelle...). Certains de ses
-modules sont des bibliothèques Robot à part entière, documentées dans leurs
-docstrings et non dans la référence des keywords :
+localisateurs humains, contrat d'extraction de tableaux, empreinte visuelle...). Une vingtaine
+de ses modules sont des bibliothèques Robot à part entière, importées une par
+une et documentées sur leur propre page de la référence des keywords :
 `Library    sapfx_common.table_csv` (aussi `table_json`, `table_xlsx`,
 `table_svg`, `table_parquet`) écrit une extraction et la relit,
 `sapfx_common.table_extract` porte la garde commune
@@ -56,8 +56,9 @@ des artefacts JSON déterministes, et `sapfx_common.rap_preview` construit le
 chemin de l'aperçu Fiori Elements d'un service RAP.
 
 📖 **[Documentation des keywords](https://cyrilm29.github.io/robotframework-sapfx/)**
-(en anglais) : une page de référence par bibliothèque, chaque keyword avec ses
-arguments et ses exemples.
+(en anglais) : une page de référence par bibliothèque et une pour les modules
+de `sapfx_common`, chaque keyword avec ses arguments ; chaque keyword des trois
+bibliothèques se termine en plus par un exemple d'utilisation.
 
 ## Installation
 
@@ -277,7 +278,7 @@ de migration de SAP.
 
 | Document | Sujet |
 | --- | --- |
-| [Référence des keywords](https://cyrilm29.github.io/robotframework-sapfx/) | Tous les keywords des trois bibliothèques (en anglais) |
+| [Référence des keywords](https://cyrilm29.github.io/robotframework-sapfx/) | Tous les keywords des trois bibliothèques et des modules de `sapfx_common` (en anglais) |
 | [docs/architecture.fr.md](docs/architecture.fr.md) | Comment les bibliothèques sont construites et s'articulent |
 | [docs/fiori-architecture.fr.md](docs/fiori-architecture.fr.md) | Le côté web : sélecteurs UI5, moteurs, frames, pages hybrides |
 | [docs/testing-without-sap.fr.md](docs/testing-without-sap.fr.md) | Un système SAP local et gratuit, les prérequis côté SAP |
