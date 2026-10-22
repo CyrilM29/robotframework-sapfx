@@ -73,14 +73,14 @@ effet de bord.
   par contenu, `Read Abap List` pour les sorties liste classiques.
 - **Localisateurs humains** : `Fill Field By Label`, `Click Button By Label`
   (libellé visible + géométrie, ambiguïté toujours remontée).
-- **Healing** : `Resolve Element With Healing` (suggestions scorées,
-  télémétrie, jamais silencieux), plus `scripts/healing_drift_report.py` qui
-  transforme la télémétrie en patchs de la couche resources.
+- **Des échecs qui indiquent la correction** : un élément absent liste les ids
+  les plus proches à l'écran, avec leur score, et nomme l'écran réellement
+  affiché.
 - **Perception** : `Get Screen Signature` (vue texte de l'écran réel,
-  `mode=diff`/`semantic`), screenshots (simple, annoté Set-of-Mark), baselines
-  visuelles (écran/élément/tuiles), sentinelle de dérive.
-- **Recorders et agents IA** : recorder desktop (événements natifs de l'API),
-  plugins rf-mcp, agents sap-planner/generator/healer.
+  `mode=diff`/`semantic`) et captures de la fenêtre SAP.
+- L'auto-réparation des localisateurs, les baselines visuelles, la sentinelle
+  de dérive, les recorders et les agents IA sont des outils de l'atelier, hors
+  de la bibliothèque libre.
 
 ## Conventions à adopter avec la migration
 

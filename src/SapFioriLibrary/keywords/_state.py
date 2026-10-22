@@ -32,14 +32,18 @@ from .._ui5_js import (
     UI5_THEME_PROBE_JS,
 )
 from .._ui5_runtime import applied_theme
-
-
+from typing import TYPE_CHECKING, Literal, Any
 
 
 class StateKeywords:
     """Mixin compose dans :class:`SapFioriLibrary` (voir ce module).
     Suppose la page active de Browser accessible via ``self._browser()``
     et la plomberie de ``_base.py`` disponible par composition."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def wait_for_ui5_idle(self, timeout=None, settle="300 ms"):
         """Attend que la page soit *réellement au repos* : plus aucune
@@ -120,8 +124,8 @@ class StateKeywords:
                                             or "aucune"))
             raise AssertionError(
                 "La page n'est pas revenue au repos après %s (calme continu "
-                "exigé : %d ms ; %s). Log Fiori Diagnostics donne le détail "
-                "(console, erreurs, composition)."
+                "exigé : %d ms ; %s). Get Page Composition dit quelles "
+                "technologies la page porte."
                 % (secs_to_timestr(budget), settle_ms, detail))
         return dict(state)
 
@@ -294,7 +298,7 @@ class StateKeywords:
         return {"requested": str(result.get("requested") or ""),
                 "applied": applied_theme(result.get("classes"))}
 
-    def get_ui5_messages(self, include_toasts=True):
+    def get_ui5_messages(self, include_toasts: bool = True):
         """Lit les *messages UI5* de la page : le MessageManager (module
         ``Messaging`` des UI5 récents, ``getMessageManager()`` sinon) plus les
         ``MessageToast`` récents, captés par un hook posé à l'injection du
@@ -334,7 +338,7 @@ class StateKeywords:
             result.pop("toasts", None)
         return result
 
-    def ui5_should_have_no_messages_of_type(self, message_type="Error"):
+    def ui5_should_have_no_messages_of_type(self, message_type: Literal["Error", "Warning", "Success", "Information", "None"] = "Error"):
         """Échoue si le MessageManager UI5 porte AU MOINS un message du type
         donné (``Error``, ``Warning`` …) : l'assertion *locale-safe* du canal
         web (convention n°3 : on juge le TYPE, le texte n'est joint au message

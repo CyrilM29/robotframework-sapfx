@@ -10,14 +10,17 @@ Ce mixin ajoute la couche ergonomique par-dessus : résoudre les colonnes par le
 Robot pour que les tests puissent faire des assertions sur les données plutôt que
 sur les coordonnées de cellules.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
+from sapfx_common.gui_element_id import GuiElementIdInput
 from sapfx_common._tabular import blank_rows
 from sapfx_common.abap_list import reconstruct_rows
 from sapfx_common.com_safety import shell_subtype
 from sapfx_common.object_tree import LEAF_SHELL_SUBTYPES
-from sapfx_common.robot_args import as_name_list, as_optional_int
+from sapfx_common.robot_args import OptionalNameListInput, as_name_list, as_optional_int
 from sapfx_common.table_control import unique_titles
 
 # Le remède joint à l'erreur de conversion de `max_rows` : l'incident vécu est
@@ -25,11 +28,24 @@ from sapfx_common.table_control import unique_titles
 _COLUMNS_HINT = "Une liste de colonnes se passe par columns=."
 
 
+class GridNotLoadedError(RuntimeError):
+    """Un relevé de grille porte des lignes que l'ALV n'avait pas chargées."""
+
+
 class GridKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Opère sur les objets shell GuiGridView
     (plus `Read Abap List` pour les sorties liste classiques, sans objet grille)."""
 
-    def get_grid_column_ids(self, table_id):
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les lecteurs de grille
+        # sont annotés (type NameList), donc leurs corps sont vérifiés.
+        session: Any
+        def take_screenshot(self, screenshot_name: str = ...) -> Any: ...
+        def get_cell_value(self, *args: Any, **kwargs: Any) -> Any: ...
+        def select_table_row(self, *args: Any, **kwargs: Any) -> Any: ...
+        def set_cell_value(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def get_grid_column_ids(self, table_id: GuiElementIdInput):
         """Retourne la liste des identifiants techniques des colonnes d'une grille ALV, dans l'ordre d'affichage.
 
         Exemple :
@@ -39,14 +55,16 @@ class GridKeywords:
         grid = self._grid(table_id)
         return [col for col in grid.ColumnOrder]
 
-    def count_blank_grid_rows(self, rows, columns=None):
+    def count_blank_grid_rows(self, rows, columns: OptionalNameListInput = None):
         """Combien de lignes d'un relevé de grille sont *entièrement vides*.
 
         La garde que le nombre de lignes ne donne PAS. Une ALV ne matérialise
-        ses lignes qu'au fil du défilement, et `Read Grid` lit les lignes non
-        chargées en cellules VIDES plutôt que d'échouer : le relevé porte
-        alors le bon nombre de lignes, se relit fidèlement, se compare à
-        lui-même sans écart, et ne contient rien.
+        ses lignes qu'au fil du défilement et rend les lignes non chargées en
+        cellules VIDES : le relevé porte alors le bon nombre de lignes, se
+        relit fidèlement, se compare à lui-même sans écart, et ne contient
+        rien. `Read Grid` refuse ce cas depuis le 2026-10-22 ; ce keyword
+        reste la vérification d'un relevé venu d'ailleurs ou de `Read Full
+        Grid`.
 
         Mesuré le 2026-09-15 sur le rapport RSPARAM : la MÊME lecture rendait
         1635 lignes pleines sur un système du banc et 1639 lignes dont 137
@@ -69,7 +87,7 @@ class GridKeywords:
         """
         return blank_rows(rows, as_name_list(columns, "columns") or None)
 
-    def get_grid_column_titles(self, table_id):
+    def get_grid_column_titles(self, table_id: GuiElementIdInput):
         """Retourne la carte ``{id technique: titre AFFICHÉ}`` des colonnes d'une
         grille ALV, dans l'ordre d'affichage.
 
@@ -101,7 +119,7 @@ class GridKeywords:
         return {str(cid): grid.GetDisplayedColumnTitle(cid)
                 for cid in grid.ColumnOrder}
 
-    def get_column_id_by_title(self, table_id, title):
+    def get_column_id_by_title(self, table_id: GuiElementIdInput, title):
         """Résout un ``title`` de colonne visible en son identifiant technique.
 
         La correspondance est insensible à la casse et ignore les espaces en bordure.
@@ -147,7 +165,7 @@ class GridKeywords:
             % (title, table_id, dict(zip(col_ids, unique_titles(raw), strict=True)))
         )
 
-    def get_cell_value_by_column_title(self, table_id, row_num, title):
+    def get_cell_value_by_column_title(self, table_id: GuiElementIdInput, row_num: int, title):
         """Comme `Get Cell Value` mais adresse la colonne par son titre visible.
 
         Exemple :
@@ -158,7 +176,7 @@ class GridKeywords:
         col_id = self.get_column_id_by_title(table_id, title)
         return self.get_cell_value(table_id, row_num, col_id)
 
-    def set_cell_value_by_column_title(self, table_id, row_num, title, text):
+    def set_cell_value_by_column_title(self, table_id: GuiElementIdInput, row_num: int, title, text):
         """Comme `Set Cell Value` mais adresse la colonne par son titre visible.
 
         Le pendant en écriture de `Get Cell Value By Column Title` : évite d'avoir à
@@ -172,7 +190,7 @@ class GridKeywords:
         col_id = self.get_column_id_by_title(table_id, title)
         self.set_cell_value(table_id, row_num, col_id, text)
 
-    def find_row_by_column_value(self, table_id, title, value, ignore_case=False):
+    def find_row_by_column_value(self, table_id: GuiElementIdInput, title, value, ignore_case: bool = False):
         """Retourne l'index (base 0) de la *première* ligne dont la cellule de la
         colonne ``title`` vaut ``value``, ou ``-1`` si aucune.
 
@@ -197,7 +215,7 @@ class GridKeywords:
                 return row
         return -1
 
-    def select_row_by_column_value(self, table_id, title, value, ignore_case=False):
+    def select_row_by_column_value(self, table_id: GuiElementIdInput, title, value, ignore_case: bool = False):
         """Sélectionne la première ligne dont la colonne ``title`` vaut ``value``.
 
         Lève si aucune ligne ne correspond (l'erreur nomme la colonne et la valeur).
@@ -217,8 +235,8 @@ class GridKeywords:
         self.select_table_row(table_id, row)
         return row
 
-    def get_cell_value_by_row_content(self, table_id, anchor_title, anchor_value,
-                                      target_title, ignore_case=False):
+    def get_cell_value_by_row_content(self, table_id: GuiElementIdInput, anchor_title, anchor_value,
+                                      target_title, ignore_case: bool = False):
         """Lit la cellule ``target_title`` de la ligne repérée par son *contenu* :
         « la ligne dont ``anchor_title`` vaut ``anchor_value`` », l'adressage
         ``contenu @ colonne`` (à la RoboSAPiens) appliqué à l'ALV. Aucun index de
@@ -241,8 +259,8 @@ class GridKeywords:
             )
         return self.get_cell_value_by_column_title(table_id, row, target_title)
 
-    def read_full_grid(self, table_id, page_step=None, max_rows=None,
-                       columns=None):
+    def read_full_grid(self, table_id: GuiElementIdInput, page_step=None, max_rows=None,
+                       columns: OptionalNameListInput = None):
         """Comme `Read Grid` mais *fait défiler* la grille pour forcer le chargement
         différé de toutes les lignes avant de lire.
 
@@ -278,13 +296,20 @@ class GridKeywords:
             pass
         return self.read_grid(table_id, max_rows=max_rows, columns=columns)
 
-    def read_grid(self, table_id, max_rows=None, columns=None):
+    def read_grid(self, table_id: GuiElementIdInput, max_rows=None, columns: OptionalNameListInput = None):
         """Lit une grille ALV dans une liste de dicts ``[{column_title: value, ...}]``.
 
         Seules les lignes actuellement chargées sont lues ; SAP charge les grilles
-        en différé, donc pour les grandes tables faites défiler/paginer d'abord
-        (voir `Scroll`) ou passez un plafond ``max_rows``. Le plafond est journalisé
+        en différé, donc pour les grandes tables employez `Read Full Grid` (qui
+        fait défiler) ou passez un plafond ``max_rows``. Le plafond est journalisé
         pour qu'une lecture tronquée ne soit jamais confondue avec une lecture complète.
+
+        Un relevé creux ÉCHOUE au lieu de passer (depuis le 2026-10-22) : une
+        ALV rend une ligne non chargée en cellules vides, donc quand le relevé
+        porte des lignes entièrement vides, la première est amenée dans la
+        fenêtre et relue ; si elle se remplit, l'échec nomme `Read Full Grid`.
+        Une ligne restée vide après ce défilement est une vraie ligne vide, et
+        le relevé passe. La position de défilement est restaurée.
 
         ``columns`` (liste d'ids TECHNIQUES, ``CARRID`` … ; une valeur seule,
         une chaîne à virgules ``CARRID,CONNID`` ou une liste-littérale
@@ -336,7 +361,52 @@ class GridKeywords:
         rows = []
         for row in range(row_count):
             rows.append({key: grid.GetCellValue(row, cid) for cid, key in pairs})
+        self._refuse_unloaded_rows(table_id, grid, pairs, rows)
         return rows
+
+    def _refuse_unloaded_rows(self, table_id, grid, pairs, rows):
+        """Échoue si une ligne vide du relevé se remplit une fois affichée.
+
+        Une ALV rend ses lignes non chargées en cellules VIDES au lieu de
+        lever : le relevé a le bon nombre de lignes et ne contient rien
+        (1639 lignes dont 137 remplies, RSPARAM, 2026-09-15). Une ligne
+        réellement vide existe aussi ; on ne la confond pas avec une ligne
+        non chargée : la première ligne vide est amenée dans la fenêtre puis
+        relue, et seule une ligne qui se remplit prouve le chargement manquant.
+        La position de défilement est restaurée dans tous les cas.
+        """
+        blank = [i for i, row in enumerate(rows)
+                 if not any(str(value or "").strip() for value in row.values())]
+        if not blank:
+            return
+        probe, original = blank[0], None
+        try:
+            original = grid.FirstVisibleRow
+            grid.FirstVisibleRow = probe
+            reread = [grid.GetCellValue(probe, cid) for cid, _ in pairs]
+        except (AttributeError, com_error) as exc:
+            logger.warn(
+                "Grid '%s': %s of %s rows read are entirely blank and the first one "
+                "could not be scrolled into view to tell an empty row from an "
+                "unloaded one (%s). `Read Full Grid` scrolls before reading."
+                % (table_id, len(blank), len(rows), exc))
+            return
+        finally:
+            if original is not None:
+                try:
+                    grid.FirstVisibleRow = original
+                except (AttributeError, com_error):
+                    pass
+        if any(str(value or "").strip() for value in reread):
+            self.take_screenshot()
+            raise GridNotLoadedError(
+                "Grid '%s': %s of %s rows read are entirely blank, and row %s holds "
+                "data once scrolled into view: the grid had not loaded those rows "
+                "when they were read. Use `Read Full Grid`, which scrolls through "
+                "the grid before reading, then `Count Blank Grid Rows` to check."
+                % (table_id, len(blank), len(rows), probe))
+        logger.info("Grid '%s': %s entirely blank row(s), still blank once scrolled "
+                    "into view (empty rows, not unloaded ones)." % (table_id, len(blank)))
 
     def read_abap_list(self):
         """Lit la *liste ABAP classique* affichée (sortie SE38, SE16 sans ALV,

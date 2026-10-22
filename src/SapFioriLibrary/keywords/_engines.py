@@ -13,6 +13,8 @@ Extrait de ``SapFioriLibrary.py`` (convention #13).
 
 
 
+from typing import TYPE_CHECKING, Any
+
 from sapfx_common.secrets import reveal_secret
 from sapfx_common.system_identity import webgui_identity
 from sapfx_common.webgui_selection import selection_criteria
@@ -32,6 +34,7 @@ from .._ui5_runtime import (
     build_wc_selector,
     selector_to_json,
 )
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 
 
@@ -41,9 +44,20 @@ class EngineKeywords:
     Suppose la page active de Browser accessible via ``self._browser()``
     et la plomberie de ``_base.py`` disponible par composition."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _act_with_retry(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _browser(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _pick_wc(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resolve(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _scoped_selector(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _wait_visible(self, *args: Any, **kwargs: Any) -> Any: ...
+
     # -- moteur 'sid' SAP WebGUI (SAP GUI for HTML) ---------------------------
 
-    def resolve_sid(self, sid):
+    def resolve_sid(self, sid: GuiElementIdInput):
         """Résout un élément *SAP WebGUI* par son ``SID`` stable vers un sélecteur
         Browser. Le SID est l'identifiant de script SAP GUI (``wnd[0]/usr/ctxtVBAK-VBELN``)
         porté dans l'attribut ``lsdata`` de l'élément sur les pages WebGUI classiques /
@@ -56,7 +70,7 @@ class EngineKeywords:
         """
         return self._scoped_selector(sid_xpath(sid))
 
-    def click_sid(self, sid):
+    def click_sid(self, sid: GuiElementIdInput):
         """Clique sur un élément SAP WebGUI par son SID.
 
         Exemple :
@@ -64,7 +78,7 @@ class EngineKeywords:
         """
         self._browser().click(self.resolve_sid(sid))
 
-    def fill_sid_input(self, sid, text):
+    def fill_sid_input(self, sid: GuiElementIdInput, text):
         """Remplit un champ de saisie SAP WebGUI (par SID) avec ``text``.
 
         Exemple :
@@ -73,7 +87,7 @@ class EngineKeywords:
         base = self.resolve_sid(sid)
         self._browser().fill_text(base, text)
 
-    def sid_should_be_visible(self, sid):
+    def sid_should_be_visible(self, sid: GuiElementIdInput):
         """Vérifie qu'un élément SAP WebGUI avec le SID donné est visible.
 
         Exemple :
@@ -147,15 +161,17 @@ class EngineKeywords:
         brut = self._evaluate(WEBGUI_IDENTITY_PROBE_JS)
         return webgui_identity(brut if isinstance(brut, dict) else {})
 
-    def list_webgui_menus(self, window=0):
+    def list_webgui_menus(self, window: int = 0):
         """Ids DOM *visibles* des menus de la barre de menus WebGUI de la
         fenêtre ``window`` (``wnd[N]/mbar/menu[i]…-BtnChoiceMenu``), dans
         l'ordre du DOM. La structure d'ids et le suffixe de rendu sont un
         savoir du canal WebGUI (relevés live 2026-07-18), pas d'un site : la
         POSITION qui compte (System = avant-dernier, Help = dernier, la
-        convention SAP) reste à l'appelant. Liste vide = aucun menu visible
-        (barre pas encore rendue : sonder dans un ``Wait Until Keyword
-        Succeeds``).
+        convention SAP) reste à l'appelant. Liste vide = aucun menu visible :
+        le bandeau du WebGUI ne rend sa barre de menus qu'après son bouton
+        « More » (``css=[id$="-moreButton"] >> visible=true``, relevé le
+        2026-10-14 sur a4h, aucun nœud ``mbar`` avant), puis sonder dans un
+        ``Wait Until Keyword Succeeds``.
 
         Exemple :
         | ${menus}=    `List Webgui Menus`
@@ -226,7 +242,7 @@ class EngineKeywords:
 
     # -- moteur Web Components (pages UI5 Web Components, hors registre UI5) ---
 
-    def resolve_wc_control(self, index=0, **selector_parts):
+    def resolve_wc_control(self, index: int = 0, **selector_parts):
         """Résout un *UI5 Web Component* (custom element ``ui5-*``) en sélecteur Browser.
 
         Troisième moteur de résolution, pour les pages « pur Web Components »
@@ -249,8 +265,8 @@ class EngineKeywords:
         car les hôtes WC n'ont souvent pas d'id propre.
 
         Exemple :
-        | ${selector}=    `Resolve Wc Control`    tag=Button    text=Save    properties={'design': 'Emphasized'}
-        | Should Be Equal    ${selector}    css=[id="saveBtn"]
+        | ${selector}=    `Resolve Wc Control`    tag=Button    name=Settings
+        | Should Start With    ${selector}    css=[id="sdk---app--aboutMenuButton"]
         """
         selector = build_wc_selector(**selector_parts)
         description = "wc %s" % selector
@@ -287,19 +303,21 @@ class EngineKeywords:
         paths = self._evaluate(RESOLVE_WC_JS, arg=selector_to_json(selector)) or []
         return len(paths)
 
-    def click_wc_control(self, index=0, **selector_parts):
+    def click_wc_control(self, index: int = 0, **selector_parts):
         """Résout un Web Component ``ui5-*`` et clique dessus via Browser.
         Re-résout à chaque tentative (*stale element*, cf. `Click Ui5 Control`).
 
         Exemple :
-        | `Click Wc Control`    tag=Button    text=Save    properties={'design': 'Emphasized'}
+        | `Click Wc Control`    tag=Button    name=Settings
+        | ${popups}=    `Get Ui5 Open Popups`
+        | Should Be Equal    ${popups}[0][technology]    wc
         """
         self._act_with_retry(
             lambda: self._browser().click(
                 self.resolve_wc_control(index=index, **selector_parts)),
             "click wc %s" % (selector_parts or "index %s" % index))
 
-    def fill_wc_input(self, text, index=0, **selector_parts):
+    def fill_wc_input(self, text, index: int = 0, **selector_parts):
         """Résout un champ de saisie Web Component (``ui5-input`` …) et le remplit.
 
         Le champ ``<input>`` réel vit dans le *shadow root* (ouvert) de l'hôte : le
@@ -308,7 +326,8 @@ class EngineKeywords:
         ``text`` accepte le type ``Secret``, déballé à la frontière.
 
         Exemple :
-        | `Fill Wc Input`    Jean Dupont    tag=Input    name=Customer name
+        | `Fill Wc Input`    ElementRegistry    tag=ShellBarSearch
+        | `Fill Wc Input`    ${EMPTY}    tag=ShellBarSearch
         """
         text = reveal_secret(text)
 
@@ -322,18 +341,18 @@ class EngineKeywords:
                 self._scoped_selector("css=%s input, %s textarea" % (path, path)), text)
         self._act_with_retry(_fill, "fill wc %s" % (selector_parts or "index %s" % index))
 
-    def get_wc_text(self, index=0, **selector_parts):
+    def get_wc_text(self, index: int = 0, **selector_parts):
         """Résout un Web Component ``ui5-*`` et retourne son texte visible.
 
         Exemple :
-        | ${label}=    `Get Wc Text`    tag=Button    name=Cancel order
-        | Should Be Equal    ${label}    Cancel
+        | ${label}=    `Get Wc Text`    tag=Button
+        | Should Be Equal    ${label}    Button Text
         """
         return self._browser().get_text(self.resolve_wc_control(index=index, **selector_parts))
 
     # -- moteur DOM générique (zones non-SAP d'une page hybride) ---------------
 
-    def resolve_dom_element(self, index=0, **selector_parts):
+    def resolve_dom_element(self, index: int = 0, **selector_parts):
         """Résout un *élément DOM générique* en sélecteur Browser : le 5e
         moteur, pour les zones NON-SAP d'une page hybride.
 
@@ -404,7 +423,7 @@ class EngineKeywords:
         paths = self._evaluate(RESOLVE_DOM_JS, arg=selector_to_json(selector)) or []
         return len(paths)
 
-    def click_dom_element(self, index=0, **selector_parts):
+    def click_dom_element(self, index: int = 0, **selector_parts):
         """Résout un élément DOM générique et clique dessus via Browser.
         Re-résout à chaque tentative (*stale element*, cf. `Click Ui5 Control`).
 
@@ -416,7 +435,7 @@ class EngineKeywords:
                 self.resolve_dom_element(index=index, **selector_parts)),
             "click dom %s" % (selector_parts or "index %s" % index))
 
-    def fill_dom_input(self, text, index=0, **selector_parts):
+    def fill_dom_input(self, text, index: int = 0, **selector_parts):
         """Résout un champ de saisie DOM générique et le remplit avec ``text``.
 
         La cible peut être le champ ``<input>`` / ``<textarea>`` lui-même OU un
@@ -446,7 +465,7 @@ class EngineKeywords:
                     % (path, path, path)), text)
         self._act_with_retry(_fill, "fill dom %s" % (selector_parts or "index %s" % index))
 
-    def get_dom_text(self, index=0, **selector_parts):
+    def get_dom_text(self, index: int = 0, **selector_parts):
         """Résout un élément DOM générique et retourne son texte visible.
 
         Exemple :

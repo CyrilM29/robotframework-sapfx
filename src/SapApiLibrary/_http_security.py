@@ -109,7 +109,7 @@ class HttpSecurityKeywords(ServiceNatureKeywords):
 
     def confront_security_control(self, control: str, declared: Any,
                                   observed: Any,
-                                  expectation: Any = True) -> dict[str, Any]:
+                                  expectation: bool = True) -> dict[str, Any]:
         """Confronte ce qu'un paramètre DÉCLARE et ce que le fil MONTRE, et
         rend le verdict de la confrontation.
 

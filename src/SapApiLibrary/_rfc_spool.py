@@ -24,6 +24,7 @@ from typing import Any, Optional
 
 from robot.api import logger
 
+from sapfx_common.argument_types import SpoolIdInput
 from sapfx_common import bapi_return, rfc_reads, spool
 from sapfx_common.robot_args import as_optional_int
 
@@ -79,7 +80,7 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
             entries.append(spool.describe_step_spool(step, spool_row))
         return entries
 
-    def read_job_spool(self, jobname: str, jobcount: str, step: Any = 1,
+    def read_job_spool(self, jobname: str, jobcount: str, step: int = 1,
                        alias: str = "default",
                        external_user: Optional[str] = None) -> dict[str, Any]:
         """Lit le spool d'UN pas de job par ``BAPI_XBP_JOB_SPOOLLIST_READ``
@@ -126,7 +127,7 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
         lines = spool.normalize_spool_lines(result.get("SPOOL_LIST"))
         return spool.spool_summary(lines)
 
-    def get_spool_request_attributes(self, spool_id: Any, alias: str = "default",
+    def get_spool_request_attributes(self, spool_id: SpoolIdInput, alias: str = "default",
                                      external_user: Optional[str] = None
                                      ) -> dict[str, Any]:
         """Les attributs d'une demande de spool par
@@ -167,10 +168,10 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
             raise AssertionError(bapi_return.format_bapi_failure(
                 function_name, failing, rollback_hint=False))
 
-    def read_spool_request(self, spool_id: Any, first_page: Any = 1,
-                           last_page: Any = 0, alias: str = "default",
+    def read_spool_request(self, spool_id: SpoolIdInput, first_page: int = 1,
+                           last_page: int = 0, alias: str = "default",
                            external_user: Optional[str] = None,
-                           verify_complete: Any = False
+                           verify_complete: bool = False
                            ) -> dict[str, Any]:
         """Lit une demande de spool par son NUMÉRO, par
         ``BAPI_XBP_GET_SPOOL_AS_DAT`` (session XBP partagée) : ``{spool_id,
@@ -242,7 +243,7 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
         return summary
 
     def job_step_should_have_no_spool(self, jobname: str, jobcount: str,
-                                      step: Any = 1, alias: str = "default",
+                                      step: int = 1, alias: str = "default",
                                       external_user: Optional[str] = None
                                       ) -> dict[str, Any]:
         """Vérifie qu'un pas de job n'a produit AUCUN spool, par DEUX sources :
@@ -276,7 +277,7 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
             "en a rendu %d lignes : les deux sources se contredisent."
             % (step_number, jobname, jobcount, content["line_count"]))
 
-    def spool_request_should_not_exist(self, spool_id: Any,
+    def spool_request_should_not_exist(self, spool_id: SpoolIdInput,
                                        alias: str = "default",
                                        external_user: Optional[str] = None
                                        ) -> dict[str, Any]:
@@ -299,7 +300,7 @@ class RfcSpoolKeywords(RfcJobScheduleKeywords):
                              "les deux sources se contredisent." % number)
 
     def lines_should_contain_in_order(self, lines: Any, *markers: Any,
-                                      same_line: Any = False) -> list[dict[str, Any]]:
+                                      same_line: bool = False) -> list[dict[str, Any]]:
         """Vérifie que ``markers`` apparaissent DANS L'ORDRE dans ``lines`` et
         rend leurs positions ``[{marker, line, column}]``. ``lines`` accepte
         le résultat de `Read Job Spool` ou `Read Spool Request` (dict portant

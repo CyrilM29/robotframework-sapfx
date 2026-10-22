@@ -2,14 +2,14 @@
 
 Un audit de configuration lit la valeur EFFECTIVE d'un paramètre et s'arrête
 là. C'est ce que rend le canal RFC, et cela suffit pour dire si un système est
-durci. Cela ne suffit pas pour dire **pourquoi**, et la différence compte
+durci. Cela ne suffit pas pour dire *pourquoi*, et la différence compte
 davantage qu'il n'y paraît.
 
 Mesuré le 2026-09-14 sur ABAP Platform 2023 (release 758, kernel 793) en
-croisant l'écran du rapport de paramètres avec le canal RFC : sur les **42**
-paramètres de sécurité audités par les campagnes du dépôt, **39** portent leur
-valeur par DÉFAUT, 3 sont déclarés dans le profil d'instance et **aucun n'y
-est modifié** (les trois y répètent exactement le défaut). Le durcissement
+croisant l'écran du rapport de paramètres avec le canal RFC : sur les *42*
+paramètres de sécurité audités par les campagnes du dépôt, *39* portent leur
+valeur par DÉFAUT, 3 sont déclarés dans le profil d'instance et *aucun n'y
+est modifié* (les trois y répètent exactement le défaut). Le durcissement
 supérieur de cette release, que les campagnes précédentes constataient sans
 pouvoir l'expliquer, n'est donc pas un réglage d'exploitant.
 
@@ -18,13 +18,13 @@ D'où la distinction que porte ce module entre « posé dans le profil » et
 c'est un run qui l'a imposée en démentant une première lecture manuelle trop
 rapide.
 
-**Limite de ce que la colonne permet d'affirmer**, et elle vaut d'être dite :
+*Limite de ce que la colonne permet d'affirmer*, et elle vaut d'être dite :
 le rapport donne une valeur « par défaut » sans préciser si elle est compilée
 dans le noyau ou héritée d'un profil par défaut. Ce module parle donc de
 l'origine PROFIL D'INSTANCE contre DÉFAUT, et laisse à l'appelant le soin de
 ne pas surinterpréter le second terme.
 
-**Pourquoi cette distinction change la lecture d'une dérive.** Une sentinelle
+*Pourquoi cette distinction change la lecture d'une dérive.* Une sentinelle
 qui surveille ces valeurs surveille en réalité le NOYAU. Un écart y apparaîtra
 lors d'une montée de version, pas parce que quelqu'un a modifié le système, et
 le remède n'est pas le même. Inversement, un paramètre de sécurité qui
@@ -43,6 +43,18 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping, Optional
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
     "PROFILE_VALUE_WIDTH",
     "ORIGINS",
@@ -51,7 +63,6 @@ __all__ = [
     "discriminating_parameter_names",
     "proven_truncations",
     "summarize_origins",
-    "looks_truncated",
     "truncated_profile_names",
 ]
 
@@ -76,10 +87,15 @@ def looks_truncated(value: Any, width: int = PROFILE_VALUE_WIDTH) -> bool:
     L'employer pour ÉCARTER une comparaison plutôt que pour la déclarer
     fausse : comparer une valeur peut-être tronquée à une valeur complète
     fabrique un écart qui n'existe pas.
+
+    Exemple :
+    | ${suspect}=    `Looks Truncated`    immediate /usr/sap/A4H/SYS/exe/uc/linuxx86_64/sapcpe pf=/usr
+    | Should Be True    ${suspect}
     """
     return len(str(value or "").strip()) >= int(width)
 
 
+@keyword
 def classify_parameter_origin(name: str, effective: Any, profile: Any,
                               default: Any,
                               width: int = PROFILE_VALUE_WIDTH
@@ -108,6 +124,10 @@ def classify_parameter_origin(name: str, effective: Any, profile: Any,
     qu'une valeur coupée comparée à une valeur complète produit un faux écart.
     C'est le cas de treize paramètres sur la cible, dont aucun n'est de
     sécurité, mais la garde ne dépend pas de cette chance.
+
+    Exemple :
+    | ${fiche}=    `Classify Parameter Origin`    login/min_password_lng    6    ${EMPTY}    6
+    | Should Be Equal    ${fiche}[origin]    kernel
     """
     nom = str(name or "").strip()
     if not nom:
@@ -151,6 +171,7 @@ def classify_parameter_origin(name: str, effective: Any, profile: Any,
     }
 
 
+@keyword
 def summarize_origins(fiches: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Résume un lot de classements : combien viennent du profil, du noyau,
     et lesquels divergent.
@@ -158,9 +179,19 @@ def summarize_origins(fiches: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     Les listes sont triées, donc deux relevés identiques produisent le même
     résumé, ce dont dépend toute comparaison entre deux passages.
 
-    ``profile_backed`` est la liste qui intéresse un audit : ce sont les
-    paramètres qu'une décision humaine a posés. Sur la cible elle est VIDE
-    pour le périmètre de sécurité, et c'est le résultat.
+    ``profile_backed`` liste les paramètres que le profil d'instance porte et
+    que la valeur effective suit. ``profile_changing`` est la liste qui
+    intéresse vraiment un audit : ceux dont le profil MODIFIE le défaut, donc
+    qu'une décision humaine a posés ; ``profile_redundant``, ceux qu'il se
+    contente de répéter. Mesuré sur ABAP Platform 2023 (périmètre de sécurité,
+    42 paramètres) : trois portés par le profil (``gw/reg_info``,
+    ``gw/sec_info``, ``login/password_downwards_compatibility``), aucun
+    modifié, et c'est le résultat.
+
+    Exemple :
+    | ${verdict}=    Compare Channels    ${screen_rows}    ${effective}
+    | ${summary}=    `Summarize Origins`    ${verdict}[entries]
+    | Should Be Equal    ${summary}[profile_changing]    ${{ ['Execute_00'] }}
     """
     retenues = [dict(f) for f in fiches]
     par_origine: dict[str, list[str]] = {}
@@ -185,6 +216,7 @@ def summarize_origins(fiches: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+@keyword
 def truncated_profile_names(screen_rows: Iterable[Mapping[str, Any]],
                             name_key: str = "NAME",
                             profile_key: str = "USER_VALUE",
@@ -196,6 +228,10 @@ def truncated_profile_names(screen_rows: Iterable[Mapping[str, Any]],
     c'est une capacité, et la largeur y était dupliquée en dur, de sorte qu'un
     changement de l'une des deux copies aurait rendu l'autre incohérente sans
     que rien ne le dise.
+
+    Exemple :
+    | ${suspects}=    `Truncated Profile Names`    ${screen_rows}
+    | Should Be Equal    ${suspects}    ${{ ['Execute_00'] }}
     """
     return sorted({
         str(r.get(name_key, "")).strip() for r in screen_rows
@@ -203,6 +239,7 @@ def truncated_profile_names(screen_rows: Iterable[Mapping[str, Any]],
         and str(r.get(name_key, "")).strip()})
 
 
+@keyword
 def proven_truncations(screen_rows: Iterable[Mapping[str, Any]],
                        effective: Mapping[str, Any], name_key: str = "NAME",
                        profile_key: str = "USER_VALUE") -> list[str]:
@@ -217,6 +254,10 @@ def proven_truncations(screen_rows: Iterable[Mapping[str, Any]],
     Sans cette fonction, un scénario qui veut « prouver la troncature » ne
     peut que relire son propre critère de sélection (la longueur), ce qui ne
     peut pas échouer. Le distinguo a été imposé par une revue indépendante.
+
+    Exemple :
+    | ${proven}=    `Proven Truncations`    ${screen_rows}    ${effective}
+    | Should Be Equal    ${proven}    ${{ ['Execute_00'] }}
     """
     par_nom = {str(r.get(name_key, "")).strip(): str(r.get(profile_key, "")
                                                      or "").strip()
@@ -232,6 +273,7 @@ def proven_truncations(screen_rows: Iterable[Mapping[str, Any]],
     return sorted(prouves)
 
 
+@keyword
 def discriminating_parameter_names(screen_rows: Iterable[Mapping[str, Any]],
                                    name_key: str = "NAME",
                                    profile_key: str = "USER_VALUE",
@@ -244,6 +286,10 @@ def discriminating_parameter_names(screen_rows: Iterable[Mapping[str, Any]],
     que soit la source que suit la valeur effective, elle est la même. Une
     contre-épreuve bâtie sur de tels paramètres ne prouverait donc rien, et
     c'est la raison d'être de ce sélecteur.
+
+    Exemple :
+    | ${names}=    `Discriminating Parameter Names`    ${screen_rows}
+    | Should Be Equal    ${names}    ${{ ['Execute_00'] }}
     """
     noms = [str(r.get(name_key, "")).strip() for r in screen_rows
             if str(r.get(profile_key, "") or "").strip()
@@ -254,6 +300,7 @@ def discriminating_parameter_names(screen_rows: Iterable[Mapping[str, Any]],
     return ordonnes[:int(limit)] if limit else ordonnes
 
 
+@keyword
 def compare_channels(screen_rows: Iterable[Mapping[str, Any]],
                      effective: Mapping[str, Any],
                      names: Optional[Iterable[str]] = None,
@@ -270,6 +317,11 @@ def compare_channels(screen_rows: Iterable[Mapping[str, Any]],
 
     C'est ce croisement qui répond à « ce durcissement est-il un réglage ou un
     défaut », question à laquelle aucun des deux canaux ne répond seul.
+
+    Exemple :
+    | ${verdict}=    `Compare Channels`    ${screen_rows}    ${effective}
+    | Should Be Equal    ${verdict}[kernel_backed]    ${{ ['login/min_password_lng'] }}
+    | Should Be Equal    ${verdict}[profile_redundant]    ${{ ['gw/sec_info'] }}
     """
     par_nom = {str(r.get(name_key, "")).strip(): r for r in screen_rows}
     vises = [str(n).strip() for n in (names or effective.keys())]

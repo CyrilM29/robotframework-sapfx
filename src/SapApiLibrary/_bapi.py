@@ -18,6 +18,8 @@ from typing import Any
 
 from robot.api import logger
 
+from sapfx_common.robot_args import OptionalNameListInput
+from sapfx_common.argument_types import RfcFunctionNameInput
 from sapfx_common import bapi_return
 
 from ._http import _as_bool
@@ -27,8 +29,8 @@ from ._rfc import RfcKeywords
 class BapiKeywords(RfcKeywords):
     """Mixin de :class:`SapApiLibrary` : le pattern BAPI du canal RFC."""
 
-    def call_bapi(self, function_name: str, alias: str = "default",
-                  return_key: str = "RETURN", accept: Any = None,
+    def call_bapi(self, function_name: RfcFunctionNameInput, alias: str = "default",
+                  return_key: str = "RETURN", accept: OptionalNameListInput = None,
                   **params: Any) -> Any:
         """Appelle une *BAPI* et vérifie sa table ``RETURN`` (BAPIRET2) :
         un message de type ``E`` / ``A`` / ``X`` = échec listant les messages
@@ -77,7 +79,7 @@ class BapiKeywords(RfcKeywords):
         return result
 
     def bapi_should_fail_with_message_id(self, expected_message_id: str,
-                                         function_name: str,
+                                         function_name: RfcFunctionNameInput,
                                          alias: str = "default",
                                          return_key: str = "RETURN",
                                          rollback: bool = True,

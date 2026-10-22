@@ -17,6 +17,8 @@ import json
 import urllib.parse
 from typing import Any, Optional
 
+from sapfx_common.argument_types import ODataPathInput
+
 from robot.api import logger
 
 from ._core import _ApiCore
@@ -32,7 +34,7 @@ from ._http import (
 class OdataWriteKeywords(_ApiCore):
     """Mixin de :class:`SapApiLibrary` : ecritures et fabrique de donnees."""
 
-    def post_odata(self, path: str, payload: Any, alias: str = "default",
+    def post_odata(self, path: ODataPathInput, payload: Any, alias: str = "default",
                    track: bool = False, **query: str) -> Any:
         """POST OData avec le protocole *CSRF* SAP : un GET préalable avec
         ``X-CSRF-Token: Fetch`` obtient le token (mémorisé avec les cookies de
@@ -71,7 +73,7 @@ class OdataWriteKeywords(_ApiCore):
                     "chemin pour garantir le nettoyage.")
         return result
 
-    def patch_odata(self, path: str, payload: Any, alias: str = "default",
+    def patch_odata(self, path: ODataPathInput, payload: Any, alias: str = "default",
                     if_match: Optional[str] = "*", **query: str) -> Any:
         """PATCH OData (mise à jour partielle d'une entité, v2 et v4) avec le
         protocole CSRF et l'en-tête ``If-Match`` (défaut ``*`` : beaucoup
@@ -93,7 +95,7 @@ class OdataWriteKeywords(_ApiCore):
             return {}
         return self._decode_json(raw, status, path)
 
-    def delete_odata(self, path: str, alias: str = "default",
+    def delete_odata(self, path: ODataPathInput, alias: str = "default",
                      if_match: Optional[str] = "*", **query: str) -> Any:
         """DELETE OData (v2 et v4) avec le protocole CSRF et ``If-Match``
         (mêmes règles que `Patch Odata`). ``path`` vise l'entité avec sa clé.
@@ -120,7 +122,7 @@ class OdataWriteKeywords(_ApiCore):
             return None
         return {"If-Match": str(if_match)}
 
-    def ensure_odata_entity(self, entity_path: str, payload: Any,
+    def ensure_odata_entity(self, entity_path: ODataPathInput, payload: Any,
                             alias: str = "default",
                             create_path: Optional[str] = None,
                             track: bool = False) -> dict[str, Any]:

@@ -19,6 +19,8 @@ l'erreur ouverte, et `Get Modal Buttons` rendait ``[]`` pour ``wnd[1]``, qui
 porte pourtant quatre boutons, parce que la perception ne parcourait que la
 fenêtre ACTIVE. Avec un seul modal ouvert, rien ne change.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 
 from sapfx_common.status_message import normalize_message_class, normalize_message_number
@@ -43,9 +45,24 @@ _EXCLUDED_FUNCTION = ("00", "255")
 # plus de trois ; au-delà, la session est de toute façon à reprendre).
 _MAX_MODAL_DEPTH = 9
 
+# Le dialogue de message générique de SAP (programme SAPMSDYP, dynpro 10) :
+# son champ d'icône porte le TYPE du message, ``M_INFO`` pour une information
+# (relevé le 2026-10-21 sur a4h, dialogue d'expiration de licence après la
+# connexion). Le type se lit à l'icône, jamais au texte, traduit.
+_MESSAGE_DIALOG_PROGRAM = "SAPMSDYP"
+_INFORMATION_ICON = "M_INFO"
+_MESSAGE_TEXT_FIELDS = 9
+
 
 class WindowKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def _topmost_modal_window(self):
         """Indice du modal le plus haut (``2`` pour ``wnd[2]``), ou ``None``
@@ -153,7 +170,7 @@ class WindowKeywords:
                                 "tooltip": (element.tooltip or "").strip()})
         return buttons
 
-    def dismiss_modal_window(self, window=None, confirm=False):
+    def dismiss_modal_window(self, window=None, confirm: bool = False):
         """Referme la fenêtre modale ``wnd[window]`` (omis : le modal le PLUS
         HAUT de la pile, celui qui a la main) et VÉRIFIE qu'elle a
         disparu. Voies essayées dans l'ordre : la touche (F12, ou Entrée si
@@ -228,6 +245,73 @@ class WindowKeywords:
             "La fenêtre wnd[%s] est restée ouverte après %s. Boutons du modal : %s "
             "(cliquer le bon par Click Element, ou Click Popup Button)."
             % (window, ", ".join(attempts), available))
+
+    def _information_dialog(self, window):
+        """``{text, icon}`` si ``wnd[window]`` est le dialogue de message SAPMSDYP
+        d'une INFORMATION (icône ``M_INFO``, ``usr/txtMESSTXT1`` présent, aucune
+        question ni Annuler), sinon ``None``."""
+        try:
+            program = (self.session.Info.Program or "").strip().upper()
+            icon = (self.session.findById("wnd[%s]/usr/txtIK1" % window).IconName or "").strip()
+            first = self.session.findById("wnd[%s]/usr/txtMESSTXT1" % window)
+        except (AttributeError, com_error):
+            return None
+        if (program != _MESSAGE_DIALOG_PROGRAM or icon != _INFORMATION_ICON
+                or not self._is_informational_modal(window)):
+            return None
+        lines = [(first.Text or "").strip()]
+        for index in range(2, _MESSAGE_TEXT_FIELDS + 1):
+            field = self.session.findById("wnd[%s]/usr/txtMESSTXT%d" % (window, index), False)
+            if field is None:
+                break
+            lines.append((field.Text or "").strip())
+        return {"text": " ".join(line for line in lines if line), "icon": icon}
+
+    def dismiss_information_dialogs(self, max_dialogs: int = 5) -> list[dict[str, str]]:
+        """Referme les dialogues d'INFORMATION ouverts au-dessus de l'écran (la
+        connexion en laisse) et rend ce qu'ils disaient, pour le journal : une
+        liste ``[{text, icon}]``, vide quand il n'y en avait aucun.
+
+        Un dialogue d'information est le dialogue de message générique de SAP
+        (programme ``SAPMSDYP``) dont l'icône vaut ``M_INFO`` et dont la barre
+        n'offre ni Annuler ni question : il est reconnu à sa STRUCTURE et à
+        son icône, jamais à son texte, traduit. Mesuré le 2026-10-21 sur a4h :
+        « License expiration date: 04.11.2026 (in 14 days) » suit chaque
+        connexion SAP GUI et bloque `Open System Status` tant qu'il est
+        ouvert. Tout autre modal reste en place (message d'erreur ou
+        d'avertissement, question, connexion multiple, changement de mot de
+        passe) : le keyword s'arrête au premier qui n'est pas une information.
+        Un dialogue que son bouton ne referme pas échoue en le nommant, comme
+        plus de ``max_dialogs`` à la suite.
+
+        Exemple :
+        | ${closed}=    `Dismiss Information Dialogs`
+        | Log Many    @{closed}
+        | ${modal}=    `Element Is Present`    wnd[1]
+        | Should Not Be True    ${modal}
+        """
+        closed: list[dict[str, str]] = []
+        for _ in range(int(max_dialogs)):
+            window = self._topmost_modal_window()
+            if window is None:
+                return closed
+            dialog = self._information_dialog(window)
+            if dialog is None:
+                return closed
+            self.session.findById("wnd[%s]/tbar[0]/btn[0]" % window).press()
+            self.wait_until_busy_done()
+            if self._window_open(window) and self._information_dialog(window) == dialog:
+                self.take_screenshot()
+                raise AssertionError(
+                    "Le dialogue d'information wnd[%s] (« %s ») est resté ouvert après "
+                    "son bouton Continuer." % (window, dialog["text"]))
+            closed.append(dialog)
+        if self._topmost_modal_window() is not None and self._information_dialog(
+                self._topmost_modal_window()) is not None:
+            raise AssertionError(
+                "Plus de %s dialogues d'information à la suite : %s. La session est à "
+                "reprendre." % (max_dialogs, "; ".join(d["text"] for d in closed)))
+        return closed
 
 
 def _as_bool(value):

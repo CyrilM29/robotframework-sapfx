@@ -18,6 +18,7 @@ from typing import Any, Optional
 from robot.utils import timestr_to_secs
 
 from sapfx_common import abap_components, cds_source, gateway_status, odata_error, odata_metadata
+from sapfx_common.argument_types import ODataServicePathInput
 from sapfx_common.polling import poll_until
 from sapfx_common.vocabulary import lookup_as_dict
 
@@ -30,7 +31,7 @@ class DiscoveryKeywords(OdataReadKeywords):
     Herite des lectures (`List Odata Services` lit le catalogue par
     `Get Odata Entities`)."""
 
-    def get_odata_metadata(self, service_path: str, alias: str = "default",
+    def get_odata_metadata(self, service_path: ODataServicePathInput, alias: str = "default",
                            refresh: bool = False) -> dict[str, Any]:
         """Télécharge et parse le ``$metadata`` du service (v2 ET v4) en dict
         JSON-safe : ``{"version", "entity_sets": {nom: {"entity_type",
@@ -66,7 +67,7 @@ class DiscoveryKeywords(OdataReadKeywords):
         session.metadata_cache[key] = parsed
         return parsed
 
-    def find_odata_property_by_label(self, service_path: str, label: str,
+    def find_odata_property_by_label(self, service_path: ODataServicePathInput, label: str,
                                      alias: str = "default",
                                      entity_set: Optional[str] = None
                                      ) -> list[dict[str, Any]]:
@@ -115,7 +116,8 @@ class DiscoveryKeywords(OdataReadKeywords):
         """
         path = catalog_path or gateway_status.CATALOG_SERVICE_PATH
         query.setdefault("format", "json")
-        entries = self.get_odata_entities(path, alias=alias, **query)
+        entries = self.get_odata_entities(path, alias=alias, follow_next=False,
+                                          max_pages=100, **query)
         return odata_metadata.simplify_catalog_entries(entries)
 
     def get_abap_software_components(self, alias: str = "default") -> dict[str, Any]:
@@ -231,8 +233,11 @@ class DiscoveryKeywords(OdataReadKeywords):
         application a répondu, cette route-là n'existe pas), ``forbidden``,
         ``dialog`` (4xx au corps JSON : l'application traite et explique),
         ``login_page`` (2xx au corps HTML : PAS une donnée, le « vert et
-        faux » d'une cible derrière un fournisseur d'identité), ``data``,
-        ``other``.
+        faux » d'une cible derrière un fournisseur d'identité),
+        ``soap_fault`` (enveloppe SOAP portant un ``Fault``, QUEL QUE SOIT le
+        statut : le runtime SOAP d'ABAP la rend en 500, et rendue en 200 elle
+        passerait pour une donnée), ``data``, ``other``. Accepte aussi tout
+        dictionnaire de réponse qui porte statut, en-têtes et corps.
 
         Le complément tolérant de `Get Gateway Status`, pour cartographier un
         canal plutôt que le valider : trois familles de 404 se cachent sous un
@@ -370,7 +375,11 @@ class DiscoveryKeywords(OdataReadKeywords):
 
     def lookup_business_term(self, term: str, domain: Optional[str] = None,
                              threshold: float = 0.8) -> dict[str, Any]:
-        """Résout un *terme métier* (français ou anglais, synonymes
+        """*DEPRECATED* depuis la 0.8.6 : employer ``Lookup Business Term`` de
+        ``sapfx_common.vocabulary`` (``Library    sapfx_common.vocabulary``), même
+        contrat et même résultat. Ce keyword sera retiré deux versions plus tard.
+
+        Résout un *terme métier* (français ou anglais, synonymes
         compris) vers sa fiche SAP : canonique, champ ABAP, table de
         référence, domaine. Le même vocabulaire partagé que les canaux GUI
         (``sapfx_common.vocabulary``, concept issu de playwright-praman,

@@ -21,6 +21,8 @@ convention non localisée), et le dialogue atteint est VÉRIFIÉ structurellemen
 Logique pure dans ``sapfx_common.system_identity`` et
 ``sapfx_common.menu_path``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
@@ -36,6 +38,10 @@ from sapfx_common.system_identity import (
 )
 
 _STATUS_ANCHOR = "usr/txtSYST-MANDT"     # présent sur le seul dynpro SAPLSHSY/700
+# Le statut RÉDUIT (dynpro SAPLSHSY/750) ne porte que les données du référentiel
+# (transaction, programme, dynpro) : mesuré le 2026-10-14 pour un compte au rôle
+# restreint sur la 758, sans échec d'autorisation au journal SU53.
+_REPOSITORY_ANCHOR = "usr/txtSHKONTEXT-TCODE"
 _KERNEL_BUTTON = "tbar[0]/btn[17]"       # « Other Kernel Information » (Shift+F5)
 _KERNEL_ANCHOR = "usr/txtKINFOSTRUC-KERNEL_RELEASE"
 _DETAILS_BUTTON = "usr/btnPRELINFO"      # « Details » -> « Installed Software »
@@ -53,6 +59,13 @@ def _as_bool(value):
 
 class SystemIdentityKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def dismiss_modal_window(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def _element(self, element_id):
         try:
@@ -82,8 +95,10 @@ class SystemIdentityKeywords:
         (l'indice 11 gravé cliquait « Log Off » sur la 758). Le dialogue
         atteint est VÉRIFIÉ structurellement (champ ``txtSYST-MANDT`` sur
         ``wnd[1]``). Un modal déjà ouvert = refus (le refermer par `Dismiss
-        Modal Window`) ; dialogue inattendu = refermé puis échec nommant la
-        voie manuelle (`Select Menu Item` avec le chemin de textes de la langue
+        Modal Window`) ; statut RÉDUIT aux données du référentiel (le cas d'un
+        compte au rôle restreint, mesuré sur la 758) = refermé puis échec qui
+        le dit et renvoie au canal RFC ; dialogue inattendu = refermé puis
+        échec nommant la voie manuelle (`Select Menu Item` avec le chemin de textes de la langue
         de session). Retourne l'id de l'entrée de menu CLIQUÉE (par exemple
         ``wnd[0]/mbar/menu[5]/menu[10]`` sur SE16 de la release 758), la trace
         de la résolution qu'un test peut confronter à un relevé indépendant du
@@ -122,9 +137,18 @@ class SystemIdentityKeywords:
         self.wait_until_busy_done()
         if self._element("wnd[1]/%s" % _STATUS_ANCHOR) is None:
             opened = self._element("wnd[1]") is not None
+            reduced = opened and self._element("wnd[1]/%s" % _REPOSITORY_ANCHOR) is not None
             if opened:
                 self.dismiss_modal_window(1)
             self.take_screenshot()
+            if reduced:
+                raise AssertionError(
+                    "L'entrée %s a bien ouvert « System: Status », mais SANS sa section "
+                    "système (pas de champ %s) : le dialogue ne montre que les données du "
+                    "référentiel, comme pour un compte au rôle restreint (relevé sur la "
+                    "758). La barre de menus est standard. Lire l'identité avec un compte "
+                    "qui voit cette section, ou par RFC (Read System Identity de "
+                    "SapApiLibrary)." % (target, _STATUS_ANCHOR.split("/")[-1]))
             raise AssertionError(
                 "L'entrée %s n'a pas ouvert le dialogue « System: Status » (%s) : "
                 "cette barre de menus ne suit pas la disposition standard. Ouvrir "
@@ -178,7 +202,7 @@ class SystemIdentityKeywords:
             self.dismiss_modal_window(popup)
         return rows
 
-    def get_system_identity(self, kernel=True, components=True):
+    def get_system_identity(self, kernel: bool = True, components: bool = True):
         """Lit l'IDENTITÉ du système joint dans « System > Status » et la rend
         en dict JSON-safe : ``system_id``, ``client``, ``user``, ``language``,
         ``server_name`` (``hôte_SID_instance``, décomposé en
@@ -202,7 +226,7 @@ class SystemIdentityKeywords:
         """
         self.open_system_status()
         window = 1
-        unread = []
+        unread: list[str] = []
         status = self._read_fields(window, STATUS_FIELDS)
         kernel_fields = self._read_kernel(window, unread) if _as_bool(kernel) else None
         rows = self._read_components(window, unread) if _as_bool(components) else None

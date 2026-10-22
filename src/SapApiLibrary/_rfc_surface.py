@@ -32,6 +32,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Mapping, Optional
 
+from sapfx_common.robot_args import NameListInput
 from sapfx_common import robot_args, security_baseline, security_surface
 
 from ._rfc_security import RfcSecurityKeywords
@@ -234,7 +235,7 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     # Journal d'audit : la configuration CROISÉE avec le contenu
     # ------------------------------------------------------------------ #
     def read_audit_log_coverage(self, alias: str = "default",
-                                window_days: Any = DEFAULT_AUDIT_WINDOW_DAYS,
+                                window_days: int = DEFAULT_AUDIT_WINDOW_DAYS,
                                 today: Optional[str] = None) -> dict[str, Any]:
         """Croise la configuration du journal d'audit et son *contenu réel*,
         et rend le verdict de couverture.
@@ -354,7 +355,7 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
     # ------------------------------------------------------------------ #
     # Autorisations : les porteurs d'objets critiques
     # ------------------------------------------------------------------ #
-    def count_authorization_object_usage(self, objects: Any,
+    def count_authorization_object_usage(self, objects: NameListInput,
                                          alias: str = "default"
                                          ) -> dict[str, int]:
         """Compte, par objet d'autorisation, le nombre de lignes de rôle qui

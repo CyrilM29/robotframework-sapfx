@@ -21,6 +21,8 @@ configuration) dans ``sapfx_common.flp_tiles``. Extrait au format des autres
 mixins (convention #13).
 """
 
+from typing import TYPE_CHECKING, Any
+
 from robot.utils import is_truthy, timestr_to_secs
 
 from sapfx_common import flp_tiles
@@ -31,12 +33,21 @@ from .._flp_js import (
     FLP_TILE_COUNTERS_PROBE_JS,
     PAGE_NUMBER_SAMPLE_PROBE_JS,
 )
+from sapfx_common.argument_types import FlpIntentInput
 
 
 class FlpTileKeywords:
     """Mixin composé dans :class:`SapFioriLibrary` (voir ce module). Suppose
     ``self._evaluate``, ``self._flp_result``, ``self.ui5_timeout`` et
     ``self.poll_interval`` disponibles par composition."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _flp_result(self, *args: Any, **kwargs: Any) -> Any: ...
+        poll_interval: Any
+        ui5_timeout: Any
 
     def _rendered_tiles(self):
         tiles = self._evaluate(FLP_TILE_COUNTERS_PROBE_JS)
@@ -81,7 +92,7 @@ class FlpTileKeywords:
                    flp_tiles.normalize_intent(intent)))
         return matches[position]
 
-    def get_flp_tile_counter(self, intent, index=None, ignore_parameters=False):
+    def get_flp_tile_counter(self, intent: FlpIntentInput, index=None, ignore_parameters: bool = False):
         """Lit le *compteur affiché* par la tuile d'un intent, avec son
         verdict : un dict JSON-safe ``{intent, intent_parameters, tile_id,
         intent_source, chip_id, chip_instance_id, value, scale, rendered,
@@ -173,9 +184,9 @@ class FlpTileKeywords:
                 % (result["intent"], result["reason"], result["number"]))
         return result
 
-    def wait_for_flp_tile_counter(self, intent, timeout=None,
-                                  accept_truncated=False, index=None,
-                                  ignore_parameters=False):
+    def wait_for_flp_tile_counter(self, intent: FlpIntentInput, timeout=None,
+                                  accept_truncated: bool = False, index=None,
+                                  ignore_parameters: bool = False):
         """Attend que la tuile d'un intent affiche un compteur *chargé et
         entier*, et retourne le même dict que `Get Flp Tile Counter`, dont
         ``number`` (un entier) est la valeur à comparer.
@@ -272,8 +283,8 @@ class FlpTileKeywords:
                    attendus["group"], attendus["decimal"]))
         return lus
 
-    def get_flp_tile_configuration(self, intent, index=None,
-                                   ignore_parameters=False):
+    def get_flp_tile_configuration(self, intent: FlpIntentInput, index=None,
+                                   ignore_parameters: bool = False):
         """Retourne la *configuration* d'une tuile des groupes de
         l'utilisateur, désignée par son intent : un dict JSON-safe
         ``{intent, intent_parameters, title, group_id, tile_instance_id,

@@ -61,7 +61,7 @@ Composition by mixins, without a base class (abridged):
 
 ```
 SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
-              PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
+              PerceptionKeywords, DiagnosticsKeywords,
               SemanticKeywords, EmbeddedBrowserKeywords, ...,
               GridCellKeywords, ElementKeywords, InputKeywords,
               ValueCheckKeywords)
@@ -98,36 +98,12 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     **fast path** (one COM call for the whole subtree) with automatic fallback
     to the node-by-node COM walk. Also the in-memory screenshots
     (`Get Screenshot As Base64`, `Log Screenshot`: data-URI inline in the
-    Robot log), the **annotated screenshot** (`Get/Log Annotated Screenshot`,
-    Set-of-Mark: numbered boxes over every actionable target + a
-    `number -> id` legend; a vision agent reads the number and feeds the id to
-    a deterministic keyword instead of guessing coordinates) and the **visual
-    assertions** (`Get Screen Perceptual Hash`, `Screen Should Match Baseline`:
-    snapshot semantics over a pure dHash, `sapfx_common.visual_hash` +
-    shared `sapfx_common.visual_baseline`; Pillow only at the image boundary,
-    optional extra `visual`; `mask_elements=auto` neutralizes the legitimately
-    volatile status/title bars before hashing). The pixel channel gains three
-    precision tools: `Get Element Perceptual Hash` /
-    `Element Should Match Baseline` (the hash grid covers ONE element's
-    cropped region: a change inside an opaque GuiShell weighs on all 64 bits
-    instead of being diluted into the whole screen) and
-    `Get Screen Tile Hashes` (one fingerprint per tile of a 4×4 grid: drift
-    gets **localized**, not just detected). A perceptual hash encodes the
-    **capture geometry** as much as the content, so `per_resolution=True`
-    keeps one committed baseline per geometry (`<name>@1920x1032.png`) and a
-    suite stays comparable across workstations that do not render the same
-    size; without the option, a failure whose two geometries differ says so
-    rather than reading as a functional regression. The pixel channel covers
-    exactly what the Scripting API cannot see: opaque GuiShell list rendering,
-    record-only charts.
+    Robot log).
   - `_diagnostics`: scripting **preflight** (`Get Scripting Status`,
     `Scripting Should Be Fully Enabled`, which fails early with the exact RZ11
-    parameter to fix), `Enable Test Tool Mode`, `Get Session Telemetry`.
-  - `_healing`: locator **auto-healing** (`Resolve Element With Healing`: repairs
-    above a similarity threshold with a logged WARNING, never silently; a
-    `label=` anchor adds a label-based repair path: a visible label survives
-    the subscreen renumbering that kills ids; `Get Closest Element Ids`). Pure
-    scoring lives in `sapfx_common.healing`.
+    parameter to fix), `Enable Test Tool Mode`.
+  - Failures name the closest ids on screen, scored by the pure
+    `sapfx_common.healing`, and the screen actually displayed.
   - `_semantic`: **human locators** (ported from RoboSAPiens, Apache 2.0, see
     `NOTICE`): `Find/Fill/Read Field By Label`, `Click Button By Label` target
     controls the way a business user describes them (visible label + geometric
@@ -222,22 +198,6 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     id, `Bapi Should Fail With Message Id` to assert one), `Read Rfc Table`
     refuses a RAW field (returned truncated to half), and `Filter Change
     Documents` / `Latest Change Number` state an audit claim offline.
-  - The perception mixin also hosts the **drift sentinel**
-    (`Check Screen Against Watch` over the pure
-    `sapfx_common.screen_watch`): watched screens are remembered (structured
-    signature + optional visual fingerprint + per-tile fingerprints) and later
-    passes report ONLY what moved: change detection **without a single
-    scripted test** (`tests/robot/ecc_drift_sentinel.robot` is the
-    nightly-watch harness). Three channels per screen: the structural smart
-    diff (renames paired, value changes named), the global visual hash, and
-    the **tile grid**. A local drift too diluted for the global hash is
-    caught by its own tile and reported with its position, pixel rectangle
-    and the elements covering it. `per_resolution=True` gives every capture
-    geometry its own VISUAL references while the structural signature stays
-    shared, because a screen signature does not depend on the display
-    resolution and a perceptual fingerprint does; without it, a visual drift
-    between two different geometries is annotated as possibly being scale
-    alone.
 - **`SapEccLibrary.py`** wires them together and overrides `run_transaction` for
   locale-independent error detection. `ROBOT_LIBRARY_SCOPE = SUITE`: tests in
   one suite share their COM connection, while distinct normal Robot suites
@@ -255,11 +215,9 @@ the healing scoring), `object_tree` (the `GetObjectTree` JSON
 flattening, the structured perception model), `semantic` (label-based
 geometric resolution + the verified inverse `describe_element` used by the
 recorder and the `mode=semantic` affordances view), `abap_list` (geometric row
-reconstruction for classic ABAP lists), `visual_hash` (the pure perceptual
-dHash behind the visual assertions, plus crop/mask/tile primitives) and
-`visual_baseline` (the shared snapshot-baseline semantics and the Pillow
-decode boundary, used by the ECC *and* Fiori visual keywords:
-`Ui5 Screen Should Match Baseline` is the same cycle on a Browser capture).
+reconstruction for classic ABAP lists), `visual_hash` (a pure perceptual
+dHash, plus crop/mask/tile primitives) and `visual_baseline` (snapshot
+semantics and the Pillow decode boundary).
 New cross-channel primitives go there, never inline.
 
 ## The API channel (`src/SapApiLibrary`)

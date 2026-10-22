@@ -1,11 +1,11 @@
-"""Écriture d'un relevé tabulaire en **Parquet**, canal OPTIONNEL.
+"""Écriture d'un relevé tabulaire en *Parquet*, canal OPTIONNEL.
 
 Le format colonnaire des gros volumes : compressé, typé, lu nativement par
 pandas, R (``arrow``), DuckDB, Spark et les outils décisionnels. C'est le bon
 format quand le relevé n'est plus un tableau qu'on regarde mais une table
 qu'on interroge.
 
-**Pourquoi il est optionnel, et pourquoi c'est assumé.** Parquet n'est pas un
+*Pourquoi il est optionnel, et pourquoi c'est assumé.* Parquet n'est pas un
 format qu'on écrit à la main : ses métadonnées sont du Thrift binaire, et un
 écrivain maison non confronté à un vrai lecteur produirait des fichiers
 plausibles que rien ne relirait. Les trois autres formats de restitution du
@@ -15,7 +15,7 @@ bibliothèques (extra ``parquet``). C'est le même arbitrage que ``pyrfc`` pour
 le canal RFC et ``Pillow`` pour les assertions visuelles : une capacité réelle,
 absente par défaut, qui se DÉCLARE indisponible au lieu d'échouer obscurément.
 
-**Ce que ce module ajoute au simple appel de pyarrow**, et c'est sa raison
+*Ce que ce module ajoute au simple appel de pyarrow*, et c'est sa raison
 d'être : le même contrat de colonnes que les trois autres formats, le même
 verdict JSON-safe, un statut qu'on peut sonder AVANT d'écrire (sur le patron
 de :mod:`sapfx_common.rfc_channel`), et surtout le typage IMPOSÉ en chaîne.
@@ -37,6 +37,18 @@ from sapfx_common._tabular import normalize_rows, table_columns
 from sapfx_common._tabular import row_limit
 from sapfx_common._tabular_io import locked_target, prepare_target
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
     "PARQUET_EXTRA_HINT",
     "parquet_channel_status",
@@ -53,6 +65,7 @@ PARQUET_EXTRA_HINT = (
     "chaîne décisionnelle.")
 
 
+@keyword
 def parquet_channel_status() -> dict[str, Any]:
     """Dit si le canal Parquet est utilisable, et sinon POURQUOI.
 
@@ -60,6 +73,10 @@ def parquet_channel_status() -> dict[str, Any]:
     permet à une suite de se SAUTER proprement au lieu de rougir là où rien
     n'est cassé, exactement comme le canal RFC : un format optionnel absent
     n'est pas un défaut du système testé.
+
+    Exemple :
+    | ${status}=    `Parquet Channel Status`
+    | Should Be True    ${status}[available]    ${status}[remedy]
     """
     if importlib.util.find_spec("pyarrow") is None:
         return {
@@ -93,8 +110,14 @@ def parquet_channel_status() -> dict[str, Any]:
     }
 
 
+@keyword
 def parquet_is_available() -> bool:
-    """Le prédicat, pour une garde de suite. N'échoue jamais."""
+    """Le prédicat, pour une garde de suite. N'échoue jamais.
+
+    Exemple :
+    | ${available}=    `Parquet Is Available`
+    | Skip If    not ${available}    The optional parquet extra is not installed.
+    """
     return bool(parquet_channel_status()["available"])
 
 
@@ -109,6 +132,7 @@ def _require_parquet() -> Any:
     return pq
 
 
+@keyword
 def write_table_parquet(path: str, rows: Iterable[Mapping[str, Any]],
                         columns: Optional[Sequence[str]] = None,
                         headers: Optional[Mapping[str, Any]] = None,
@@ -123,6 +147,10 @@ def write_table_parquet(path: str, rows: Iterable[Mapping[str, Any]],
     Le verdict porte ``{path, rows, total_rows, columns, compression,
     truncated_rows, bytes, writer}``. ``writer`` nomme la version qui a écrit :
     un fichier illisible ailleurs se diagnostique d'abord par là.
+
+    Exemple :
+    | ${verdict}=    `Write Table Parquet`    ${OUTPUT DIR}/T000_A4H.parquet    ${rows}
+    | Should Be Equal As Integers    ${verdict}[rows]    2
     """
     pq = _require_parquet()
     import pyarrow as pa
@@ -161,12 +189,17 @@ def write_table_parquet(path: str, rows: Iterable[Mapping[str, Any]],
     }
 
 
+@keyword
 def read_table_parquet(path: str) -> list[dict[str, Any]]:
     """Relit un Parquet et rend son relevé, pour confronter l'écrit à
     l'origine comme pour les autres formats.
 
     Les valeurs reviennent en texte : le fichier a été écrit en chaînes, et
     rendre autre chose ici masquerait une écriture qui aurait, elle, dérivé.
+
+    Exemple :
+    | ${read}=    `Read Table Parquet`    ${parquet}
+    | Should Be Equal    ${read}[0][MTEXT]    SAP SE
     """
     pq = _require_parquet()
     table = pq.read_table(str(path))

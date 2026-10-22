@@ -19,6 +19,23 @@ import base64
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+#: Les keywords que ``Library    sapfx_common.auth_flows`` expose. Sans
+#: ``__all__``, le décorateur ``dataclass`` importé plus haut devenait un keyword
+#: ``Dataclass`` (relevé le 2026-10-16 par un inventaire des keywords appelés).
+__all__ = ["basic_auth_header"]
+
 
 @dataclass(frozen=True)
 class IdpPreset:
@@ -62,7 +79,13 @@ def resolve_preset(preset: str,
     """La fiche effective : le preset nommé, surchargé champ par champ.
 
     Preset inconnu = erreur immédiate avec la liste des presets valides
-    (jamais de repli silencieux vers ``generic``)."""
+    (jamais de repli silencieux vers ``generic``).
+
+    Exemple :
+    | ${preset}=    `Resolve Preset`    generic    username_selector=input[name="sap-user"]
+    | ...    password_selector=input[name="sap-password"]    submit_selector=[id="LOGIN_LINK"]
+    | Should Be Equal    ${preset.username_selector}    input[name="sap-user"]
+    """
     key = str(preset).strip().lower()
     if key not in IDP_PRESETS:
         raise ValueError(
@@ -78,6 +101,7 @@ def resolve_preset(preset: str,
         description=base.description)
 
 
+@keyword
 def basic_auth_header(user: Any, password: Any) -> str:
     """L'en-tête ``Authorization`` d'une authentification HTTP de base.
 
@@ -105,6 +129,18 @@ def basic_auth_header(user: Any, password: Any) -> str:
     Un utilisateur contenant ``:`` est refusé : la RFC ne permet pas de le
     représenter, et un identifiant tronqué en silence enverrait chercher un
     problème de droits.
+
+    *Attention au journal* : la valeur rendue PORTE l'identifiant et le mot de
+    passe (le base64 est un encodage, pas un chiffrement), et Robot journalise
+    la valeur qu'un keyword affecte à une variable. Baisser le niveau de
+    journal autour de l'appel et de son usage, comme le font l'exemple
+    ci-dessous et la ressource de connexion WebGUI.
+
+    Exemple :
+    | ${previous}=    Set Log Level    NONE
+    | ${authorization}=    `Basic Auth Header`    DEVELOPER    ${password}
+    | Should Start With    ${authorization}    Basic${SPACE}
+    | Set Log Level    ${previous}
     """
     from sapfx_common.secrets import reveal_secret
 

@@ -1,4 +1,9 @@
-"""Mixins de keywords composes dans :class:`SapFioriLibrary.SapFioriLibrary`."""
+"""Mixins de keywords composes dans :class:`SapFioriLibrary.SapFioriLibrary`.
+
+Seuls les mixins de la bibliotheque publique sont listes ici ; ceux de
+l'atelier s'ajoutent par ``SapFioriLibrary._extension``, absent de la
+distribution publique.
+"""
 from ._actions import ActionKeywords
 from ._base import FioriBase
 from ._composition import CompositionKeywords
@@ -18,5 +23,5 @@ __all__ = ["ActionKeywords", "CompositionKeywords", "EngineKeywords",
            "FioriBase", "FlpKeywords", "FlpServiceKeywords",
            "FlpSpacesKeywords", "FlpTileKeywords",
            "FlpTileRefreshKeywords", "FrameKeywords",
-           "LocatorKeywords", "PerceptionKeywords", "StateKeywords",
-           "TableKeywords"]
+           "LocatorKeywords", "PerceptionKeywords",
+           "StateKeywords", "TableKeywords"]

@@ -14,17 +14,25 @@ Extrait de ``_grid.py`` (convention #13 : un fichier, un metier) : l'ALV et
 les listes ABAP restent la-bas, les deux mixins se composent dans
 :class:`SapEccLibrary`.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
 from sapfx_common import table_control
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 
 class TableControlKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Opère sur les GuiTableControl
     (tables de dynpro classiques), par titre de colonne visible."""
 
-    def read_table_control(self, table_id, max_rows=None):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def read_table_control(self, table_id: GuiElementIdInput, max_rows=None):
         """Lit un *GuiTableControl* (table de dynpro classique : saisie de
         postes, listes de champs SE11…) en liste de dicts
         ``[{titre_de_colonne: texte}]``.
@@ -82,7 +90,7 @@ class TableControlKeywords:
         self._scroll_table_to(table_id, original, best_effort=True)
         return rows
 
-    def get_table_control_cell(self, table_id, row, column_title):
+    def get_table_control_cell(self, table_id: GuiElementIdInput, row, column_title):
         """Texte de la cellule ``(ligne absolue, titre de colonne)`` d'un
         table control : ``row`` est l'index *absolu* 0-based, le défilement
         jusqu'à la fenêtre qui contient la ligne est automatique.
@@ -108,7 +116,7 @@ class TableControlKeywords:
                 % (row, table_id, getattr(table, "RowCount", "?")))
         return text
 
-    def set_table_control_cell(self, table_id, row, column_title, value):
+    def set_table_control_cell(self, table_id: GuiElementIdInput, row, column_title, value):
         """Écrit ``value`` dans la cellule ``(ligne absolue, titre de
         colonne)`` d'un table control : la saisie des transactions classiques
         adressée comme l'ALV, par titre visible. Cellule non modifiable =
@@ -135,8 +143,8 @@ class TableControlKeywords:
         cell.Text = value
         return table_id
 
-    def find_table_control_row(self, table_id, column_title, value,
-                               ignore_case=False):
+    def find_table_control_row(self, table_id: GuiElementIdInput, column_title, value,
+                               ignore_case: bool = False):
         """Index *absolu* (0-based) de la première ligne dont la colonne
         ``column_title`` vaut ``value``, ou ``-1`` si aucune (miroir de
         `Find Row By Column Value` côté ALV) : le défilement de recherche à

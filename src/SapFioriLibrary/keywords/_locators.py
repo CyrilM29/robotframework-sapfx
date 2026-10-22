@@ -9,6 +9,8 @@ role->xpath->sid->wc->dom, reparation journalisee + telemetrie).
 
 Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
+from typing import TYPE_CHECKING, Any
+
 import json
 
 from robot.api import logger
@@ -32,8 +34,7 @@ from .._ui5_runtime import (
     build_wc_selector,
     selector_to_json,
 )
-
-
+from sapfx_common.argument_types import Ui5XpathInput
 
 
 class LocatorKeywords:
@@ -41,9 +42,21 @@ class LocatorKeywords:
     Suppose la page active de Browser accessible via ``self._browser()``
     et la plomberie de ``_base.py`` disponible par composition."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _act_with_retry(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _browser(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _pick(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _pick_id(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _relaxed_hint(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resolve(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _scoped_selector(self, *args: Any, **kwargs: Any) -> Any: ...
+
     # -- mots-clés de résolution ----------------------------------------------
 
-    def resolve_ui5_control(self, index=0, **selector_parts):
+    def resolve_ui5_control(self, index: int = 0, **selector_parts):
         """Résout un contrôle UI5 par type/propriétés vers un sélecteur Browser.
 
         Accepte l'un des paramètres suivants : ``controlType`` (``sap.m.Button`` ou simplement
@@ -89,7 +102,7 @@ class LocatorKeywords:
                 % (selector, self._relaxed_hint(selector_parts)))
         return self._pick(ids, int(index), str(selector))
 
-    def resolve_ui5_by_xpath(self, xpath, index=0):
+    def resolve_ui5_by_xpath(self, xpath: Ui5XpathInput, index: int = 0):
         """Résout un contrôle via un *UI5 XPath hiérarchique* sur l'arbre des contrôles.
 
         Les noms de balises de l'arbre correspondent aux types courts des contrôles et les
@@ -246,7 +259,7 @@ class LocatorKeywords:
                 "frame avec `Get Ui5 Frame Stack`.")
         return [dict(entry) for entry in result]
 
-    def click_ui5_dialog_button(self, position=0, id=None):
+    def click_ui5_dialog_button(self, position: int = 0, id=None):
         """Clique le bouton d'index ``position`` (base 0) du *dialogue ouvert le
         plus récent*, et non un bouton désigné par son libellé.
 
@@ -279,12 +292,11 @@ class LocatorKeywords:
         qui décide de ce que fait son bouton.
 
         Exemple :
-        | `Click Ui5 Dialog Button`    0    id=msgPop
+        | `Click Ui5 Control`    controlType=sap.m.Button    properties={'text': '/^Dialog$/'}
+        | `Ui5 Control Should Be Visible`    controlType=sap.m.Dialog
         | `Click Ui5 Dialog Button`    0
-        | ${status}=    `Get Ui5 Property`    text    id=popStatus
-        | Should Be Equal    ${status}    confirm
         """
-        request = {"position": int(position)}
+        request: dict[str, Any] = {"position": int(position)}
         if id not in (None, "", "None"):
             request["id"] = str(id)
         payload = json.dumps(request)
@@ -321,7 +333,7 @@ class LocatorKeywords:
             lambda: self._browser().click(self._scoped_selector('css=[id="%s"]' % dom_id)),
             "click dialog button at position %s" % position)
 
-    def get_ui5_xpath(self, index=0, **selector_parts):
+    def get_ui5_xpath(self, index: int = 0, **selector_parts):
         """Résout un contrôle puis retourne son *UI5 XPath unique le plus court*.
 
         Porté depuis playwright-sap : le ``//suffixe`` le plus court du chemin du contrôle dans
@@ -421,7 +433,6 @@ class LocatorKeywords:
             return resolved
         raise AssertionError(
             "No fallback resolved the control. Attempts: %s\n"
-            "Every engine failed. Call Log Fiori Diagnostics for the whole "
-            "picture (page composition, UI5 tree, console errors, frame "
-            "scope), or Get Page Composition if you only need the engines "
-            "to try." % " ; ".join(failures))
+            "Every engine failed. Call Get Page Composition to see which "
+            "technologies the page hosts and which engines or frames to "
+            "try." % " ; ".join(failures))

@@ -6,8 +6,8 @@ sont indépendants du canal : ils prennent des lignes et des colonnes. Ce qui ne
 l'est PAS, c'est la LECTURE qui les alimente, et c'est là que vit le seul
 risque sérieux de cette capacité.
 
-**Les quatre canaux matérialisent leur tableau paresseusement, chacun à sa
-façon, et aucun ne le dit spontanément.** Mesuré les 2026-09-15 et 16 sur les
+*Les quatre canaux matérialisent leur tableau paresseusement, chacun à sa
+façon, et aucun ne le dit spontanément.* Mesuré les 2026-09-15 et 16 sur les
 cibles du banc :
 
 ===========  ==================================  ===================  ==========================
@@ -15,11 +15,11 @@ Canal        Ce qui est rendu                    Ce qui est déclaré   Ce qui t
 ===========  ==================================  ===================  ==========================
 SAP GUI      toutes les lignes, mais les         ``RowCount``         des lignes VIDES
 (ALV)        cellules non défilées sont VIDES
-WebGUI       une page de 200 lignes,             ``totalRows`` du     **rien**
+WebGUI       une page de 200 lignes,             ``totalRows`` du     *rien*
 (ITS)        renumérotées ``row[1]``...          ``lsdata``
-UI5          ``growingThreshold`` lignes         ``getLength()`` du   **rien**
+UI5          ``growingThreshold`` lignes         ``getLength()`` du   *rien*
 (sap.m)      (30 mesurées sur 4133)              binding
-RFC          ``ROWCOUNT`` lignes exactement      **rien du tout**,    **rien**
+RFC          ``ROWCOUNT`` lignes exactement      *rien du tout*,    *rien*
 (READ_TABLE) (50 mesurées sur 205)               total à mesurer
                                                  par un AUTRE module
 ===========  ==================================  ===================  ==========================
@@ -35,7 +35,7 @@ module de comptage distinct de celui qui lit, et c'est cette indépendance qui
 fait que la garde mesure quelque chose plutôt que de comparer une lecture à
 elle-même (voir :mod:`sapfx_common.rfc_extract`).
 
-D'où ce module : **une seule règle de refus, pour les quatre canaux**. La
+D'où ce module : *une seule règle de refus, pour les quatre canaux*. La
 faire vivre dans chaque suite reviendrait à la réécrire à chaque nouveau
 canal, et une revue indépendante a déjà relevé le 2026-09-15 qu'une garde
 oubliée sur un seul chemin suffit à produire cinq fichiers creux, tous verts.
@@ -50,6 +50,18 @@ from typing import Any, Mapping, Optional, Sequence
 
 from sapfx_common._tabular import blank_rows, normalize_rows, table_columns
 from sapfx_common.robot_args import as_name_list, as_optional_int
+
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
 
 __all__ = ["build_table_extract", "table_extract_should_be_complete",
            "describe_table_extract", "project_extract_rows"]
@@ -94,6 +106,7 @@ def _declared_is_final(value: Any) -> bool:
     return bool(value)
 
 
+@keyword
 def build_table_extract(rows: Any, columns: Any = None,
                         headers: Optional[Mapping[str, Any]] = None,
                         declared_rows: Any = None, source: Any = "",
@@ -130,6 +143,11 @@ def build_table_extract(rows: Any, columns: Any = None,
     un total absent. La notion vit ici et non dans le seul canal qui la porte,
     sans quoi son contrôle resterait dans un scénario et disparaîtrait dès
     qu'on joue un autre scénario seul.
+
+    Exemple :
+    | ${extract}=    `Build Table Extract`    ${rows}    declared_rows=2
+    | ...    source=T000 on A4H/001    key=MANDT
+    | Should Be True    ${extract}[complete]
     """
     lignes = normalize_rows(rows)
     demandees = as_name_list(columns, "columns") or None
@@ -166,6 +184,7 @@ def build_table_extract(rows: Any, columns: Any = None,
             "complete": complet, "source": str(source or "")}
 
 
+@keyword
 def table_extract_should_be_complete(extract: Mapping[str, Any],
                                      min_rows: Any = 0,
                                      min_columns: Any = 0) -> dict[str, Any]:
@@ -181,6 +200,9 @@ def table_extract_should_be_complete(extract: Mapping[str, Any],
     Le total non DÉCLARÉ est refusé lui aussi : accepter le silence est
     exactement le défaut que ce module existe pour empêcher, puisque le canal
     qui se tait est celui qui ne laisse aucune autre trace.
+
+    Exemple :
+    | `Table Extract Should Be Complete`    ${extract}    min_rows=2    min_columns=3
     """
     source = str(extract.get("source") or "le relevé")
     lu = int(extract.get("row_count") or 0)
@@ -265,11 +287,16 @@ def table_extract_should_be_complete(extract: Mapping[str, Any],
     return dict(extract)
 
 
+@keyword
 def describe_table_extract(extract: Mapping[str, Any]) -> str:
     """Une ligne de journal qui dit ce qui a RÉELLEMENT été lu.
 
     Le total déclaré y figure toujours, y compris quand il coïncide : c'est ce
     qui distingue un journal qui prouve d'un journal qui rassure.
+
+    Exemple :
+    | ${line}=    `Describe Table Extract`    ${extract}
+    | Should Contain    ${line}    2/2
     """
     declare = extract.get("declared_rows")
     lu = int(extract.get("row_count") or 0)
@@ -295,6 +322,7 @@ def describe_table_extract(extract: Mapping[str, Any]) -> str:
         int(extract.get("blank_rows") or 0), reste)
 
 
+@keyword
 def project_extract_rows(extract: Mapping[str, Any], headers: Any,
                          row_limit: Any = None) -> list[dict[str, Any]]:
     """Le relevé mis dans la forme que le fichier écrit doit porter.
@@ -316,6 +344,11 @@ def project_extract_rows(extract: Mapping[str, Any], headers: Any,
     n'était pas le coût d'entretien mais la DIVERGENCE : quatre corps qui
     prétendent vérifier les mêmes fichiers finissent par ne plus vérifier la
     même chose.
+
+    Exemple :
+    | @{titles}=    Create List    Client    Name    City
+    | ${expected}=    `Project Extract Rows`    ${extract}    ${titles}
+    | Should Be Equal    ${expected}[0][Client]    000
     """
     colonnes = [str(c) for c in (extract.get("columns") or [])]
     libelles = [str(h) for h in as_name_list(headers, "headers")]

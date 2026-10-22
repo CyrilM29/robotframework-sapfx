@@ -13,6 +13,7 @@ Extrait au format des autres mixins (convention #13).
 """
 
 import json
+from typing import TYPE_CHECKING, Any
 
 from .._ui5_js import (
     FLP_APPS_PROBE_JS,
@@ -24,13 +25,18 @@ from .._ui5_js import (
     FLP_USER_PROBE_JS,
 )
 
-from sapfx_common.robot_args import as_name_list
+from sapfx_common.robot_args import NameListInput, as_name_list
 
 
 class FlpServiceKeywords:
     """Mixin compose dans :class:`SapFioriLibrary` (voir ce module).
     Suppose la page active de Browser accessible via ``self._browser()``
     et la plomberie de ``_base.py`` disponible par composition."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : `Get Flp Intent
+        # Support` est annoté (type NameList), donc son corps est vérifié.
+        def _evaluate(self, js: str, arg: Any = None) -> Any: ...
 
     def _flp_result(self, result, service=None):
         """Traduit les sentinelles des sondes ushell en échec actionnable."""
@@ -142,7 +148,7 @@ class FlpServiceKeywords:
         return self._flp_result(self._evaluate(FLP_APPS_PROBE_JS),
                                 service="SearchableContent") or []
 
-    def list_flp_catalogs(self, include_tiles=True):
+    def list_flp_catalogs(self, include_tiles: bool = True):
         """Catalogues assignés à l'utilisateur, lus au service *LaunchPage*
         (le ushell classique ABAP) : liste de dicts ``{id, tiles}`` où
         ``tiles`` est ``[{intent, target_url}]``. C'est le catalogue de
@@ -173,7 +179,7 @@ class FlpServiceKeywords:
         return self._flp_result(self._evaluate(FLP_GROUPS_PROBE_JS),
                                 service="LaunchPage") or []
 
-    def get_flp_intent_support(self, intents):
+    def get_flp_intent_support(self, intents: NameListInput):
         """Résolvabilité d'une LISTE d'intents en un aller-retour, par le
         service *CrossApplicationNavigation* (``isIntentSupported``) :
         liste de dicts ``{intent, supported}`` dans l'ordre donné. ``intents``

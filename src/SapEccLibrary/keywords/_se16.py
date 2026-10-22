@@ -38,6 +38,9 @@ from sapfx_common.cross_channel import selection_criteria
 from sapfx_common.polling import poll_until
 from sapfx_common.robot_args import displayed_count
 from sapfx_common.semantic import screen_affordances
+from sapfx_common.argument_types import TableNameInput
+from sapfx_common.gui_element_id import GuiElementIdInput
+from typing import TYPE_CHECKING, Literal, Any
 
 # Ecrans standard pilotes par ce mixin. Le Data Browser et le dialogue de
 # selection multiple sont des ecrans SAP standard, stables par version : leurs
@@ -75,7 +78,22 @@ class Se16Keywords:
     écrans de consultation du Data Browser (SE16), jamais une donnée métier.
     Suppose ``self.session`` posé par les keywords de connexion."""
 
-    def reach_se16_selection_screen(self, table, timeout=None):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def click_element(self, *args: Any, **kwargs: Any) -> Any: ...
+        def get_status_message(self, *args: Any, **kwargs: Any) -> Any: ...
+        def input_text(self, *args: Any, **kwargs: Any) -> Any: ...
+        def run_transaction(self, *args: Any, **kwargs: Any) -> Any: ...
+        def select_checkbox(self, *args: Any, **kwargs: Any) -> Any: ...
+        def select_radio_button(self, *args: Any, **kwargs: Any) -> Any: ...
+        def send_vkey(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_element_present(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    @keyword(tags=["touches:transaction:SE16"])
+    def reach_se16_selection_screen(self, table: TableNameInput, timeout=None):
         """SE16 jusqu'à l'écran de sélection de ``table``, verdict structuré.
 
         Ouvre SE16, saisit le nom, valide (Entrée) et absorbe les modales de
@@ -176,7 +194,7 @@ class Se16Keywords:
     # Data Browser », alors que trois messages d'échec de cette bibliothèque
     # et huit suites écrivent « ALV ». Robot matche sans la casse, donc rien
     # ne casserait, mais la documentation publiée doit citer le sigle juste.
-    @keyword("Use ALV Grid In Data Browser")
+    @keyword("Use ALV Grid In Data Browser", tags=["touches:transaction:SE16"])
     def use_alv_grid_in_data_browser(self):
         """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
         *grille ALV* (Settings → User Parameters → ALV Grid Display).
@@ -205,6 +223,7 @@ class Se16Keywords:
         """
         self.set_data_browser_output("alv_grid")
 
+    @keyword(tags=["touches:transaction:SE16"])
     def use_standard_list_in_data_browser(self):
         """Bascule la sortie du Data Browser (SE16) de l'utilisateur courant en
         *liste SE16 standard* (Settings → User Parameters → Standard SE16
@@ -229,7 +248,8 @@ class Se16Keywords:
         """
         self.set_data_browser_output("standard_list")
 
-    def set_data_browser_output(self, mode):
+    @keyword(tags=["touches:transaction:SE16"])
+    def set_data_browser_output(self, mode: Literal["alv_grid", "alv_list", "standard_list"]):
         """Pose la sortie du Data Browser : ``alv_grid``, ``alv_list`` ou
         ``standard_list`` (les trois radios du dialogue « User-Specific
         Settings »). Mode inconnu = refus listant les trois. Persistant par
@@ -259,6 +279,7 @@ class Se16Keywords:
         self.wait_until_busy_done()
         return wanted
 
+    @keyword(tags=["touches:transaction:SE16"])
     def get_data_browser_output(self):
         """Lit la sortie COURANTE du Data Browser de l'utilisateur
         (``alv_grid`` / ``alv_list`` / ``standard_list``) dans le dialogue
@@ -324,7 +345,7 @@ class Se16Keywords:
         self.wait_until_busy_done()
         return displayed_count(raw)
 
-    def fill_multiple_selection(self, values, button_id=_DD02L_MULTI_BUTTON):
+    def fill_multiple_selection(self, values, button_id: GuiElementIdInput = _DD02L_MULTI_BUTTON):
         """Charge une LISTE de valeurs dans la sélection multiple d'un critère.
 
         Ouvre le dialogue standard « Multiple Selection » par son bouton

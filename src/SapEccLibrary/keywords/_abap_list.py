@@ -15,16 +15,26 @@ case de la ligne voulue (le préalable de « Job > Delete » dans SM37 et de
 `Read Abap List` reste tel quel (compatibilité). Logique pure dans
 ``sapfx_common.abap_list``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
-from sapfx_common.abap_list import aligned_rows, attach_icons, list_cells, matching_rows
+from sapfx_common.abap_list import (aligned_rows, attach_icons, find_list_cell, list_cells,
+                                    list_summary, matching_rows)
 
 
 class AbapListKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
-    def read_abap_list_rows(self, header="auto", rows="auto", icons=False):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _screen_elements(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+
+    def read_abap_list_rows(self, header="auto", rows="auto", icons: bool = False):
         """Lit la liste classique affichée en *lignes alignées sur l'en-tête* :
         une liste de dicts ``{titre d'en-tête: valeur}`` où chaque cellule est
         rattachée à sa colonne par la COLONNE de son identifiant
@@ -38,8 +48,12 @@ class AbapListKeywords:
         fournie : le rappel des critères de SM37 porte lui aussi des cases,
         et la ligne d'information de la liste SE16 standard porte plus de
         cellules que l'en-tête ; sans case, la première ligne d'au moins
-        deux cellules), le TEXTE d'une cellule d'en-tête, ou le numéro de sa
-        ligne de liste. ``rows`` :
+        deux cellules ; jamais une ligne ENCADRÉE, bloc de synthèse ou
+        message, comme « Number of Entries Displayed » en tête de SM58 et de
+        SMQ1, voir `Read Abap List Summary`), le TEXTE d'une cellule
+        d'en-tête, ou le numéro de sa ligne de liste. Une liste qui ne porte
+        que des lignes encadrées (SM58 sans sélection, SMQ1 vide : « Nothing
+        was selected. ») rend ``[]``, le message journalisé. ``rows`` :
         ``selectable`` (seules les lignes à case : une liste sélectionnable
         SANS donnée rend ``[]``), ``all``, ou ``auto`` (``selectable`` si la
         liste porte des cases, sinon toutes les lignes sous l'en-tête moins
@@ -102,6 +116,64 @@ class AbapListKeywords:
                 "lue, donc impossible à distinguer d'une cellule sans icône : %s"
                 % (len(unreadable), ", ".join(unreadable[:10])))
         return attach_icons(result, found)
+
+    def read_abap_list_summary(self):
+        """Lit le bloc de synthèse ENCADRÉ en tête de la liste classique
+        affichée : une entrée ``{row, label, value}`` par ligne, dans l'ordre,
+        une ligne de titre rendant ``value`` vide.
+
+        Les moniteurs SM58, SMQ1 et SMQ2 y portent leurs compteurs (« Number
+        of Entries Displayed », « Number of failed entries ») : ce sont eux, et
+        non les lignes de la liste, qui disent combien d'entrées le moniteur
+        a sélectionnées (SM58 n'affiche ses données qu'une ligne sur deux). Une
+        liste SANS bloc rend ``[]``, jamais une erreur : c'est la forme de SM58
+        lancé avec ses réglages par défaut, qui ne montre que « Nothing was
+        selected. ». Les libellés sont localisés : les nommer appartient au
+        page object ; les valeurs restent du texte. Lecture seule.
+
+        Exemple :
+        | `Run Transaction`    SMQ1
+        | `Send Vkey`    F8
+        | ${summary}=    `Read Abap List Summary`
+        | Length Should Be    ${summary}    3
+        """
+        return list_summary(self._screen_elements())
+
+    def double_click_abap_list_cell(self, text, column=None, header="auto"):
+        """Double-clique (F2) sur la cellule d'une ligne de la liste classique
+        affichée dont le texte vaut EXACTEMENT ``text`` (dans la colonne
+        d'en-tête ``column`` si elle est donnée), puis VÉRIFIE que l'écran a
+        changé : nouveau niveau de liste (SMQ2 : la file, puis ses LUW),
+        écran de détail ou fenêtre. Rend l'identifiant de la cellule visée.
+
+        Aucune cellule ou plusieurs = échec listant un échantillon ou les
+        candidats, jamais la première venue ; un double-clic qui ne change
+        rien échoue en le disant. Le geste ne fait que NAVIGUER dans une liste
+        de lecture : une action (exécuter, supprimer) reste un bouton à
+        presser explicitement.
+
+        Exemple :
+        | ${cell}=    `Double Click Abap List Cell`    LH    column=CARRID
+        | `Send Vkey`    F3
+        """
+        elements = self._screen_elements()
+        try:
+            cell = find_list_cell(elements, text, column=column, header=header)
+        except ValueError as exc:
+            raise AssertionError(str(exc)) from exc
+        before = [(item.id, item.text) for item in elements]
+        try:
+            self.session.findById(cell.id).setFocus()
+            self.session.findById("wnd[0]").sendVKey(2)
+        except (AttributeError, com_error) as exc:
+            raise AssertionError("Double-clic impossible sur %s : %s" % (cell.id, exc)) from exc
+        self.wait_until_busy_done()
+        after = [(item.id, item.text) for item in self._screen_elements()]
+        if after == before:
+            raise AssertionError(
+                "Le double-clic sur %s (%r) n'a rien ouvert : l'écran est inchangé."
+                % (cell.id, text))
+        return cell.id
 
     def select_abap_list_row(self, text, column=None, header="auto"):
         """Coche la case de sélection de la ligne dont une cellule vaut

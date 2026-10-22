@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from sapfx_common.argument_types import IdocNumberInput
+from sapfx_common.robot_args import NameListInput
 from sapfx_common import idoc, idoc_profiles, idoc_status
 
 from ._http import _as_bool
@@ -36,7 +38,7 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
                              segments: Any, receiver_partner_type: str = "LS",
                              sender_partner: Optional[str] = None,
                              sender_port: Optional[str] = None,
-                             ready_for_dispatch: Any = True,
+                             ready_for_dispatch: bool = True,
                              alias: str = "default") -> dict[str, Any]:
         """Crée un IDoc SORTANT et rend ``{"docnum", "status", "message_type",
         "idoc_type", "segment_count", "created_date", "created_time"}``.
@@ -143,7 +145,7 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         """
         return self._idoc_syntax(idoc_type, alias)
 
-    def set_idoc_status(self, docnum: Any, status: Any, alias: str = "default",
+    def set_idoc_status(self, docnum: IdocNumberInput, status: Any, alias: str = "default",
                         repid: str = "SAPFX") -> dict[str, Any]:
         """Pose un statut sur un IDoc (``EDI_DOCUMENT_OPEN_FOR_PROCESS``,
         ``EDI_DOCUMENT_STATUS_SET``, ``EDI_DOCUMENT_CLOSE_PROCESS``, commit) et
@@ -185,8 +187,8 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
         self.commit_bapi_transaction(alias)
         return {"docnum": number, "status_before": before, "status": code}
 
-    def read_idoc_segments(self, docnum: Any, alias: str = "default",
-                           decode: Any = False) -> list[dict[str, Any]]:
+    def read_idoc_segments(self, docnum: IdocNumberInput, alias: str = "default",
+                           decode: bool = False) -> list[dict[str, Any]]:
         """Lit les segments d'un IDoc (``EDI_DOCUMENT_OPEN_FOR_READ``,
         ``EDI_SEGMENTS_GET_ALL``, ``EDI_DOCUMENT_CLOSE_READ``, toujours
         refermé, même sur échec) : ``[{"segment", "segnum", "parent", "level",
@@ -235,7 +237,7 @@ class RfcIdocKeywords(RfcIdocProfileKeywords):
             segments.append(entry)
         return segments
 
-    def delete_idoc(self, docnum: Any, allowed_message_types: Any,
+    def delete_idoc(self, docnum: IdocNumberInput, allowed_message_types: NameListInput,
                     alias: str = "default") -> dict[str, Any]:
         """Supprime un IDoc (``EDI_DOCUMENT_DELETE`` puis commit) et rend
         ``{"docnum", "deleted", ...}``. ``allowed_message_types`` est

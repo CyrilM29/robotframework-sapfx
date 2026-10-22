@@ -1,4 +1,4 @@
-"""Écriture d'un relevé tabulaire en **CSV**, logique pure.
+"""Écriture d'un relevé tabulaire en *CSV*, logique pure.
 
 Troisième format de restitution à côté de :mod:`sapfx_common.table_svg` (une
 preuve qu'on colle dans un rapport) et :mod:`sapfx_common.table_xlsx` (un
@@ -8,17 +8,17 @@ un script, un tableur, un moteur d'analyse.
 Il passe pour le format trivial des trois. Il est le seul à porter quatre
 pièges dont chacun produit un fichier parfaitement lisible et faux.
 
-1. **L'encodage.** Un CSV en UTF-8 sans marque d'ordre d'octets est ouvert en
+1. *L'encodage.* Un CSV en UTF-8 sans marque d'ordre d'octets est ouvert en
    codage local par Excel, qui massacre alors tout accent. La marque est donc
    écrite par défaut (``utf-8-sig``) : les lecteurs standard la gèrent, et
    c'est le seul réglage qui ne casse rien nulle part. Le dépôt a déjà payé
    ce piège dans l'autre sens, une référence de sentinelle éditée sous Windows
    ayant fait rougir une lecture stricte sur son propre décodage.
-2. **Le séparateur.** Le défaut est la virgule, qui est la norme (RFC 4180) et
+2. *Le séparateur.* Le défaut est la virgule, qui est la norme (RFC 4180) et
    ce que lisent les outils. Un Excel configuré en français attend le
    point-virgule et rend sinon une colonne unique : ``delimiter=;`` est là
    pour ce cas, et c'est un choix d'usage, pas une correction.
-3. **L'injection de formule.** Une valeur qui commence par ``=``, ``+``, ``-``
+3. *L'injection de formule.* Une valeur qui commence par ``=``, ``+``, ``-``
    ou ``@`` est interprétée comme une FORMULE à l'ouverture. C'est un vecteur
    d'exécution connu, et un relevé de paramètres SAP en porte réellement (une
    valeur négative commence par un tiret). Ce module ne neutralise RIEN par
@@ -26,7 +26,7 @@ pièges dont chacun produit un fichier parfaitement lisible et faux.
    trois formats refusent ; il COMPTE les cellules concernées dans son verdict
    et n'agit que si ``neutralize_formulas`` le demande, auquel cas le verdict
    dit combien de valeurs ont été préfixées.
-4. **Les fins de ligne.** Fixées à CRLF (RFC 4180), donc identiques quelle que
+4. *Les fins de ligne.* Fixées à CRLF (RFC 4180), donc identiques quelle que
    soit la plateforme : deux écritures de la même donnée produisent le même
    fichier, comme pour les deux autres formats.
 
@@ -44,14 +44,19 @@ from sapfx_common._tabular import normalize_rows, table_columns
 from sapfx_common._tabular import row_limit, unique_header
 from sapfx_common._tabular_io import write_text
 
-__all__ = [
-    "FORMULA_PREFIXES",
-    "looks_like_formula",
-    "formula_risk_cells",
-    "render_table_csv",
-    "write_table_csv",
-    "read_table_csv",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["FORMULA_PREFIXES", "formula_risk_cells", "write_table_csv", "read_table_csv"]
 
 #: Les amorces qu'un tableur interprète comme une formule. Le tiret en fait
 #: partie, ce qui rend le sujet concret : une valeur négative est un cas
@@ -66,11 +71,16 @@ def looks_like_formula(value: Any) -> bool:
 
     Le critère est le premier caractère, tabulation et retour chariot de tête
     compris, car un tableur les ignore avant de décider.
+
+    Exemple :
+    | ${risk}=    `Looks Like Formula`    -100
+    | Should Be True    ${risk}
     """
     texte = ("" if value is None else str(value)).lstrip("\t\r\n ")
     return texte.startswith(FORMULA_PREFIXES)
 
 
+@keyword
 def formula_risk_cells(rows: Iterable[Mapping[str, Any]],
                        columns: Optional[Sequence[str]] = None) -> int:
     """Combien de cellules du relevé seraient lues comme des formules.
@@ -78,6 +88,10 @@ def formula_risk_cells(rows: Iterable[Mapping[str, Any]],
     Rendre ce compte sans rien changer est le coeur du contrat : l'appelant
     apprend le risque et décide, là où une neutralisation par défaut aurait
     modifié la donnée mesurée sans le dire.
+
+    Exemple :
+    | ${cells}=    `Formula Risk Cells`    ${rows}
+    | Should Be Equal As Integers    ${cells}    0
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -101,6 +115,10 @@ def render_table_csv(rows: Iterable[Mapping[str, Any]],
     L'en-tête porte les colonnes, dans l'ordre demandé. Les valeurs sont
     écrites telles quelles, guillemets posés par le module standard là où le
     délimiteur, un guillemet ou un espace l'exigent.
+
+    Exemple :
+    | ${text}=    `Render Table Csv`    ${rows}    headers=${headers}
+    | Should Start With    ${text}    Client,Name,City
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -126,6 +144,7 @@ def render_table_csv(rows: Iterable[Mapping[str, Any]],
     return tampon.getvalue()
 
 
+@keyword
 def write_table_csv(path: str, rows: Iterable[Mapping[str, Any]],
                     columns: Optional[Sequence[str]] = None,
                     delimiter: str = ",",
@@ -145,6 +164,11 @@ def write_table_csv(path: str, rows: Iterable[Mapping[str, Any]],
     laquelle Excel rend les accents en codage local. La retirer donne un
     fichier UTF-8 nu, plus propre pour une chaîne d'outils qui sait déjà quoi
     lire.
+
+    Exemple :
+    | ${verdict}=    `Write Table Csv`    ${OUTPUT DIR}/T000_A4H.csv    ${rows}    headers=${headers}
+    | Should Be Equal As Integers    ${verdict}[rows]    2
+    | Should Be Equal As Integers    ${verdict}[formula_cells]    0
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -172,11 +196,12 @@ def write_table_csv(path: str, rows: Iterable[Mapping[str, Any]],
     }
 
 
+@keyword
 def read_table_csv(path: str, delimiter: Optional[str] = None
                    ) -> list[dict[str, Any]]:
     """Relit un CSV et rend son relevé, en-tête en clés.
 
-    Le pendant de :func:`write_table_csv`, pour que l'écrit soit CONFRONTÉ au
+    Le pendant de `Write Table Csv`, pour que l'écrit soit CONFRONTÉ au
     relevé d'origine : un fichier qui existe n'est pas un fichier juste.
 
     La lecture se fait en ``utf-8-sig``, qui accepte le fichier avec ET sans
@@ -187,6 +212,10 @@ def read_table_csv(path: str, delimiter: Optional[str] = None
     Sans ``delimiter``, le séparateur est DÉDUIT de la ligne d'en-tête : un
     CSV reçu ne dit pas lequel il emploie, et supposer la virgule rend une
     unique colonne dont le nom est toute la ligne.
+
+    Exemple :
+    | ${read}=    `Read Table Csv`    ${csv}
+    | Should Be Equal    ${read}[1][Client]    001
     """
     with open(str(path), "r", encoding="utf-8-sig", newline="") as flux:
         contenu = flux.read()

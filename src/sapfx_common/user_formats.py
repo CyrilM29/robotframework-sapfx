@@ -25,6 +25,21 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import Mapping
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+#: Les keywords que ``Library    sapfx_common.user_formats`` expose.
+__all__ = ["format_date", "parse_date", "format_number", "parse_number", "parse_time"]
+
 # DATFM (USR01-DATFM) -> patron strftime, séparateur, ordre.
 DATE_FORMATS: Mapping[str, str] = {
     "1": "%d.%m.%Y",
@@ -56,21 +71,37 @@ _ISO_DATE = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
 
 
 def normalize_date_key(key: object) -> str:
-    """Clé ``DATFM`` telle que SAP la rend (chaîne, blancs retirés)."""
+    """Clé ``DATFM`` telle que SAP la rend (chaîne, blancs retirés).
+
+    Exemple :
+    | ${key}=    `Normalize Date Key`    ${SPACE}1
+    | Should Be Equal    ${key}    1
+    """
     return str(key if key is not None else "").strip()
 
 
 def normalize_decimal_key(key: object) -> str:
     """Clé ``DCPFM`` : la clé de la notation ``1.234.567,89`` est VIDE, et une
-    combo la rend parfois comme ``" "`` (un blanc) : les deux sont la même."""
+    combo la rend parfois comme ``" "`` (un blanc) : les deux sont la même.
+
+    Exemple :
+    | ${key}=    `Normalize Decimal Key`    ${SPACE}
+    | Should Be Empty    ${key}
+    """
     return str(key if key is not None else "").strip().upper()
 
 
+@keyword
 def format_date(iso_date: str, date_format_key: object) -> str:
     """``2026-09-01`` -> la forme attendue par l'utilisateur (``01.09.2026``
     pour la clé ``1``). ``iso_date`` accepte aussi un ``datetime.date``.
     Refuse en nommant la clé pour un calendrier non grégorien ou inconnu, et
-    en nommant la date pour une date invalide : jamais une date fausse."""
+    en nommant la date pour une date invalide : jamais une date fausse.
+
+    Exemple :
+    | ${text}=    `Format Date`    2026-09-01    1
+    | Should Be Equal    ${text}    01.09.2026
+    """
     key = normalize_date_key(date_format_key)
     pattern = DATE_FORMATS.get(key)
     if pattern is None:
@@ -95,9 +126,15 @@ def format_date(iso_date: str, date_format_key: object) -> str:
     return value.strftime(pattern)
 
 
+@keyword
 def parse_date(text: str, date_format_key: object) -> str:
     """La forme utilisateur (``01.09.2026`` en clé ``1``) -> ISO ``2026-09-01``.
-    Une chaîne vide rend une chaîne vide (champ non renseigné)."""
+    Une chaîne vide rend une chaîne vide (champ non renseigné).
+
+    Exemple :
+    | ${iso}=    `Parse Date`    01.09.2026    1
+    | Should Be Equal    ${iso}    2026-09-01
+    """
     key = normalize_date_key(date_format_key)
     pattern = DATE_FORMATS.get(key)
     if pattern is None:
@@ -113,6 +150,7 @@ def parse_date(text: str, date_format_key: object) -> str:
             % (raw, DATE_FORMAT_LABELS[key], key))
 
 
+@keyword
 def format_number(value: object, decimal_format_key: object,
                   decimals: int | None = None,
                   thousands: bool = False) -> str:
@@ -120,7 +158,12 @@ def format_number(value: object, decimal_format_key: object,
     est un nombre Python OU une chaîne en notation TECHNIQUE (point décimal,
     sans séparateur de milliers). ``decimals`` fixe le nombre de décimales ;
     ``thousands=True`` insère le séparateur de milliers de l'utilisateur (un
-    champ de saisie SAP l'accepte, mais ne l'exige jamais : défaut à False)."""
+    champ de saisie SAP l'accepte, mais ne l'exige jamais : défaut à False).
+
+    Exemple :
+    | ${text}=    `Format Number`    3.25    ${EMPTY}    thousands=${True}
+    | Should Be Equal    ${text}    3,25
+    """
     key = normalize_decimal_key(decimal_format_key)
     if key not in DECIMAL_FORMATS:
         raise ValueError(
@@ -150,10 +193,16 @@ def format_number(value: object, decimal_format_key: object,
     return ("-" if sign else "") + result
 
 
+@keyword
 def parse_number(text: str, decimal_format_key: object) -> str:
     """La forme utilisateur (``1.234,50`` en clé vide) -> notation technique
     ``1234.50`` (chaîne, pour ne perdre aucune décimale). Vide -> vide.
-    Un signe négatif SAP en suffixe (``100-``) est reconnu."""
+    Un signe négatif SAP en suffixe (``100-``) est reconnu.
+
+    Exemple :
+    | ${value}=    `Parse Number`    3,25    ${EMPTY}
+    | Should Be Equal    ${value}    3.25
+    """
     key = normalize_decimal_key(decimal_format_key)
     if key not in DECIMAL_FORMATS:
         raise ValueError(
@@ -178,7 +227,13 @@ def parse_number(text: str, decimal_format_key: object) -> str:
 def describe_formats(date_format_key: object, decimal_format_key: object,
                      time_format_key: object = "") -> dict:
     """Le dict JSON-safe que rend `Get User Formats` : les CLÉS techniques
-    et leur forme, jamais un libellé localisé."""
+    et leur forme, jamais un libellé localisé.
+
+    Exemple :
+    | ${formats}=    `Describe Formats`    1    ${EMPTY}    0
+    | Should Be Equal    ${formats}[date_pattern]    DD.MM.YYYY
+    | Should Be Equal    ${formats}[decimal_example]    1.234.567,89
+    """
     date_key = normalize_date_key(date_format_key)
     decimal_key = normalize_decimal_key(decimal_format_key)
     return {
@@ -200,13 +255,19 @@ TIME_FORMAT_LABELS: Mapping[str, str] = {
 _TIME = re.compile(r"^\s*(\d{1,2}):(\d{2}):(\d{2})\s*([AaPp][Mm])?\s*$")
 
 
+@keyword
 def parse_time(text: str, time_format_key: object = "0") -> str:
     """Une heure affichée au format ``TIMEFM`` de l'utilisateur en
     ``HH:MM:SS`` sur 24 heures. Clé vide = ``0`` (24 heures, le défaut).
     Vide rend vide ; une forme qui ne suit pas le format est REFUSÉE en le
     nommant (un suffixe AM/PM attendu et absent, ou présent en 24 heures).
     La casse du suffixe n'est pas contrôlée (les clés 1 et 2, comme 3 et 4,
-    ne diffèrent que par elle)."""
+    ne diffèrent que par elle).
+
+    Exemple :
+    | ${time}=    `Parse Time`    13:21:05    0
+    | Should Be Equal    ${time}    13:21:05
+    """
     key = str(time_format_key if time_format_key is not None else "").strip() or "0"
     if key not in TIME_FORMAT_LABELS:
         raise ValueError("Format d'heure TIMEFM %r non pris en charge." % (key,))

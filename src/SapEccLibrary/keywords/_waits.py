@@ -14,6 +14,8 @@ Ces keywords sont la méthode recommandée pour attendre ; réservez `Set Explic
 aux démos et au débogage. Les boucles de sondage/relance elles-mêmes vivent dans
 ``sapfx_common.polling`` (partagées avec le canal Fiori).
 """
+from typing import TYPE_CHECKING, Any
+
 import time
 
 from robot.utils import secs_to_timestr, timestr_to_secs
@@ -25,12 +27,19 @@ from sapfx_common.com_safety import (
     is_disconnected_error,
 )
 from sapfx_common.polling import poll_until, retry_call
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 
 class WaitKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose que ``self.session`` est une
     GuiSession connectée (définie par `Connect To Session`) et que
     ``self.default_timeout`` / ``self.poll_interval`` (secondes, float) existent."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def wait_until_busy_done(self, timeout=None):
         """Bloque jusqu'à ce que le serveur SAP ait fini de traiter la requête en cours.
@@ -93,7 +102,7 @@ class WaitKeywords:
                 "SAP session was still busy after %s seconds." % self._timeout_secs(timeout)
             )
 
-    def wait_until_element_present(self, element_id, timeout=None, interval="0.2s"):
+    def wait_until_element_present(self, element_id: GuiElementIdInput, timeout=None, interval="0.2s"):
         """Attend que ``element_id`` existe sur l'écran courant.
 
         Retourne l'élément résolu (objet COM) pour permettre l'enchaînement. Lève
@@ -120,7 +129,7 @@ class WaitKeywords:
             )
         return element
 
-    def wait_until_element_value_is(self, element_id, expected, timeout=None, interval="0.2s"):
+    def wait_until_element_value_is(self, element_id: GuiElementIdInput, expected, timeout=None, interval="0.2s"):
         """Attend que la valeur retournée par `Get Value` pour ``element_id`` soit
         égale à ``expected``. Utile pour les panneaux de statut mis à jour après
         une sauvegarde.
@@ -146,7 +155,7 @@ class WaitKeywords:
                 % (element_id, state["last"], expected, self._timeout_secs(timeout))
             )
 
-    def click_element_with_retry(self, element_id, retries=3, interval="0.3s"):
+    def click_element_with_retry(self, element_id: GuiElementIdInput, retries: int = 3, interval="0.3s"):
         """Clique sur ``element_id`` en retentant les échecs transitoires.
 
         Sur SAP GUI, un clic peut échouer ponctuellement parce que l'élément n'est
@@ -253,7 +262,7 @@ class WaitKeywords:
         self.poll_interval = timestr_to_secs(interval)
         return previous
 
-    def element_is_present(self, element_id):
+    def element_is_present(self, element_id: GuiElementIdInput):
         """``True`` si ``element_id`` existe sur l'écran courant, ``False``
         s'il est absent : une SONDE, qui ne capture jamais l'écran et ne lève
         jamais pour une absence (``findById`` sous sa forme silencieuse).

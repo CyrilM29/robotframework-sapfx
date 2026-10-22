@@ -28,8 +28,14 @@ La couche métier (`resources/fiori_keywords.resource`) encapsule ceci afin que 
 se lisent de la même façon que du côté ECC : voir `docs/fiori-architecture.md`.
 """
 
+from typing import TYPE_CHECKING
+
 from robot.utils import timestr_to_secs
 
+from sapfx_common.argument_types import CONVERTERS as ARGUMENT_TYPES
+from sapfx_common.gui_element_id import GuiElementId
+from sapfx_common.library_extension import extend_library
+from sapfx_common.robot_args import NameList
 from sapfx_common.session_context import current_execution_namespace
 
 from .keywords import (
@@ -58,9 +64,13 @@ class SapFioriLibrary(FrameKeywords, LocatorKeywords, EngineKeywords,
     """Résout les contrôles UI5 en sélecteurs utilisables par Browser. Nécessite que la
     bibliothèque Browser soit importée dans la même suite (elle réutilise la page active de Browser)."""
 
-    __version__ = "0.8.5"
+    __version__ = "0.8.6"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
+    # Types métier d'arguments (backlog 2.75) : Robot convertit, Libdoc publie
+    # le type avec sa documentation et les formes d'entrée acceptées.
+    ROBOT_LIBRARY_CONVERTERS = {NameList: NameList.from_value,
+                                GuiElementId: GuiElementId.from_value, **ARGUMENT_TYPES}
 
     def _context_state(self):
         namespace = current_execution_namespace()
@@ -104,3 +114,10 @@ class SapFioriLibrary(FrameKeywords, LocatorKeywords, EngineKeywords,
         self._state_by_namespace = {}
         self._ui5_frame = None
         self._last_page_tree = None
+
+
+if not TYPE_CHECKING:
+    # Les keywords de l'atelier s'ajoutent ici quand ``_extension`` existe (dépôt
+    # privé) ; la distribution publique n'a pas ce module et garde la classe telle
+    # quelle.
+    SapFioriLibrary = extend_library(SapFioriLibrary, __package__)

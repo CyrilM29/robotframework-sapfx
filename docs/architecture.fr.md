@@ -62,7 +62,7 @@ Composition par mixins, sans classe de base (abrégé) :
 
 ```
 SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
-              PerceptionKeywords, DiagnosticsKeywords, HealingKeywords,
+              PerceptionKeywords, DiagnosticsKeywords,
               SemanticKeywords, EmbeddedBrowserKeywords, ...,
               GridCellKeywords, ElementKeywords, InputKeywords,
               ValueCheckKeywords)
@@ -103,37 +103,12 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     **chemin rapide** `GetObjectTree` (un appel COM pour tout le sous-arbre)
     avec repli automatique sur la marche COM nœud par nœud. Également les
     captures en mémoire (`Get Screenshot As Base64`, `Log Screenshot` :
-    data-URI inline dans le log Robot), le **screenshot annoté**
-    (`Get/Log Annotated Screenshot`, façon Set-of-Mark : boîtes numérotées sur
-    chaque cible actionnable + légende `numéro -> id` ; un agent à vision lit
-    le numéro et donne l'id à un keyword déterministe au lieu de deviner des
-    coordonnées) et les **assertions visuelles** (`Get Screen Perceptual
-    Hash`, `Screen Should Match Baseline` : sémantique snapshot sur un dHash
-    pur, `sapfx_common.visual_hash` + `sapfx_common.visual_baseline` partagé ;
-    Pillow seulement à la frontière image, extra optionnel `visual` ;
-    `mask_elements=auto` neutralise avant hachage les barres de statut/titre,
-    légitimement volatiles). Le canal pixels gagne trois outils de précision :
-    `Get Element Perceptual Hash` / `Element Should Match Baseline` (la grille
-    du hash couvre la région recadrée d'UN élément : un changement dans un
-    GuiShell opaque pèse sur les 64 bits au lieu d'être dilué dans l'écran) et
-    `Get Screen Tile Hashes` (une empreinte par tuile d'une grille 4×4 : la
-    dérive est **localisée**, pas seulement détectée). Une empreinte
-    perceptuelle encode la **géométrie de capture** autant que le contenu :
-    `per_resolution=True` garde une baseline committée par géométrie
-    (`<name>@1920x1032.png`), donc une même suite reste comparable sur des
-    postes qui n'affichent pas la même taille ; sans l'option, un échec dont
-    les deux géométries diffèrent le dit, au lieu de se lire comme une
-    régression fonctionnelle. Le canal pixels couvre exactement ce que l'API
-    Scripting ne voit pas : rendu GuiShell opaque des listes, graphiques
-    record-only.
+    data-URI inline dans le log Robot).
   - `_diagnostics` : **préflight** scripting (`Get Scripting Status`,
     `Scripting Should Be Fully Enabled`, soit un échec précoce avec le paramètre RZ11 exact à
-    corriger), `Enable Test Tool Mode`, `Get Session Telemetry`.
-  - `_healing` : **auto-réparation** de localisateurs (`Resolve Element With Healing` :
-    répare au-dessus d'un seuil de similarité avec un WARNING journalisé, jamais en
-    silence ; une ancre ``label=`` ajoute une voie de réparation par libellé, car un
-    libellé visible survit aux renumérotations de sous-écrans qui tuent les ids ;
-    `Get Closest Element Ids`). Le scoring pur vit dans `sapfx_common.healing`.
+    corriger), `Enable Test Tool Mode`.
+  - Les échecs nomment les ids les plus proches à l'écran, scorés par le pur
+    `sapfx_common.healing`, et l'écran réellement affiché.
   - `_semantic` : **localisateurs humains** (portés de RoboSAPiens, Apache-2.0 ;
     voir `NOTICE`) : `Find/Fill/Read Field By Label`, `Click Button By Label`
     ciblent les contrôles comme un utilisateur métier les décrit (libellé
@@ -235,22 +210,6 @@ SapEccLibrary(ConnectionKeywords, WaitKeywords, GridKeywords,
     l'asserter), `Read Rfc Table` refuse un champ RAW (rendu tronqué de
     moitié), et `Filter Change Documents` / `Latest Change Number` énoncent
     une assertion d'audit hors ligne.
-  - Le mixin de perception héberge aussi la **sentinelle de dérive**
-    (`Check Screen Against Watch` sur le pur `sapfx_common.screen_watch`) :
-    les écrans surveillés sont mémorisés (signature structurée + empreinte
-    visuelle optionnelle + empreintes par tuile) et chaque passage suivant ne
-    remonte QUE ce qui a bougé : la détection de changement **sans un seul
-    test scripté** (`tests/robot/ecc_drift_sentinel.robot` est le harnais de
-    veille nocturne). Trois canaux par écran : le diff structurel intelligent
-    (renommages appariés, changements de valeur nommés), le hash visuel
-    global, et la **grille de tuiles** : une dérive locale trop diluée pour le
-    hash global est rattrapée par SA tuile et rapportée avec sa position, son
-    rectangle en pixels et les éléments qui la recouvrent.
-    `per_resolution=True` donne à chaque géométrie de capture ses propres
-    références VISUELLES, le canal structurel restant partagé : une signature
-    d'écran ne dépend pas de la résolution, une empreinte perceptuelle si.
-    Sans l'option, une dérive visuelle entre deux géométries différentes est
-    annotée comme pouvant n'être qu'un changement d'échelle.
 - **`SapEccLibrary.py`** les assemble et redéfinit `run_transaction` pour une
   détection d'erreurs indépendante de la locale. `ROBOT_LIBRARY_SCOPE = SUITE` :
   les tests d'une suite partagent leur connexion COM, tandis que deux suites
@@ -269,12 +228,9 @@ diff intelligent `pair_renames` qui réutilise le scoring de healing),
 perception structuré), `semantic` (la résolution géométrique par libellé +
 l'inverse vérifié `describe_element` utilisé par le recorder et par la vue
 affordances `mode=semantic`), `abap_list` (la reconstruction géométrique des
-listes ABAP classiques), `visual_hash` (le dHash perceptuel pur derrière les
-assertions visuelles, plus les primitives crop/masque/tuiles) et
-`visual_baseline` (la sémantique snapshot partagée des baselines et la
-frontière de décodage Pillow, utilisée par les keywords visuels ECC **et**
-Fiori : `Ui5 Screen Should Match Baseline` est le même cycle sur une capture
-Browser). Toute nouvelle primitive trans-canal va là, jamais en inline.
+listes ABAP classiques), `visual_hash` (un dHash perceptuel pur, plus les
+primitives crop/masque/tuiles) et `visual_baseline` (la sémantique snapshot
+et la frontière de décodage Pillow). Toute nouvelle primitive trans-canal va là, jamais en inline.
 
 ## Le canal API (`src/SapApiLibrary`)
 

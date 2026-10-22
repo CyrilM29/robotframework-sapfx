@@ -22,7 +22,7 @@ entity set OData) ; elles partagent **les mêmes contrats et la même méthode**
 une seule règle de complétude pour extraire un tableau, qu'il vienne d'une
 grille ALV, d'une table UI5 ou d'un appel RFC ; une même identité de message
 (`MO/E/402`) à l'écran et en RFC ; et, sur les deux canaux à écran, la même
-boucle perception → action et un même journal de réparation des localisateurs.
+perception de l'écran ou de la page active.
 Le vocabulaire métier se construit au-dessus, dans les keywords Robot Framework
 de votre projet : c'est là qu'un test cesse de dépendre du canal. Un même run
 peut traverser les trois
@@ -44,8 +44,8 @@ nom `robotframework-sapfx`.
 | **`SapApiLibrary`** | OData v2 et v4, RFC / BAPI | La bibliothèque standard Python pour HTTP (protocole CSRF SAP compris) ; RFC optionnel via `pyrfc`. |
 
 Un quatrième paquet, `sapfx_common`, porte la logique pure que les trois
-partagent (attente, scores de réparation, diff de perception, moteur de
-localisateurs humains, contrat d'extraction de tableaux, empreinte visuelle...). Une vingtaine
+partagent (attente, scores des ids les plus proches, diff de perception, moteur
+de localisateurs humains, contrat d'extraction de tableaux...). Une vingtaine
 de ses modules sont des bibliothèques Robot à part entière, importées une par
 une et documentées sur leur propre page de la référence des keywords :
 `Library    sapfx_common.table_csv` (aussi `table_json`, `table_xlsx`,
@@ -68,8 +68,8 @@ pip install "robotframework-sapfx[web]"     # + bibliothèque Browser, pour SapF
 rfbrowser init                              # une fois : navigateurs Playwright
 ```
 
-Autres extras : `visual` (Pillow, pour les baselines d'écran) et `parquet`
-(pyarrow, pour les exports Parquet). Prérequis par canal :
+Autre extra : `parquet` (pyarrow, pour les exports Parquet). Prérequis par
+canal :
 
 - **Tous** : Python 3.10 ou plus, Robot Framework 7.4 ou plus.
 - **`SapEccLibrary`** : Windows, SAP GUI for Windows, et le scripting activé
@@ -197,45 +197,36 @@ Count The Products
   ARIA et nom accessible) pour les zones non SAP des pages hybrides ; les
   iframes imbriquées des launchpads par une pile de frames ;
   `Get Page Composition` dit quelle technologie vit où.
-- **Une réparation de localisateurs jamais silencieuse** : les échecs listent
-  les ids les plus proches à l'écran, avec leur score ;
-  `Resolve Element With Healing` et `Resolve Ui5 With Fallback` réparent un
-  localisateur périmé avec un avertissement journalisé et un journal de
-  télémétrie optionnel.
-- **La perception de l'écran**, pour le débogage et les agents IA :
-  `Get Screen Signature`, `Get Screen Map` (cibles actionnables numérotées),
-  `Get Ui5 Page Tree`, mode différentiel, captures annotées.
-- **Des assertions visuelles** là où l'API Scripting ne voit rien (shells
-  opaques, graphiques) : baselines par empreinte perceptuelle, par écran, par
-  élément ou par tuile.
+- **Des échecs qui indiquent la correction** : un élément SAP GUI absent liste
+  les ids les plus proches à l'écran, avec leur score, et nomme l'écran
+  réellement affiché ; `Resolve Ui5 With Fallback` essaie les autres moteurs
+  web avec un avertissement journalisé.
+- **La perception de l'écran**, pour le débogage : `Get Screen Signature`
+  (vue complète, différentielle ou formulaire de l'écran actif),
+  `Get Open Windows`, `Get Ui5 Page Tree` et son mode différentiel.
 - **Des préflights qui nomment leur remède** : scripting côté serveur et
   client, posture de sécurité du poste, activation de la Gateway,
   disponibilité du canal RFC ; et la configuration de sécurité du serveur ABAP
-  lue par RFC (paramètres de profil jugés sur leur code de retour, dérive
-  confrontée à une référence committée).
+  lue par RFC (paramètres de profil jugés sur leur code de retour).
 - **Le canal API comme plateforme de données** : CRUD OData complet avec CSRF,
   `$batch`, pagination pilotée par le serveur, perception du `$metadata` avec
   les libellés humains, une fabrique de données de test qui nettoie derrière
   elle, BAPI jugées par type de message et refus assertés par identifiant de
   message, lectures de tables RFC, jobs de fond et leur spool, IDocs sortants
   (création, attente sur le code de statut, lien avec l'IDoc entrant par son
-  TID), documents de modification.
-- **Des écritures gouvernées** sur les trois canaux : une politique de session
-  (`Set Session Policy`, `Set Api Policy`) place une session en mode `full`,
-  `explore` ou `read_only`, avec transactions permises ou bloquées et une
-  piste d'audit, et une écriture peut exiger l'approbation d'une personne (un
-  outil MCP, ou un mot tapé sur le poste) ; une écriture refusée n'atteint
-  jamais SAP. C'est un garde-fou d'exploitation : les autorisations SAP restent
-  le vrai contrôle.
+  TID) et documents de modification.
+- **Un garde-fou d'écriture** sur les trois canaux : un fichier de politique
+  désigné par `SAPFX_SESSION_POLICY` peut placer chaque session en mode
+  `read_only` ou restreindre les transactions et les modules fonction qu'elle
+  peut lancer ; une écriture refusée n'atteint jamais SAP. C'est un garde-fou
+  d'exploitation : les autorisations SAP restent le vrai contrôle.
 - **Des lectures de sécurité et d'exploitation** : utilisateurs et rôles de
   test créés et supprimés derrière une liste blanche (`Ensure Test User`,
   `Ensure Test Role`), les échecs d'autorisation d'un autre utilisateur lus
   dans SU53, le journal d'erreurs et le registre de services de la Gateway, le
-  certificat TLS que STRUST déclare confronté à celui que l'ICM sert, la
+  certificat TLS que STRUST déclare confronté à celui que l'ICM sert, et la
   nature d'un service OData (RAP, BOPF, Gateway ou CAP) prouvée par son
-  `$metadata` (`Get Odata Service Nature`), et l'impact d'une requête de
-  transport sur les objets et les suites (`Get Change Impact`, un niveau
-  d'utilisation, ses limites dites).
+  `$metadata` (`Get Odata Service Nature`).
 - **Plusieurs sessions SAP GUI** par alias dans une même suite, la navigation
   dans le launchpad SAP Fiori par intent et la connexion par un fournisseur
   d'identité, les compteurs de tuiles lus comme des nombres
@@ -249,6 +240,22 @@ connaissent [wdi5](https://github.com/ui5-community/wdi5),
 la référence hors de Robot Framework. SAPFX ne le remplace pas : son périmètre
 est l'automatisation de tests SAP dans Robot Framework, où le client lourd, le
 canal API et Fiori partagent un exécuteur, un rapport et les mêmes contrats.
+
+## Ce que couvre la bibliothèque libre
+
+La bibliothèque libre porte ce qu'il faut à un test pour piloter SAP sur ses
+canaux : se connecter, percevoir, trouver, agir, attendre, lire et vérifier,
+ainsi que les protocoles derrière. Les outils de l'atelier construits au-dessus
+n'en font pas partie : le support des agents IA (cartes d'écran numérotées,
+captures annotées, diagnostic agrégé), l'auto-réparation des localisateurs,
+les baselines visuelles et la veille de dérive, les keywords de politique
+d'écriture et d'approbation, la télémétrie, l'analyse d'impact, la
+cartographie du paysage, le verdict de release, les artefacts de campagne et
+l'extraction de table par RFC. Ils ont quitté la bibliothèque libre dans la
+version 0.8.6 et font partie des outils de l'atelier, délivrés sur devis ; les
+versions précédentes sur PyPI les gardent, sous la même licence Apache 2.0. De
+nouvelles capacités rejoignent la bibliothèque libre au fil du temps,
+quelques-unes à chaque version.
 
 ## Au-delà du test
 

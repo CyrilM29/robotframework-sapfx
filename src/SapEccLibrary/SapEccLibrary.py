@@ -17,13 +17,21 @@ keywords lisibles métier pour les tests se trouvent dans
 """
 import os
 import threading
+from typing import TYPE_CHECKING
 
 from robot.api import logger
 from robot.utils import timestr_to_secs
 
+from sapfx_common import touch_log
 from sapfx_common.com_safety import ensure_com_initialized, is_disconnected_error
+from sapfx_common.argument_types import ScreenRef, TableName
+from sapfx_common.gui_element_id import GuiElementId
+from sapfx_common.library_extension import extend_library
 from sapfx_common.policy_gate import gate_for
+from sapfx_common.robot_args import NameList
 from sapfx_common.session_context import current_execution_namespace
+from sapfx_common.transaction_code import TransactionCode, TransactionCodeInput
+from sapfx_common.vkeys import VirtualKey
 
 from .keywords import (
     AbapListKeywords,
@@ -31,15 +39,13 @@ from .keywords import (
     ComboBoxKeywords,
     ConnectionKeywords,
     ConnectionProbeKeywords,
-    DdicKeywords,
+    DdicFieldKeywords,
     DiagnosticsKeywords,
     ElementKeywords,
     EmbeddedBrowserKeywords,
-    GovernanceKeywords,
     GridActionKeywords,
     GridCellKeywords,
     GridKeywords,
-    HealingKeywords,
     InputKeywords,
     MenuKeywords,
     PerceptionKeywords,
@@ -55,9 +61,7 @@ from .keywords import (
     ToolbarKeywords,
     TreeKeywords,
     ValueCheckKeywords,
-    VisualKeywords,
     WaitKeywords,
-    WatchKeywords,
     WindowKeywords,
 )
 from .keywords._screenshots import SapWindowScreenshot
@@ -69,11 +73,9 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
                     MenuKeywords, WindowKeywords, SystemIdentityKeywords,
                     StatusBarKeywords, AuthorizationFailureKeywords,
                     TabStripKeywords, ToolbarKeywords,
-                    PerceptionKeywords, ScreenshotKeywords, VisualKeywords,
-                    WatchKeywords, DiagnosticsKeywords, GovernanceKeywords,
-                    HealingKeywords,
+                    PerceptionKeywords, ScreenshotKeywords, DiagnosticsKeywords,
                     SemanticKeywords, EmbeddedBrowserKeywords, PointerKeywords,
-                    SessionKeywords, DdicKeywords, Se16Keywords,
+                    SessionKeywords, DdicFieldKeywords, Se16Keywords,
                     GridCellKeywords, ElementKeywords, InputKeywords,
                     ValueCheckKeywords):
     """Bibliothèque Robot Framework pour automatiser le client bureau SAP GUI (ECC,
@@ -101,8 +103,7 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
     `Read Field By Label` et `Click Button By Label` acceptent des localisateurs
     *humains* (libellé visible, ``Gauche @ Haut``, ``N @ Libellé`` / ``Libellé
     @ N`` pour une grille, ``Ancre >> Reste`` pour une portée, ``= contenu`` ;
-    voir `Find Element By Label`), résolus géométriquement sur l'écran réel ; et
-    `Resolve Element With Healing` accepte une ancre ``label=`` de secours.
+    voir `Find Element By Label`), résolus géométriquement sur l'écran réel.
 
     == Contrôles navigateur embarqués ==
     Certains écrans embarquent un contrôle WebView2 (aide moderne, Business
@@ -111,9 +112,17 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
     bibliothèque Browser (``Library    Browser`` requise dans la suite).
     """
 
-    __version__ = "0.8.5"
+    __version__ = "0.8.6"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
+    # Types métier d'arguments (backlog 2.75) : Robot convertit, Libdoc publie
+    # le type avec sa documentation et les formes d'entrée acceptées.
+    ROBOT_LIBRARY_CONVERTERS = {VirtualKey: VirtualKey.from_value,
+                                NameList: NameList.from_value,
+                                GuiElementId: GuiElementId.from_value,
+                                ScreenRef: ScreenRef.from_value,
+                                TransactionCode: TransactionCode.from_value,
+                                TableName: TableName.from_value}
 
     # Vrais préfixes de navigation de l'OK-code (nouvelle session/fenêtre/onglet).
     # Un tcode de namespace client/partenaire (ex. ``/BEV1/RCA01``, ``/SAPAPO/...``)
@@ -325,7 +334,7 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
         rest = transaction[2:]
         return not rest or rest.startswith("/") or "/" not in rest
 
-    def run_transaction(self, transaction, skip_if_error=False):
+    def run_transaction(self, transaction: TransactionCodeInput, skip_if_error: bool = False):
         """Exécute une transaction SAP et vérifie qu'elle s'est bien ouverte.
 
         Le keyword de robotframework-sapguilibrary détectait une transaction
@@ -358,6 +367,7 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
         | Should Be Equal    ${transaction}    SE16
         """
         gate_for(self, "SapEccLibrary", "Approve Next Write").check_transaction(transaction)
+        touch_log.record_transaction("SapEccLibrary", transaction)
         already_prefixed = self._has_nav_prefix(transaction)
         okcode = transaction if already_prefixed else "/n" + transaction
         before = self._screen_identity_or_none() if transaction.lower() == "/n" else None
@@ -458,3 +468,10 @@ class SapEccLibrary(ConnectionKeywords, ConnectionProbeKeywords, WaitKeywords,
                 "Expected a success status message but got type '%s': %s"
                 % (msg_type, text)
             )
+
+
+if not TYPE_CHECKING:
+    # Les keywords de l'atelier s'ajoutent ici quand ``_extension`` existe (dépôt
+    # privé) ; la distribution publique n'a pas ce module et garde la classe telle
+    # quelle.
+    SapEccLibrary = extend_library(SapEccLibrary, __package__)

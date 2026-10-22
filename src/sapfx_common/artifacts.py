@@ -29,8 +29,19 @@ from typing import Any, Mapping
 
 from sapfx_common.robot_args import as_name_list
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
-    "deterministic_json",
     "artifact_hash",
     "build_deterministic_artifact",
     "write_deterministic_artifact",
@@ -46,7 +57,12 @@ DEFAULT_EXCLUDED = (TIMESTAMP_KEY, HASH_KEY, SCOPE_KEY)
 
 def deterministic_json(payload: Any) -> str:
     """Sérialisation canonique : clés triées, indentation 2, UTF-8 non échappé,
-    fin de ligne LF. La même pour le fichier et pour l'empreinte."""
+    fin de ligne LF. La même pour le fichier et pour l'empreinte.
+
+    Exemple :
+    | ${text}=    `Deterministic Json`    ${register}
+    | Should Contain    ${text}    "release": "758"
+    """
     return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -73,11 +89,17 @@ def _hashed_subset(payload: Mapping[str, Any], hashed: list[str],
     return {key: value for key, value in payload.items() if key not in excluded}
 
 
+@keyword
 def artifact_hash(payload: Mapping[str, Any], hashed_keys: Any = None,
                   excluded_keys: Any = None) -> str:
     """SHA-256 du JSON canonique du PÉRIMÈTRE haché : les seules
     ``hashed_keys`` quand elles sont données, sinon tout SAUF les clés exclues
-    (l'horodatage, l'empreinte et la portée elle-même, toujours exclus)."""
+    (l'horodatage, l'empreinte et la portée elle-même, toujours exclus).
+
+    Exemple :
+    | ${hash}=    `Artifact Hash`    ${register}    hashed_keys=capabilities
+    | Length Should Be    ${hash}    64
+    """
     if not isinstance(payload, Mapping):
         raise ValueError("Un artefact est un dictionnaire, reçu %s." % type(payload).__name__)
     hashed, excluded = _scope(payload, hashed_keys, excluded_keys)
@@ -85,12 +107,19 @@ def artifact_hash(payload: Mapping[str, Any], hashed_keys: Any = None,
     return hashlib.sha256(deterministic_json(subset).encode("utf-8")).hexdigest()
 
 
+@keyword
 def build_deterministic_artifact(payload: Mapping[str, Any], hashed_keys: Any = None,
                                  excluded_keys: Any = None,
                                  timestamp: Any = None) -> dict[str, Any]:
     """L'artefact complet : le contenu, ``hash_scope`` (ce que l'empreinte
     couvre), ``sha256`` et ``generated_at`` (UTC ISO 8601 ; ``timestamp`` =
-    une chaîne pour la fixer, ``False`` pour l'omettre)."""
+    une chaîne pour la fixer, ``False`` pour l'omettre).
+
+    Exemple :
+    | ${artifact}=    `Build Deterministic Artifact`    ${register}    hashed_keys=capabilities
+    | Should Be Equal    ${artifact}[hash_scope][hashed_keys]    ${{ ['capabilities'] }}
+    | Should Not Be Empty    ${artifact}[generated_at]
+    """
     if not isinstance(payload, Mapping):
         raise ValueError("Un artefact est un dictionnaire, reçu %s." % type(payload).__name__)
     hashed, excluded = _scope(payload, hashed_keys, excluded_keys)
@@ -111,11 +140,18 @@ def build_deterministic_artifact(payload: Mapping[str, Any], hashed_keys: Any = 
     return artifact
 
 
+@keyword
 def write_deterministic_artifact(path: str, payload: Mapping[str, Any],
                                  hashed_keys: Any = None, excluded_keys: Any = None,
                                  timestamp: Any = None) -> str:
     """Écrit `build_deterministic_artifact` dans ``path`` (UTF-8, LF, dossier
-    créé) et retourne le chemin absolu."""
+    créé) et retourne le chemin absolu.
+
+    Exemple :
+    | ${path}=    `Write Deterministic Artifact`    ${OUTPUT DIR}/ecc_capability_register.json
+    | ...    ${register}    hashed_keys=capabilities
+    | File Should Exist    ${path}
+    """
     artifact = build_deterministic_artifact(payload, hashed_keys, excluded_keys, timestamp)
     target = os.path.abspath(str(path))
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
@@ -134,11 +170,17 @@ def _load(value: Any) -> dict[str, Any]:
     return data
 
 
+@keyword
 def read_deterministic_artifact(path: Any) -> dict[str, Any]:
     """Relit un artefact et VÉRIFIE son empreinte sur le périmètre qu'il
     déclare : une empreinte absente ou qui ne se recalcule pas = ``ValueError``
     (artefact altéré ou écrit par un autre outil), jamais une comparaison sur
-    du contenu douteux."""
+    du contenu douteux.
+
+    Exemple :
+    | ${artifact}=    `Read Deterministic Artifact`    ${path}
+    | Should Be Equal    ${artifact}[capabilities][tree.read_nodes][verdict]    covered
+    """
     artifact = _load(path)
     scope = artifact.get(SCOPE_KEY)
     recorded = artifact.get(HASH_KEY)
@@ -183,11 +225,17 @@ def _differences(a: Any, b: Any, path: str, out: list[dict[str, str]]) -> None:
                     "b": json.dumps(b, ensure_ascii=False, sort_keys=True)})
 
 
+@keyword
 def compare_deterministic_artifacts(a: Any, b: Any) -> dict[str, Any]:
     """Compare deux artefacts (chemins ou dicts, empreintes VÉRIFIÉES) sur leur
     périmètre haché : ``{identical, sha256_a, sha256_b, differences}`` où
     chaque différence nomme son chemin (``capabilities.tree.read_nodes.verdict``).
-    Deux périmètres différents sont REFUSÉS (non probants), jamais moyennés."""
+    Deux périmètres différents sont REFUSÉS (non probants), jamais moyennés.
+
+    Exemple :
+    | ${comparison}=    `Compare Deterministic Artifacts`    ${register_754}    ${register_758}
+    | Should Be True    ${comparison}[identical]
+    """
     left = read_deterministic_artifact(a)
     right = read_deterministic_artifact(b)
     if left[SCOPE_KEY] != right[SCOPE_KEY]:

@@ -11,6 +11,10 @@ les touches documentées, et une autre version de SAP GUI peut en connaître
 d'autres. Seule la combinaison passe par la table, et l'échec d'une
 combinaison inconnue propose les plus proches au lieu d'un simple
 « invalide ».
+
+``VirtualKey`` (2026-10-14) est le TYPE d'argument que Robot Framework
+convertit et que Libdoc publie : le premier type métier des bibliothèques
+(backlog 2.75), là où l'argument n'était qu'un ``str`` sans contrat écrit.
 """
 from __future__ import annotations
 
@@ -75,6 +79,25 @@ def resolve_vkey(value: Any) -> int:
     raise ValueError(
         "Combinaison de touches %r inconnue : donner un numéro de VKey (0 à 97) ou "
         "une combinaison comme F8, Ctrl+S, Shift+F3%s" % (str(value), hint))
+
+
+class VirtualKey(int):
+    """Touche virtuelle SAP GUI : le numéro d'API (``0`` = Entrée, ``8`` =
+    F8, ``12`` = F12) ou la combinaison clavier (``F8``, ``Ctrl+S``,
+    ``Shift+F3``, ``Esc``), casse et espaces indifférents. Une combinaison
+    inconnue est refusée en nommant les plus proches ; un numéro passe tel
+    quel, une autre version de SAP GUI pouvant en connaître d'autres.
+    """
+
+    # Le convertisseur que Robot Framework appelle (ROBOT_LIBRARY_CONVERTERS).
+    # Volontairement SANS docstring : Libdoc publie celle du convertisseur
+    # avant celle de la classe, et c'est le contrat d'usage ci-dessus qui doit
+    # paraître. Un VirtualKey EST un entier : le corps du keyword et tout appel
+    # Python direct (qui ne passe pas par la conversion) reçoivent la même
+    # valeur que resolve_vkey.
+    @classmethod
+    def from_value(cls, value: str | int) -> VirtualKey:
+        return cls(resolve_vkey(value))
 
 
 def vkey_name(number: int) -> str:

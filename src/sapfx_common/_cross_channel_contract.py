@@ -18,6 +18,7 @@ import re
 from typing import Any, Mapping
 
 from sapfx_common import odata_metadata
+from robot.api.deco import keyword
 
 SCHEMA_VERSION = 1
 
@@ -68,6 +69,7 @@ def _positive_int(value: Any, name: str) -> int:
     return number
 
 
+@keyword
 def validate_cross_channel_scope(services: Any, ecc_client: Any,
                                  api_client: Any, max_entity_sets: Any = 60,
                                  max_couples: Any = 20,
@@ -82,11 +84,18 @@ def validate_cross_channel_scope(services: Any, ecc_client: Any,
 
     Deux refus, tous deux volontairement bloquants :
 
-    - **mandants divergents** : le comptage SE16 se fait dans le mandant de la
+    - *mandants divergents* : le comptage SE16 se fait dans le mandant de la
       session GUI et le ``$count`` dans celui du canal API. Les faire diverger
       compare deux populations et fabrique un écart qui n'existe pas ; la
       campagne refuse l'exécution plutôt que de rapporter une incohérence ;
-    - **périmètre non borné** : aucune limite n'a de mode illimité implicite.
+    - *périmètre non borné* : aucune limite n'a de mode illimité implicite.
+
+    Exemple :
+    | @{services}=    Create List    /sap/opu/odata/iwbep/GWSAMPLE_BASIC
+    | ${scope}=    `Validate Cross Channel Scope`    ${services}    001    001
+    | Should Be Equal    ${scope}[client]    001
+    | Run Keyword And Expect Error    GLOB:*Mandants divergents*
+    | ...    `Validate Cross Channel Scope`    ${services}    001    002
     """
     cleaned = sorted({s.strip() for s in _as_value_list(services) if s.strip()})
     if not cleaned:
@@ -117,11 +126,12 @@ def _service_tail(path: str) -> str:
     return str(path).rstrip("/").rsplit("/", 1)[-1].casefold()
 
 
+@keyword
 def catalog_coverage(services: Any, catalog: Any) -> dict[str, Any]:
     """Recoupe le périmètre demandé avec le catalogue Gateway de la cible.
 
     Retourne ``{"catalog_size", "published", "missing"}``. Un service du
-    périmètre absent du catalogue est un **écart de portabilité rapporté**
+    périmètre absent du catalogue est un *écart de portabilité rapporté*
     (la cible ne publie pas ce service), jamais une erreur de configuration
     silencieuse : c'est l'information utile quand la même campagne passe d'une
     cible ECC à une cible S/4HANA.
@@ -131,6 +141,13 @@ def catalog_coverage(services: Any, catalog: Any) -> dict[str, Any]:
     technique ou au titre, préfixe ``Z`` d'espace de noms client toléré : le
     catalogue observé publie ``ZGWSAMPLE_BASIC`` pour le service exposé sous
     ``/sap/opu/odata/iwbep/GWSAMPLE_BASIC``.
+
+    Exemple :
+    | @{services}=    Create List    /sap/opu/odata/iwbep/GWSAMPLE_BASIC
+    | ${catalog}=    List Odata Services    alias=a4h
+    | ${coverage}=    `Catalog Coverage`    ${services}    ${catalog}
+    | Should Be Empty    ${coverage}[missing]
+    | Should Be Equal As Integers    ${coverage}[catalog_size]    38
     """
     entries = [e for e in (catalog or []) if isinstance(e, Mapping)]
     published: list[str] = []
@@ -169,6 +186,12 @@ def normalize_identifier(name: str, acronym_aware: bool = True) -> str:
 
     Un nom déjà en majuscules (le cas des champs DDIC) traverse inchangé, aux
     séparateurs près.
+
+    Exemple :
+    | ${field}=    `Normalize Identifier`    ProductID
+    | Should Be Equal    ${field}    PRODUCT_ID
+    | ${naive}=    `Normalize Identifier`    ProductID    acronym_aware=${False}
+    | Should Be Equal    ${naive}    PRODUCT_I_D
     """
     raw = str(name or "").strip()
     if not raw:
@@ -201,6 +224,7 @@ def _property_type(properties: Any, name: str) -> str:
     return ""
 
 
+@keyword
 def describe_service_contract(metadata: Any,
                               max_entity_sets: Any = 60) -> dict[str, Any]:
     """Fiche de contrat d'un service, un enregistrement par entity set.
@@ -219,6 +243,12 @@ def describe_service_contract(metadata: Any,
 
     ``truncated`` devient vrai quand la limite a écarté des entity sets : une
     borne atteinte reste visible, jamais un succès silencieux.
+
+    Exemple :
+    | ${meta}=    Get Odata Metadata    /sap/opu/odata/iwbep/GWSAMPLE_BASIC    alias=a4h
+    | ${contract}=    `Describe Service Contract`    ${meta}
+    | Length Should Be    ${contract}[entity_sets]    16
+    | Should Not Be True    ${contract}[truncated]
     """
     limit = _positive_int(max_entity_sets, "max_entity_sets")
     sets = metadata.get("entity_sets", {}) if isinstance(metadata, Mapping) \
@@ -259,6 +289,7 @@ def describe_service_contract(metadata: Any,
     }
 
 
+@keyword
 def write_simulation_candidates(metadata: Any) -> dict[str, Any]:
     """Qualification d'écriture d'un service, déléguée à
     ``sapfx_common.odata_metadata.write_simulation_candidates``.
@@ -269,6 +300,11 @@ def write_simulation_candidates(metadata: Any) -> dict[str, Any]:
     module dans une suite. Aucune logique n'est dupliquée : la qualification,
     ses valeurs par défaut de Gateway et la distinction entre capacité
     déclarée et capacité par défaut vivent en un seul endroit.
+
+    Exemple :
+    | ${meta}=    Get Odata Metadata    /sap/opu/odata/iwbep/GWSAMPLE_BASIC    alias=a4h
+    | ${qualified}=    `Write Simulation Candidates`    ${meta}
+    | Should Be Equal    ${qualified}[candidates][0][evidence]    default
     """
     return odata_metadata.write_simulation_candidates(dict(metadata or {}))
 
@@ -283,6 +319,11 @@ def odata_error_code(payload: Any) -> str:
     la langue de la session. Les deux formes ``{"error": {...}}`` (v2 et v4)
     et ``{"error": {"code": ...}}`` imbriquée dans ``odata.error`` sont
     lues.
+
+    Exemple :
+    | ${payload}=    Evaluate    {'error': {'code': 'CX_SADL_GW_PRIVIL_VIOLATION'}}
+    | ${code}=    `Odata Error Code`    ${payload}
+    | Should Be Equal    ${code}    CX_SADL_GW_PRIVIL_VIOLATION
     """
     if isinstance(payload, str):
         try:
@@ -300,11 +341,12 @@ def odata_error_code(payload: Any) -> str:
     return ""
 
 
+@keyword
 def classify_entity_set_probes(contract: Any, probes: Any) -> list[dict[str, Any]]:
     """Verdict par entity set, en croisant ce que le service DÉCLARE et ce que
     la sonde a MESURÉ.
 
-    ``contract`` : la fiche de :func:`describe_service_contract`. ``probes`` :
+    ``contract`` : la fiche de `Describe Service Contract`. ``probes`` :
     les résultats de la sonde tolérante (``{"entity_set", "status",
     "error_code", "count"}``), ceux des entity sets réellement interrogés.
 
@@ -320,6 +362,13 @@ def classify_entity_set_probes(contract: Any, probes: Any) -> list[dict[str, Any
 
     La somme des verdicts couvre par construction tous les entity sets de la
     fiche de contrat.
+
+    Exemple :
+    | ${probe}=    Probe Odata Entity Sets    /sap/opu/odata/iwbep/GWSAMPLE_BASIC    ProductSet,BusinessPartnerSet
+    | ...    alias=a4h
+    | ${verdicts}=    `Classify Entity Set Probes`    ${contract}    ${probe}[probed]
+    | Should Be Equal    ${verdicts}[0][verdict]    available
+    | Should Be Equal    ${verdicts}[1][verdict]    not_probed
     """
     measured = {}
     for probe in probes or []:
@@ -355,6 +404,7 @@ def classify_entity_set_probes(contract: Any, probes: Any) -> list[dict[str, Any
     return sorted(results, key=lambda r: r["entity_set"])
 
 
+@keyword
 def compare_odata_properties_with_ddic_fields(
         properties: Any, fields: Any, aliases: Any = None,
         keys: Any = None, acronym_aware: bool = True) -> dict[str, Any]:
@@ -362,8 +412,8 @@ def compare_odata_properties_with_ddic_fields(
 
     Trois passes ORDONNÉES, et rien au-delà : (1) alias explicitement déclaré
     pour le couple, (2) normalisation consciente des acronymes, (3) rien. Une
-    propriété que ces deux passes ne trouvent pas reste **non appariée et
-    rapportée** : aucun appariement de force, aucun score approximatif.
+    propriété que ces deux passes ne trouvent pas reste *non appariée et
+    rapportée* : aucun appariement de force, aucun score approximatif.
 
     ``properties`` : le dict ``{nom: {"type", ...}}`` du ``$metadata`` (une
     simple liste de noms est acceptée). ``fields`` : les lignes DD03L
@@ -379,6 +429,12 @@ def compare_odata_properties_with_ddic_fields(
     Une propriété de type complexe (hors espace ``Edm.``) est classée
     ``complex_type`` et non « échec d'appariement » : elle ne correspond à
     aucun champ plat par construction.
+
+    Exemple :
+    | ${contract}=    `Compare Odata Properties With Ddic Fields`    ${properties}    ${fields}
+    | ...    keys=${keys}
+    | Should Be Equal As Integers    ${contract}[summary][matched]    15
+    | Should Be Empty    ${contract}[unmatched_keys]
     """
     alias_map = {str(k): str(v).strip().upper()
                  for k, v in dict(aliases or {}).items()}

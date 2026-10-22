@@ -12,7 +12,9 @@ Logique pure : les E/S HTTP restent dans ``SapApiLibrary``.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
+from xml.etree import ElementTree
 
 #: Chemin standard du catalogue de services de la Gateway embarquée.
 CATALOG_SERVICE_PATH = "/sap/opu/odata/iwfnd/catalogservice;v=2/ServiceCollection"
@@ -137,6 +139,39 @@ def looks_like_json(body: str) -> bool:
 #: STRUCTUREL des trois familles de 404 d'un site BTP (relevé live
 #: 2026-08-26) : le corps porte le même sens en toutes lettres, mais un texte
 #: ne s'asserte pas.
+SOAP_ENVELOPE_NAMESPACES = ("http://schemas.xmlsoap.org/soap/envelope/",
+                            "http://www.w3.org/2003/05/soap-envelope")
+_SOAP_FAULT_TAG = re.compile(r"<(?:[A-Za-z_][\w.-]*:)?Fault[\s/>]")
+
+
+def looks_like_soap_fault(body: str) -> bool:
+    """Vrai quand le corps est une enveloppe SOAP (1.1 ou 1.2) dont le
+    ``Body`` porte un élément ``Fault``, quel que soit le statut HTTP.
+
+    Structurel : la racine ``Envelope`` d'un espace SOAP et l'élément
+    ``Fault`` sous ``Body``, jamais le texte de ``faultstring`` (traduit). Un
+    corps TRONQUÉ (la sonde n'en garde que le début) ne se parse plus : il est
+    alors reconnu par l'espace de l'enveloppe et la balise ``Fault``. Né du
+    scénario 17 (2026-10-18) : le runtime SOAP d'ABAP rend une faute métier en
+    500 ``text/xml`` et la classait ``other``, une faute rendue en 200 aurait
+    passé pour une donnée.
+    """
+    head = (body or "").lstrip("﻿ \t\r\n")
+    if not head.startswith("<") or not any(ns in head for ns in SOAP_ENVELOPE_NAMESPACES):
+        return False
+    if "<!DOCTYPE" in head.upper()[:2000]:
+        return False
+    try:
+        root = ElementTree.fromstring(head)
+    except ElementTree.ParseError:
+        return bool(_SOAP_FAULT_TAG.search(head))
+    if root.tag.rsplit("}", 1)[-1] != "Envelope" or root.tag[1:].split("}", 1)[0] not in SOAP_ENVELOPE_NAMESPACES:
+        return False
+    return any(child.tag.rsplit("}", 1)[-1] == "Fault"
+               for body_el in root if body_el.tag.rsplit("}", 1)[-1] == "Body"
+               for child in body_el)
+
+
 ROUTER_ERROR_HEADER = "x-cf-routererror"
 
 
@@ -157,6 +192,9 @@ def classify_http_response(http_status: Optional[int],
     - ``login_page`` : 2xx dont le corps est du HTML, la réponse n'est PAS une
       donnée (le « vert et faux » des cibles derrière un fournisseur
       d'identité) ;
+    - ``soap_fault`` : une enveloppe SOAP portant un ``Fault``, QUEL QUE SOIT
+      le statut (le runtime SOAP d'ABAP la rend en 500 ; rendue en 200, elle
+      serait sinon classée ``data``), reconnue par sa structure ;
     - ``data`` : 2xx qui n'est pas du HTML ;
     - ``other`` : tout le reste (5xx, 3xx…).
 
@@ -170,6 +208,8 @@ def classify_http_response(http_status: Optional[int],
     if http_status is None:
         return "unreachable"
     status = int(http_status)
+    if looks_like_soap_fault(body):
+        return "soap_fault"
     names = {str(name).lower() for name in (headers or ())}
     if status == 404:
         return "unknown_route" if ROUTER_ERROR_HEADER in names else "missing_route"

@@ -1,18 +1,21 @@
-"""Mixins de keywords composés dans :class:`SapEccLibrary.SapEccLibrary`."""
+"""Mixins de keywords composés dans :class:`SapEccLibrary.SapEccLibrary`.
+
+Seuls les mixins de la bibliothèque publique sont listés ici ; ceux de
+l'atelier s'ajoutent par ``SapEccLibrary._extension``, absent de la
+distribution publique.
+"""
 from ._abap_list import AbapListKeywords
 from ._authorization_failures import AuthorizationFailureKeywords
 from ._combobox import ComboBoxKeywords
 from ._connection import ConnectionKeywords
 from ._connection_probe import ConnectionProbeKeywords
-from ._ddic import DdicKeywords
+from ._ddic_fields import DdicFieldKeywords
 from ._diagnostics import DiagnosticsKeywords
 from ._elements import ElementKeywords
 from ._embedded_browser import EmbeddedBrowserKeywords
-from ._governance import GovernanceKeywords
 from ._grid import GridKeywords
 from ._grid_actions import GridActionKeywords
 from ._grid_cells import GridCellKeywords
-from ._healing import HealingKeywords
 from ._identity import SystemIdentityKeywords
 from ._inputs import InputKeywords
 from ._menus import MenuKeywords
@@ -28,9 +31,7 @@ from ._tabstrip import TabStripKeywords
 from ._toolbar import ToolbarKeywords
 from ._trees import TreeKeywords
 from ._value_checks import ValueCheckKeywords
-from ._visual import VisualKeywords
 from ._waits import WaitKeywords
-from ._watch import WatchKeywords
 from ._windows import WindowKeywords
 
 __all__ = [
@@ -39,15 +40,13 @@ __all__ = [
     "ComboBoxKeywords",
     "ConnectionKeywords",
     "ConnectionProbeKeywords",
-    "DdicKeywords",
+    "DdicFieldKeywords",
     "DiagnosticsKeywords",
     "ElementKeywords",
     "EmbeddedBrowserKeywords",
-    "GovernanceKeywords",
     "GridActionKeywords",
     "GridCellKeywords",
     "GridKeywords",
-    "HealingKeywords",
     "InputKeywords",
     "MenuKeywords",
     "PerceptionKeywords",
@@ -63,8 +62,6 @@ __all__ = [
     "ToolbarKeywords",
     "TreeKeywords",
     "ValueCheckKeywords",
-    "VisualKeywords",
     "WaitKeywords",
-    "WatchKeywords",
     "WindowKeywords",
 ]

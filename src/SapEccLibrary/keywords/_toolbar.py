@@ -12,7 +12,10 @@ boutons que la perception voit (``btn[8]``, ``btn[2]``, ``btn[14]``,
 parcours structuré que la perception ; l'icône (``IconName``, locale-safe) est
 lue par contrôle, best-effort.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 APPLICATION_TOOLBAR = "wnd[0]/tbar[1]"
 SYSTEM_TOOLBAR = "wnd[0]/tbar[0]"
@@ -21,13 +24,21 @@ SYSTEM_TOOLBAR = "wnd[0]/tbar[0]"
 class ToolbarKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _screen_elements(self, *args: Any, **kwargs: Any) -> Any: ...
+        def click_element(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
+
     def _toolbar_icon(self, button_id):
         try:
             return str(getattr(self.session.findById(button_id, False), "IconName", "") or "")
         except (AttributeError, com_error):
             return ""
 
-    def list_toolbar_buttons(self, toolbar_id=APPLICATION_TOOLBAR):
+    def list_toolbar_buttons(self, toolbar_id: GuiElementIdInput = APPLICATION_TOOLBAR):
         """Les boutons d'une barre d'outils de la fenêtre (défaut : la barre
         d'APPLICATION ``wnd[0]/tbar[1]`` ; ``wnd[0]/tbar[0]`` = barre système) :
         liste de dicts ``{id, text, tooltip, icon}`` dans l'ordre d'affichage,
@@ -48,7 +59,7 @@ class ToolbarKeywords:
                                 "icon": self._toolbar_icon(element.id)})
         return buttons
 
-    def click_application_toolbar_button(self, button, toolbar_id=APPLICATION_TOOLBAR):
+    def click_application_toolbar_button(self, button, toolbar_id: GuiElementIdInput = APPLICATION_TOOLBAR):
         """Clique le bouton ``button`` de la barre d'application : son id complet
         (``wnd[0]/tbar[1]/btn[31]``), son segment (``btn[31]``) ou son nom
         d'icône (``ICON_COUNT``, locale-safe). Bouton absent = échec listant

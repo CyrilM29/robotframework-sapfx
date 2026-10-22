@@ -1,15 +1,15 @@
-"""Écriture d'un relevé tabulaire en **classeur Excel** (.xlsx), logique pure.
+"""Écriture d'un relevé tabulaire en *classeur Excel* (.xlsx), logique pure.
 
 Pendant de :mod:`sapfx_common.table_svg` : le SVG est une preuve qu'on colle
 dans un rapport, le XLSX un relevé qu'un auditeur trie et filtre lui-même.
 
-**Aucune dépendance nouvelle.** Un .xlsx est une archive ZIP de documents XML,
+*Aucune dépendance nouvelle.* Un .xlsx est une archive ZIP de documents XML,
 et ce module l'écrit avec la seule bibliothèque standard, comme le dépôt le
 fait déjà pour le multipart OData. La raison n'est pas l'économie : une
 dépendance de rendu se serait invitée dans le wheel des bibliothèques, donc
 chez tous les utilisateurs, pour un besoin qui reste périphérique.
 
-**Le piège que ce module ferme, et c'est sa vraie raison d'être.** Excel
+*Le piège que ce module ferme, et c'est sa vraie raison d'être.* Excel
 retype ce qu'il lit : un mandant ``000`` devient ``0``, une valeur ``1/2``
 devient une date, un identifiant long part en notation scientifique. Appliqué
 à un relevé SAP, cela corrompt silencieusement ce que la campagne a mesuré, et
@@ -18,7 +18,7 @@ sont donc écrites en TEXTE explicite (chaînes en ligne + format ``@``), sans
 option pour faire autrement : un relevé d'audit n'est pas un tableur de
 calcul, et ce que l'écran a rendu doit rester ce que le fichier porte.
 
-Le classeur est **déterministe** : dates d'archive figées, aucune propriété de
+Le classeur est *déterministe* : dates d'archive figées, aucune propriété de
 document horodatée, ordre des parties stable. Deux écritures de la même donnée
 produisent le même fichier à l'octet près, ce dont dépend toute comparaison
 entre deux passages.
@@ -39,15 +39,19 @@ from sapfx_common._tabular import xml_escape
 from sapfx_common._tabular import row_limit, unique_header
 from sapfx_common._tabular_io import write_bytes
 
-__all__ = [
-    "MAX_CELL_CHARS",
-    "MAX_SHEET_NAME",
-    "column_letter",
-    "normalize_sheet_name",
-    "build_xlsx",
-    "write_table_xlsx",
-    "read_table_xlsx",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["MAX_CELL_CHARS", "MAX_SHEET_NAME", "write_table_xlsx", "read_table_xlsx"]
 
 #: Le plafond d'Excel pour le contenu d'une cellule. Au-delà, le fichier
 #: s'ouvre mais la cellule est rejetée : mieux vaut couper en l'annonçant.
@@ -73,6 +77,10 @@ def column_letter(index: int) -> str:
 
     Au-delà de 26 colonnes la notation devient ``AA`` : un relevé large n'est
     pas un cas d'école, une grille SAP en porte couramment plus de trente.
+
+    Exemple :
+    | ${letter}=    `Column Letter`    27
+    | Should Be Equal    ${letter}    AB
     """
     if index < 0:
         raise ValueError("Un index de colonne ne peut pas être négatif.")
@@ -91,6 +99,10 @@ def normalize_sheet_name(name: Optional[str]) -> str:
     façon de refuser est un fichier réputé corrompu à l'ouverture : le message
     ne nomme évidemment pas la feuille. La normalisation est donc silencieuse
     et documentée plutôt que bloquante, sauf pour un nom vide.
+
+    Exemple :
+    | ${name}=    `Normalize Sheet Name`    T000 / A4H
+    | Should Be Equal    ${name}    T000 - A4H
     """
     brut = str(name or "").strip()
     if not brut:
@@ -253,6 +265,10 @@ def build_xlsx(rows: Iterable[Mapping[str, Any]],
     Séparé de l'écriture pour que la construction reste testable sans toucher
     au disque, et pour qu'un appelant puisse remettre les octets ailleurs
     (une pièce jointe, un artefact) sans passer par un fichier temporaire.
+
+    Exemple :
+    | ${content}=    `Build Xlsx`    ${rows}    sheet_name=T000
+    | Should Be Equal    ${content}[:2]    ${{ b'PK' }}
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -270,6 +286,7 @@ def build_xlsx(rows: Iterable[Mapping[str, Any]],
     return tampon.getvalue()
 
 
+@keyword
 def write_table_xlsx(path: str, rows: Iterable[Mapping[str, Any]],
                      columns: Optional[Sequence[str]] = None,
                      sheet_name: str = "Relevé",
@@ -286,6 +303,11 @@ def write_table_xlsx(path: str, rows: Iterable[Mapping[str, Any]],
 
     Toutes les cellules sont du TEXTE : voir l'en-tête du module, c'est un
     choix et non une limite.
+
+    Exemple :
+    | ${verdict}=    `Write Table Xlsx`    ${OUTPUT DIR}/T000_A4H.xlsx    ${rows}
+    | ...    sheet_name=T000    headers=${headers}
+    | Should Be Equal As Integers    ${verdict}[rows]    2
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -325,10 +347,11 @@ def _cell_position(reference: str) -> int:
     return max(0, index - 1)
 
 
+@keyword
 def read_table_xlsx(path: str) -> list[dict[str, Any]]:
     """Relit un classeur et rend son relevé, en-tête en clés.
 
-    Le pendant de :func:`write_table_xlsx`, sur le patron des artefacts JSON
+    Le pendant de `Write Table Xlsx`, sur le patron des artefacts JSON
     du dépôt : ce qui a été écrit doit pouvoir être CONFRONTÉ au relevé
     d'origine, sinon la seule preuve qu'un fichier est correct est qu'il
     existe.
@@ -338,6 +361,10 @@ def read_table_xlsx(path: str) -> list[dict[str, Any]]:
     brutes. Tout est rendu en texte : une comparaison avec un relevé d'écran
     se fait entre chaînes, et retyper à la lecture réintroduirait exactement le
     piège que l'écriture ferme.
+
+    Exemple :
+    | ${read}=    `Read Table Xlsx`    ${xlsx}
+    | Should Be Equal    ${read}[0][Client]    000
     """
     with zipfile.ZipFile(str(path)) as archive:
         partagees: list[str] = []

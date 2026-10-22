@@ -65,6 +65,7 @@ class SessionKeywords:
         def send_vkey(self, vkey_id: Any, window: int = 0) -> None: ...
         def wait_until_busy_done(self, timeout: Any = None) -> None: ...
         def take_screenshot(self, screenshot_name: str = "sap-screenshot") -> None: ...
+        def dismiss_information_dialogs(self, max_dialogs: int = 5) -> list: ...
 
     def open_sap_session(self, alias, connection_string=None, connection_name=None,
                          user=None, password: "str | Secret | None" = None,
@@ -86,9 +87,12 @@ class SessionKeywords:
         masquée partout, même en TRACE ; ce keyword ne la journalise jamais,
         y compris pour une chaîne ordinaire. Un login qui ne se
         termine pas (mauvais identifiants, popup multi-logon ``wnd[1]``, mot
-        de passe expiré) échoue en le nommant. Pour une 2e session du MÊME
-        utilisateur, préférer `Create Gui Session` : aucun re-login, donc
-        aucun popup multi-logon.
+        de passe expiré) échoue en le nommant. Les dialogues d'INFORMATION qui
+        suivent la connexion (`Dismiss Information Dialogs` : l'avis
+        d'expiration de licence d'a4h, par exemple) sont refermés et leur
+        texte journalisé ; tout autre dialogue reste ouvert. Pour une 2e
+        session du MÊME utilisateur, préférer `Create Gui Session` : aucun
+        re-login, donc aucun popup multi-logon.
 
         Exemple :
         | `Open Sap Session`    erp    connection_string=/H/vhcala4hci/S/3200
@@ -360,3 +364,9 @@ class SessionKeywords:
                 "expired password), or a locked user. For a second session of "
                 "the SAME user, use Create Gui Session instead (no re-login, "
                 "no multi-logon popup)." % user)
+        # Un dialogue d'INFORMATION peut suivre la connexion (expiration de la
+        # licence sur a4h, 2026-10-21) : refermé, son texte journalisé.
+        closed = self.dismiss_information_dialogs()
+        if closed:
+            logger.info("Information dialog(s) closed after login: %s"
+                        % "; ".join(dialog["text"] for dialog in closed))

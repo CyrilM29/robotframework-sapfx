@@ -19,8 +19,12 @@ l'écran (l'effecteur la met au premier plan, best-effort) et le curseur bouge
 réellement ; c'est un outil de dernier recours, pas le chemin nominal (les
 ids et libellés de ``resources/`` restent la règle, convention 1).
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
+from sapfx_common.gui_element_id import GuiElementIdInput
+from typing import Literal
 
 _TRUTHY = ("1", "true", "yes", "on")
 
@@ -34,7 +38,12 @@ _BUTTON_EVENTS = {
 class PointerKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
-    def get_element_screen_region(self, element_id):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        session: Any
+
+    def get_element_screen_region(self, element_id: GuiElementIdInput):
         """Région *écran* (pixels physiques) d'un élément : dict ``left`` /
         ``top`` / ``width`` / ``height``, les propriétés ``ScreenLeft`` /
         ``ScreenTop`` de l'API (position absolue à l'écran, pas relative à la
@@ -58,8 +67,8 @@ class PointerKeywords:
                 % (element_id, err))
         return region
 
-    def click_element_at_offset(self, element_id, x_pct=0.5, y_pct=0.5,
-                                button="left", focus=True):
+    def click_element_at_offset(self, element_id: GuiElementIdInput, x_pct: float = 0.5, y_pct: float = 0.5,
+                                button: Literal["left", "right", "double"] = "left", focus: bool = True):
         """Clic *matériel* à une position relative DANS un élément, le repli
         pour les zones que l'API ne scripte pas (intérieur d'un GuiShell,
         GuiChart, cibles de drag & drop).
@@ -84,15 +93,17 @@ class PointerKeywords:
             raise ValueError(
                 "Offsets hors de l'élément : x_pct=%s, y_pct=%s (attendu 0.0-1.0)."
                 % (x_pct, y_pct))
-        button = str(button).strip().lower()
-        if button not in _BUTTON_EVENTS:
-            raise ValueError("Bouton inconnu '%s' (left / right / double)." % button)
+        # La conversion Robot (Literal) a déjà normalisé ; un appel Python
+        # direct ne passe pas par elle, d'où la normalisation gardée ici.
+        pressed = str(button).strip().lower()
+        if pressed not in _BUTTON_EVENTS:
+            raise ValueError("Bouton inconnu '%s' (left / right / double)." % pressed)
         region = self.get_element_screen_region(element_id)
         x = region["left"] + int(region["width"] * x_pct)
         y = region["top"] + int(region["height"] * y_pct)
         if str(focus).strip().lower() in _TRUTHY:
             self._focus_sap_window()
-        self._send_hardware_click(x, y, button)
+        self._send_hardware_click(x, y, pressed)
         logger.info("Clic matériel %s à (%d, %d) : %s @ (%.0f%%, %.0f%%)."
                     % (button, x, y, element_id, x_pct * 100, y_pct * 100))
         return {"x": x, "y": y}

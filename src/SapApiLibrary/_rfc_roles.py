@@ -22,6 +22,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from sapfx_common.robot_args import NameListInput
+from sapfx_common.argument_types import TableNameInput
 from sapfx_common import user_provisioning
 from sapfx_common.rfc_tables import abap_quote
 
@@ -32,7 +34,8 @@ from ._rfc_surface import RfcSurfaceKeywords
 class RfcRoleKeywords(RfcSurfaceKeywords):
     """Mixin de :class:`SapApiLibrary` : rôles de test."""
 
-    def ensure_test_role(self, role: str, transactions: Any, allowed_prefixes: Any,
+    def ensure_test_role(self, role: str, transactions: NameListInput,
+                         allowed_prefixes: NameListInput,
                          description: str = "", authorizations: Any = None,
                          alias: str = "default") -> dict[str, Any]:
         """Garantit un rôle PFCG de test, de façon idempotente, et rend
@@ -47,7 +50,9 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
         restreint ne s'élargit pas en silence, et il ne dépend pas de SU25,
         jamais exécuté sur les images trial (le générateur refuse alors de
         reconstruire depuis le menu, ``S#/S/318``). Un rôle dont la création
-        s'est interrompue avant la génération est COMPLÉTÉ (``completed``).
+        s'est interrompue avant la génération est COMPLÉTÉ (``completed``),
+        à condition que son titre soit ``description`` : compléter est une
+        écriture, refusée sur un rôle que ce marqueur ne désigne pas.
 
         Présent avec exactement les mêmes transactions et exactement les
         mêmes valeurs (``S_TCODE`` compris) : laissé (``present``). Présent
@@ -69,7 +74,7 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
 
         Exemple :
         | ${role}=    `Ensure Test Role`    ZSAPFX_EPM_DISPLAY    SE16
-        | ...    allowed_prefixes=ZSAPFX_    description=SAPFX test role: EPM display only
+        | ...    allowed_prefixes=ZSAPFX_    description=SAPFX test role: EPM tables display only
         | ...    authorizations=${display_only}    alias=abap2023
         """
         name = user_provisioning.require_test_role(role, allowed_prefixes)
@@ -96,7 +101,12 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
         if not diffs and self._role_profile(name, alias) is None:
             # Un rôle jamais généré est l'état qu'une création interrompue
             # laisse (mesuré : PROFGEN_TABLES_NOT_UPDATED après l'écriture de
-            # la définition). Le compléter n'est pas le réécrire.
+            # la définition). Le compléter n'est pas le réécrire, mais c'est
+            # une ÉCRITURE sur un objet existant : son titre doit être le
+            # marqueur demandé, comme avant une suppression (relevé au rejeu
+            # des exemples du 2026-10-14, la vérification manquait ici).
+            user_provisioning.require_same_marker(
+                name, self._role_title(name, alias), str(description or ""), kind="role")
             self._generate_role_profile(name, manual, alias)
             missing, extra = self._role_value_differences(name, manual, alias)
             if missing or extra:
@@ -154,7 +164,7 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
         return {"role": name, "exists": True, "title": self._role_title(name, alias),
                 "values": values, "profile": self._role_profile_verdict(name, alias)}
 
-    def get_table_authorization_group(self, table: str,
+    def get_table_authorization_group(self, table: TableNameInput,
                                       alias: str = "default") -> dict[str, Any]:
         """Le groupe d'autorisation EFFECTIF de ``table``, celui que contrôle
         ``S_TABU_DIS`` (champ ``DICBERCLS``), lu dans ``TDDAT`` : rend
@@ -175,7 +185,7 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
                                    options="TABNAME = %s" % abap_quote(name))
         return user_provisioning.table_authorization_group(name, rows)
 
-    def role_should_grant_exactly(self, role: str, transactions: Any,
+    def role_should_grant_exactly(self, role: str, transactions: NameListInput,
                                   authorizations: Any = None,
                                   alias: str = "default") -> dict[str, Any]:
         """Échoue sauf si le rôle ``role`` existe, déclare EXACTEMENT
@@ -212,7 +222,7 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
                                  "attendu (%s)." % (name, " ; ".join(reasons)))
         return read
 
-    def delete_test_role(self, role: str, allowed_prefixes: Any, description: str,
+    def delete_test_role(self, role: str, allowed_prefixes: NameListInput, description: str,
                          alias: str = "default") -> dict[str, Any]:
         """Supprime un rôle PFCG de TEST (et son profil généré) et rend
         ``{"deleted", "role"}``, après avoir RELU son absence. Un rôle déjà
@@ -239,7 +249,8 @@ class RfcRoleKeywords(RfcSurfaceKeywords):
         self._require_writable_client(alias)
         if not self._role_exists(name, alias):
             return {"deleted": False, "role": name}
-        user_provisioning.require_same_marker(name, self._role_title(name, alias), description)
+        user_provisioning.require_same_marker(name, self._role_title(name, alias), description,
+                                             kind="role")
         holders = sorted({str(r.get("UNAME", "")).strip() for r in self.read_rfc_table(
             "AGR_USERS", ["UNAME"], alias=alias, options="AGR_NAME = '%s'" % name)} - {""})
         if holders:

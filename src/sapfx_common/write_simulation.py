@@ -1,32 +1,32 @@
 """Simulation d'écriture réversible : périmètre, perception de l'écran de
 saisie, observation de réversibilité.
 
-Logique **pure** (aucune E/S, aucun COM, aucun HTTP) de la campagne « écrire
+Logique *pure* (aucune E/S, aucun COM, aucun HTTP) de la campagne « écrire
 par un canal, constater par l'autre, puis prouver le retour à l'état initial »
 (plan ``specs/simulation-ecriture-lecture-cross-canal.md``). Elle complète
 ``cross_channel``, qui qualifie des candidats à l'écriture SANS écrire et
 laisse par construction ``reversibility_observed`` à ``unknown`` : c'est ce
 module qui produit l'observation datée qui remplit ce champ.
 
-Il est **importé comme bibliothèque Robot** par la couche ``resources/`` : d'où
+Il est *importé comme bibliothèque Robot* par la couche ``resources/`` : d'où
 des fonctions de module aux signatures JSON-safe, comme dans
 ``ddic_inventory`` et ``cross_channel``.
 
 Trois enseignements live (A4H, 2026-08-22) sont encodés ici plutôt que dans un
 commentaire de suite :
 
-- **une écriture d'écran se refuse au niveau du DICTIONNAIRE, pas des droits**.
+- *une écriture d'écran se refuse au niveau du DICTIONNAIRE, pas des droits*.
   Les onze tables ``/DMO/*`` du modèle de démonstration RAP portent un
   ``MAINFLAG`` vide : SE16 répond « maintenance not allowed » en type ``E``
   quelle que soit l'autorisation de l'utilisateur. Une cible d'écriture se
   qualifie donc AUSSI par le dictionnaire, jamais par le seul fait qu'elle soit
   lisible par les deux canaux ;
-- **les champs de l'écran de saisie SE16 ne se déclarent pas, ils se
-  perçoivent**. Leurs identifiants suivent ``<préfixe><TABLE>-<CHAMP>``, où le
+- *les champs de l'écran de saisie SE16 ne se déclarent pas, ils se
+  perçoivent*. Leurs identifiants suivent ``<préfixe><TABLE>-<CHAMP>``, où le
   préfixe est le type de contrôle et varie d'un champ à l'autre. Dérivés de la
   perception, ils restent justes quand l'écran est régénéré ;
-- **le périmètre d'écriture est une liste blanche, et son défaut est
-  RIEN**. Une liste vide n'autorise pas tout : elle refuse tout.
+- *le périmètre d'écriture est une liste blanche, et son défaut est
+  RIEN*. Une liste vide n'autorise pas tout : elle refuse tout.
 """
 from __future__ import annotations
 
@@ -34,8 +34,19 @@ import json
 import re
 from typing import Any, Iterable, Mapping
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
-    "normalize_table_name",
     "validate_write_target",
     "table_entry_fields",
     "build_reversibility_observation",
@@ -60,6 +71,10 @@ def normalize_table_name(table: Any) -> str:
     distinct de ``DMOCARRIER``) ; seule la comparaison avec un identifiant
     d'écran les ignore, parce que SAP ne les reproduit pas toujours dans un
     identifiant de contrôle.
+
+    Exemple :
+    | ${table}=    `Normalize Table Name`    snwd_pd_catgos
+    | Should Be Equal    ${table}    SNWD_PD_CATGOS
     """
     return str(table or "").strip().upper()
 
@@ -68,6 +83,7 @@ def _screen_form(table: str) -> str:
     return table.replace("/", "")
 
 
+@keyword
 def validate_write_target(table: Any, allowlist: Any = None) -> str:
     """Refuse toute écriture hors de la liste blanche, et retourne la cible.
 
@@ -78,8 +94,13 @@ def validate_write_target(table: Any, allowlist: Any = None) -> str:
     - une cible vide (rien à écrire, donc rien à autoriser) ;
     - une cible absente de la liste blanche, l'erreur nommant la liste.
 
-    Une liste blanche vide n'autorise **pas tout** : elle refuse tout. Un
+    Une liste blanche vide n'autorise *pas tout* : elle refuse tout. Un
     périmètre d'écriture par défaut ne peut pas être « le système entier ».
+
+    Exemple :
+    | @{allowlist}=    Create List    SNWD_PD_CATGOS
+    | ${target}=    `Validate Write Target`    SNWD_PD_CATGOS    ${allowlist}
+    | Should Be Equal    ${target}    SNWD_PD_CATGOS
     """
     target = normalize_table_name(table)
     if not target:
@@ -111,6 +132,7 @@ def _as_list(values: Any) -> list[str]:
     return [str(value) for value in values]
 
 
+@keyword
 def table_entry_fields(signature: Any, table: Any) -> dict[str, str]:
     """Carte ``{CHAMP: localisateur}`` de l'écran de SAISIE SE16 courant,
     DÉRIVÉE de la perception au lieu d'être maintenue à la main.
@@ -128,6 +150,10 @@ def table_entry_fields(signature: Any, table: Any) -> dict[str, str]:
     Retourne un dict vide quand l'écran n'est pas un écran de saisie de cette
     table : c'est à l'appelant d'en faire un échec actionnable, avec le
     contexte qu'il est seul à connaître.
+
+    Exemple :
+    | ${fields}=    `Table Entry Fields`    ${signature}    SNWD_PD_CATGOS
+    | Should Be Equal    ${fields}[CATEGORY]    wnd[0]/usr/ctxtSNWD_PD_CATGOS-CATEGORY
     """
     target = normalize_table_name(table)
     wanted = _screen_form(target)
@@ -161,6 +187,7 @@ def _as_int(value: Any, name: str) -> int:
         raise ValueError(f"{name} doit être un entier, reçu {value!r}.")
 
 
+@keyword
 def build_reversibility_observation(
         target: Any, key_field: Any, key_value: Any, observed_at_utc: Any,
         write_channel: str = "ecc", observation_channel: str = "api",
@@ -192,6 +219,16 @@ def build_reversibility_observation(
 
     L'observation ne porte ni identifiant d'utilisateur ni secret : cible,
     canaux, clé technique, entiers et horodatage UTC.
+
+    Exemple :
+    | ${observation}=    `Build Reversibility Observation`    SNWD_PD_CATGOS    CATEGORY
+    | ...    ZZ_SAPFX_TEST_CATEGORY    2026-08-22T10:41:07+00:00    entity_set=SubCategories
+    | ...    service=/sap/opu/odata/sap/SEPMRA_SHOP    screen_count_before=32
+    | ...    screen_count_after_write=33    screen_count_after_delete=32    api_count_before=32
+    | ...    api_count_after_write=33    api_count_after_delete=32
+    | ...    seen_by_observation_channel=${True}    values_match=${True}
+    | ...    gone_from_observation_channel=${True}
+    | Should Be Equal    ${observation}[verdict]    reversible
     """
     screen_before = _as_int(screen_count_before, "screen_count_before")
     screen_after_write = _as_int(screen_count_after_write,
@@ -242,10 +279,16 @@ def build_reversibility_observation(
     }
 
 
+@keyword
 def reversibility_observation_json(observation: Any) -> str:
     """Sérialisation déterministe de l'observation : clés triées, indentation
     fixe, fins LF. Même contrat que l'artefact de croisement, pour que deux
-    exécutions sur les mêmes faits produisent le même fichier."""
+    exécutions sur les mêmes faits produisent le même fichier.
+
+    Exemple :
+    | ${text}=    `Reversibility Observation Json`    ${observation}
+    | Should Contain    ${text}    "initial_state_restored": true
+    """
     payload: Mapping[str, Any] = dict(observation or {})
     return json.dumps(payload, ensure_ascii=False, indent=2,
                       sort_keys=True) + "\n"

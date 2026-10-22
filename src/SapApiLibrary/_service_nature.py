@@ -17,9 +17,10 @@ capacité nouvelle va dans son propre module).
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from sapfx_common import odata_error
+from sapfx_common.argument_types import ODataServicePathInput
 from sapfx_common import odata_service_nature as nature_logic
 from sapfx_common.rfc_tables import abap_quote
 
@@ -31,7 +32,7 @@ _ERROR_STATUSES = tuple(range(400, 600))
 class ServiceNatureKeywords(TlsPostureKeywords):
     """Mixin de :class:`SapApiLibrary` : nature d'un service OData."""
 
-    def get_odata_service_nature(self, service_path: str, alias: str = "default",
+    def get_odata_service_nature(self, service_path: ODataServicePathInput, alias: str = "default",
                                  binding: Any = None) -> dict[str, Any]:
         """Lit le ``$metadata`` du service (en XML) et rend sa nature, prouvée
         par des marqueurs lus et jamais par son nom : ``{nature, odata_version,
@@ -88,7 +89,9 @@ class ServiceNatureKeywords(TlsPostureKeywords):
         verdict["service_path"] = key
         return verdict
 
-    def odata_service_nature_should_be(self, service_path: str, expected: str,
+    def odata_service_nature_should_be(self, service_path: ODataServicePathInput,
+                                       expected: Literal["rap_draft", "rap", "abap_bopf_draft",
+                                                         "abap_gateway", "cap", "unknown"],
                                        alias: str = "default",
                                        binding: Any = None) -> dict[str, Any]:
         """Échoue si la nature lue par `Get Odata Service Nature` n'est pas

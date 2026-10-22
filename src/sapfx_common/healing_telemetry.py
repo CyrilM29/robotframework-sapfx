@@ -1,7 +1,7 @@
 """Journal cumulatif des réparations de localisateurs (télémétrie de healing).
 
-Le healing (``Resolve Element With Healing`` côté ECC, ``Resolve Ui5 With
-Fallback`` côté Fiori) journalise déjà chaque réparation en WARNING dans le log
+Le healing (``Resolve Ui5 With Fallback`` côté Fiori, la résolution
+auto-réparable côté ECC) journalise déjà chaque réparation en WARNING dans le log
 Robot, visible mais volatile : chaque run écrase le précédent. Ce module y
 ajoute un journal **JSONL cumulatif** (une ligne JSON par réparation, en append)
 qui survit aux runs : en le relisant sur une semaine de CI, on voit *quels*

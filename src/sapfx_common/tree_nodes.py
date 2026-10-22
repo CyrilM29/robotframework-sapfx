@@ -28,13 +28,18 @@ class TreeNode:
     """Un nœud d'arbre normalisé : ``key`` opaque (jamais nettoyée), ``text``
     (colonne principale pour un arbre à colonnes), ``level`` quand l'API le
     donne (0 = racine), ``folder`` (porte des enfants), ``columns`` = les
-    autres colonnes d'un arbre de type 2."""
+    autres colonnes d'un arbre de type 2. ``expanded`` dit si un dossier est
+    déplié (``None`` hors dossier ou illisible) : un dossier jamais déplié
+    n'a pas encore chargé ses enfants, donc son ``children`` à 0 ne prouve
+    PAS qu'il est vide (mesuré le 2026-10-18 sur SBGRFCMON, dont l'arbre ne
+    charge ses nœuds qu'à l'expansion)."""
     key: str
     text: str = ""
     level: Optional[int] = None
     folder: bool = False
     children: Optional[int] = None
     columns: dict = field(default_factory=dict)
+    expanded: Optional[bool] = None
 
     def as_dict(self) -> dict:
         return asdict(self)

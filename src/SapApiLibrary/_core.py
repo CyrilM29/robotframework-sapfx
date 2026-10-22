@@ -20,6 +20,7 @@ import urllib.parse
 import urllib.request
 from typing import Any, Optional
 
+from sapfx_common import touch_log
 from sapfx_common.policy_gate import gate_for
 from sapfx_common.secrets import reveal_secret
 
@@ -103,20 +104,24 @@ class _ApiCore:
                  body: Any = None,
                  allowed_errors: tuple = (),
                  _retried_auth: bool = False,
-                 _policy_checked: bool = False) -> tuple[int, dict, bytes]:
+                 _policy_checked: bool = False,
+                 full_error_body: bool = False) -> tuple[int, dict, bytes]:
         """Requête HTTP d'une session : retourne (statut, en-têtes, corps).
         >= 400 → AssertionError auto-corrigible (statut, URL, extrait du
         corps), SAUF les statuts listés dans ``allowed_errors`` (retournés
         avec l'extrait du corps : le GET d'existence d'`Ensure Odata Entity`
-        attend son 404). Session OAuth2 : token Bearer garanti avant l'appel,
+        attend son 404 ; avec ``full_error_body``, le corps ENTIER, celui
+        d'une faute SOAP dépassant l'extrait). Session OAuth2 : token Bearer garanti avant l'appel,
         renouvelé et rejoué UNE fois sur 401. La télémétrie de session est
         alimentée ici (compteurs, durées, dernier statut). Une écriture passe
-        d'abord par la politique de session (`Set Api Policy`) ; celles du
+        d'abord par la politique de session ; celles du
         protocole CSRF y sont passées dans `_write_request`, AVANT le GET du
         jeton, et arrivent ici avec ``_policy_checked``."""
         if not (_retried_auth or _policy_checked):
             gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_http(
                 method, path, body)
+        if not _retried_auth:
+            touch_log.record_http("SapApiLibrary", method, path)
         session = self._session(alias)
         url = self._build_url(session, path, query)
         merged = dict(session.headers)
@@ -138,12 +143,13 @@ class _ApiCore:
             if err.code == 401 and session.token_url and not _retried_auth:
                 session.access_token = None
                 return self._request(alias, method, path, query, headers, body,
-                                     allowed_errors, _retried_auth=True)
-            excerpt = _decompress(err.headers, err.read())[
-                :_BODY_EXCERPT].decode("utf-8", errors="replace")
+                                     allowed_errors, _retried_auth=True,
+                                     full_error_body=full_error_body)
+            raw = _decompress(err.headers, err.read())
+            excerpt = raw[:_BODY_EXCERPT].decode("utf-8", errors="replace")
             if err.code in allowed_errors:
                 return (err.code, dict(err.headers or {}),
-                        excerpt.encode("utf-8"))
+                        raw if full_error_body else excerpt.encode("utf-8"))
             telemetry["errors"] += 1
             telemetry["last_error"] = "HTTP %d %s" % (err.code, err.reason)
             raise _RequestError(
@@ -189,6 +195,7 @@ class _ApiCore:
         (2026-08-26, site Work Zone BTP) : ~15 sondes réseau, ``requests: 2``.
         Seul ``errors`` reste hors sonde : un refus est ici un RÉSULTAT
         consigné, pas un échec du canal."""
+        touch_log.record_http("SapApiLibrary", "GET", path)
         session = self._session(alias)
         url = self._build_url(session, path, query)
         merged = dict(session.headers)

@@ -21,8 +21,8 @@ GUI scripting id, a UI5 control selector, an OData entity set); what they share
 is **the same contracts and the same method**: one completeness rule for
 extracting a table, whether it comes from an ALV grid, a UI5 table or an RFC
 call; one message identity (`MO/E/402`) on the screen and over RFC; and, on the
-two screen channels, the same perception → action loop and one locator-repair
-log. The business vocabulary is built above, in your project's Robot Framework
+two screen channels, the same perception of the active screen or page. The
+business vocabulary is built above, in your project's Robot Framework
 keywords: that is where a test stops depending on the channel. One run can
 cross all three (prepare data through the API, drive
 the screen for what you actually test, check the result through another
@@ -42,8 +42,8 @@ the **keyword reference**. The libraries are distributed on PyPI as
 | **`SapApiLibrary`** | OData v2 and v4, RFC / BAPI | Python standard library for HTTP (SAP CSRF protocol included); optional RFC through `pyrfc`. |
 
 A fourth package, `sapfx_common`, holds the pure logic the three share
-(polling, healing scores, perception diff, human-locator engine, table
-extraction contract, visual hashing...). About twenty of its modules are
+(polling, closest-id scores, perception diff, human-locator engine, table
+extraction contract...). About twenty of its modules are
 Robot libraries in their own right, imported one by one and documented on
 their own page of the keyword reference: `Library    sapfx_common.table_csv` (also `table_json`,
 `table_xlsx`, `table_svg`, `table_parquet`) writes an extraction and reads it
@@ -65,8 +65,8 @@ pip install "robotframework-sapfx[web]"     # + Browser library, for SapFioriLib
 rfbrowser init                              # one-time: Playwright browsers
 ```
 
-Other extras: `visual` (Pillow, for screen baselines) and `parquet` (pyarrow,
-for Parquet exports). Requirements per channel:
+Other extra: `parquet` (pyarrow, for Parquet exports). Requirements per
+channel:
 
 - **All**: Python 3.10 or later, Robot Framework 7.4 or later.
 - **`SapEccLibrary`**: Windows, SAP GUI for Windows, and scripting enabled on
@@ -187,39 +187,34 @@ Count The Products
   accessible name) for the non-SAP parts of hybrid pages; nested iframes of
   launchpads through a frame stack; `Get Page Composition` says which
   technology lives where.
-- **Locator healing, never silent**: failures list the closest ids on screen,
-  scored; `Resolve Element With Healing` and `Resolve Ui5 With Fallback` repair
-  a stale locator with a logged warning and an optional telemetry journal.
-- **Screen perception** for debugging and AI agents: `Get Screen Signature`,
-  `Get Screen Map` (numbered actionable targets), `Get Ui5 Page Tree`, diff
-  mode, annotated screenshots.
-- **Visual assertions** where the Scripting API sees nothing (opaque shells,
-  charts): perceptual-hash baselines per screen, per element or per tile.
+- **Failures that point to the fix**: a missing SAP GUI element lists the
+  closest ids on screen, scored, and names the screen actually displayed;
+  `Resolve Ui5 With Fallback` tries the other web engines with a logged
+  warning.
+- **Screen perception** for debugging: `Get Screen Signature` (full, diff or
+  form view of the active screen), `Get Open Windows`, `Get Ui5 Page Tree`
+  with its diff mode.
 - **Preflights** that name their remedy: scripting on server and client,
   workstation security posture, Gateway activation, RFC channel availability;
   and the ABAP server's security configuration read over RFC (profile
-  parameters judged on their return code, drift against a committed
-  reference).
+  parameters judged on their return code).
 - **The API channel as a data platform**: full OData CRUD with CSRF, `$batch`,
   server-driven paging, `$metadata` perception with human labels, a test-data
   factory that cleans up after itself, BAPIs judged by message type and
   refusals asserted by message identifier, RFC table reads, background jobs
   and their spool, outbound IDocs (create, wait on the status code, link to
-  the inbound IDoc by its TID), change documents.
-- **Governed writes** on the three channels: a session policy (`Set Session
-  Policy`, `Set Api Policy`) puts a session in `full`, `explore` or
-  `read_only` mode, with allowed or blocked transactions and an audit trail,
-  and a write can require the approval of a person (an MCP tool, or a word
-  typed on the workstation); a refused write never reaches SAP. It is an
-  operational guardrail: SAP authorizations remain the real control.
+  the inbound IDoc by its TID) and change documents.
+- **A write guardrail** on the three channels: a policy file named by
+  `SAPFX_SESSION_POLICY` can put every session in `read_only` mode or restrict
+  the transactions and function modules it may run; a refused write never
+  reaches SAP. It is an operational guardrail: SAP authorizations remain the
+  real control.
 - **Security and operations readings**: test users and roles created and
   removed behind an allowlist (`Ensure Test User`, `Ensure Test Role`),
   another user's authorization failures read from SU53, the Gateway error log
   and service registry, the TLS certificate STRUST declares compared with the
-  one the ICM serves, the nature of an OData service (RAP, BOPF, Gateway or
-  CAP) proven by its `$metadata` (`Get Odata Service Nature`), and the impact
-  of a transport request on objects and suites (`Get Change Impact`, one
-  level of usage, its limits stated).
+  one the ICM serves, and the nature of an OData service (RAP, BOPF, Gateway
+  or CAP) proven by its `$metadata` (`Get Odata Service Nature`).
 - **Several SAP GUI sessions** by alias in one suite, SAP Fiori launchpad
   navigation by intent and login through an identity provider, tile counters
   read as numbers (`Get Flp Tile Counter`), the Spaces and Pages mode read
@@ -232,6 +227,20 @@ Teams that test UI5 apps with JavaScript tooling will know
 Framework. SAPFX does not replace it: its scope is SAP test automation in Robot
 Framework, where the desktop client, the API channel and Fiori share one
 runner, one report and the same contracts.
+
+## What the open library covers
+
+The open library carries what a test needs to drive SAP on its channels:
+connect, perceive, find, act, wait, read and check, and the protocols behind
+them. The workshop tools built on top of it are not part of it: support for AI
+agents (numbered screen maps, annotated screenshots, aggregated diagnostics),
+locator self-repair, visual baselines and drift watch, write-policy and
+approval keywords, telemetry, change-impact analysis, landscape mapping,
+release verdicts, campaign artifacts and RFC table extraction. They left the
+open library in version 0.8.6 and are available with the workshop tools,
+delivered on quote; the earlier releases on PyPI keep them, under the same
+Apache 2.0 licence. New capabilities join the open library over time, a few
+at each release.
 
 ## Beyond testing
 

@@ -29,6 +29,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from sapfx_common.robot_args import NameListInput, OptionalNameListInput
 from sapfx_common import security_baseline, user_provisioning
 from sapfx_common.secrets import reveal_secret
 
@@ -39,8 +40,8 @@ from ._rfc_roles import RfcRoleKeywords
 class RfcUserKeywords(RfcRoleKeywords):
     """Mixin de :class:`SapApiLibrary` : utilisateurs de test."""
 
-    def ensure_test_user(self, user: str, password: Any, allowed_prefixes: Any,
-                         roles: Any = None, description: str = "",
+    def ensure_test_user(self, user: str, password: Any, allowed_prefixes: NameListInput,
+                         roles: OptionalNameListInput = None, description: str = "",
                          alias: str = "default") -> dict[str, Any]:
         """Garantit un utilisateur de dialogue de TEST et rend ``{"state",
         "user", "roles", "was_locked", "failed_logons_before"}``.
@@ -171,7 +172,7 @@ class RfcUserKeywords(RfcRoleKeywords):
             raise
         return "valid"
 
-    def delete_test_user(self, user: str, allowed_prefixes: Any, description: str,
+    def delete_test_user(self, user: str, allowed_prefixes: NameListInput, description: str,
                          alias: str = "default") -> dict[str, Any]:
         """Supprime un utilisateur de TEST et rend ``{"deleted", "user"}``.
         Un utilisateur déjà absent rend ``deleted`` faux (le nettoyage est

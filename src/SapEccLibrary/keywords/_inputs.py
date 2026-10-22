@@ -30,9 +30,10 @@ from robot.api import logger
 from robot.api.types import Secret
 
 from sapfx_common.secrets import reveal_secret
-from sapfx_common.vkeys import resolve_vkey, vkey_name
+from sapfx_common.vkeys import VirtualKey, resolve_vkey, vkey_name
 
-from ._governance import check_save_gesture
+from ._write_gate import check_save_gesture
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 _TEXT_FIELDS = ("GuiTextField", "GuiCTextField", "GuiPasswordField", "GuiOkCodeField")
 _TEXT_SHELL_SUBTYPES = ("TextEdit",)
@@ -44,11 +45,14 @@ class InputKeywords:
 
     if TYPE_CHECKING:
         # Contrat du composite (SapEccLibrary), déclaré pour mypy seulement :
-        # `Input Password` est annoté (type Secret), donc son corps est vérifié.
+        # `Input Password` est annoté (type Secret), `Send Vkey` aussi (type
+        # VirtualKey), donc leurs corps sont vérifiés.
         session: Any
         def _explicit_pause(self) -> None: ...
+        def take_screenshot(self, screenshot_name: str = ...) -> Any: ...
+        def get_element_type(self, *args: Any, **kwargs: Any) -> Any: ...
 
-    def click_element(self, element_id):
+    def click_element(self, element_id: GuiElementIdInput):
         """Clique ``element_id`` : presse un bouton, sélectionne un onglet ou
         une entrée de menu. Pour une case, un bouton radio ou une combo,
         employer `Select Checkbox`, `Select Radio Button` ou `Select Combo Box
@@ -74,7 +78,7 @@ class InputKeywords:
                 "'select checkbox' instead?" % element_type)
         self._explicit_pause()
 
-    def input_text(self, element_id, text):
+    def input_text(self, element_id: GuiElementIdInput, text):
         """Saisit ``text`` dans le champ ``element_id`` puis RELIT le champ :
         un écart (saisie tronquée par la longueur du champ, champ protégé)
         échoue en nommant la valeur obtenue. Champs pris en charge : texte,
@@ -100,7 +104,7 @@ class InputKeywords:
             self._text_should_have_been_written(element_id, value)
         self._explicit_pause()
 
-    def input_password(self, element_id, password: str | Secret):
+    def input_password(self, element_id: GuiElementIdInput, password: str | Secret):
         """Saisit un mot de passe dans le champ identifié, sans le journaliser
         et sans le relire (un champ masqué ne rend pas sa valeur).
 
@@ -123,7 +127,7 @@ class InputKeywords:
         logger.info("Typing password into text field '%s'." % element_id)
         self._explicit_pause()
 
-    def select_checkbox(self, element_id):
+    def select_checkbox(self, element_id: GuiElementIdInput):
         """Coche la case ``element_id`` (sans effet si elle l'est déjà) et
         RELIT son état : une case protégée qui reste décochée échoue.
 
@@ -135,7 +139,7 @@ class InputKeywords:
         """
         self._set_selected(element_id, "GuiCheckBox", "select checkbox", True)
 
-    def unselect_checkbox(self, element_id):
+    def unselect_checkbox(self, element_id: GuiElementIdInput):
         """Décoche la case ``element_id`` (sans effet si elle l'est déjà) et
         RELIT son état.
 
@@ -148,7 +152,7 @@ class InputKeywords:
         """
         self._set_selected(element_id, "GuiCheckBox", "unselect checkbox", False)
 
-    def select_radio_button(self, element_id):
+    def select_radio_button(self, element_id: GuiElementIdInput):
         """Sélectionne le bouton radio ``element_id`` et RELIT son état.
 
         Exemple :
@@ -159,14 +163,15 @@ class InputKeywords:
         """
         self._set_selected(element_id, "GuiRadioButton", "select radio button", True)
 
-    def send_vkey(self, vkey_id, window=0):
+    def send_vkey(self, vkey_id: VirtualKey, window: int = 0) -> None:
         """Envoie une touche virtuelle SAP à la fenêtre ``wnd[window]`` (pas à
         un champ : pour saisir, `Input Text`). ``vkey_id`` est un numéro
         (``0`` = Entrée, ``3`` = F3, ``8`` = F8, ``12`` = F12...) ou une
         combinaison (``F8``, ``Ctrl+S``, ``Shift+F3``, ``Esc`` ; casse et
-        espaces indifférents). Table complète : ``sapfx_common.vkeys``. Une
-        combinaison inconnue échoue en proposant les plus proches. La
-        synchronisation reste à l'appelant.
+        espaces indifférents), voir le type `VirtualKey`. Table complète :
+        ``sapfx_common.vkeys``. Une combinaison inconnue est refusée avant
+        tout geste, en proposant les plus proches. La synchronisation reste à
+        l'appelant.
 
         Exemple :
         | `Input Text`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME    SCARR

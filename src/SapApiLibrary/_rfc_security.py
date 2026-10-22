@@ -22,12 +22,8 @@ Ajouté à côté de `_rfc_reads.py` plutôt que dedans (convention #13).
 """
 from __future__ import annotations
 
-import datetime
 import json
-import os
 from typing import Any, Iterable, Mapping, Optional
-
-from robot.api import logger
 
 from sapfx_common import (
     rfc_tables,
@@ -35,8 +31,8 @@ from sapfx_common import (
     security_baseline,
     security_inventory,
 )
+from sapfx_common.robot_args import NameListInput, OptionalNameListInput
 
-from ._http import _as_bool
 from ._rfc_extract import RfcExtractKeywords
 
 #: Les comptes livrés par SAP dont l'état est un contrôle de sécurité en soi.
@@ -49,7 +45,7 @@ STANDARD_USERS = ("SAP*", "DDIC", "EARLYWATCH", "TMSADM", "SAPCPIC",
 class RfcSecurityKeywords(RfcExtractKeywords):
     """Mixin de :class:`SapApiLibrary` : la posture de sécurité par RFC."""
 
-    def read_profile_parameters(self, parameters: Any,
+    def read_profile_parameters(self, parameters: NameListInput,
                                 alias: str = "default") -> list[dict[str, Any]]:
         """Lit un *lot de paramètres de profil* et rend une fiche par
         paramètre : ``{"name", "status", "value"}``.
@@ -109,7 +105,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
                 name, result.get("RC"), result.get("PARAMETER_VALUE")))
         return readings
 
-    def profile_parameters_should_be_defined(self, parameters: Any,
+    def profile_parameters_should_be_defined(self, parameters: NameListInput,
                                              alias: str = "default"
                                              ) -> list[dict[str, Any]]:
         """Vérifie que TOUS les paramètres demandés ont une valeur effective
@@ -142,7 +138,7 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         return readings
 
     def read_standard_users_status(self, alias: str = "default",
-                                   users: Any = None,
+                                   users: OptionalNameListInput = None,
                                    client: Optional[str] = None
                                    ) -> list[dict[str, Any]]:
         """Lit l'état des *comptes standards livrés par SAP* dans le mandant
@@ -240,7 +236,8 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         return security_inventory.classify_audit_configuration(config)
 
     def read_rfc_destination_inventory(self, alias: str = "default",
-                                       types: Any = None) -> list[dict[str, Any]]:
+                                       types: OptionalNameListInput = None
+                                       ) -> list[dict[str, Any]]:
         """Inventorie les *destinations RFC* et classe chacune : où elle
         pointe, et si elle conserve un logon ou un mot de passe.
 
@@ -279,65 +276,8 @@ class RfcSecurityKeywords(RfcExtractKeywords):
                 row.get("RFCDEST", ""), kind, row.get("RFCOPTIONS", "")))
         return fiches
 
-    def build_security_posture(self, identity: Mapping[str, Any],
-                               readings: Iterable[Mapping[str, Any]],
-                               controls: Iterable[Mapping[str, Any]],
-                               observations: Optional[Mapping[str, Any]] = None
-                               ) -> dict[str, Any]:
-        """Assemble l'artefact déterministe d'une posture : identité de la
-        cible, mesures, verdicts et résumé, plus un hash calculé *hors
-        horodatage*.
-
-        ``identity`` doit porter ce qui PROUVE la cible. Sur un poste qui
-        héberge deux conteneurs SAP, l'identifiant système et le nom d'hôte
-        applicatif ne le font pas (les deux annoncent la même chose) et
-        l'adresse IP est volatile : les ancres sont la release et le kernel.
-        Hors ligne : n'ouvre aucune connexion, tout vient des lectures déjà
-        faites.
-
-        Exemple :
-        | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
-        | ${readings}=    `Read Profile Parameters`    login/min_password_lng    alias=a4h
-        | &{control}=    Create Dictionary    key=password.min_length    parameter=login/min_password_lng
-        | ...    comparison=at_least    expected=6    severity=high
-        | @{controls}=    Create List    ${control}
-        | ${posture}=    `Build Security Posture`    ${info}[RFCSI_EXPORT]    ${readings}    ${controls}
-        | Should Be Equal As Integers    ${posture}[summary][compliant]    1
-        """
-        return security_baseline.posture_artifact(
-            identity, readings, controls_verdicts(controls, readings),
-            observations=observations,
-            generated_at=datetime.datetime.now(
-                datetime.timezone.utc).isoformat(timespec="seconds"))
-
-    def write_security_posture(self, path: str,
-                               artifact: Mapping[str, Any]) -> dict[str, Any]:
-        """Écrit un artefact de posture en JSON trié déterministe et retourne
-        ``{path, sha256}``.
-
-        Deux exécutions aux mêmes mesures sur la même cible écrivent le même
-        contenu au hash près de l'horodatage, donc un artefact committé sert de
-        référence de dérive.
-
-        Exemple :
-        | ${proof}=    `Write Security Posture`    ${OUTPUT DIR}/posture-a4h.json    ${posture}
-        | Should Not Be Empty    ${proof}[sha256]
-        """
-        payload = dict(artifact)
-        blob = json.dumps(payload, sort_keys=True, ensure_ascii=False,
-                          indent=2) + "\n"
-        directory = os.path.dirname(str(path))
-        if directory:
-            os.makedirs(directory, exist_ok=True)
-        with open(str(path), "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(blob)
-        digest = str(payload.get("hash", ""))
-        logger.info("Posture de sécurité écrite dans %s (hash %s)."
-                    % (path, digest))
-        return {"path": str(path), "sha256": digest}
-
     def read_security_posture(self, path: str) -> dict[str, Any]:
-        """Relit un artefact écrit par `Write Security Posture` et le rend tel
+        """Relit un artefact de posture de sécurité (JSON) et le rend tel
         quel, pour qu'une suite n'ouvre jamais le fichier elle-même.
 
         Lu en ``utf-8-sig`` et non en ``utf-8``, à dessein : une référence
@@ -355,72 +295,6 @@ class RfcSecurityKeywords(RfcExtractKeywords):
         """
         with open(str(path), encoding="utf-8-sig") as handle:
             return dict(json.load(handle))
-
-    def security_posture_should_not_have_drifted(
-            self, reference_path: str, readings: Iterable[Mapping[str, Any]],
-            identity: Optional[Mapping[str, Any]] = None,
-            fail_on_drift: Any = True) -> dict[str, Any]:
-        """Compare la posture mesurée à la *référence committée* de la cible,
-        et rend le verdict de dérive.
-
-        Sémantique *snapshot*, celle de la sentinelle d'écran du dépôt :
-        au premier passage la référence n'existe pas, elle est ÉCRITE et
-        l'appel réussit avec un WARNING nommant le fichier à committer ;
-        ensuite, tout écart est rapporté paramètre par paramètre.
-
-        C'est ce qui rend une campagne de sécurité rejouable au lieu d'être un
-        audit à verdict permanent. Juger « ce système est-il durci » rend une
-        suite rouge à vie sur un bac à sable, donc désactivée ; juger « sa
-        configuration a-t-elle bougé depuis la référence » a une réponse
-        binaire, et c'est la dérive non annoncée qui est l'incident.
-
-        ``fail_on_drift`` (vrai par défaut) décide si une dérive fait échouer
-        ou se contente d'un rapport. Le verdict retourné est JSON-safe.
-
-        Exemple :
-        | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
-        | ${readings}=    `Read Profile Parameters`    login/min_password_lng,login/fails_to_user_lock
-        | ...    alias=a4h
-        | ${verdict}=    `Security Posture Should Not Have Drifted`
-        | ...    ${OUTPUT DIR}/posture-reference-a4h.json    ${readings}    identity=${info}[RFCSI_EXPORT]
-        | Should Not Be True    ${verdict}[drifted]
-        """
-        measured = [dict(r) for r in readings]
-        reference_path = os.path.normpath(str(reference_path))
-        exists = os.path.exists(str(reference_path))
-        if not exists:
-            artifact = security_baseline.posture_artifact(
-                identity or {"note": "référence initiale"}, measured, [])
-            self.write_security_posture(reference_path, artifact)
-            logger.warn(
-                "Aucune référence de posture : %s vient d'être ÉCRITE à partir "
-                "de ce passage. La relire, la committer, et c'est elle qui "
-                "servira de comparaison ensuite." % reference_path)
-            return {"first_visit": True, "drifted": False,
-                    "reference": str(reference_path), "changed": [],
-                    "appeared": [], "disappeared": [],
-                    "unchanged": len(measured)}
-
-        reference = self.read_security_posture(reference_path)
-        verdict = security_baseline.compare_posture(
-            measured, reference.get("readings", []))
-        verdict["first_visit"] = False
-        verdict["reference"] = str(reference_path)
-        if verdict["drifted"] and _as_bool(fail_on_drift):
-            lines = [f"- {c['name']} : {c['before']['status']}"
-                     f" {c['before']['value']!r} -> {c['after']['status']}"
-                     f" {c['after']['value']!r}" for c in verdict["changed"]]
-            for name in verdict["appeared"]:
-                lines.append(f"- {name} : apparu (absent de la référence)")
-            for name in verdict["disappeared"]:
-                lines.append(f"- {name} : disparu du relevé")
-            raise AssertionError(
-                "La configuration de sécurité a DÉRIVÉ depuis la référence "
-                f"{reference_path} :\n" + "\n".join(lines) +
-                "\n\nSi la dérive est voulue, relire la référence et la "
-                "re-committer ; sinon, c'est un changement de configuration "
-                "non annoncé sur la cible.")
-        return verdict
 
 
 def controls_verdicts(controls: Iterable[Mapping[str, Any]],

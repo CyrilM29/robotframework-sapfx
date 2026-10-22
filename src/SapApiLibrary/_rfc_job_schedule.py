@@ -17,10 +17,11 @@ Logique pure dans ``sapfx_common.job_schedule``. Typed.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from robot.api import logger
 
+from sapfx_common.robot_args import NameListInput
 from sapfx_common import bapi_return, job_schedule
 
 from ._rfc_jobs import RfcJobKeywords
@@ -32,9 +33,10 @@ SCHEDULE_FIELDS = ("JOBCOUNT", "STATUS", "SDLUNAME", "PERIODIC", "PRDHOURS", "SD
 class RfcJobScheduleKeywords(RfcJobKeywords):
     """Mixin de :class:`SapApiLibrary` : planifier un job de fond."""
 
-    def schedule_background_job(self, jobname: str, program: str, allowed_prefixes: Any,
+    def schedule_background_job(self, jobname: str, program: str, allowed_prefixes: NameListInput,
                                 alias: str = "default", start: str = job_schedule.IMMEDIATE,
-                                period_hours: Any = 0, variant: str = "", if_planned: str = "refuse",
+                                period_hours: int = 0, variant: str = "",
+                                if_planned: Literal["refuse", "keep"] = "refuse",
                                 step_user: Optional[str] = None,
                                 external_user: Optional[str] = None) -> dict[str, Any]:
         """Planifie le job ``jobname`` d'une étape ABAP ``program`` (et

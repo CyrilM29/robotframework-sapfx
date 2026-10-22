@@ -189,7 +189,9 @@ class RfcGatewayKeywords(RfcUserKeywords):
         qui est dessous). Un chemin introuvable rend ``found`` faux et
         ``missing`` nomme le premier segment absent ; plusieurs lignes
         d'activation pour un même nœud font échouer en les nommant, jamais la
-        première prise en silence.
+        première prise en silence. Un segment de plus de 15 caractères est
+        cherché par son nom long (``ICFALTNME``), ICF lui donnant un nom
+        technique généré, que l'activation lit ensuite.
 
         C'est le nœud qui porte le voyant ICF de ``/IWFND/MAINT_SERVICE`` : un
         service OData de la Gateway est servi sous le nœud ``ODATA``
@@ -207,22 +209,25 @@ class RfcGatewayKeywords(RfcUserKeywords):
                                   "active": False, "inactive_ancestors": [], "node_guid": "", "missing": ""}
         # La racine d'un hôte virtuel a pour parent FFFF… (mesuré sur a4h).
         parent, node = "F" * 25, ""
-        chain: list[tuple[str, str]] = []
+        chain: list[tuple[str, str, str]] = []
         for position, segment in enumerate([root] + segments):
             if position:
                 parent = node  # le parent d'un segment est le nœud du segment précédent
             rows = self.read_rfc_table("ICFSERVICE", ["ICF_NAME", "ICFPARGUID", "ICFNODGUID"], alias=alias,
-                                       options=build_options([("ICF_NAME", segment), ("ICFPARGUID", parent)]))
+                                       options=build_options([(gateway_log.icf_name_field(segment), segment),
+                                                              ("ICFPARGUID", parent)]))
             if not rows:
                 result["missing"] = segment
                 return result
-            chain.append((segment, parent))
+            # le nom STOCKÉ (généré pour un nom long) est la clé d'ICFSERVLOC
+            chain.append((segment, str(rows[0]["ICF_NAME"]).strip(), parent))
             node = str(rows[0]["ICFNODGUID"]).strip()
         states = []
-        for name, par in chain:
+        for segment, stored, par in chain:
             loc = self.read_rfc_table("ICFSERVLOC", ["ICF_NAME", "ICFPARGUID", "ICFACTIVE"], alias=alias,
-                                      options=build_options([("ICF_NAME", name), ("ICFPARGUID", par)]))
-            states.append((name, gateway_log.icf_activation(loc, name)))
+                                      options=build_options([("ICF_NAME", stored), ("ICFPARGUID", par)]))
+            states.append((segment, gateway_log.icf_activation(loc, segment)))
         result.update(found=True, node_guid=node, active=states[-1][1],
                       inactive_ancestors=[n for n, active in states[:-1] if not active])
         return result
+

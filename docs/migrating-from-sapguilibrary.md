@@ -71,14 +71,12 @@ effect.
   `Read Abap List` for classic list output.
 - **Human locators**: `Fill Field By Label`, `Click Button By Label` (visible
   label + geometry, ambiguity always surfaced).
-- **Healing**: `Resolve Element With Healing` (scored suggestions, telemetry,
-  never silent), plus `scripts/healing_drift_report.py` turning telemetry
-  into resource-layer patches.
+- **Failures that point to the fix**: a missing element lists the closest
+  ids on screen, scored, and names the screen actually displayed.
 - **Perception**: `Get Screen Signature` (text view of the live screen,
-  `mode=diff`/`semantic`), screenshots (plain, annotated Set-of-Mark), visual
-  baselines (screen/element/tiles), drift sentinel.
-- **Recorders and AI agents**: desktop recorder (native scripting events),
-  rf-mcp plugins, sap-planner/generator/healer agents.
+  `mode=diff`/`semantic`) and screenshots of the SAP window.
+- Locator self-repair, visual baselines, the drift sentinel, the recorders and
+  the AI agents are workshop tools, not part of the open library.
 
 ## Conventions worth adopting with the move
 

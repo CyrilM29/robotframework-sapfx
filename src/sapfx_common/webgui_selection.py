@@ -1,4 +1,4 @@
-"""Critères d'un écran de sélection SE16 rendu par le **WebGUI**, logique pure.
+"""Critères d'un écran de sélection SE16 rendu par le *WebGUI*, logique pure.
 
 Le miroir web de ``Get Se16 Selection Criteria`` (canal écran SAP GUI), et il
 existe pour la même raison : les critères d'un écran de sélection SE16 sont
@@ -31,6 +31,21 @@ import re
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+#: Les keywords que ``Library    sapfx_common.webgui_selection`` expose.
+__all__ = ["selection_criteria", "missing_criterion_message"]
+
 # Un libellé d'écran de sélection SE16 qui est un nom de champ : majuscules,
 # chiffres et soulignés. Les champs de portée générale de l'écran (le nombre
 # maximal de résultats) portent une phrase traduite et sont ainsi écartés sans
@@ -50,7 +65,14 @@ _EDGE_TOLERANCE = 1.0
 
 
 def is_technical_label(text: object) -> bool:
-    """Ce texte est-il un nom TECHNIQUE de champ (et non un libellé traduit) ?"""
+    """Ce texte est-il un nom TECHNIQUE de champ (et non un libellé traduit) ?
+
+    Exemple :
+    | ${technical}=    `Is Technical Label`    PRODUCT_ID
+    | Should Be True    ${technical}
+    | ${sentence}=    `Is Technical Label`    Maximum No. of Hits
+    | Should Not Be True    ${sentence}
+    """
     return bool(TECHNICAL_LABEL.match(str(text or "").strip()))
 
 
@@ -60,6 +82,10 @@ def selection_field_rank(sid: object) -> int | None:
     Le rang n'est pas une donnée à exploiter (il change avec le choix des
     champs de sélection) : il sert à reconnaître un critère parmi les autres
     champs de l'écran, rien de plus.
+
+    Exemple :
+    | ${rank}=    `Selection Field Rank`    wnd[0]/usr/ctxtI2-LOW
+    | Should Be Equal As Integers    ${rank}    2
     """
     segment = str(sid or "").rsplit("/", 1)[-1]
     found = SELECTION_FIELD.match(segment)
@@ -112,6 +138,13 @@ def drop_accelerator_fragments(
     géométriquement INCLUS dans son libellé ET son texte y est contenu. Deux
     libellés distincts, eux, ne s'englobent jamais, donc aucun vrai libellé ne
     peut être retiré par cette règle.
+
+    Exemple :
+    | @{labels}=    Create List    ${{ ('CATEGORY', (279, 295, 276, 356)) }}
+    | ...    ${{ ('C', (279, 295, 276, 284)) }}
+    | ${kept}=    `Drop Accelerator Fragments`    ${labels}
+    | Length Should Be    ${kept}    1
+    | Should Be Equal    ${kept}[0][0]    CATEGORY
     """
     gardes: list[tuple[str, tuple[float, float, float, float]]] = []
     for texte, zone in labels:
@@ -126,6 +159,7 @@ def drop_accelerator_fragments(
     return gardes
 
 
+@keyword
 def selection_criteria(labels: Iterable[Mapping[str, Any]],
                        fields: Iterable[Mapping[str, Any]]) -> dict[str, str]:
     """Carte ``{CHAMP_TECHNIQUE: SID}`` des critères d'un écran de sélection.
@@ -137,6 +171,13 @@ def selection_criteria(labels: Iterable[Mapping[str, Any]],
     d'autres que les critères de table). Deux libellés candidats à la même
     distance, ou un même nom de champ revendiqué par deux critères, lèvent une
     ``ValueError`` nommant les candidats.
+
+    À ne pas confondre avec le keyword homonyme de
+    ``sapfx_common.cross_channel``, qui lit la signature d'un écran SAP GUI.
+
+    Exemple :
+    | ${criteria}=    `Selection Criteria`    ${labels}    ${fields}
+    | Should Be Equal    ${criteria}[PRODUCT_ID]    wnd[0]/usr/ctxtI2-LOW
     """
     brutes: list[tuple[str, tuple[float, float, float, float]]] = []
     for entry in labels or ():
@@ -223,6 +264,7 @@ def selection_criteria(labels: Iterable[Mapping[str, Any]],
     return dict(sorted(criteres.items()))
 
 
+@keyword
 def missing_criterion_message(field: str, criteria: Mapping[str, str]) -> str:
     """Le message d'un critère absent, qui LISTE ce que l'écran porte vraiment.
 
@@ -230,6 +272,11 @@ def missing_criterion_message(field: str, criteria: Mapping[str, str]) -> str:
     dans le choix des champs de sélection (réglage persistant par utilisateur),
     pas une faute de frappe : la liste tranche entre les deux sans retourner
     sur le système.
+
+    Exemple :
+    | ${criteria}=    Selection Criteria    ${labels}    ${fields}
+    | ${message}=    `Missing Criterion Message`    SUPPLIER_GUID    ${criteria}
+    | Should Contain    ${message}    PRODUCT_ID
     """
     connus = ", ".join(sorted(criteria)) or "aucun"
     return ("Aucun critère de sélection %s sur l'écran courant. Critères "

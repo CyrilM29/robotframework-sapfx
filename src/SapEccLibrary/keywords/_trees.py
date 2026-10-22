@@ -13,6 +13,8 @@ Les clés sont rendues TELLES QUELLES (complétées à gauche sur un arbre à
 colonnes : ``'01  1      1'``). Logique pure dans ``sapfx_common.tree_nodes``.
 Tous les retours sont JSON-safe (rf-mcp).
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
@@ -26,6 +28,7 @@ from sapfx_common.tree_nodes import (
     split_path,
     unique_match,
 )
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 _TRUTHY = ("1", "true", "yes", "on")
 
@@ -62,6 +65,15 @@ def _collection(obj):
 
 class TreeKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        def element_should_be_present(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
 
     # Même profondeur de descente que le résolveur de grille : les releases
     # récentes enveloppent les contrôles dans des GuiSplitterShell.
@@ -164,8 +176,14 @@ class TreeKeywords:
             level = int(tree.GetNodeLevel(key))
         except (AttributeError, com_error, TypeError, ValueError):
             pass
+        expanded = None
+        if folder:
+            try:
+                expanded = bool(tree.IsFolderExpanded(key))
+            except (AttributeError, com_error):
+                pass
         return TreeNode(key=str(key), text=text.strip(), level=level,
-                        folder=folder, children=children, columns=values)
+                        folder=folder, children=children, columns=values, expanded=expanded)
 
     def _all_nodes(self, tree, max_nodes):
         keys = _collection(tree.GetAllNodeKeys())
@@ -178,11 +196,13 @@ class TreeKeywords:
         columns = self._tree_columns(tree)
         return [self._node(tree, key, columns) for key in keys]
 
-    def read_tree_nodes(self, tree_id, max_nodes=500):
+    def read_tree_nodes(self, tree_id: GuiElementIdInput, max_nodes: int = 500):
         """Lit les nœuds RENDUS d'un arbre : liste de dicts ``{key, text,
-        level, folder, children, columns}`` dans l'ordre de l'arbre (les
-        nœuds d'un dossier replié n'existent pas encore : `Expand Tree Node`
-        d'abord). ``key`` est la clé opaque telle quelle (la repasser
+        level, folder, children, columns, expanded}`` dans l'ordre de l'arbre
+        (les nœuds d'un dossier replié n'existent pas encore : `Expand Tree
+        Node` d'abord ; ``expanded`` faux dit qu'un ``children`` à 0 ne prouve
+        pas un dossier vide, mesuré sur SBGRFCMON dont l'arbre ne charge ses
+        nœuds qu'à l'expansion). ``key`` est la clé opaque telle quelle (la repasser
         intacte, padding compris) ; ``columns`` porte les colonnes d'un arbre
         de type 2. Plafond ATTEINT = échec (jamais une liste tronquée en
         silence).
@@ -194,7 +214,7 @@ class TreeKeywords:
         tree = self._tree(tree_id)
         return [node.as_dict() for node in self._all_nodes(tree, max_nodes)]
 
-    def read_tree_children(self, tree_id, key):
+    def read_tree_children(self, tree_id: GuiElementIdInput, key):
         """Les enfants DIRECTS du nœud ``key`` (``GetSubNodesCol``), même
         forme que `Read Tree Nodes` ; liste vide pour une feuille.
 
@@ -211,7 +231,7 @@ class TreeKeywords:
         columns = self._tree_columns(tree)
         return [self._node(tree, k, columns).as_dict() for k in keys]
 
-    def get_selected_tree_node(self, tree_id):
+    def get_selected_tree_node(self, tree_id: GuiElementIdInput):
         """La clé du nœud sélectionné (``SelectedNode``), ``""`` si aucun.
 
         Exemple :
@@ -221,7 +241,7 @@ class TreeKeywords:
         """
         return str(self._tree(tree_id).SelectedNode or "")
 
-    def select_tree_node(self, tree_id, key, expand=False):
+    def select_tree_node(self, tree_id: GuiElementIdInput, key, expand: bool = False):
         """Sélectionne le nœud ``key`` par ``SelectNode`` (la voie qui passe
         sur tous les nœuds relevés, là où l'affectation de ``selectedNode`` du
         keyword hérité échouait par intermittence), le développe si
@@ -287,7 +307,7 @@ class TreeKeywords:
         self.wait_until_busy_done()
         return True
 
-    def expand_tree_node(self, tree_id, key):
+    def expand_tree_node(self, tree_id: GuiElementIdInput, key):
         """Développe le nœud ``key`` (``ExpandNode``) et retourne ses enfants
         (`Read Tree Children`) : le geste « ouvrir un dossier et voir ce qu'il
         contient » en un keyword.
@@ -305,7 +325,7 @@ class TreeKeywords:
         self.wait_until_busy_done()
         return self.read_tree_children(tree_id, key)
 
-    def get_tree_node_key_by_text(self, tree_id, text, exact=False):
+    def get_tree_node_key_by_text(self, tree_id: GuiElementIdInput, text, exact: bool = False):
         """La clé du SEUL nœud rendu dont le texte correspond (préfixe
         insensible à la casse, ``exact=True`` pour l'égalité). Ambiguïté
         remontée avec les candidats, jamais tranchée.
@@ -319,7 +339,7 @@ class TreeKeywords:
                             "dans l'arbre '%s'" % tree_id)
         return node.key
 
-    def select_tree_node_by_text(self, tree_id, text, exact=False, expand=False):
+    def select_tree_node_by_text(self, tree_id: GuiElementIdInput, text, exact: bool = False, expand: bool = False):
         """`Get Tree Node Key By Text` puis `Select Tree Node` : retourne la clé.
 
         Exemple :
@@ -329,7 +349,7 @@ class TreeKeywords:
         key = self.get_tree_node_key_by_text(tree_id, text, exact)
         return self.select_tree_node(tree_id, key, expand)
 
-    def select_tree_node_by_path(self, tree_id, path, exact=False, expand=True):
+    def select_tree_node_by_path(self, tree_id: GuiElementIdInput, path, exact: bool = False, expand: bool = True):
         """Descend un CHEMIN de textes (``Favorites > URL - ABAP Samples``,
         séparateur ``>``) niveau par niveau : à chaque niveau, l'enfant dont le
         texte correspond est sélectionné (et développé si ``expand``, pour que
@@ -368,7 +388,7 @@ class TreeKeywords:
         assert current is not None
         return self.select_tree_node(tree_id, current.key)
 
-    def double_click_tree_node(self, tree_id, key):
+    def double_click_tree_node(self, tree_id: GuiElementIdInput, key):
         """Double-clique le nœud ``key`` (``DoubleClickNode`` : l'action
         d'ouverture, celle d'un double-clic utilisateur sur une transaction du
         menu SAP).
@@ -386,8 +406,12 @@ class TreeKeywords:
                              % (key, tree_id, exc))
         self.wait_until_busy_done()
 
-    def select_node(self, tree_id, node_id, expand=False):
-        """Le `Select Node` de robotframework-sapguilibrary, même signature :
+    def select_node(self, tree_id: GuiElementIdInput, node_id, expand: bool = False):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité : dans
+        une suite neuve, préférer `Select Tree Node`, au nom explicite et au même effet,
+        ou `Select Tree Node By Text`.
+
+        Le `Select Node` de robotframework-sapguilibrary, même signature :
         passe par ``SelectNode`` (jamais l'affectation de ``selectedNode``, qui
         échouait par intermittence avec une ``AttributeError`` COM non
         actionnable), et vérifie la sélection. Voir `Select Tree Node`.
@@ -399,8 +423,10 @@ class TreeKeywords:
         """
         self.select_tree_node(tree_id, node_id, expand)
 
-    def select_node_link(self, tree_id, link_id1, link_id2):
-        """Sélectionne puis clique le LIEN de l'item (``link_id1``, clé du
+    def select_node_link(self, tree_id: GuiElementIdInput, link_id1, link_id2):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité.
+
+        Sélectionne puis clique le LIEN de l'item (``link_id1``, clé du
         nœud ; ``link_id2``, nom de la colonne) d'un arbre à colonnes
         ``tree_id`` (``SelectItem`` puis ``ClickLink``). Absorbé de
         robotframework-sapguilibrary le 2026-10-06 (Apache License 2.0, voir
@@ -438,7 +464,7 @@ class TreeKeywords:
         tree.clickLink(link_id1, link_id2)
         self._explicit_pause()
 
-    def find_tree_nodes_by_column(self, tree_id, column, value, exact=True):
+    def find_tree_nodes_by_column(self, tree_id: GuiElementIdInput, column, value, exact: bool = True):
         """TOUS les nœuds rendus dont la COLONNE ``column`` vaut ``value``
         (liste de dicts, comme `Read Tree Nodes`). Les moniteurs de statut
         (BD87) ont des clés de nœud POSITIONNELLES (``N1``, ``N2``...) et un
@@ -449,7 +475,9 @@ class TreeKeywords:
         Exemple :
         | ${posted}=    `Find Tree Nodes By Column`    wnd[0]/usr/cntlTREE_CONTAINER/shellcont/shell    Column2    53
         | Length Should Be    ${posted}    1
-        | Should Be Equal    ${posted}[0][key]    N7
+        | `Select Tree Node`    wnd[0]/usr/cntlTREE_CONTAINER/shellcont/shell    ${posted}[0][key]
+        | ${selected}=    `Get Selected Tree Node`    wnd[0]/usr/cntlTREE_CONTAINER/shellcont/shell
+        | Should Be Equal    ${selected}    ${posted}[0][key]
         """
         tree = self._tree(tree_id)
         try:
@@ -459,7 +487,7 @@ class TreeKeywords:
             raise AssertionError(str(err)) from err
         return [n.as_dict() for n in found]
 
-    def find_tree_nodes(self, tree_id, text, exact=False):
+    def find_tree_nodes(self, tree_id: GuiElementIdInput, text, exact: bool = False):
         """TOUS les nœuds rendus dont le texte correspond (liste de dicts) :
         la sonde qui précède un choix quand un texte se répète.
 

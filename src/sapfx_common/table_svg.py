@@ -1,4 +1,4 @@
-"""Rendu d'un relevé tabulaire en **SVG**, logique pure.
+"""Rendu d'un relevé tabulaire en *SVG*, logique pure.
 
 Le dépôt sait déjà restituer une mesure en JSON déterministe
 (:mod:`sapfx_common.artifacts`) et en Markdown (les rapports de posture, de
@@ -21,7 +21,7 @@ les titres AFFICHÉS via ``headers`` quand le document est destiné à un lecteu
 humain. Le second choix rend le fichier localisé : c'est voulu, et c'est
 pourquoi il se demande.
 
-**Trois choix de rendu, et leurs raisons.**
+*Trois choix de rendu, et leurs raisons.*
 
 1. Police monospace pour les cellules. La largeur d'une colonne se CALCULE
    alors (avance fixe), là qu'une police proportionnelle obligerait soit à
@@ -48,14 +48,19 @@ from sapfx_common._tabular import table_columns, xml_escape
 from sapfx_common._tabular import row_limit
 from sapfx_common.robot_args import as_optional_int
 
-__all__ = [
-    "CHAR_WIDTH_RATIO",
-    "svg_escape",
-    "table_columns",
-    "column_widths",
-    "render_table_svg",
-    "write_table_svg",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["CHAR_WIDTH_RATIO", "write_table_svg"]
 
 #: Avance d'un caractère dans une police monospace, en fraction de la taille de
 #: police. 0.6 est la valeur des monospaces courantes (Consolas, DejaVu Sans
@@ -82,6 +87,10 @@ def svg_escape(text: Any) -> str:
     sont retirés : non représentables en XML 1.0, ils feraient rejeter le
     document ENTIER par une visionneuse stricte, et une valeur lue sur un
     écran peut en porter. Une valeur ``None`` devient une chaîne vide.
+
+    Exemple :
+    | ${text}=    `Svg Escape`    Method &1 for class &2
+    | Should Be Equal    ${text}    Method &amp;1 for class &amp;2
     """
     return xml_escape(text)
 
@@ -97,6 +106,11 @@ def column_widths(rows: Sequence[Mapping[str, Any]], columns: Sequence[str],
     et c'est lui qui décide des cellules tronquées : les deux mesures viennent
     donc de la même règle, et un rendu ne peut pas couper un texte que le
     calcul de largeur aurait cru entier.
+
+    Exemple :
+    | @{columns}=    Create List    MANDT    MTEXT    ORT01
+    | ${widths}=    `Column Widths`    ${rows}    ${columns}
+    | Should Be Equal    ${widths}    ${{ [61, 69, 84] }}
     """
     largeurs = []
     entetes = list(labels) if labels else [str(c) for c in columns]
@@ -132,6 +146,10 @@ def render_table_svg(rows: Iterable[Mapping[str, Any]],
     ANNONCÉES dans le pied du document, et une cellule coupée porte sa valeur
     complète en infobulle : un tableau rendu ne doit jamais faire croire qu'il
     montre tout.
+
+    Exemple :
+    | ${svg}=    `Render Table Svg`    ${rows}    title=T000 (A4H)    headers=${headers}
+    | Should Start With    ${svg}    <svg xmlns=
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -272,6 +290,7 @@ def _truncated_cells(lignes: Sequence[Mapping[str, Any]],
                if _cell_text(ligne.get(colonne), plafond)[1])
 
 
+@keyword
 def write_table_svg(path: str, rows: Iterable[Mapping[str, Any]],
                     columns: Optional[Sequence[str]] = None,
                     title: Optional[str] = None,
@@ -289,6 +308,11 @@ def write_table_svg(path: str, rows: Iterable[Mapping[str, Any]],
     Le fichier est écrit en UTF-8 avec des fins de ligne LF quelle que soit la
     plateforme : un artefact committé ne doit pas différer selon le poste qui
     l'a produit.
+
+    Exemple :
+    | ${verdict}=    `Write Table Svg`    ${OUTPUT DIR}/T000_A4H.svg    ${rows}
+    | ...    title=T000 (A4H)    headers=${headers}
+    | Should Be Equal As Integers    ${verdict}[truncated_rows]    0
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)

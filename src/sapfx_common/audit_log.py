@@ -6,8 +6,8 @@ approbation, transaction lancée, écriture permise, approuvée ou refusée. Les
 LECTURES ne s'y inscrivent pas (une campagne en fait des milliers, et elles
 ne changent rien sur la cible).
 
-Deux supports : la mémoire de l'instance de bibliothèque (`Get Audit Trail`,
-portée de la suite) et, en option, un fichier **JSONL cumulatif**
+Deux supports : la mémoire de l'instance de bibliothèque (portée de la
+suite) et, en option, un fichier **JSONL cumulatif**
 (``SAPFX_AUDIT_LOG=<chemin>``, une ligne par entrée, en append), sur le patron
 de ``healing_telemetry``. Une entrée porte la DÉCISION et sa CIBLE nommée
 (code de transaction, identifiant d'élément, méthode et chemin HTTP sans la
@@ -98,7 +98,7 @@ class AuditTrail:
             try:
                 from robot.api import logger
                 logger.warn("Journal d'audit %s non écrit (%s) : l'entrée reste dans "
-                            "la trace en mémoire (`Get Audit Trail`)." % (path, exc))
+                            "la trace en mémoire." % (path, exc))
             except Exception:               # noqa: BLE001 (hors Robot)
                 pass
 

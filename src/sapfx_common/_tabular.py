@@ -165,6 +165,10 @@ def table_columns(rows: Iterable[Mapping[str, Any]],
     confrontée à quoi que ce soit, donc la liste demandée est prise telle
     quelle et le fichier produit ne porte que son en-tête. Refuser reviendrait
     à interdire d'écrire l'en-tête d'un résultat légitimement vide.
+
+    Exemple :
+    | ${columns}=    `Table Columns`    ${rows}
+    | Should Be Equal    ${columns}    ${{ ['MANDT', 'MTEXT', 'ORT01'] }}
     """
     lignes = normalize_rows(rows)
     vues: list[str] = []

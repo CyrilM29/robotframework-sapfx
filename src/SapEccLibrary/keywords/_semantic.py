@@ -10,6 +10,8 @@ Deux garanties de la maison : l'ambiguïté n'est *jamais* tranchée en silence
 (échec avec la liste des candidats), et les keywords retournent des *chaînes*
 id (jamais l'objet COM : sûr à travers la frontière rf-mcp).
 """
+from typing import TYPE_CHECKING, Any
+
 import re
 
 from pythoncom import com_error
@@ -83,7 +85,18 @@ def _as_radius(scope_radius):
 class SemanticKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
-    def find_element_by_label(self, locator, control_types=None, exact=False,
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def click_element(self, *args: Any, **kwargs: Any) -> Any: ...
+        def get_value(self, *args: Any, **kwargs: Any) -> Any: ...
+        def input_text(self, *args: Any, **kwargs: Any) -> Any: ...
+        def select_checkbox(self, *args: Any, **kwargs: Any) -> Any: ...
+        def select_radio_button(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+        def unselect_checkbox(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def find_element_by_label(self, locator, control_types=None, exact: bool = False,
                               scope_radius=None):
         """Résout un localisateur *humain* en id SAP GUI (chaîne, collable partout).
 
@@ -131,7 +144,7 @@ class SemanticKeywords:
                                              fallback_types=None if types else _READ_TYPES
                                              ).element.id
 
-    def fill_field_by_label(self, label, value, exact=False, scope_radius=None):
+    def fill_field_by_label(self, label, value, exact: bool = False, scope_radius=None):
         """Saisit ``value`` dans le champ désigné par son *libellé* (même
         grammaire que `Find Element By Label`, cibles restreintes aux champs de
         saisie *modifiables* ; un champ en lecture seule, comme le « to » d'un
@@ -153,7 +166,7 @@ class SemanticKeywords:
         self.input_text(eid, value)
         return eid
 
-    def read_field_by_label(self, label, exact=False, scope_radius=None):
+    def read_field_by_label(self, label, exact: bool = False, scope_radius=None):
         """Retourne la *valeur actuelle* du champ désigné par son libellé
         (relue via COM à l'instant de l'appel, pas depuis la perception).
 
@@ -178,7 +191,7 @@ class SemanticKeywords:
                                             ).element.id
         return self.get_value(eid)
 
-    def click_button_by_label(self, label, exact=False, scope_radius=None):
+    def click_button_by_label(self, label, exact: bool = False, scope_radius=None):
         """Clique le bouton (ou onglet) désigné par son texte ou son tooltip.
         ``exact=False`` ignore le suffixe raccourci clavier des tooltips SAP
         (``Enregistrer (Ctrl+S)`` matché par ``Enregistrer``). Les entrées de
@@ -314,7 +327,7 @@ class SemanticKeywords:
                 % (field_id, iso_date))
         return self.get_value(field_id)
 
-    def select_checkbox_by_label(self, label, exact=False, scope_radius=None):
+    def select_checkbox_by_label(self, label, exact: bool = False, scope_radius=None):
         """Coche la case désignée par son TEXTE PROPRE (« Sched. ») ou par un
         libellé voisin (même grammaire que `Find Element By Label`, cibles
         restreintes aux ``GuiCheckBox``). Retourne l'id résolu.
@@ -329,7 +342,7 @@ class SemanticKeywords:
         self.select_checkbox(eid)
         return eid
 
-    def unselect_checkbox_by_label(self, label, exact=False, scope_radius=None):
+    def unselect_checkbox_by_label(self, label, exact: bool = False, scope_radius=None):
         """Décoche la case désignée par son texte ou un libellé voisin.
 
         Exemple :
@@ -342,7 +355,7 @@ class SemanticKeywords:
         self.unselect_checkbox(eid)
         return eid
 
-    def select_radio_button_by_label(self, label, exact=False, scope_radius=None):
+    def select_radio_button_by_label(self, label, exact: bool = False, scope_radius=None):
         """Sélectionne le bouton radio désigné par son texte propre
         (« Professional User Transaction ») ou un libellé voisin. Retourne l'id.
 
@@ -357,7 +370,7 @@ class SemanticKeywords:
         self.select_radio_button(eid)
         return eid
 
-    def checkbox_by_label_should_be(self, label, expected, exact=False,
+    def checkbox_by_label_should_be(self, label, expected, exact: bool = False,
                                     scope_radius=None):
         """Échoue si la case désignée par son texte n'est pas dans l'état
         ``expected`` (``checked`` / ``unchecked``, ou un booléen).
@@ -510,8 +523,12 @@ class SemanticKeywords:
             "avec 'Gauche @ Haut', exact=True ou control_types.\nCandidats :\n%s"
             % (locator, len(matches), candidates))
 
-    def lookup_business_term(self, term, domain=None, threshold=0.8):
-        """Résout un *terme métier* (français ou anglais, synonymes compris)
+    def lookup_business_term(self, term, domain=None, threshold: float = 0.8):
+        """*DEPRECATED* depuis la 0.8.6 : employer ``Lookup Business Term`` de
+        ``sapfx_common.vocabulary`` (``Library    sapfx_common.vocabulary``), même
+        contrat et même résultat. Ce keyword sera retiré deux versions plus tard.
+
+        Résout un *terme métier* (français ou anglais, synonymes compris)
         vers sa fiche SAP : canonique, champ ABAP, table de référence, domaine.
 
         Le pont entre la langue d'un plan de test (« le fournisseur », « la

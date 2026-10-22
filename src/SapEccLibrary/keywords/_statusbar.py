@@ -10,9 +10,13 @@ localisé (``MO/E/402`` contre ``MO/E/410``) : la convention #3 côté SAP GUI,
 au même grain que `Rfc Should Fail With Message Id` côté RFC. Logique pure
 dans ``sapfx_common.status_message``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 
-from sapfx_common.robot_args import as_name_list
+from sapfx_common import touch_log
+from sapfx_common.robot_args import OptionalNameListInput, as_name_list
+from sapfx_common.transaction_code import TransactionCodeInput
 from sapfx_common.status_message import (
     format_identity_mismatch,
     identity_matches,
@@ -25,6 +29,18 @@ _MAX_PARAMETERS = 4          # SAP porte quatre variables &1 à &4 dans un messa
 
 class StatusBarKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), déclaré pour mypy seulement :
+        # `Transaction Start Should Be Refused` est annoté (type NameList),
+        # donc son corps est vérifié.
+        session: Any
+        def _has_nav_prefix(self, transaction: str) -> bool: ...
+        def _screen_identity_or_none(self) -> Any: ...
+        def _modal_open(self) -> Any: ...
+        def send_vkey(self, vkey_id: Any, window: int = 0) -> None: ...
+        def wait_until_busy_done(self, timeout: Any = None) -> None: ...
+        def take_screenshot(self, screenshot_name: str = ...) -> Any: ...
 
     def _statusbar_parameters(self, status):
         method = getattr(status, "MessageParameter", None)
@@ -78,7 +94,9 @@ class StatusBarKeywords:
                 format_identity_mismatch(identity, message_class, message_number, message_type))
         return identity
 
-    def transaction_start_should_be_refused(self, transaction, accepted_identities=None):
+    def transaction_start_should_be_refused(
+            self, transaction: TransactionCodeInput,
+            accepted_identities: OptionalNameListInput = None):
         """Lance ``transaction`` et échoue sauf si son LANCEMENT est refusé :
         la transaction active n'est pas celle demandée et la barre de statut
         porte un message de type ``E`` ou ``A``. Rend l'identité du refus
@@ -119,6 +137,7 @@ class StatusBarKeywords:
             raise AssertionError(
                 "The SAP session is unreadable before starting '%s': a refusal "
                 "could not be told from a session that is gone." % code)
+        touch_log.record_transaction("SapEccLibrary", code)
         self.session.findById("wnd[0]/tbar[0]/okcd").text = okcode
         self.send_vkey(0)
         self.wait_until_busy_done()

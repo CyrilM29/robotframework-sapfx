@@ -27,6 +27,8 @@ la réécrire, et l'oublier.
 Extrait de ``_actions.py`` / ``_engines.py`` (convention #13).
 """
 
+from typing import TYPE_CHECKING, Any
+
 from .._ui5_js import (
     RESOLVE_ROLE_JS,
     TABLE_INFO_JS,
@@ -39,9 +41,16 @@ class TableKeywords:
     """Mixin composé dans :class:`SapFioriLibrary` (voir ce module).
     Suppose la plomberie de ``_base.py`` disponible par composition."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _pick_id(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resolve(self, *args: Any, **kwargs: Any) -> Any: ...
+
     # -- tables UI5 ------------------------------------------------------------
 
-    def get_ui5_table_info(self, index=0, **selector_parts):
+    def get_ui5_table_info(self, index: int = 0, **selector_parts):
         """Ce qu'une table UI5 DÉCLARE contenir, sans lire ses lignes.
 
         Le complément indispensable de `Read Ui5 Table` : celui-ci rend les

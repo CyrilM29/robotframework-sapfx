@@ -306,13 +306,9 @@ resolution; a unit test guards the sync. SAP's built-in **UI5 Test Recorder**
       runtime (light-DOM `ui5-*` scan, scoped tags, shadow-piercing click/fill,
       recorder capture; offline fixture smoke 6/6), fallback chain extended to
       role→xpath→sid→wc, healing telemetry journal (`SAPFX_HEALING_LOG`).
-- [x] **Visual channel parity with ECC**: `Get Ui5 Perceptual Hash` +
-      `Ui5 Screen Should Match Baseline`: the same snapshot-baseline cycle as
-      `Screen Should Match Baseline` (shared `sapfx_common.visual_baseline`),
-      over a Browser-library page capture. Covers what the UI5 tree does not
-      say (canvas, images, a globally altered theme/rendering). The viewport
-      size is part of the fingerprint, so the ECC option is mirrored here:
-      `per_resolution=True` keeps one baseline per capture geometry.
+- [x] **Visual channel** (perceptual-hash baselines over a page capture,
+      for what the UI5 tree does not say): moved to the workshop tools with
+      version 0.8.6.
 
 ## Trademarks
 

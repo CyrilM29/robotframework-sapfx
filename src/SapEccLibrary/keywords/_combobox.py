@@ -12,9 +12,13 @@ et les nombres dans sa notation décimale (``DCPFM``) ; une saisie ISO est
 refusée par un message de type ``E`` (00/065). Logique pure dans
 ``sapfx_common.combo_box`` et ``sapfx_common.user_formats``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
+from robot.api.deco import keyword
 
+from sapfx_common.gui_element_id import GuiElementIdInput
 from sapfx_common.combo_box import (
     entries_as_dicts,
     find_by_key,
@@ -52,6 +56,13 @@ def _as_bool(value):
 class ComboBoxKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def get_value(self, *args: Any, **kwargs: Any) -> Any: ...
+        def input_text(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
     def _combo(self, element_id):
         element_type = self.get_element_type(element_id)
         if element_type != "GuiComboBox":
@@ -60,7 +71,7 @@ class ComboBoxKeywords:
                 "Element '%s' est un %s, pas une GuiComboBox." % (element_id, element_type))
         return self.session.findById(element_id)
 
-    def get_combo_box_entries(self, element_id):
+    def get_combo_box_entries(self, element_id: GuiElementIdInput):
         """Les entrées d'une combo box : liste de dicts ``{key, value}`` dans
         l'ordre d'affichage, la CLÉ étant la donnée technique (``A`` pour
         « Dialog » dans SU01) et la valeur le libellé localisé.
@@ -75,7 +86,7 @@ class ComboBoxKeywords:
         except (AttributeError, com_error) as exc:
             raise ValueError("Les entrées de '%s' sont illisibles (%s)." % (element_id, exc))
 
-    def get_combo_box_key(self, element_id):
+    def get_combo_box_key(self, element_id: GuiElementIdInput):
         """La CLÉ de l'entrée sélectionnée (``Key``), rendue TELLE QUELLE :
         l'ancre locale-safe d'une assertion, là où `Get Value` rend le libellé.
         Aucun blanc n'est retiré : une combo peut porter deux entrées de clés
@@ -90,7 +101,7 @@ class ComboBoxKeywords:
         key = getattr(combo, "Key", "")
         return "" if key is None else str(key)
 
-    def select_combo_box_entry_by_key(self, element_id, key):
+    def select_combo_box_entry_by_key(self, element_id: GuiElementIdInput, key):
         """Sélectionne l'entrée de clé ``key`` (``.Key = ...``) et vérifie la
         sélection en la relisant sur l'élément RÉ-ACQUIS par son id après
         l'aller-retour : une combo à code fonction (le rôle de la transaction
@@ -168,8 +179,12 @@ class ComboBoxKeywords:
                 "ré-acquis." % (element_id, wanted, fault))
         return actual
 
-    def select_from_list_by_label(self, element_id, value):
-        """Surcharge du keyword hérité : même signature, sélection par
+    def select_from_list_by_label(self, element_id: GuiElementIdInput, value):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité : dans
+        une suite neuve, préférer `Select Combo Box Entry By Key`, dont la clé ne dépend
+        pas de la langue de connexion.
+
+        Surcharge du keyword hérité : même signature, sélection par
         LIBELLÉ (préfixe insensible à la casse, puis égalité si plusieurs),
         avec les trois échecs actionnables que l'hérité ne donnait pas : combo
         en affichage, libellé inconnu (entrées listées), libellé ambigu. La
@@ -212,6 +227,7 @@ class ComboBoxKeywords:
 
     # -- formats de l'utilisateur ---------------------------------------------
 
+    @keyword(tags=["touches:transaction:SU3"])
     def get_user_formats(self):
         """Lit les formats de l'UTILISATEUR connecté dans SU3 (onglet Defaults,
         clés techniques des combos, jamais leurs libellés) et revient à l'écran
@@ -252,7 +268,7 @@ class ComboBoxKeywords:
                 % keyword)
         return formats
 
-    def input_date(self, element_id, iso_date, date_format=None):
+    def input_date(self, element_id: GuiElementIdInput, iso_date, date_format=None):
         """Saisit une date donnée en ISO 8601 (``2026-09-01``) dans le champ
         ``element_id``, CONVERTIE au format de l'utilisateur (``01.09.2026``
         pour ``DD.MM.YYYY``) : la suite reste locale-safe. ``date_format`` =
@@ -271,7 +287,7 @@ class ComboBoxKeywords:
         self.input_text(element_id, text)
         return text
 
-    def read_date_field(self, element_id, date_format=None):
+    def read_date_field(self, element_id: GuiElementIdInput, date_format=None):
         """Lit la date AFFICHÉE dans ``element_id`` au format de l'utilisateur
         (``01.01.2038`` pour ``DD.MM.YYYY``) et la rend en ISO 8601
         (``2038-01-01``) : le miroir d'`Input Date`, pour qu'une suite compare
@@ -301,7 +317,7 @@ class ComboBoxKeywords:
                                  % element_id)
         return parse_date(shown, key)
 
-    def read_time_field(self, element_id, time_format=None):
+    def read_time_field(self, element_id: GuiElementIdInput, time_format=None):
         """Lit l'heure AFFICHÉE dans ``element_id`` au format ``TIMEFM`` de
         l'utilisateur et la rend en ``HH:MM:SS`` sur 24 heures : le pendant
         de `Read Date Field` pour les heures. ``time_format`` = clé ``TIMEFM``
@@ -335,7 +351,7 @@ class ComboBoxKeywords:
                                  % element_id)
         return parse_time(shown, key)
 
-    def input_number(self, element_id, value, decimal_notation=None, decimals=None):
+    def input_number(self, element_id: GuiElementIdInput, value, decimal_notation=None, decimals=None):
         """Saisit un nombre donné en notation TECHNIQUE (``1234.5``) dans le
         champ ``element_id``, converti à la notation décimale de l'utilisateur
         (``1234,5`` pour ``1.234.567,89``). ``decimal_notation`` = clé ``DCPFM``

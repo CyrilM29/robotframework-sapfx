@@ -19,8 +19,11 @@ changé, et pourquoi :
 `Element Is Changeable` et ses deux assertions vivent ici aussi : ce sont
 des lectures d'état d'un élément, au même titre que sa valeur.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 
+from sapfx_common.gui_element_id import GuiElementIdInput
 from sapfx_common.tree_nodes import is_progid
 
 # Le keyword qui sait lire un shell, nommé quand `Get Value` refuse son ProgID.
@@ -47,7 +50,14 @@ class ElementKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Lectures d'élément ; seuls
     `Set Focus` et `Maximize Window` agissent sur l'écran."""
 
-    def get_element_type(self, element_id):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def get_element_type(self, element_id: GuiElementIdInput):
         """Retourne le type SAP de ``element_id`` (``GuiButton``, ``GuiTab``...).
 
         Un élément absent échoue en nommant l'écran courant. C'est le chemin
@@ -66,7 +76,7 @@ class ElementKeywords:
             raise ValueError(self._absence_message(
                 "Cannot find element with id '%s'" % element_id)) from None
 
-    def element_should_be_present(self, element_id, message=None):
+    def element_should_be_present(self, element_id: GuiElementIdInput, message=None):
         """Échoue si ``element_id`` est absent de l'écran courant.
 
         Le message d'échec nomme l'écran réel (voir `Get Element Type`). Un
@@ -85,7 +95,7 @@ class ElementKeywords:
             raise ValueError(self._absence_message(
                 "Cannot find Element '%s'." % element_id)) from None
 
-    def get_value(self, element_id):
+    def get_value(self, element_id: GuiElementIdInput):
         """Retourne la valeur de ``element_id``, selon son type : le texte d'un
         champ, d'un libellé, d'un bouton, d'un onglet, d'une barre de titre ou
         de statut ; ``checked`` / ``unchecked`` pour une case ou un bouton
@@ -131,7 +141,7 @@ class ElementKeywords:
         except (AttributeError, com_error):
             return ""
 
-    def set_focus(self, element_id):
+    def set_focus(self, element_id: GuiElementIdInput):
         """Place le focus sur ``element_id`` (sans effet sur un volet de la
         barre de statut, qui ne le prend pas).
 
@@ -144,8 +154,11 @@ class ElementKeywords:
             self.session.findById(element_id).setFocus()
         self._explicit_pause()
 
-    def get_element_location(self, element_id):
-        """Position ÉCRAN de ``element_id`` : le couple ``(gauche, haut)`` en
+    def get_element_location(self, element_id: GuiElementIdInput):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité ; `Get
+        Element Screen Region` rend aussi la taille de l'élément.
+
+        Position ÉCRAN de ``element_id`` : le couple ``(gauche, haut)`` en
         pixels physiques (``ScreenLeft`` / ``ScreenTop``). `Get Element Screen
         Region` rend aussi la largeur et la hauteur.
 
@@ -174,7 +187,7 @@ class ElementKeywords:
             self.take_screenshot()
             raise ValueError("Cannot find window with locator '%s'" % locator) from None
 
-    def maximize_window(self, window=0):
+    def maximize_window(self, window: int = 0):
         """Agrandit la fenêtre ``wnd[window]`` (défaut : la principale).
 
         Exemple :
@@ -189,7 +202,7 @@ class ElementKeywords:
                              "open?" % window) from None
         self._explicit_pause()
 
-    def element_is_changeable(self, element_id):
+    def element_is_changeable(self, element_id: GuiElementIdInput):
         """``True`` si ``element_id`` est MODIFIABLE (propriété ``Changeable``
         de l'API Scripting), ``False`` sinon. Sur un bouton, elle dit s'il est
         actif. Lève si l'élément est absent, avec l'écran réel nommé (même
@@ -220,7 +233,7 @@ class ElementKeywords:
                 % (element_id, getattr(element, "Type", "type inconnu"), exc)) from exc
         return bool(changeable)
 
-    def element_should_be_changeable(self, element_id, message=None):
+    def element_should_be_changeable(self, element_id: GuiElementIdInput, message=None):
         """Échoue si ``element_id`` n'est pas modifiable (voir `Element Is
         Changeable`) : l'écran est en affichage, ou le champ est protégé.
         ``message`` remplace le message par défaut.
@@ -235,7 +248,7 @@ class ElementKeywords:
                 "affichage, ou champ protégé.\n%s"
                 % (element_id, self._absence_message("").strip())))
 
-    def element_should_not_be_changeable(self, element_id, message=None):
+    def element_should_not_be_changeable(self, element_id: GuiElementIdInput, message=None):
         """Échoue si ``element_id`` est modifiable (voir `Element Is
         Changeable`) : la garde qu'un écran est bien en AFFICHAGE avant d'y
         lire une valeur qu'une saisie accidentelle ne doit pas toucher.

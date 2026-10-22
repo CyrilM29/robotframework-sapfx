@@ -11,6 +11,8 @@ restreint (qui en serait refusé au lancement).
 Lecture seule. Logique pure (appariement des couples champ/valeur, lecture
 « avant / après », filtre) dans ``sapfx_common.authorization_failures``.
 """
+from robot.api.deco import keyword
+
 from sapfx_common import authorization_failures as journal
 from sapfx_common.robot_args import as_optional_int
 
@@ -27,6 +29,7 @@ class AuthorizationFailureKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée
     sous un utilisateur autorisé à lire SU53 pour un autre utilisateur."""
 
+    @keyword(tags=["touches:transaction:SU53"])
     def read_authorization_check_failures(self, user, max_rows=None):
         """Lit le journal des contrôles d'autorisation ÉCHOUÉS de ``user``
         (SU53, « Display for Different User ») et le rend en liste de dicts

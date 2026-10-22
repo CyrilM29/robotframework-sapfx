@@ -11,6 +11,8 @@ propriete inconnue = echec listant les proprietes disponibles) et
 
 Extrait de ``SapFioriLibrary.py`` (convention #13).
 """
+from typing import TYPE_CHECKING, Any
+
 import json
 
 from robot.api import logger
@@ -38,6 +40,7 @@ from .._ui5_runtime import (
     selector_to_json,
     table_read_verdict,
 )
+from sapfx_common.argument_types import Ui5XpathInput
 
 
 
@@ -47,9 +50,24 @@ class ActionKeywords:
     Suppose la page active de Browser accessible via ``self._browser()``
     et la plomberie de ``_base.py`` disponible par composition."""
 
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _act_with_retry(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _browser(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _pick_id(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _relaxed_hint(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resolve(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _scoped_selector(self, *args: Any, **kwargs: Any) -> Any: ...
+        poll_interval: Any
+        def resolve_ui5_by_xpath(self, *args: Any, **kwargs: Any) -> Any: ...
+        def resolve_ui5_control(self, *args: Any, **kwargs: Any) -> Any: ...
+        ui5_timeout: Any
+
     # -- raccourcis d'interaction ---------------------------------------------
 
-    def click_ui5_control(self, index=0, **selector_parts):
+    def click_ui5_control(self, index: int = 0, **selector_parts):
         """Résout le contrôle et clique dessus via la bibliothèque Browser.
 
         Re-résout puis re-clique en cas d'échec transitoire : entre la résolution et
@@ -64,7 +82,7 @@ class ActionKeywords:
                 self.resolve_ui5_control(index=index, **selector_parts)),
             "click %s" % (selector_parts or "index %s" % index))
 
-    def click_ui5_by_xpath(self, xpath, index=0):
+    def click_ui5_by_xpath(self, xpath: Ui5XpathInput, index: int = 0):
         """Résout un *UI5 XPath hiérarchique* puis clique le contrôle obtenu.
 
         Pendant de `Click Ui5 Control` pour les localisateurs XPath (ex. cibler un
@@ -78,7 +96,7 @@ class ActionKeywords:
             lambda: self._browser().click(self.resolve_ui5_by_xpath(xpath, index=index)),
             "click xpath %s" % xpath)
 
-    def fill_ui5_input(self, text, index=0, **selector_parts):
+    def fill_ui5_input(self, text, index: int = 0, **selector_parts):
         """Résout un champ de saisie UI5 et le remplit avec ``text`` via Browser.
 
         Les champs UI5 composites (``sap.m.Input``, ``SearchField`` …) rendent un élément
@@ -111,7 +129,7 @@ class ActionKeywords:
                 self._scoped_selector("css=%s input, %s textarea" % (attr, attr)), text)
         self._act_with_retry(_fill, "fill %s" % (selector_parts or "index %s" % index))
 
-    def fill_ui5_date(self, date, index=0, commit="Tab", **selector_parts):
+    def fill_ui5_date(self, date, index: int = 0, commit="Tab", **selector_parts):
         """Saisit une DATE donnée en ISO (``AAAA-MM-JJ``) dans un champ date UI5,
         dans le format que CE contrôle attend, puis vérifie qu'elle a été retenue.
 
@@ -133,10 +151,8 @@ class ActionKeywords:
         saisie interne) ; refuse un type date-et-heure. Retourne le texte tapé.
 
         Exemple :
-        | ${typed}=    `Fill Ui5 Date`    2026-10-15    id=dpOdataDate
-        | Should Be Equal    ${typed}    Oct 15, 2026
-        | ${model}=    `Get Ui5 Property`    text    id=rawOdataDate
-        | Should Be Equal    ${model}    2026-10-15
+        | ${typed}=    `Fill Ui5 Date`    2026-11-20    idSuffix=--DP1
+        | Should Be Equal    ${typed}    Nov 20, 2026
         """
         iso = iso_date(date)
         selector = build_control_selector(**selector_parts)
@@ -187,7 +203,7 @@ class ActionKeywords:
                     % (description, iso, text, info.get("source")))
         return text
 
-    def read_ui5_table(self, index=0, **selector_parts):
+    def read_ui5_table(self, index: int = 0, **selector_parts):
         """Lit une table UI5 en une liste de dicts ``[{en-tête: valeur, ...}]``.
 
         Pendant Fiori de `Read Grid` (ECC). Résout la table (``sap.m.Table`` ou
@@ -228,7 +244,7 @@ class ActionKeywords:
         return lignes
 
 
-    def upload_file_via_ui5(self, file_path, index=0, **selector_parts):
+    def upload_file_via_ui5(self, file_path, index: int = 0, **selector_parts):
         """Téléverse ``file_path`` dans un contrôle d'upload UI5
         (``sap.ui.unified.FileUploader``, upload d'une table Fiori Elements…) :
         résout le contrôle (mêmes sélecteurs que `Click Ui5 Control`), vise
@@ -257,7 +273,7 @@ class ActionKeywords:
         self._act_with_retry(
             _upload, "upload %s" % (selector_parts or "index %s" % index))
 
-    def get_ui5_text(self, index=0, **selector_parts):
+    def get_ui5_text(self, index: int = 0, **selector_parts):
         """Résout un contrôle et retourne son texte visible via `Get Text` de Browser.
 
         Exemple :
@@ -324,7 +340,7 @@ class ActionKeywords:
                 % (property_name, selector, available))
         return list(result.get("values") or [])
 
-    def get_ui5_property(self, property_name, index=0, **selector_parts):
+    def get_ui5_property(self, property_name, index: int = 0, **selector_parts):
         """Lit une PROPRIÉTÉ de contrôle sur le contrôle résolu (``index``, base 0).
 
         Version « un seul contrôle » de `Get Ui5 Properties`, avec le même contrat
@@ -351,7 +367,7 @@ class ActionKeywords:
                 "%s matched %s control(s); index %s is out of range."
                 % (selector, len(values), index))
 
-    def ui5_text_should_be(self, expected, index=0, **selector_parts):
+    def ui5_text_should_be(self, expected, index: int = 0, **selector_parts):
         """Vérifie que le texte visible du contrôle résolu vaut ``expected``
         (comparaison exacte après trim). C'est l'assertion de VALEUR émise par le
         recorder web (Shift+Alt+clic), pendant de `Ui5 Control Should Be Visible`

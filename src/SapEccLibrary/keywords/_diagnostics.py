@@ -23,6 +23,8 @@ de l'historique de saisie, historique désactivé sur un poste où les tests
 tapent de vraies données ; logique pure dans ``sapfx_common.client_security``).
 Voir [docs/hardening-test-environment.md](../../../docs/hardening-test-environment.md).
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 
 from sapfx_common.client_security import (
@@ -31,7 +33,6 @@ from sapfx_common.client_security import (
     find_history_databases,
     input_history_cve_status,
 )
-
 
 # Sous-types de GuiShell qui ne sont PAS une liste ABAP : chacun se lit par
 # son propre keyword (ou est hors API), aucun ne réclame le mode accessibilité.
@@ -63,6 +64,12 @@ class DiagnosticsKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Lecture seule sauf mention contraire.
     Suppose ``self.sapapp`` / ``self.connection`` / ``self.session`` posés par les
     keywords de connexion (`Connect To Session`, `Open Connection...`)."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def get_scripting_status(self):
         """Retourne un dict décrivant l'état réel du support scripting.
@@ -110,7 +117,7 @@ class DiagnosticsKeywords:
             "user": _read(info, "User"),
         }
 
-    def scripting_should_be_fully_enabled(self, allow_recording_disabled=False):
+    def scripting_should_be_fully_enabled(self, allow_recording_disabled: bool = False):
         """Échoue TÔT si le scripting serveur est absent ou dégradé, avec la cause
         exacte et le paramètre de profil (RZ11) à corriger.
 
@@ -150,7 +157,7 @@ class DiagnosticsKeywords:
                 "SAP GUI Scripting dégradé (%s) : %s"
                 % (status.get("system") or "système inconnu", " ; ".join(problems)))
 
-    def enable_test_tool_mode(self, enabled=True):
+    def enable_test_tool_mode(self, enabled: bool = True):
         """Active le mode outil de test de la session (``session.TestToolMode``).
 
         Prévu par SAP pour les outils de test : les messages d'information et
@@ -277,29 +284,6 @@ class DiagnosticsKeywords:
                else "écran sans contenu de liste",
                status["hint"] or "Cet écran n'affiche probablement pas de liste."))
 
-    def get_session_telemetry(self):
-        """Retourne les compteurs de performance de ``session.Info`` du DERNIER
-        aller-retour : ``response_time`` / ``interpretation_time`` (ms),
-        ``roundtrips``, ``flushes``, ``low_speed_connection``.
-
-        Utile pour instrumenter un run (journaliser le coût serveur de chaque
-        étape métier) ou détecter une connexion dégradée : ``flushes`` élevés =
-        beaucoup d'appels COM synchrones, candidat à l'optimisation. Clés à
-        ``None`` si la propriété n'est pas exposée par cette version.
-
-        Exemple :
-        | ${telemetry}=    `Get Session Telemetry`
-        | Should Be True    ${telemetry}[response_time] >= 0
-        """
-        info = _read(self.session, "Info")
-        return {
-            "response_time": _read(info, "ResponseTime"),
-            "interpretation_time": _read(info, "InterpretationTime"),
-            "roundtrips": _read(info, "RoundTrips"),
-            "flushes": _read(info, "Flushes"),
-            "low_speed_connection": _read(info, "IsLowSpeedConnection"),
-        }
-
     def get_client_security_status(self, history_dirs=None):
         """Posture de sécurité du POSTE de test (client SAP GUI) : lecture
         seule, aucun effet de bord.
@@ -370,8 +354,8 @@ class DiagnosticsKeywords:
             "hints": hints,
         }
 
-    def client_security_should_be_hardened(self, allow_input_history=False,
-                                           allow_unknown_patch_level=True,
+    def client_security_should_be_hardened(self, allow_input_history: bool = False,
+                                           allow_unknown_patch_level: bool = True,
                                            history_dirs=None):
         """Échoue si le POSTE de test n'est pas durci, avec la correction
         exacte à apporter (cf. `Get Client Security Status`).

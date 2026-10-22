@@ -1,31 +1,31 @@
-"""Posture de **configuration de sécurité** d'un système ABAP, logique pure.
+"""Posture de *configuration de sécurité* d'un système ABAP, logique pure.
 
 Ce que ce module tranche, et qui n'existait nulle part ailleurs dans le dépôt :
 une valeur de paramètre de profil lue sur un système ne se juge pas comme une
 donnée métier. Trois raisons, toutes payées live le 2026-08-29 en montant les
 campagnes `secu_configuration_*` contre les deux releases du poste.
 
-1. **Une mesure absente n'est pas une valeur.** ``TH_GET_PARAMETER`` ne lève
+1. *Une mesure absente n'est pas une valeur.* ``TH_GET_PARAMETER`` ne lève
    aucune exception sur un paramètre inconnu : il rend ``RC = 4`` et une chaîne
    VIDE. Un contrôle qui lit la valeur sans regarder le code de retour prend
    donc un nom mal orthographié pour un paramètre à zéro, et conclut « SNC est
    désactivé » là où il n'a rien mesuré du tout. D'où `classify_parameter` :
    un code de retour non nul rend ``unknown`` avec ``value = None``, jamais
    une chaîne vide.
-2. **Non mesuré n'est pas non conforme.** Les deux méritent d'être signalés,
+2. *Non mesuré n'est pas non conforme.* Les deux méritent d'être signalés,
    mais leur remède diffère (corriger le système contre corriger le contrôle),
    et les fondre ferait passer une campagne mal écrite pour un système mal
    configuré. `evaluate_control` garde donc ``not_measurable`` distinct de
    ``deviation``, et un contrôle non mesurable n'est JAMAIS conforme : c'est
    le repli sûr, le même que ``unmapped`` dans `classify_idoc_status` et
    `job_wait_verdict`.
-3. **Un comparateur mal choisi est un défaut du contrôle, pas du système.**
+3. *Un comparateur mal choisi est un défaut du contrôle, pas du système.*
    Comparer numériquement ``system/secure_communication`` (qui vaut ``OFF``)
    ne rend pas un système non conforme : cela rend le contrôle faux. Ce cas
    lève une erreur nommant le contrôle, son comparateur et la valeur reçue,
    plutôt que d'inventer un verdict.
 
-Le reste du module sert la **sentinelle** : une posture se compare à une
+Le reste du module sert la *sentinelle* : une posture se compare à une
 référence committée (`compare_posture`), ce qui transforme un audit ponctuel
 en détection de dérive de configuration, et se sérialise en artefact
 déterministe hashé hors horodatage (`posture_artifact`), le patron que le
@@ -39,16 +39,22 @@ import hashlib
 import json
 from typing import Any, Iterable, Mapping, Optional, Sequence
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
     "COMPARISONS",
     "LOCK_FLAGS",
-    "classify_parameter",
-    "classify_user_lock",
-    "compare_posture",
-    "evaluate_control",
     "evaluate_controls",
-    "posture_artifact",
-    "posture_hash",
     "render_posture_report",
     "summarize_verdicts",
 ]
@@ -93,6 +99,13 @@ def classify_parameter(name: str, return_code: Any,
     qui trancherait (``TPFYPROPTY``) a été mesurée VIDE sur les deux releases
     du banc le 2026-08-29, donc affirmer « ce paramètre n'existe pas sur cette
     release » dirait plus que la mesure.
+
+    Exemple :
+    | ${result}=    Call Rfc    TH_GET_PARAMETER    alias=a4h    PARAMETER_NAME=login/min_password_lng
+    | ${reading}=    `Classify Parameter`    login/min_password_lng    ${result}[RC]
+    | ...    ${result}[PARAMETER_VALUE]
+    | Should Be Equal    ${reading}[status]    defined
+    | Should Be Equal    ${reading}[value]    6
     """
     label = str(name).strip()
     if not label:
@@ -118,6 +131,11 @@ def classify_user_lock(uflag: Any) -> dict[str, Any]:
     ``locked_globally``), donc un utilisateur verrouillé pour deux raisons les
     porte toutes les deux, et un masque inconnu reste ``locked`` avec la
     mention ``unmapped_bits`` plutôt que d'être pris pour un compte actif.
+
+    Exemple :
+    | ${lock}=    `Classify User Lock`    96
+    | Should Be True    ${lock}[locked]
+    | Should Contain    ${lock}[reasons]    locked_by_failed_logons
     """
     try:
         mask = int(str(uflag).strip() or "0")
@@ -158,6 +176,12 @@ def evaluate_control(control: Mapping[str, Any],
     dernier couvre le paramètre que le système ne connaît pas : il n'est pas
     fondu dans ``deviation`` parce qu'il ne se corrige pas au même endroit, et
     il n'est jamais compté comme un succès.
+
+    Exemple :
+    | &{control}=    Create Dictionary    key=audit.enabled    parameter=rsau/enable
+    | ...    comparison=enabled    expected=1    severity=high
+    | ${verdict}=    `Evaluate Control`    ${control}    ${readings}[0]
+    | Should Be Equal    ${verdict}[verdict]    compliant
     """
     key = str(control.get("key") or control.get("parameter") or "").strip()
     if not key:
@@ -217,6 +241,7 @@ def _as_sequence(value: Any) -> Sequence[Any]:
     return [value]
 
 
+@keyword
 def evaluate_controls(controls: Iterable[Mapping[str, Any]],
                       readings: Iterable[Mapping[str, Any]]
                       ) -> list[dict[str, Any]]:
@@ -227,6 +252,10 @@ def evaluate_controls(controls: Iterable[Mapping[str, Any]],
     paramètre n'a pas été mesuré du tout reçoit ``not_measurable`` comme s'il
     avait été refusé par le système : ne rien mesurer et mesurer un inconnu
     laissent l'auditeur dans le même état, et aucun des deux n'est un succès.
+
+    Exemple :
+    | ${verdicts}=    `Evaluate Controls`    ${controls}    ${readings}
+    | Should Be Equal    ${verdicts}[1][verdict]    compliant
     """
     by_name = {str(r.get("name")): r for r in readings}
     verdicts = []
@@ -238,6 +267,7 @@ def evaluate_controls(controls: Iterable[Mapping[str, Any]],
     return verdicts
 
 
+@keyword
 def summarize_verdicts(verdicts: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     """Résume un lot de verdicts : comptes par verdict et par sévérité.
 
@@ -245,6 +275,11 @@ def summarize_verdicts(verdicts: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     "deviations_by_severity", "deviating_keys", "not_measurable_keys"}``.
     Les listes de clés sont triées, donc deux exécutions aux mêmes mesures
     produisent le même résumé, ce dont dépend le hash de l'artefact.
+
+    Exemple :
+    | ${verdicts}=    Evaluate Controls    ${controls}    ${readings}
+    | ${summary}=    `Summarize Verdicts`    ${verdicts}
+    | Should Be Equal As Integers    ${summary}[compliant]    2
     """
     items = list(verdicts)
     counts = {"compliant": 0, "deviation": 0, "not_measurable": 0}
@@ -270,7 +305,7 @@ def summarize_verdicts(verdicts: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 
 def compare_posture(current: Iterable[Mapping[str, Any]],
                     reference: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    """Compare une posture mesurée à une **référence** committée.
+    """Compare une posture mesurée à une *référence* committée.
 
     C'est ce qui fait d'un audit ponctuel une sentinelle : la question posée
     n'est plus « ce système est-il durci » (jugement discutable, et qui rend
@@ -282,6 +317,10 @@ def compare_posture(current: Iterable[Mapping[str, Any]],
     Un paramètre passé de mesuré à inconnu compte comme un changement, pas
     comme une disparition : il est toujours contrôlé, c'est sa mesure qui a
     changé de nature.
+
+    Exemple :
+    | ${drift}=    `Compare Posture`    ${readings}    ${readings}
+    | Should Not Be True    ${drift}[drifted]
     """
     now = {str(r.get("name")): r for r in current}
     before = {str(r.get("name")): r for r in reference}
@@ -309,10 +348,14 @@ def compare_posture(current: Iterable[Mapping[str, Any]],
 
 
 def posture_hash(payload: Mapping[str, Any]) -> str:
-    """Hash SHA-256 d'une posture, **horodatage exclu**.
+    """Hash SHA-256 d'une posture, *horodatage exclu*.
 
     Deux campagnes aux mêmes mesures sur la même cible rendent le même hash,
     ce qui permet de comparer deux exécutions sans les relire ligne à ligne.
+
+    Exemple :
+    | ${hash}=    `Posture Hash`    ${artifact}
+    | Length Should Be    ${hash}    64
     """
     stripped = {k: v for k, v in payload.items()
                 if k not in ("generated_at", "hash")}
@@ -336,6 +379,12 @@ def posture_artifact(identity: Mapping[str, Any],
     revient à comparer deux inconnues.
 
     Les listes sont triées et le hash est calculé hors horodatage.
+
+    Exemple :
+    | ${verdicts}=    Evaluate Controls    ${controls}    ${readings}
+    | &{identity}=    Create Dictionary    release=754    kernel=777
+    | ${artifact}=    `Posture Artifact`    ${identity}    ${readings}    ${verdicts}
+    | Should Be Equal As Integers    ${artifact}[summary][compliant]    2
     """
     ident = {str(k): str(v) for k, v in dict(identity).items() if str(v).strip()}
     if not ident:
@@ -361,12 +410,17 @@ def posture_artifact(identity: Mapping[str, Any],
     return payload
 
 
+@keyword
 def render_posture_report(artifact: Mapping[str, Any]) -> str:
     """Rend un rapport Markdown de la posture, pour le journal Robot.
 
     Le rapport nomme d'abord ce qui n'a PAS pu être mesuré, avant les écarts :
     un auditeur qui lit une liste d'écarts sans savoir combien de contrôles
     sont restés muets se croit devant un système presque conforme.
+
+    Exemple :
+    | ${report}=    `Render Posture Report`    ${artifact}
+    | Should Contain    ${report}    | release | 754 |
     """
     lines: list[str] = ["# Posture de sécurité"]
     identity = dict(artifact.get("identity", {}))

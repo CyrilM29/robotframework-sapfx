@@ -401,13 +401,20 @@ def require_marker(user: str, description: Any) -> str:
     return marker
 
 
-def require_same_marker(user: str, found: str, expected: str) -> None:
-    """Échoue si le compte existant ne porte pas le marquage attendu."""
-    if found.strip() != expected.strip():
+def require_same_marker(name: str, found: str, expected: str, kind: str = "user") -> None:
+    """Échoue si l'objet existant (``kind`` : ``user`` ou ``role``) ne porte
+    pas le marquage attendu : description technique d'un utilisateur, titre
+    d'un rôle."""
+    if found.strip() == expected.strip():
+        return
+    if kind == "role":
         raise AssertionError(
-            "Le compte %s existe mais n'est pas marqué comme cet utilisateur de "
-            "test (description technique %r, attendue %r) : il n'est ni "
-            "vérifié, ni déverrouillé, ni supprimé." % (user, found, expected))
+            "Le rôle %s existe mais n'est pas marqué comme ce rôle de test (titre "
+            "%r, attendu %r) : il n'est ni complété, ni supprimé." % (name, found, expected))
+    raise AssertionError(
+        "Le compte %s existe mais n'est pas marqué comme cet utilisateur de "
+        "test (description technique %r, attendue %r) : il n'est ni "
+        "vérifié, ni déverrouillé, ni supprimé." % (name, found, expected))
 
 
 #: Le groupe d'autorisation contrôlé pour une table qui n'en déclare aucun.

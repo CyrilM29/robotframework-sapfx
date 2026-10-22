@@ -17,16 +17,29 @@ Les lectures ALV de haut niveau (`Read Grid`, par titre, par contenu) vivent
 dans ``_grid.py`` ; les actions (double-clic, menu contextuel, tri) dans
 ``_grid_actions.py``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 from robot.api import logger
 
 from sapfx_common import alv_cells
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 
 class GridCellKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`."""
 
-    def get_row_count(self, table_id):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resolved_grid_id(self, *args: Any, **kwargs: Any) -> Any: ...
+        def element_should_be_present(self, *args: Any, **kwargs: Any) -> Any: ...
+        def get_element_type(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def get_row_count(self, table_id: GuiElementIdInput):
         """Nombre de lignes d'une grille, y compris quand le localisateur vise
         le conteneur qui l'enveloppe (releases récentes).
 
@@ -38,7 +51,7 @@ class GridCellKeywords:
         self.element_should_be_present(table_id)
         return self.session.findById(table_id).rowCount
 
-    def get_cell_value(self, table_id, row_num, col_id):
+    def get_cell_value(self, table_id: GuiElementIdInput, row_num: int, col_id):
         """Valeur de la cellule (ligne ``row_num`` à partir de 0, colonne
         d'identifiant technique ``col_id``), localisateur de conteneur toléré.
         Colonne inconnue = échec.
@@ -55,7 +68,7 @@ class GridCellKeywords:
             self.take_screenshot()
             raise ValueError("Cannot find Column_id '%s'." % col_id) from None
 
-    def get_grid_cell_icon(self, table_id, row_num, col_id):
+    def get_grid_cell_icon(self, table_id: GuiElementIdInput, row_num: int, col_id):
         """Le code d'icône d'une cellule d'ALV (``S_TL_G`` pour la cellule
         ``@S_TL_G\\Q Service is active @``, ``07`` pour ``@07@``), ou ``None``
         quand la cellule porte une donnée et non une icône. L'info-bulle
@@ -72,7 +85,7 @@ class GridCellKeywords:
         """
         return alv_cells.icon_code(self.get_cell_value(table_id, int(row_num), col_id))
 
-    def set_cell_value(self, table_id, row_num, col_id, text):
+    def set_cell_value(self, table_id: GuiElementIdInput, row_num: int, col_id, text):
         """Écrit ``text`` dans une cellule d'une grille modifiable puis RELIT
         la cellule : un écart échoue en nommant la valeur obtenue.
         Localisateur de conteneur toléré.
@@ -101,7 +114,7 @@ class GridCellKeywords:
                                                               actual, text))
         self._explicit_pause()
 
-    def click_toolbar_button(self, table_id, button_id):
+    def click_toolbar_button(self, table_id: GuiElementIdInput, button_id):
         """Clique le bouton ``button_id`` de la barre d'outils PROPRE d'une
         grille (``&FIND``, ``&SORT_ASC``...), ou d'une barre d'outils
         autonome. Localisateur de conteneur toléré.
@@ -123,7 +136,7 @@ class GridCellKeywords:
             raise ValueError("Cannot find Button_id '%s'." % button_id) from None
         self._explicit_pause()
 
-    def select_table_row(self, table_id, row_num):
+    def select_table_row(self, table_id: GuiElementIdInput, row_num: int):
         """Sélectionne une ligne entière (index à partir de 0) d'une grille ALV
         ou d'un table control (``GuiTableControl``, ligne ABSOLUE).
 
@@ -148,8 +161,10 @@ class GridCellKeywords:
                                  "type '%s'" % element_type) from None
         self._explicit_pause()
 
-    def select_table_column(self, table_id, column_id):
-        """Sélectionne une colonne entière d'une grille ALV par son identifiant
+    def select_table_column(self, table_id: GuiElementIdInput, column_id):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité.
+
+        Sélectionne une colonne entière d'une grille ALV par son identifiant
         technique ; colonne inconnue = échec.
 
         Exemple :
@@ -166,8 +181,11 @@ class GridCellKeywords:
             raise ValueError("Cannot find Column_id '%s'." % column_id) from None
         self._explicit_pause()
 
-    def scroll(self, element_id, position):
-        """Place la barre de défilement verticale de ``element_id`` (un table
+    def scroll(self, element_id: GuiElementIdInput, position):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité ; pour
+        lire une grille entière, `Read Full Grid` fait défiler lui-même.
+
+        Place la barre de défilement verticale de ``element_id`` (un table
         control, une zone d'écran défilante) sur la ligne ``position``. Une
         grille ALV défile par `Read Full Grid`.
 
@@ -180,8 +198,10 @@ class GridCellKeywords:
         self.session.findById(element_id).verticalScrollbar.position = position
         self._explicit_pause()
 
-    def get_scroll_position(self, element_id):
-        """Position de la barre de défilement verticale de ``element_id``.
+    def get_scroll_position(self, element_id: GuiElementIdInput):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité.
+
+        Position de la barre de défilement verticale de ``element_id``.
 
         Exemple :
         | ${position}=    `Get Scroll Position`    wnd[0]/usr/tabsTAB_STRIP/tabpDEF/ssubTS_SCREEN:SAPLSD41:2201/tblSAPLSD41TC0

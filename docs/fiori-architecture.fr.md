@@ -323,14 +323,9 @@ option complémentaire plus lourde.
       shadow roots, capture recorder ; smoke hors ligne 6/6), chaîne de repli
       étendue à role→xpath→sid→wc, journal de télémétrie de healing
       (`SAPFX_HEALING_LOG`).
-- [x] **Parité du canal visuel avec l'ECC** : `Get Ui5 Perceptual Hash` +
-      `Ui5 Screen Should Match Baseline` : le même cycle snapshot-baseline que
-      `Screen Should Match Baseline` (`sapfx_common.visual_baseline` partagé),
-      sur une capture de page de la bibliothèque Browser. Couvre ce que
-      l'arbre UI5 ne dit pas (canvas, images, thème/rendu globalement altéré).
-      La taille du viewport fait partie de l'empreinte : l'option ECC est donc
-      reprise ici, `per_resolution=True` garde une baseline par géométrie de
-      capture.
+- [x] **Canal visuel** (baselines par empreinte perceptuelle sur une capture
+      de page, pour ce que l'arbre UI5 ne dit pas) : passé dans les outils de
+      l'atelier avec la version 0.8.6.
 
 ## Marques
 

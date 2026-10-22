@@ -4,19 +4,19 @@ Voisin de `security_baseline.py`, qui juge des PARAMÈTRES. Ici on classe deux
 inventaires dont la lecture brute induit en erreur, chacun pour une raison
 différente et chacune mesurée le 2026-08-29 sur les deux releases du banc.
 
-**Le journal d'audit.** `rsau/enable` valait 1 sur les deux cibles, et une
+*Le journal d'audit.* `rsau/enable` valait 1 sur les deux cibles, et une
 campagne s'arrêtant là conclut « audit actif ». Le relevé complet dit autre
-chose : 10 slots de filtrage DÉCLARÉS, **zéro actif**. Le journal est armé au
+chose : 10 slots de filtrage DÉCLARÉS, *zéro actif*. Le journal est armé au
 niveau du noyau et ne filtre rien, donc il n'enregistre pas ce qu'un auditeur
 croit qu'il enregistre. `classify_audit_configuration` sépare donc « armé » de
 « filtrant » et rend `armed_without_filter`, l'état qui ressemble le plus à un
 faux positif de conformité dans tout ce domaine.
 
-**Les destinations RFC.** Une destination qui stocke un logon vers un autre
+*Les destinations RFC.* Une destination qui stocke un logon vers un autre
 système est un chemin d'élévation classique, et l'information n'est pas dans
 une colonne : elle est enfouie dans un agrégat de marqueurs mono-lettres
 (`RFCOPTIONS`). `classify_rfc_destination` en extrait ce qui est établi sans
-ambiguïté et **s'arrête là** : les marqueurs non documentés de façon fiable ne
+ambiguïté et *s'arrête là* : les marqueurs non documentés de façon fiable ne
 sont pas devinés, et la fonction ne prétend jamais lire un secret, seulement
 constater qu'il en existe un.
 
@@ -27,12 +27,19 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping, Optional
 
-__all__ = [
-    "OPTION_MARKERS",
-    "classify_audit_configuration",
-    "classify_rfc_destination",
-    "summarize_destinations",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["OPTION_MARKERS", "summarize_destinations"]
 
 #: Les marqueurs de ``RFCDES-RFCOPTIONS`` dont la signification est établie.
 #: Volontairement court : le reste (``Y=``, ``h=``, ``z=``, ``W=``…) n'est pas
@@ -54,10 +61,10 @@ _STORED_PASSWORD = re.compile(r"(?:^|,)\s*v=", re.IGNORECASE)
 
 
 def classify_audit_configuration(config: Mapping[str, Any]) -> dict[str, Any]:
-    """Classe la configuration du **journal d'audit de sécurité**.
+    """Classe la configuration du *journal d'audit de sécurité*.
 
     ``config`` est la réponse brute du module de lecture (``ENABLE``,
-    ``SLOTCOUNT``, ``SLOTINFO``, ``VERSION``, ``FILESTATUS``…). Rend
+    ``SLOTCOUNT``, ``SLOTINFO``, ``VERSION``, ``FILESTATUS`` …). Rend
     ``{"enabled", "slots_declared", "slots_active", "filtering", "verdict",
     "version", "file_status"}``.
 
@@ -65,7 +72,7 @@ def classify_audit_configuration(config: Mapping[str, Any]) -> dict[str, Any]:
     la fonction :
 
     - ``disabled`` : le journal n'est pas armé ;
-    - ``armed_without_filter`` : il est armé et **aucun slot n'est actif**,
+    - ``armed_without_filter`` : il est armé et *aucun slot n'est actif*,
       donc il n'enregistre pas ce qu'un lecteur de `rsau/enable` croit qu'il
       enregistre. Mesuré sur les deux releases du banc : 10 slots déclarés,
       zéro actif. C'est le faux positif de conformité le plus coûteux du
@@ -74,6 +81,11 @@ def classify_audit_configuration(config: Mapping[str, Any]) -> dict[str, Any]:
 
     Un ``SLOTINFO`` absent ou illisible ne compte JAMAIS comme des slots
     actifs : le repli sûr, ici, est de ne pas inventer une couverture d'audit.
+
+    Exemple :
+    | ${config}=    Call Rfc    RSAU_GET_AUDIT_CONFIG    alias=a4h
+    | ${audit}=    `Classify Audit Configuration`    ${config}
+    | Should Be Equal    ${audit}[verdict]    armed_without_filter
     """
     enabled = str(config.get("ENABLE", "")).strip().upper() == "X"
     try:
@@ -135,6 +147,13 @@ def classify_rfc_destination(destination: str, rfctype: Any,
     Les marqueurs non établis sont IGNORÉS plutôt que devinés : sur un
     inventaire de sécurité, une interprétation approximative vaut moins que
     l'absence d'interprétation, parce qu'elle serait lue comme un fait.
+
+    Exemple :
+    | ${rows}=    Read Rfc Table    RFCDES    RFCDEST,RFCTYPE,RFCOPTIONS    alias=a4h
+    | ...    options=RFCDEST = 'SAPOSS'
+    | ${destination}=    `Classify Rfc Destination`    ${rows}[0][RFCDEST]    ${rows}[0][RFCTYPE]
+    | ...    ${rows}[0][RFCOPTIONS]
+    | Should Be True    ${destination}[stored_password]
     """
     name = str(destination).strip()
     if not name:
@@ -150,6 +169,7 @@ def classify_rfc_destination(destination: str, rfctype: Any,
     return fiche
 
 
+@keyword
 def summarize_destinations(fiches: Iterable[Mapping[str, Any]],
                            types: Optional[Iterable[str]] = None
                            ) -> dict[str, Any]:
@@ -160,6 +180,10 @@ def summarize_destinations(fiches: Iterable[Mapping[str, Any]],
     les seules qui portent un logon vers un système tiers). Les listes sont
     triées, donc deux relevés identiques produisent le même résumé, ce dont
     dépend toute comparaison entre deux cibles.
+
+    Exemple :
+    | ${summary}=    `Summarize Destinations`    ${fiches}
+    | Should Contain    ${summary}[with_stored_password]    SAPOSS
     """
     retenues = [dict(f) for f in fiches]
     if types is not None:

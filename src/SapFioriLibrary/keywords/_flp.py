@@ -30,6 +30,8 @@ from .._ui5_runtime import (
 )
 
 from ._base import FioriBase
+from sapfx_common.argument_types import FlpIntentInput
+from typing import Literal
 
 
 class FlpKeywords(FioriBase):
@@ -41,7 +43,7 @@ class FlpKeywords(FioriBase):
     # (concepts issus de l'analyse de playwright-praman, Apache-2.0, voir NOTICE ;
     #  réimplémentés sur nos moteurs, jamais portés verbatim)
 
-    def open_fiori_app(self, intent, **params):
+    def open_fiori_app(self, intent: FlpIntentInput, **params):
         """Navigue le launchpad vers un *intent sémantique*
         ``SemanticObject-action`` (``Shell-home``, ``SalesOrder-manage`` …),
         paramètres nommés émis en query string (``Open Fiori App
@@ -162,7 +164,7 @@ class FlpKeywords(FioriBase):
         return result
 
     def log_in_via_identity_provider(self, username, password: str | Secret,
-                                     preset="sap-ias",
+                                     preset: Literal["sap-ias", "azure-ad", "generic"] = "sap-ias",
                                      username_selector=None,
                                      password_selector=None,
                                      submit_selector=None, timeout=None):
@@ -239,8 +241,12 @@ class FlpKeywords(FioriBase):
                 "couverte par ce keyword." % idp.name)
         logger.info("IDP login (%s) submitted for user %s." % (idp.name, username))
 
-    def lookup_business_term(self, term, domain=None, threshold=0.8):
-        """Résout un *terme métier* (français ou anglais, synonymes compris)
+    def lookup_business_term(self, term, domain=None, threshold: float = 0.8):
+        """*DEPRECATED* depuis la 0.8.6 : employer ``Lookup Business Term`` de
+        ``sapfx_common.vocabulary`` (``Library    sapfx_common.vocabulary``), même
+        contrat et même résultat. Ce keyword sera retiré deux versions plus tard.
+
+        Résout un *terme métier* (français ou anglais, synonymes compris)
         vers sa fiche SAP : canonique, champ ABAP, table, domaine.
 
         Vocabulaire partagé ECC↔Fiori (``sapfx_common.vocabulary`` : MM/SD/FI

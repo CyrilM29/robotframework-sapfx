@@ -10,17 +10,27 @@ Le chemin de textes est une facilité de LISIBILITÉ tolérée dans un page
 object (les textes sont localisés, convention 3) ; les positions sont
 stables par transaction. Logique pure dans ``sapfx_common.menu_path``.
 """
+from typing import TYPE_CHECKING, Any
+
 from sapfx_common.menu_path import (
     describe_menu,
     menu_items_from_elements,
     resolve_menu_path,
 )
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 
 class MenuKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
 
-    def list_menu_items(self, window="wnd[0]"):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _screen_elements(self, *args: Any, **kwargs: Any) -> Any: ...
+        def click_element(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def list_menu_items(self, window: GuiElementIdInput = "wnd[0]"):
         """Les entrées de la barre de menus de ``window`` : liste de dicts
         ``{id, text, positions, path}`` dans l'ordre de perception (``path``
         = positions jointes par ``>``, rejouable par `Select Menu Item`).
@@ -31,7 +41,7 @@ class MenuKeywords:
         """
         return describe_menu(menu_items_from_elements(self._screen_elements(), window))
 
-    def resolve_menu_item(self, path, window="wnd[0]"):
+    def resolve_menu_item(self, path, window: GuiElementIdInput = "wnd[0]"):
         """L'id du ``GuiMenu`` désigné par ``path`` (``System > Status``,
         ``4 > 11``, ou mixte), résolu niveau par niveau sur la barre PERÇUE ;
         échec actionnable listant les entrées du niveau fautif.
@@ -45,7 +55,7 @@ class MenuKeywords:
             raise ValueError("Aucune entrée de menu perçue sous '%s/mbar'." % window)
         return resolve_menu_path(items, str(path)).id
 
-    def select_menu_item(self, path, window="wnd[0]"):
+    def select_menu_item(self, path, window: GuiElementIdInput = "wnd[0]"):
         """Sélectionne l'entrée de menu désignée par ``path`` (`Resolve Menu
         Item` puis `Click Element`, qui appelle ``Select()`` sur un GuiMenu) et
         attend la fin de l'aller-retour. Retourne l'id sélectionné (à

@@ -5,7 +5,7 @@ formes, mesurées le 2026-09-14 sur ABAP Platform 2023 en lisant le rapport des
 comptes standards, trompent une lecture naïve et demandent chacune un
 traitement opposé.
 
-**Un code d'icône n'est pas une valeur.** La colonne de verrouillage de ce
+*Un code d'icône n'est pas une valeur.* La colonne de verrouillage de ce
 rapport rend ``@07@`` pour tout compte existant et une chaîne vide pour les
 autres. Ce n'est ni un booléen, ni un libellé : c'est l'identifiant d'une
 icône, que le client résout en image. Le lire comme une donnée donne une
@@ -13,7 +13,7 @@ colonne de `@07@` dont on ne sait rien, et la comparer à un booléen d'un autre
 canal échoue toujours. En revanche il a une qualité précieuse : il est
 INDÉPENDANT DE LA LANGUE, là où le libellé qu'il remplace ne l'est pas.
 
-**Un libellé d'état est une traduction.** La colonne de statut de mot de passe
+*Un libellé d'état est une traduction.* La colonne de statut de mot de passe
 du même rapport rend ``Exists; Password not trivial.`` en anglais, et autre
 chose ailleurs. La convention du dépôt interdit d'asserter dessus : cette
 colonne se RAPPORTE, elle ne se juge pas.
@@ -31,14 +31,19 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping, Optional
 
-__all__ = [
-    "ICON_PATTERN",
-    "icon_code",
-    "is_icon",
-    "cell_is_data",
-    "distinct_icons",
-    "establish_icon_meaning",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["ICON_PATTERN", "icon_code", "distinct_icons", "establish_icon_meaning"]
 
 #: La forme d'un identifiant d'icône dans une cellule d'ALV : ``@07@``,
 #: ``@5B\\QTexte@``, ``@S_TL_G\\Q Service is active @`` (UNE barre oblique
@@ -50,6 +55,7 @@ __all__ = [
 ICON_PATTERN = re.compile(r"^@([0-9A-Za-z_]{1,30})(?:\\Q.*)?@$")
 
 
+@keyword
 def icon_code(value: Any) -> Optional[str]:
     """Rend l'identifiant d'icône d'une cellule, ou ``None`` si ce n'en est
     pas une.
@@ -57,6 +63,10 @@ def icon_code(value: Any) -> Optional[str]:
     ``@07@`` rend ``"07"``. Une valeur ordinaire rend ``None``, ce qui permet
     d'écrire ``if icon_code(cell) is None`` pour distinguer une donnée d'un
     pictogramme sans jamais comparer à une chaîne littérale.
+
+    Exemple :
+    | ${code}=    `Icon Code`    @07@
+    | Should Be Equal    ${code}    07
     """
     texte = str(value or "").strip()
     trouve = ICON_PATTERN.match(texte)
@@ -64,7 +74,12 @@ def icon_code(value: Any) -> Optional[str]:
 
 
 def is_icon(value: Any) -> bool:
-    """Dit si la cellule porte une icône plutôt qu'une donnée."""
+    """Dit si la cellule porte une icône plutôt qu'une donnée.
+
+    Exemple :
+    | ${icon}=    `Is Icon`    @07@
+    | Should Be True    ${icon}
+    """
     return icon_code(value) is not None
 
 
@@ -75,11 +90,18 @@ def cell_is_data(value: Any) -> bool:
     toute comparaison entre deux canaux : une colonne d'icônes confrontée à un
     booléen échoue systématiquement, et le message d'échec accuse alors le
     système au lieu de la lecture.
+
+    Exemple :
+    | ${data}=    `Cell Is Data`    DDIC
+    | Should Be True    ${data}
+    | ${icon}=    `Cell Is Data`    @07@
+    | Should Not Be True    ${icon}
     """
     texte = str(value or "").strip()
     return bool(texte) and not is_icon(texte)
 
 
+@keyword
 def distinct_icons(rows: Iterable[Mapping[str, Any]], column: str
                    ) -> dict[str, int]:
     """Compte les identifiants d'icône distincts d'une colonne.
@@ -87,6 +109,10 @@ def distinct_icons(rows: Iterable[Mapping[str, Any]], column: str
     Une colonne qui ne porte qu'UN seul code ne discrimine rien : c'est le cas
     de la colonne de verrouillage sur la cible, où tout compte existant porte
     le même pictogramme. Le savoir évite de croire qu'on a mesuré un état.
+
+    Exemple :
+    | ${codes}=    `Distinct Icons`    ${rows}    LOCKED
+    | Should Be Equal As Integers    ${codes}[07]    5
     """
     comptes: dict[str, int] = {}
     for ligne in rows:
@@ -96,6 +122,7 @@ def distinct_icons(rows: Iterable[Mapping[str, Any]], column: str
     return dict(sorted(comptes.items()))
 
 
+@keyword
 def establish_icon_meaning(rows: Iterable[Mapping[str, Any]], column: str,
                            key_columns: Iterable[str],
                            known: Mapping[str, bool]) -> dict[str, Any]:
@@ -131,6 +158,12 @@ def establish_icon_meaning(rows: Iterable[Mapping[str, Any]], column: str,
     C'est la méthode qui permet d'appliquer ensuite l'interprétation au
     périmètre que seul l'écran atteint, là où aucune vérité de référence n'est
     disponible.
+
+    Exemple :
+    | @{keys}=    Create List    MANDT    USERNAME
+    | ${meaning}=    `Establish Icon Meaning`    ${rows}    LOCKED    ${keys}    ${known}
+    | Should Not Be True    ${meaning}[discriminating]
+    | Should Be Equal As Integers    ${meaning}[coverage]    2
     """
     colonnes = [str(c) for c in key_columns]
     observations: dict[str, set[bool]] = {}

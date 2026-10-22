@@ -11,6 +11,8 @@ autre canal n'encadre pas sa REQUÊTE. La logique (fraîcheur des réponses, lie
 au corps) vit dans ``sapfx_common.flp_tiles``, les sondes dans ``_flp_js``.
 """
 
+from typing import TYPE_CHECKING, Any
+
 import json
 
 from robot.utils import timestr_to_secs
@@ -23,6 +25,7 @@ from .._flp_js import (
     FLP_TILE_REFRESH_PROBE_JS,
     PAGE_RESOURCE_RESPONSES_PROBE_JS,
 )
+from sapfx_common.argument_types import FlpIntentInput
 
 
 class FlpTileRefreshKeywords:
@@ -32,9 +35,19 @@ class FlpTileRefreshKeywords:
     Tile Configuration`, `Get Flp Tile Counter`) disponibles par
     composition."""
 
-    def refresh_flp_tile_counter(self, intent, timeout=None,
-                                 accept_truncated=False, index=None,
-                                 ignore_parameters=False):
+    if TYPE_CHECKING:
+        # Contrat du composite, pour mypy seulement : les
+        # keywords annotés font vérifier leurs corps.
+        def _comparable_counter(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _evaluate(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _flp_result(self, *args: Any, **kwargs: Any) -> Any: ...
+        def get_flp_tile_configuration(self, *args: Any, **kwargs: Any) -> Any: ...
+        poll_interval: Any
+        ui5_timeout: Any
+
+    def refresh_flp_tile_counter(self, intent: FlpIntentInput, timeout=None,
+                                 accept_truncated: bool = False, index=None,
+                                 ignore_parameters: bool = False):
         """Fait RÉINTERROGER son service par la tuile d'un intent, prouve que
         la réponse est arrivée APRÈS la demande, puis retourne le compteur
         chargé : le dict de `Wait For Flp Tile Counter` complété de

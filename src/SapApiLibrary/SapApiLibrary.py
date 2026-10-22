@@ -23,7 +23,7 @@ dépendance nouvelle à épingler (la leçon pywin32 de la convention 6). Couvre
   (`Get Odata Metadata`, entity sets/clés/libellés ``sap:label``), catalogue
   Gateway (`List Odata Services`), préflight actionnable
   (`Get Gateway Status` / `Gateway Should Be Active` /
-  `Wait Until Api Available`) et télémétrie (`Get Api Telemetry`) ;
+  `Wait Until Api Available`) ;
 * le protocole *CSRF* SAP (``X-CSRF-Token: Fetch`` puis rejeu du token et
   des cookies sur les écritures, re-fetch et rejeu UNE fois sur 403 CSRF) ;
 * l'authentification *Basic*, *OAuth2 client credentials* (S/4 Cloud,
@@ -40,12 +40,15 @@ l'URL effective et le début du corps de réponse.
 """
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from robot.api import logger
 from robot.api.types import Secret
 from robot.utils import timestr_to_secs
 
+from sapfx_common.argument_types import API_CONVERTERS
+from sapfx_common.library_extension import extend_library
+from sapfx_common.robot_args import NameList
 from sapfx_common.secrets import reveal_secret
 from sapfx_common.session_context import current_execution_namespace
 
@@ -61,11 +64,9 @@ from ._http import (  # noqa: F401  (re-exports : surface historique du module)
 from ._odata_read import OdataReadKeywords
 from ._odata_write import OdataWriteKeywords
 from ._http_security import HttpSecurityKeywords
-from ._governance import ApiGovernanceKeywords
 
 class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
-                    OdataReadKeywords, HttpSecurityKeywords,
-                    ApiGovernanceKeywords, _ApiCore):
+                    OdataReadKeywords, HttpSecurityKeywords, _ApiCore):
     """Bibliothèque Robot Framework pour parler aux APIs SAP (OData v2/v4, RFC).
 
     == Sessions ==
@@ -103,7 +104,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     `Gateway Should Be Active` diagnostiquent une Gateway désactivée (le cas
     A4H ``/IWFND/CM_COS/003``) en nommant la remédiation ;
     `Wait Until Api Available` attend qu'un système (re)démarre ;
-    `Get Api Telemetry` et `List Api Sessions` exposent l'état JSON-safe.
+    `List Api Sessions` expose l'état JSON-safe.
 
     == RFC et BAPI (optionnel) ==
     `Open Rfc Connection` / `Call Rfc` utilisent `pyrfc` si installé
@@ -160,18 +161,15 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     `Read Standard Users Status` rend l'état des comptes livrés par SAP, un
     compte ABSENT étant rendu comme tel plutôt qu'omis.
 
-    `Build Security Posture` assemble un artefact déterministe (hash calculé
-    hors horodatage), `Write` / `Read Security Posture` le persistent, et
-    `Security Posture Should Not Have Drifted` le compare à une référence
-    committée : sémantique snapshot, le premier passage écrit la référence avec
-    un avertissement et réussit, les suivants nomment chaque écart. C'est ce
-    qui rend une campagne de sécurité rejouable, la question posée devenant
-    « la configuration a-t-elle bougé » plutôt que « ce système est-il durci ».
+    `Read Security Posture` relit un artefact de posture (JSON) tel quel.
     """
 
-    __version__ = "0.8.5"
+    __version__ = "0.8.6"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
+    # Types métier d'arguments (backlog 2.75) : Robot convertit, Libdoc publie
+    # le type avec sa documentation et les formes d'entrée acceptées.
+    ROBOT_LIBRARY_CONVERTERS = {NameList: NameList.from_value, **API_CONVERTERS}
 
     def __init__(self, default_timeout: str = "30s") -> None:
         """``default_timeout`` : délai réseau par défaut des sessions ouvertes
@@ -339,8 +337,8 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
         porte une authentification Basic OU une clé d'API, ``oauth`` si elle
         porte un client OAuth2, ``csrf_token_cached`` si un token CSRF a déjà
         été obtenu ;
-        ``requests`` / ``errors`` viennent de la télémétrie (détail :
-        `Get Api Telemetry`), ``created_entities`` compte les entités suivies
+        ``requests`` / ``errors`` viennent de la télémétrie du canal,
+        ``created_entities`` compte les entités suivies
         par la fabrique de données. C'est la perception du canal API (il n'a
         pas d'écran), consommée par le state provider rf-mcp (`SapApiPlugin`)
         et utile en débogage de suite multi-alias.
@@ -365,19 +363,9 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
             "rfc_connections": sorted(self._rfc_connections()),
         }
 
-    def get_api_telemetry(self, alias: str = "default") -> dict[str, Any]:
-        """Télémétrie JSON-safe de la session ``alias`` : nombre de requêtes,
-        d'erreurs, temps réseau cumulé (secondes), dernier statut, dernière
-        URL, dernière erreur. Jamais de credentials ni de corps de réponse :
-        consommable tel quel à travers rf-mcp.
 
-        Exemple :
-        | ${telemetry}=    `Get Api Telemetry`    alias=a4h
-        | Should Be Equal As Integers    ${telemetry}[errors]    0
-        """
-        session = self._session(alias)
-        data = dict(session.telemetry)
-        data["seconds"] = round(float(data["seconds"]), 3)
-        data["alias"] = alias
-        data["base_url"] = session.base_url
-        return data
+if not TYPE_CHECKING:
+    # Les keywords de l'atelier s'ajoutent ici quand ``_extension`` existe (dépôt
+    # privé) ; la distribution publique n'a pas ce module et garde la classe telle
+    # quelle.
+    SapApiLibrary = extend_library(SapApiLibrary, __package__)

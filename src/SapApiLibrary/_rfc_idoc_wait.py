@@ -22,6 +22,7 @@ from typing import Any
 
 from robot.utils import timestr_to_secs
 
+from sapfx_common.argument_types import IdocNumberInput
 from sapfx_common import idoc, idoc_status
 from sapfx_common.polling import poll_until
 
@@ -32,10 +33,10 @@ from ._rfc_idoc import RfcIdocKeywords
 class RfcIdocWaitKeywords(RfcIdocKeywords):
     """Mixin de :class:`SapApiLibrary` : attendre un statut, relier deux IDocs."""
 
-    def wait_for_idoc_status(self, docnum: Any, expected: Any = "success",
+    def wait_for_idoc_status(self, docnum: IdocNumberInput, expected: Any = "success",
                              timeout: str = "30s", poll: str = "1s",
                              alias: str = "default",
-                             raise_on_failure: Any = True) -> dict[str, Any]:
+                             raise_on_failure: bool = True) -> dict[str, Any]:
         """Attend qu'un IDoc atteigne un statut TERMINAL, en sondant ``EDIDC``
         (jamais de pause fixe), et rend ``{"docnum", "status", "category",
         "state", "reached", "waited_seconds", "history"}``.
@@ -107,7 +108,7 @@ class RfcIdocWaitKeywords(RfcIdocKeywords):
         raise AssertionError(
             idoc_status.format_wait_failure(number, verdict, history, expected))
 
-    def get_idoc_counterpart(self, docnum: Any, timeout: str = "30s",
+    def get_idoc_counterpart(self, docnum: IdocNumberInput, timeout: str = "30s",
                              poll: str = "1s",
                              alias: str = "default") -> dict[str, Any]:
         """Retrouve l'IDoc LIÉ à ``docnum`` : le numéro de l'autre IDoc dont un

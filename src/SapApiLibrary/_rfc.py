@@ -5,11 +5,9 @@ dependance dure), la perception du canal (`Get Rfc Channel Status`,
 `Get Rfc Connection Attributes`, `Read Rfc Table`), la classification de ses
 refus par code technique (`Rfc Should Fail With Code`) ou par identifiant de
 message (`Rfc Should Fail With Message Id`). L'attente d'un job de fond
-(`Wait For Background Job` et sa perception) vit dans ``_rfc_jobs.py``, et
-la *surface du canal* (`Write Rfc Surface Artifact` /
-`Compare Rfc Surface Artifacts`) dans ``_rfc_surface_artifact.py`` : deux
-extractions du 2026-10-06, le fichier approchant la limite de 500 lignes
-(convention n°13).
+(`Wait For Background Job` et sa perception) vit dans ``_rfc_jobs.py`` :
+une extraction du 2026-10-06, le fichier approchant la limite de 500
+lignes (convention n°13).
 
 Le pattern *BAPI* (`Call Bapi` jugé par TYPE de BAPIRET2,
 `Commit/Rollback Bapi Transaction`, refus par identifiant de message) vit
@@ -21,6 +19,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from sapfx_common.robot_args import NameListInput
+from sapfx_common.argument_types import RfcFunctionNameInput, TableNameInput
+from sapfx_common import touch_log
 from sapfx_common.policy_gate import gate_for
 from sapfx_common import rfc_channel, rfc_tables
 from sapfx_common.secrets import reveal_secret
@@ -144,9 +145,9 @@ class RfcKeywords(_ApiCore):
         attributes = connection.get_connection_attributes()
         return {str(name): str(value) for name, value in dict(attributes).items()}
 
-    def read_rfc_table(self, table: str, fields: Any, alias: str = "default",
+    def read_rfc_table(self, table: TableNameInput, fields: NameListInput, alias: str = "default",
                        options: Any = None, rowcount: int = 0,
-                       delimiter: str = "|") -> list[dict[str, str]]:
+                       delimiter: str = "|", raw_as_hex: bool = False) -> list[dict[str, str]]:
         """Lit une table par ``RFC_READ_TABLE`` et rend une liste de dicts
         ``{champ: valeur}`` : le miroir sans écran de `Read Grid` (ECC) et de
         `Read Business Entities` (OData).
@@ -163,24 +164,54 @@ class RfcKeywords(_ApiCore):
         alors qu'elle est pleine et que le fautif est le champ. Vérifier
         l'orthographe des champs avant de conclure à une absence de données.
 
+        Un champ que le module ne rend pas est REFUSÉ en le nommant : il OMET
+        sans erreur ce qu'il ne sait pas livrer (mesuré le 2026-10-19 sur
+        ``ESH_ADM_PARAM-VALUE``, un champ chaîne court ``SSTR``), si bien que les
+        lignes rendues n'en auraient pas la clé et qu'une lecture par nom la
+        prendrait pour une valeur absente ou vide.
+
         Un champ RAW (``TYPE X`` : GUID, ``NODE_KEY``) est REFUSÉ : le module le
         rend tronqué à la moitié de sa valeur, et deux lignes différentes
-        peuvent alors porter la même valeur visible (mesuré sur A4H).
+        peuvent alors porter la même valeur visible (mesuré sur A4H). Avec
+        ``raw_as_hex=True``, la lecture passe par le mode ``ET_DATA`` du module
+        (``USE_ET_DATA_4_RETURN``), qui rend le RAW EN ENTIER en hexadécimal
+        (mesuré le 2026-10-18 sur 754 : 32 caractères pour un RAW 16 là où la
+        lecture ordinaire en rend 16) ; ce mode met en forme les nombres, dates
+        et heures selon l'utilisateur (``21.203`` pour un INT4), donc il
+        n'accepte que des champs texte, NUMC, RAW et entiers (ramenés à leurs
+        chiffres), et refuse les décimaux, dates et heures en les nommant. Les caractères NUL de
+        fin d'un champ texte (écrits par certains clients NW RFC) sont retirés.
 
         Exemple :
         | ${clients}=    `Read Rfc Table`    T000    MANDT,MTEXT    alias=a4h
         | ${lufthansa}=    `Read Rfc Table`    SCARR    CARRID,CARRNAME,CURRCODE    alias=a4h
         | ...    options=CARRID = 'LH'
         | Should Be Equal    ${lufthansa}[0][CURRCODE]    EUR
+        | ${partners}=    `Read Rfc Table`    BUT000    PARTNER,PARTNER_GUID    alias=a4h
+        | ...    rowcount=1    raw_as_hex=True
+        | Length Should Be    ${partners}[0][PARTNER_GUID]    32
         """
         params = rfc_tables.read_table_params(
             table, rfc_tables.as_field_list(fields),
             rfc_tables.as_clause_list(options),
             delimiter=delimiter, rowcount=int(rowcount))
+        if raw_as_hex:
+            params["USE_ET_DATA_4_RETURN"] = "X"
         result = self.call_rfc("RFC_READ_TABLE", alias=alias, **params)
+        omitted = rfc_tables._undelivered_fields(result, rfc_tables.as_field_list(fields))
+        if omitted:
+            raise AssertionError(rfc_tables._format_undelivered(str(table), omitted))
+        if raw_as_hex:
+            unsafe = rfc_tables._et_data_unsafe_fields(result)
+            if unsafe:
+                raise ValueError("raw_as_hex=True n'accepte que des champs texte, NUMC, RAW et "
+                                 "entiers : %s seraient mis en forme selon l'utilisateur. Les lire "
+                                 "sans raw_as_hex." % ", ".join(unsafe))
+            return rfc_tables._parse_et_data(result, delimiter=delimiter)
         raw = rfc_tables.truncated_raw_fields(result)
         if raw:
-            raise AssertionError(rfc_tables.format_truncated_raw(str(table), raw))
+            raise AssertionError(rfc_tables.format_truncated_raw(str(table), raw)
+                                 + " Pour lire le RAW en entier : raw_as_hex=True.")
         return rfc_tables.parse_read_table(result, delimiter=delimiter)
 
     def rfc_should_fail_with_code(self, expected_code: str, keyword: str,
@@ -290,7 +321,7 @@ class RfcKeywords(_ApiCore):
                 "d'abord (%s)." % (alias, keyword))
         return connection
 
-    def call_rfc(self, function_name: str, alias: str = "default",
+    def call_rfc(self, function_name: RfcFunctionNameInput, alias: str = "default",
                  **params: Any) -> Any:
         """Appelle le module fonction ``function_name`` sur la connexion RFC
         ``alias`` (ouverte par `Open Rfc Connection`) et retourne le résultat
@@ -313,6 +344,7 @@ class RfcKeywords(_ApiCore):
         """
         connection = self._require_rfc_connection(alias, "Call Rfc")
         gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_rfc(function_name)
+        touch_log.record_rfc("SapApiLibrary", function_name, params)
         return connection.call(
             function_name, **rfc_channel.plain_rfc_parameters(params))
 

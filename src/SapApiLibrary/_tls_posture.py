@@ -32,10 +32,10 @@ from robot.utils import timestr_to_secs
 
 from sapfx_common import tls_certificates as tls
 
-from ._rfc_landscape import RfcLandscapeKeywords
+from ._rfc_gateway import RfcGatewayKeywords
 
 
-class TlsPostureKeywords(RfcLandscapeKeywords):
+class TlsPostureKeywords(RfcGatewayKeywords):
     """Mixin de :class:`SapApiLibrary` : certificat STRUST, services ICM, fil TLS."""
 
     def list_strust_identities(self, alias: str = "default") -> list[dict[str, str]]:
@@ -127,7 +127,7 @@ class TlsPostureKeywords(RfcLandscapeKeywords):
         return tls.describe_certificate(name, der, parsed)
 
     def get_certificate_expiry_verdict(self, valid_to: str, valid_from: Optional[str] = None,
-                                       warning_days: Any = 30,
+                                       warning_days: int = 30,
                                        now: Optional[str] = None) -> dict[str, Any]:
         """Rend le verdict d'échéance d'un certificat SANS échouer :
         ``{verdict, valid_to, valid_from, now, days_remaining, warning_days}``,
@@ -145,7 +145,7 @@ class TlsPostureKeywords(RfcLandscapeKeywords):
         return tls.certificate_expiry_verdict(_asn1(valid_to), _asn1(valid_from), warning_days, now)
 
     def certificate_expiry_should_be_valid(self, valid_to: str, valid_from: Optional[str] = None,
-                                           warning_days: Any = 30, now: Optional[str] = None,
+                                           warning_days: int = 30, now: Optional[str] = None,
                                            subject: str = "le certificat") -> dict[str, Any]:
         """Juge une échéance de certificat et échoue sauf verdict ``valid`` :
         ``expired``, ``expiring`` (moins de ``warning_days`` jours),
@@ -167,7 +167,7 @@ class TlsPostureKeywords(RfcLandscapeKeywords):
             raise AssertionError(tls.describe_expiry_failure(subject, verdict))
         return verdict
 
-    def strust_certificate_should_be_valid(self, identity: str, warning_days: Any = 30,
+    def strust_certificate_should_be_valid(self, identity: str, warning_days: int = 30,
                                            now: Optional[str] = None,
                                            alias: str = "default") -> dict[str, Any]:
         """Lit le certificat propre de l'identité STRUST ``identity`` par RFC

@@ -196,7 +196,7 @@ def recommended_engines(composition: dict[str, Any]) -> list[str]:
 # --- Carte numérotée de page (@N) --------------------------------------------
 # Pendant Fiori de la carte ECC (patron « map / @e1 » agent-first, cf. Vibium) :
 # l'arbre de contrôles UI5 est réduit aux cibles ACTIONNABLES, numérotées, pour
-# que l'agent agisse par référence (`Click Ui5 Ref`) sans recopier un id.
+# qu'un agent agisse par référence sans recopier un id.
 
 # Types courts SAISISSABLES (marqués ``*`` : la valeur courante est affichée).
 # ``FieldInput`` / ``FieldMultiInput`` : la saisie INTERNE d'un

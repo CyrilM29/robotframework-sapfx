@@ -26,6 +26,18 @@ from __future__ import annotations
 import urllib.parse
 from typing import Any
 
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
 __all__ = [
     "rap_service_url",
     "build_fe_preview_path",
@@ -69,6 +81,7 @@ def _split_repository_name(name: str) -> tuple[str, str]:
     return "sap", name.lower()
 
 
+@keyword
 def rap_service_url(binding: Any, service: Any, version: Any = "0001") -> str:
     """Adresse OData v4 d'un service RAP publié, dérivée de son binding.
 
@@ -79,6 +92,10 @@ def rap_service_url(binding: Any, service: Any, version: Any = "0001") -> str:
     la convention ``sap`` de la plateforme, non relevée sur ce banc. En cas de
     doute, passer l'adresse annoncée par le système à
     `Build Fe Preview Path` (argument ``service_url``) plutôt que la dériver.
+
+    Exemple :
+    | ${url}=    `Rap Service Url`    /DMO/UI_TRAVEL_D_D_O4    /DMO/UI_TRAVEL_D_D
+    | Should Be Equal    ${url}    /sap/opu/odata4/dmo/ui_travel_d_d_o4/srvd/dmo/ui_travel_d_d/0001/
     """
     binding_ns, binding_name = _split_repository_name(_text(binding, "binding"))
     service_ns, service_name = _split_repository_name(_text(service, "service"))
@@ -90,6 +107,7 @@ def _encode(plain: str) -> str:
     return "".join(chr(ord(char) + CODE_POINT_SHIFT) for char in plain)
 
 
+@keyword
 def build_fe_preview_path(binding: Any, service: Any, entity_set: Any,
                           version: Any = "0001", service_url: Any = "",
                           navigation_property: Any = "",
@@ -98,16 +116,18 @@ def build_fe_preview_path(binding: Any, service: Any, entity_set: Any,
     """Chemin de l'aperçu Fiori Elements d'un entity set racine d'un service RAP v4.
 
     À concaténer à l'adresse HTTPS du serveur ABAP puis à ouvrir dans le
-    navigateur (la page demande l'authentification du système). Exemple :
-
-    | ${path}= | Build Fe Preview Path | /DMO/UI_TRAVEL_D_D_O4 | /DMO/UI_TRAVEL_D_D | Travel | client=001 |
-    | Go To | https://localhost:50101${path} |
+    navigateur (la page demande l'authentification du système).
 
     ``service_url`` vide : dérivée par `Rap Service Url`. ``client`` et
     ``language`` ajoutent ``sap-client`` / ``sap-ui-language`` (vides =
     absents : la langue par défaut de l'utilisateur s'applique). Le serveur
     n'ouvre l'aperçu que d'un binding PUBLIÉ ; un binding inconnu rend une
     erreur serveur, pas une page vide.
+
+    Exemple :
+    | ${path}=    `Build Fe Preview Path`    /DMO/UI_TRAVEL_D_D_O4    /DMO/UI_TRAVEL_D_D    Travel
+    | ...    client=001
+    | Should Start With    ${path}    /sap/bc/adt/businessservices/odatav4/feap?feapParams=
     """
     binding_text = _text(binding, "binding")
     service_text = _text(service, "service")
@@ -133,11 +153,18 @@ def build_fe_preview_path(binding: Any, service: Any, entity_set: Any,
     return FEAP_V4_PATH + "?" + urllib.parse.urlencode(query, quote_via=urllib.parse.quote)
 
 
+@keyword
 def decode_fe_preview_params(value: Any) -> dict[str, str]:
     """L'inverse de l'encodage : ``feapParams`` (encodé URL ou non) -> champs nommés.
 
     Sert au diagnostic d'une adresse d'aperçu relevée ailleurs (un lien copié
     depuis les outils ABAP) ; accepte aussi un chemin complet ``...?feapParams=...``.
+
+    Exemple :
+    | ${path}=    Build Fe Preview Path    /DMO/UI_TRAVEL_D_D_O4    /DMO/UI_TRAVEL_D_D    Travel
+    | ${params}=    `Decode Fe Preview Params`    ${path}
+    | Should Be Equal    ${params}[primary_entity_set]    Travel
+    | Should Be Equal    ${params}[service_binding]    /DMO/UI_TRAVEL_D_D_O4
     """
     text = "" if value is None else str(value)
     if "feapParams=" in text:

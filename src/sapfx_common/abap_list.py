@@ -103,8 +103,77 @@ def _by_row(cells: Sequence[ListCell]) -> dict[int, list[ListCell]]:
     return rows
 
 
+def boxed_rows(cells: Sequence[ListCell]) -> set[int]:
+    """Les lignes ENCADRÉES d'une liste classique : bornées à gauche ET à
+    droite par un label VIDE (le trait vertical d'un cadre), au plus deux
+    cellules texte entre les deux (un libellé et sa valeur, ou un message).
+
+    Mesuré sur SM58, SMQ1 et SMQ2 (754 et 758, 2026-10-18) : le bloc de
+    synthèse en tête de liste (« Number of Entries Displayed » et sa valeur)
+    a des labels vides en colonnes 1 et 49 sur chaque ligne, et le message
+    « Nothing was selected. » est encadré de même (colonnes 1 et 63). Une
+    ligne d'en-tête ou de données porte plus de deux cellules texte : la
+    borne protège une liste à séparateurs verticaux d'être prise pour un
+    cadre."""
+    rows = _by_row([cell for cell in cells if cell.kind == "lbl"])
+    boxed = set()
+    for number, row_cells in rows.items():
+        texts = _text_cells(row_cells)
+        if not texts or len(texts) > 2:
+            continue
+        left = min(row_cells, key=lambda cell: cell.column)
+        right = max(row_cells, key=lambda cell: cell.column)
+        if left.text or right.text or left is right:
+            continue
+        if all(left.column < cell.column < right.column for cell in texts):
+            boxed.add(number)
+    return boxed
+
+
+def _boxed_runs(boxed: set[int]) -> list[list[int]]:
+    runs: list[list[int]] = []
+    for number in sorted(boxed):
+        if runs and number == runs[-1][-1] + 1:
+            runs[-1].append(number)
+        else:
+            runs.append([number])
+    return runs
+
+
+def list_summary(elements: Sequence[ScreenElement]) -> list[dict[str, Any]]:
+    """Le bloc de synthèse ENCADRÉ en tête d'une liste classique : une entrée
+    ``{row, label, value}`` par ligne, dans l'ordre (ligne de titre :
+    ``value`` vide). Un bloc est une suite de lignes encadrées consécutives
+    dont au moins une porte DEUX cellules (libellé et valeur) ; un message
+    encadré seul (« Nothing was selected. ») n'en est pas un, et une liste
+    sans bloc rend ``[]``. Libellés localisés : rendus pour le page object
+    qui les ancre, jamais une clé d'assertion."""
+    cells = list_cells(elements)
+    by_row = _by_row(cells)
+    summary: list[dict[str, Any]] = []
+    for run in _boxed_runs(boxed_rows(cells)):
+        if not any(len(_text_cells(by_row[number])) == 2 for number in run):
+            continue
+        for number in run:
+            texts = _text_cells(by_row[number])
+            summary.append({"row": number, "label": texts[0].text,
+                            "value": texts[1].text if len(texts) > 1 else ""})
+    return summary
+
+
+def _messages(by_row: dict[int, list[ListCell]], boxed: set[int]) -> list[dict[str, Any]]:
+    """Les messages encadrés isolés (une ligne, une cellule) : jamais une donnée."""
+    found = []
+    for run in _boxed_runs(boxed):
+        texts = _text_cells(by_row[run[0]])
+        if len(run) == 1 and len(texts) == 1:
+            found.append({"_row": run[0], "text": texts[0].text})
+    return found
+
+
 def _find_header_row(rows: dict[int, list[ListCell]], header: Any,
-                     selectable: Sequence[int]) -> int:
+                     selectable: Sequence[int],
+                     boxed: frozenset[int] = frozenset()) -> Optional[int]:
     """Le numéro de ligne de l'en-tête : ``header`` entier (numéro de ligne
     de liste), texte (première ligne portant une cellule égale), ou ``auto``.
 
@@ -121,7 +190,12 @@ def _find_header_row(rows: dict[int, list[ListCell]], header: Any,
     huit cellules contre quatre à l'en-tête, et « la plus fournie » la
     prenait pour l'en-tête, chaque ligne rendant alors ses trois premières
     valeurs fondues dans une seule colonne. Sans case : la première ligne
-    d'au moins deux cellules texte."""
+    d'au moins deux cellules texte. Les lignes ENCADRÉES (`boxed_rows` :
+    bloc de synthèse, message) cèdent la place à toute autre candidate
+    (mesuré le 2026-10-18 : sur SM58 et SMQ1, « Number of Entries
+    Displayed » et sa valeur étaient pris pour l'en-tête). Une liste qui ne
+    porte QUE des lignes encadrées, dont un message isolé (« Nothing was
+    selected. »), n'a pas d'en-tête : ``None``."""
     text = str(header).strip() if header is not None else "auto"
     if text.isdigit():
         number = int(text)
@@ -139,6 +213,15 @@ def _find_header_row(rows: dict[int, list[ListCell]], header: Any,
                   if len(_text_cells(rows[number])) >= 2
                   and number not in selectable
                   and (last_selectable is None or number < last_selectable)]
+    unboxed = [number for number in candidates if number not in boxed]
+    if unboxed:
+        candidates = unboxed
+    elif boxed and not selectable and _messages(rows, set(boxed)) and all(
+            number in boxed for number in rows if _text_cells(rows[number])):
+        # bloc de synthèse et message encadré seulement : aucune donnée. Sans
+        # message isolé, l'ancienne règle s'applique (une liste à séparateurs
+        # verticaux encadre aussi ses lignes)
+        return None
     if not candidates:
         raise ValueError(
             "Aucune ligne d'en-tête détectable (au moins deux cellules texte%s) : "
@@ -203,7 +286,13 @@ def aligned_rows(elements: Sequence[ScreenElement], header: Any = "auto",
     cells = list_cells(elements)
     by_row = _by_row(cells)
     checkboxes = {cell.row: cell.id for cell in cells if cell.kind == "chk"}
-    header_row = _find_header_row(by_row, header, sorted(checkboxes))
+    boxed = boxed_rows(cells)
+    header_row = _find_header_row(by_row, header, sorted(checkboxes), frozenset(boxed))
+    if header_row is None:
+        # liste réduite à un bloc de synthèse et/ou un message encadré : aucune
+        # donnée, et le message n'en est pas une (SM58 et SMQ1 sans sélection)
+        return {"header_row": None, "columns": [], "rows": [],
+                "ignored": _messages(by_row, boxed)}
     header_cells = _text_cells(by_row[header_row])
     titles = _titles(header_cells)
     starts = [cell.column for cell in header_cells]
@@ -254,6 +343,45 @@ def matching_rows(rows: Sequence[dict[str, Any]], text: Any,
         if any(str(value).strip() == wanted for value in values):
             found.append(row)
     return found
+
+
+def find_list_cell(elements: Sequence[ScreenElement], text: Any,
+                   column: Optional[str] = None, header: Any = "auto") -> ListCell:
+    """Le label d'une ligne de données dont le texte vaut EXACTEMENT ``text``
+    (dans la colonne d'en-tête ``column`` si elle est donnée) : la cible d'un
+    double-clic de liste (descendre d'un niveau dans SMQ2, ouvrir un spool).
+
+    Aucune cellule = ``ValueError`` avec un échantillon ; plusieurs =
+    ``ValueError`` les listant (jamais la première venue) ; colonne inconnue
+    = ``ValueError`` listant les colonnes ; liste sans en-tête (rien que des
+    lignes encadrées) = ``ValueError``."""
+    result = aligned_rows(elements, header=header, rows="all")
+    if result["header_row"] is None:
+        raise ValueError("La liste n'a ni en-tête ni donnée (bloc de synthèse ou message "
+                         "seulement) : aucune cellule à viser.")
+    starts = [entry["column"] for entry in result["columns"]]
+    titles = [entry["title"] for entry in result["columns"]]
+    if column is not None and column not in titles:
+        raise ValueError("Colonne %r inconnue ; colonnes : %s." % (column, titles))
+    data_rows = {int(row["_row"]) for row in result["rows"]}
+    wanted = str(text).strip()
+    found = []
+    for cell in list_cells(elements):
+        if cell.kind != "lbl" or cell.row not in data_rows or cell.text != wanted:
+            continue
+        index = max((i for i, start in enumerate(starts) if start <= cell.column), default=None)
+        if column is None or (index is not None and titles[index] == column):
+            found.append(cell)
+    if not found:
+        sample = sorted({value for row in result["rows"][:10] for key, value in row.items()
+                         if not key.startswith("_") and value})[:12]
+        raise ValueError("Aucune cellule de la liste ne vaut %r%s ; échantillon : %s."
+                         % (wanted, " dans la colonne %r" % column if column else "", sample))
+    if len(found) > 1:
+        raise ValueError("%d cellules valent %r%s (%s) : préciser column=."
+                         % (len(found), wanted, " dans la colonne %r" % column if column else "",
+                            [cell.id for cell in found]))
+    return found[0]
 
 
 def attach_icons(result: Mapping[str, Any], icons: Mapping[str, str]) -> list[dict[str, Any]]:

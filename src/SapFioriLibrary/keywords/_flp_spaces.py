@@ -12,7 +12,7 @@ bundle ``__SAPFX`` n'est pas injecté. La règle vit dans
 import json
 
 from sapfx_common import flp_spaces
-from sapfx_common.robot_args import as_name_list
+from sapfx_common.robot_args import OptionalNameListInput, as_name_list
 
 from .._flp_spaces_js import (
     FLP_MENU_STATE_PROBE_JS,
@@ -94,7 +94,7 @@ class FlpSpacesKeywords:
         types = result.get("types") or {}
         return {k: int(types[k]) for k in sorted(types)}
 
-    def get_flp_spaces_mode(self, ignored_keys=None):
+    def get_flp_spaces_mode(self, ignored_keys: OptionalNameListInput = None):
         """Le mode *Espaces et Pages* du launchpad, établi par TROIS lectures
         de natures différentes : la configuration déclarée
         (``ushell.spaces``), l'état effectif du service *Menu* et les types
@@ -139,7 +139,7 @@ class FlpSpacesKeywords:
             declared, flp_spaces.classify_effective(menu),
             flp_spaces.classify_rendered(types, on_home=on_home, location=location))
 
-    def flp_spaces_mode_should_be(self, expected, ignored_keys=None):
+    def flp_spaces_mode_should_be(self, expected, ignored_keys: OptionalNameListInput = None):
         """Assertion : le mode *Espaces et Pages* établi par `Get Flp Spaces
         Mode` vaut ``expected`` (``active`` ou ``inactive``), les trois
         lectures concordant. Une lecture illisible ou une divergence échoue

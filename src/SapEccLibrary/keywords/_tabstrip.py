@@ -11,6 +11,8 @@ reste), la CLÉ technique est le suffixe ``tabp<CLÉ>`` de l'id ; la sélection
 est VÉRIFIÉE en relisant l'onglet actif. Logique pure dans
 ``sapfx_common.tab_strip``.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
 
 from sapfx_common.tab_strip import (
@@ -20,6 +22,7 @@ from sapfx_common.tab_strip import (
     format_tabs,
     relative_id,
 )
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 _TRUTHY = ("1", "true", "yes", "on")
 
@@ -32,6 +35,12 @@ def _as_bool(value):
 
 class TabStripKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Suppose ``self.session`` connectée."""
+
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _screen_elements(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
 
     def _tabstrip(self, tabstrip_id):
         element_type = self.get_element_type(tabstrip_id)
@@ -48,7 +57,7 @@ class TabStripKeywords:
         except (AttributeError, com_error):
             return ""
 
-    def list_tabs(self, tabstrip_id):
+    def list_tabs(self, tabstrip_id: GuiElementIdInput):
         """Les onglets du tabstrip ``tabstrip_id`` : liste de dicts
         ``{id, key, text, selected}`` dans l'ordre d'affichage, ``key`` étant la
         clé TECHNIQUE (``LOGO`` pour ``tabpLOGO``, locale-safe) et ``text`` le
@@ -68,7 +77,7 @@ class TabStripKeywords:
                 % tabstrip_id)
         return tabs
 
-    def get_selected_tab(self, tabstrip_id):
+    def get_selected_tab(self, tabstrip_id: GuiElementIdInput):
         """L'onglet ACTIF du tabstrip (dict ``{id, key, text, selected}``) ;
         échec nommant les onglets si aucun n'est marqué actif.
 
@@ -97,7 +106,7 @@ class TabStripKeywords:
                 % (tab["key"], active["key"], format_tabs(self.list_tabs(tabstrip_id))))
         return active
 
-    def select_tab(self, tabstrip_id, key):
+    def select_tab(self, tabstrip_id: GuiElementIdInput, key):
         """Active l'onglet de CLÉ technique ``key`` (``LOGO``, ``DEFA``... le
         suffixe ``tabp<CLÉ>`` de son id, insensible à la casse) et VÉRIFIE
         qu'il est devenu l'onglet actif. Clé absente = échec listant les
@@ -116,7 +125,7 @@ class TabStripKeywords:
                 % (key, tabstrip_id, format_tabs(tabs)))
         return self._activate(tabstrip_id, tab)
 
-    def select_tab_by_label(self, tabstrip_id, label, exact=False):
+    def select_tab_by_label(self, tabstrip_id: GuiElementIdInput, label, exact: bool = False):
         """Active l'onglet dont le LIBELLÉ correspond (préfixe insensible à la
         casse, ``exact=True`` pour l'égalité) et vérifie la sélection. Le
         libellé est LOCALISÉ : c'est un choix de lisibilité pour un page

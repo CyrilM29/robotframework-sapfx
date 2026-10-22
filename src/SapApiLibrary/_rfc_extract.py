@@ -15,19 +15,16 @@ deux n'ont ni le même contrat de sortie ni les mêmes gardes.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional
+from sapfx_common import rfc_extract
+from sapfx_common.argument_types import TableNameInput
 
-from robot.api import logger
-
-from sapfx_common import rfc_channel, rfc_extract, rfc_tables, table_extract
-
-from ._rfc_surface_artifact import RfcSurfaceArtifactKeywords
+from ._rfc_spool import RfcSpoolKeywords
 
 
-class RfcExtractKeywords(RfcSurfaceArtifactKeywords):
+class RfcExtractKeywords(RfcSpoolKeywords):
     """Mixin de :class:`SapApiLibrary` : extraire un tableau par le canal RFC."""
 
-    def count_rfc_table_rows(self, table: str, alias: str = "default") -> int:
+    def count_rfc_table_rows(self, table: TableNameInput, alias: str = "default") -> int:
         """Compte les lignes d'une table *sans en rapatrier aucune*, par un
         module DIFFÉRENT de celui qui lit.
 
@@ -43,8 +40,8 @@ class RfcExtractKeywords(RfcSurfaceArtifactKeywords):
         Deux propriétés à connaître, toutes deux mesurées et non supposées.
         Le module compte la table ENTIÈRE et n'accepte aucune clause de
         sélection : il ne sait donc pas borner une lecture filtrée, et
-        `Extract Rfc Table` refuse de les apparier plutôt que d'annoncer des
-        lignes manquantes qui n'existent pas. Il suit en revanche le mandant
+        apparier les deux annoncerait des lignes manquantes qui n'existent
+        pas. Il suit en revanche le mandant
         de la connexion, donc il compte bien la même population que la
         lecture (sur A4H, ``USR02`` est annoncée à 5 lignes et le mandant 001
         en rend exactement 5, alors que le mandant 000 existe et porte au
@@ -55,8 +52,7 @@ class RfcExtractKeywords(RfcSurfaceArtifactKeywords):
         deux releases du banc) : ``-1`` pour un objet absent du dictionnaire
         ou une structure, ``-2`` pour une VUE (vue de base de données ou vue
         SQL d'une CDS). Une vue se compte en lisant sa seule colonne clé
-        (`Read Rfc Table`), ou se borne par le total d'un canal tiers
-        (`declared_rows=` d'`Extract Rfc Table`). Un zéro, lui, désigne une
+        (`Read Rfc Table`), ou se borne par le total d'un canal tiers. Un zéro, lui, désigne une
         table réellement vide, que seul un plancher de lignes distingue d'un
         relevé intègre.
 
@@ -77,83 +73,3 @@ class RfcExtractKeywords(RfcSurfaceArtifactKeywords):
                 rfc_extract.count_function_missing_message(nom, err)) from err
         return rfc_extract.entries_total(reponse, nom)
 
-    def extract_rfc_table(self, table: str, fields: Any,
-                          alias: str = "default", options: Any = None,
-                          rowcount: Any = 0, key: Any = "",
-                          headers: Optional[Mapping[str, Any]] = None,
-                          declared_rows: Any = None,
-                          delimiter: str = "|") -> dict[str, Any]:
-        """Extrait un tableau par RFC et rend le relevé *avec son contrat*,
-        dans la forme commune aux quatre canaux.
-
-        Le miroir sans écran d'`Extract Displayed Report` (SAP GUI),
-        d'`Extract Displayed WebGui Grid` et d'`Extract Displayed Ui5 Table` :
-        même dictionnaire en sortie, donc même garde
-        (`Table Extract Should Be Complete`) et mêmes écrivains de fichiers.
-        Une règle par canal est une règle qu'un canal de plus fait oublier.
-
-        Le total déclaré est mesuré par `Count Rfc Table Rows`, sauf si
-        ``declared_rows`` est fourni : le passer permet de PROUVER la
-        complétude par un canal tiers (le ``$count`` du service OData qui
-        projette la même table), ce qui est la preuve la plus forte que ce
-        dépôt sache produire, puisque ni le module de lecture ni celui de
-        comptage n'y participent.
-
-        Ce que le canal ne sait pas faire, et qui doit se lire ici plutôt que
-        se découvrir à l'usage : il n'expose *aucun libellé affiché*. Les
-        colonnes sont des noms de champs ABAP, stables et indépendants de la
-        langue, donc le contraire exact du canal UI5, dont les seules clés
-        disponibles sont des titres traduits. Passer ``headers`` permet à la
-        couche métier de donner des en-têtes humains au fichier livré, sans
-        que le relevé perde ses clés techniques.
-
-        ``rowcount`` borne la lecture, et c'est justement le geste dangereux :
-        le module rend alors exactement N lignes, propres et ordonnées, sans
-        aucun témoin de la troncature (mesuré le 2026-09-16 : 50 lignes
-        rendues sur les 205 de ``SNWD_PD``). La garde partagée le voit parce
-        que le total, lui, vient d'ailleurs.
-
-        Dernière limite du canal, et elle porte sur la LARGEUR et non sur la
-        hauteur : le serveur borne la ligne PROJETÉE à 512 octets. Extraire
-        « toute la table » échoue donc sur les tables larges (mesuré :
-        ``SNWD_PD`` fait 533 octets sur ses 24 champs, refus
-        ``DATA_BUFFER_EXCEEDED`` / ``AD/E/559``). Le refus est relayé INTACT,
-        pour rester assertable par son code, et son remède est journalisé en
-        avertissement, parce que la sortie de secours (lire en deux
-        projections qui partagent la clé, puis recoller) ne se devine pas.
-
-        Exemple :
-        | ${extract}=    `Extract Rfc Table`    T000    MANDT,MTEXT    alias=a4h    key=MANDT
-        | Should Be True    ${extract}[complete]
-        """
-        nom = str(table or "").strip().upper()
-        projection = rfc_tables.as_field_list(fields)
-        if not projection:
-            raise ValueError(
-                "Aucune colonne projetée pour %s : une extraction RFC nomme "
-                "les champs à lire (le module ne sait pas rendre « toutes les "
-                "colonnes », et une ligne projetée reste bornée à 512 octets)."
-                % (nom or "?"))
-        # Le refus du couple filtre + total de table entière tombe AVANT le
-        # moindre aller-retour : un refus qui constate après coup n'empêche
-        # rien, et la lecture d'une grosse table n'est pas gratuite.
-        declare = rfc_extract.require_bounded_scope(nom, options, declared_rows)
-        try:
-            lignes = self.read_rfc_table(nom, projection, alias=alias,
-                                         options=options,
-                                         rowcount=int(rowcount or 0),
-                                         delimiter=delimiter)
-        except Exception as err:   # noqa: BLE001 : le refus est RELAYÉ intact
-            if rfc_channel.rfc_error_code(err).upper() == rfc_extract.BUFFER_ERROR_CODE:
-                # Journalisé, jamais enveloppé : envelopper coûterait le code
-                # technique du refus, donc la possibilité de l'asserter
-                # autrement que par un texte localisé (convention n°3).
-                logger.warn(rfc_extract.buffer_exceeded_remedy(nom, projection))
-            raise
-        if declare is None:
-            declare = self.count_rfc_table_rows(nom, alias=alias)
-        return table_extract.build_table_extract(
-            lignes, columns=projection, headers=headers,
-            declared_rows=declare, key=key,
-            source=rfc_extract.describe_rfc_source(nom, projection, options,
-                                                   rowcount))

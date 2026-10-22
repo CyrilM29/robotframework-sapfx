@@ -19,7 +19,10 @@ de SE16 (mesuré : ``&SORT_DSC`` y est un argument invalide) : `Sort Grid By
 Column` passe par la barre de la grille quand elle en a une, sinon échoue en
 listant ce qui existe, jamais en silence.
 """
+from typing import TYPE_CHECKING, Any
+
 from pythoncom import com_error
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 _TRUTHY = ("1", "true", "yes", "on")
 _SORT_CODES = {False: ("&SORT_UP", "&SORT_ASC"), True: ("&SORT_DOWN", "&SORT_DSC")}
@@ -35,7 +38,19 @@ class GridActionKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`, au-dessus de ``GridKeywords``
     (dont il réutilise ``_grid`` : localisateur de conteneur toléré)."""
 
-    def double_click_grid_cell(self, table_id, row_num, column):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _grid(self, *args: Any, **kwargs: Any) -> Any: ...
+        def element_should_be_present(self, *args: Any, **kwargs: Any) -> Any: ...
+        def get_element_type(self, *args: Any, **kwargs: Any) -> Any: ...
+        def list_toolbar_buttons(self, *args: Any, **kwargs: Any) -> Any: ...
+        session: Any
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+        def wait_until_busy_done(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def double_click_grid_cell(self, table_id: GuiElementIdInput, row_num: int, column):
         """Double-clique la cellule (``row_num`` 0-based, ``column`` = id
         technique de colonne) d'une grille ALV : ``SetCurrentCell`` puis
         ``DoubleClickCurrentCell``, le geste qui ouvre le détail d'une ligne
@@ -60,7 +75,7 @@ class GridActionKeywords:
                                              list(grid.ColumnOrder)))
         self.wait_until_busy_done()
 
-    def doubleclick_element(self, element_id, item_id, column_id):
+    def doubleclick_element(self, element_id: GuiElementIdInput, item_id, column_id):
         """Double-clique un item : sur une GRILLE (``ColumnOrder``), la cellule
         (ligne ``item_id``, colonne ``column_id``) par `Double Click Grid
         Cell` ; sur un autre shell (un arbre), l'item par ``doubleClickItem``.
@@ -89,7 +104,7 @@ class GridActionKeywords:
         self.session.findById(element_id).doubleClickItem(item_id, column_id)
         self._explicit_pause()
 
-    def list_grid_context_menu(self, table_id):
+    def list_grid_context_menu(self, table_id: GuiElementIdInput):
         """Ouvre le menu contextuel d'une grille et le REFERME (touche
         Échap par ``Escape`` non nécessaire : le menu se ferme au prochain
         appel), retourne ses entrées ``{code, text, level}`` : le code fonction
@@ -124,7 +139,7 @@ class GridActionKeywords:
         walk(menu, 0)
         return items
 
-    def select_grid_context_menu_item(self, table_id, code):
+    def select_grid_context_menu_item(self, table_id: GuiElementIdInput, code):
         """Ouvre le menu contextuel de la grille et choisit l'entrée de code
         fonction ``code`` (``&FILTER``, ``&FIND``, ``&XXL``...) par
         ``SelectContextMenuItem`` ; code absent = échec listant les codes du
@@ -148,7 +163,7 @@ class GridActionKeywords:
         grid.SelectContextMenuItem(wanted)
         self.wait_until_busy_done()
 
-    def select_context_menu_item(self, element_id, menu_or_button_id, item_id):
+    def select_context_menu_item(self, element_id: GuiElementIdInput, menu_or_button_id, item_id):
         """Choisit l'entrée ``item_id`` (code fonction) d'un menu contextuel.
         Sur une GRILLE, passe par `Select Grid Context Menu Item` (le
         deuxième argument est alors ignoré ; le keyword de
@@ -181,7 +196,7 @@ class GridActionKeywords:
         target.selectContextMenuItem(item_id)
         self._explicit_pause()
 
-    def list_grid_toolbar_buttons(self, table_id):
+    def list_grid_toolbar_buttons(self, table_id: GuiElementIdInput):
         """Les boutons de la barre d'outils PROPRE d'une grille : liste de
         dicts ``{id, tooltip, type}``. Vide quand la grille n'a pas de barre
         (SE16 : les fonctions vivent dans la barre d'application).
@@ -191,7 +206,7 @@ class GridActionKeywords:
         | Should Be Equal    ${buttons}[0][id]    &DETAIL
         """
         grid = self._grid(table_id)
-        buttons = []
+        buttons: list[dict[str, Any]] = []
         try:
             count = int(grid.ToolbarButtonCount)
         except (AttributeError, com_error, TypeError, ValueError):
@@ -207,7 +222,7 @@ class GridActionKeywords:
                 continue
         return buttons
 
-    def click_toolbar_button(self, table_id, button_id):
+    def click_toolbar_button(self, table_id: GuiElementIdInput, button_id):
         """Clique le bouton ``button_id`` de la barre d'outils propre d'une
         grille ; un bouton ABSENT échoue
         en listant les boutons de la barre de la grille (vide = la grille n'a
@@ -221,7 +236,9 @@ class GridActionKeywords:
         | `Dismiss Modal Window`
         """
         try:
-            return super().click_toolbar_button(table_id, button_id)
+            # Le keyword de cellule (GridCellKeywords) suit ce mixin dans l'ordre
+            # de résolution de SapEccLibrary : mypy ne voit que la base object.
+            return super().click_toolbar_button(table_id, button_id)  # type: ignore[misc]
         except ValueError as exc:
             buttons = self.list_grid_toolbar_buttons(table_id)
             if buttons:
@@ -245,7 +262,7 @@ class GridActionKeywords:
                         "List Grid Context Menu)." % inventory)
             raise ValueError("%s %s" % (exc, hint)) from exc
 
-    def sort_grid_by_column(self, table_id, column, descending=False):
+    def sort_grid_by_column(self, table_id: GuiElementIdInput, column, descending: bool = False):
         """Trie la grille sur la colonne ``column`` (id technique) : sélection
         de la colonne puis bouton de tri de la barre de la grille
         (``&SORT_UP`` / ``&SORT_DOWN``), à défaut entrée de tri du menu

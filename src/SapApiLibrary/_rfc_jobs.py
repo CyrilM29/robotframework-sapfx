@@ -25,11 +25,12 @@ Logique pure dans ``sapfx_common.background_jobs``. Typed.
 from __future__ import annotations
 
 import time
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from robot.api import logger
 from robot.utils import timestr_to_secs
 
+from sapfx_common.robot_args import NameListInput, OptionalNameListInput
 from sapfx_common import background_jobs, bapi_return, rfc_reads, rfc_tables
 from sapfx_common.polling import poll_until
 from sapfx_common.background_jobs import JOB_RUN_FIELDS
@@ -98,7 +99,8 @@ class RfcJobKeywords(RfcIdocWaitKeywords):
                                        report["detail"]))
         return report
 
-    def background_job_state_should_be(self, jobname: str, state: str,
+    def background_job_state_should_be(self, jobname: str,
+                                       state: Literal["done", "aborted", "pipeline", "unmapped", "missing"],
                                        jobcount: Optional[str] = None,
                                        alias: str = "default") -> dict[str, Any]:
         """Vérifie que le job est dans l'état ``state`` (``done``,
@@ -119,8 +121,8 @@ class RfcJobKeywords(RfcIdocWaitKeywords):
         return report
 
     def delete_background_job(self, jobname: str, jobcount: str,
-                              allowed_prefixes: Any, alias: str = "default",
-                              allowed_statuses: Any = None,
+                              allowed_prefixes: NameListInput, alias: str = "default",
+                              allowed_statuses: OptionalNameListInput = None,
                               external_user: Optional[str] = None,
                               owner: Optional[str] = None
                               ) -> dict[str, Any]:

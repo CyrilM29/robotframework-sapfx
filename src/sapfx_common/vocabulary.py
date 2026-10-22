@@ -1,17 +1,17 @@
-"""Vocabulaire métier SAP : logique pure, partagée ECC↔Fiori.
+"""Vocabulaire métier SAP : logique pure, commune aux canaux écran, Fiori et API.
 
 Concept issu de l'analyse de playwright-praman (Apache-2.0, attribution dans
-``NOTICE``), réimplémenté sur notre modèle : un **terme métier** (anglais ou
+``NOTICE``), réimplémenté sur notre modèle : un *terme métier* (anglais ou
 français, synonymes compris : « vendor », « fournisseur », « supplier ») se
-résout vers sa fiche : nom canonique, **champ ABAP**, table de référence,
+résout vers sa fiche : nom canonique, *champ ABAP*, table de référence,
 domaine (module SAP). Exploitable par les agents (sap-planner qui parle
 métier, sap-generator qui remplit des écrans de sélection SE16) comme par un
 humain qui écrit une suite.
 
 Contrat, aligné sur ``sapfx_common.semantic`` : la résolution retourne TOUS
 les candidats scorés (:func:`resolve_term`) et le raccourci :func:`lookup_term`
-tranche selon un **seuil de refus** : score insuffisant ou ambiguïté (deux
-candidats confondables) = erreur **avec la liste des candidats**, jamais de
+tranche selon un *seuil de refus* : score insuffisant ou ambiguïté (deux
+candidats confondables) = erreur *avec la liste des candidats*, jamais de
 premier-match silencieux.
 
 Barème (du plus sûr au plus flou) : canonique exact 1.0 · synonyme exact 0.9 ·
@@ -29,6 +29,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Iterable, Optional, Sequence
+
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Le seul keyword que Robot lit dans ce module quand une suite l'importe
+#: (``Library    sapfx_common.vocabulary``) : la recherche de terme métier,
+#: commune aux canaux. Le reste est l'API Python du module.
+__all__ = ["lookup_business_term"]
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
 
 
 @dataclass(frozen=True)
@@ -225,3 +242,28 @@ def lookup_as_dict(term: str, domain: Optional[str] = None,
         "score": match.score,
         "matched_via": match.matched_via,
     }
+
+
+@keyword
+def lookup_business_term(term: str, domain: Optional[str] = None,
+                         threshold: float = DEFAULT_THRESHOLD) -> dict:
+    """Résout un *terme métier* (français ou anglais, synonymes compris) vers
+    sa fiche SAP : dict JSON-safe ``{canonical, abap_field, table, domain,
+    synonyms, description, score, matched_via}``.
+
+    Le vocabulaire est commun aux canaux (écran, Fiori, API) : ce keyword en
+    est la copie de référence. Les copies homonymes de SapEccLibrary,
+    SapFioriLibrary et SapApiLibrary sont dépréciées à partir de la 0.8.6 et
+    renvoient ici ; d'ici leur retrait, une suite qui importe aussi l'une de
+    ces bibliothèques qualifie l'appel (``sapfx_common.vocabulary.Lookup
+    Business Term``) ou pose `Set Library Search Order`. Un score sous ``threshold`` ou une ambiguïté (deux fiches
+    confondables) fait échouer en listant les candidats, jamais un premier
+    résultat choisi en silence. ``domain`` restreint au module SAP (``MM``,
+    ``SD``, ``FI``, ``FLIGHT``).
+
+    Exemple :
+    | ${entry}=    `Lookup Business Term`    compagnie aérienne
+    | Should Be Equal    ${entry}[abap_field]    CARRID
+    | Should Be Equal    ${entry}[table]    SCARR
+    """
+    return lookup_as_dict(term, domain=domain, threshold=float(threshold))

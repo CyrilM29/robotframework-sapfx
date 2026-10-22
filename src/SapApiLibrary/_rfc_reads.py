@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from sapfx_common.argument_types import OptionalIdocNumberInput
 from sapfx_common import idoc_status, rfc_reads
-from sapfx_common.robot_args import as_name_list
+from sapfx_common.robot_args import OptionalNameListInput, as_name_list
 
 from ._http import _as_bool
 from ._xbp import XbpSessionMixin
@@ -33,7 +34,7 @@ class RfcReadKeywords(XbpSessionMixin):
                               username: Optional[str] = None,
                               date_from: Optional[str] = None,
                               tcode: Optional[str] = None,
-                              include_items: Any = True,
+                              include_items: bool = True,
                               rowcount: int = 0) -> list[dict[str, Any]]:
         """Lit les *documents de modification* (CDHDR, postes CDPOS) d'une
         classe d'objet : l'assertion d'audit « la modification a bien été
@@ -89,8 +90,8 @@ class RfcReadKeywords(XbpSessionMixin):
     def filter_change_documents(self, documents: Any, since: Any = None,
                                 tcode: Any = None, change_ind: Any = None,
                                 table: Any = None, key_suffix: Any = None,
-                                fields: Any = None, indicator: Any = None,
-                                all_fields: Any = False) -> list[dict[str, Any]]:
+                                fields: OptionalNameListInput = None, indicator: Any = None,
+                                all_fields: bool = False) -> list[dict[str, Any]]:
         """Filtre des documents rendus par `Read Change Documents`, HORS
         ligne : le constat d'audit « un document POSTÉRIEUR à ``since``
         journalise tel poste », sans ``Evaluate`` dans la suite.
@@ -127,12 +128,12 @@ class RfcReadKeywords(XbpSessionMixin):
         return rfc_reads.latest_change_number(documents)
 
     def get_idoc_status(self, alias: str = "default",
-                        docnum: Optional[str] = None,
+                        docnum: OptionalIdocNumberInput = None,
                         message_type: Optional[str] = None,
                         idoc_type: Optional[str] = None,
                         direction: Optional[str] = None,
                         date_from: Optional[str] = None,
-                        include_history: Any = False,
+                        include_history: bool = False,
                         rowcount: int = 0) -> dict[str, Any]:
         """Lit le *statut des IDocs* (EDIDC) et le juge par CODE : le test
         d'intégration classique (« l'IDoc est parti / a été intégré »), sans
@@ -201,7 +202,7 @@ class RfcReadKeywords(XbpSessionMixin):
                              alias: str = "default",
                              user: Optional[str] = None,
                              date_from: Optional[str] = None,
-                             with_problems_only: Any = False,
+                             with_problems_only: bool = False,
                              rowcount: int = 0) -> dict[str, Any]:
         """Lit les *journaux applicatifs* (BALHDR, transaction SLG1 sans
         écran) : ce qu'écrivent les traitements. Retourne ``{"headers":

@@ -26,7 +26,9 @@ from ._cross_channel_contract import (
     _as_value_list,
     normalize_identifier,
 )
+from robot.api.deco import keyword
 
+@keyword
 def build_couple_verdict(couple: Any, api_count: Any = None,
                          ddic_count: Any = None,
                          api_count_unfiltered: Any = None) -> dict[str, Any]:
@@ -39,8 +41,8 @@ def build_couple_verdict(couple: Any, api_count: Any = None,
     Trois lectures, et une seule assertion possible pour chacune :
 
     - ``equal`` : les deux comptes doivent être égaux ;
-    - ``equal_under_filter`` : égaux **une fois les filtres déclarés
-      appliqués** ; l'écart sans filtre est consigné (``api_count_unfiltered``)
+    - ``equal_under_filter`` : égaux *une fois les filtres déclarés
+      appliqués* ; l'écart sans filtre est consigné (``api_count_unfiltered``)
       au lieu d'être masqué, puisque c'est lui qui documente la projection ou
       les brouillons ;
     - ``not_comparable`` : jamais asserté en égalité, motif consigné.
@@ -48,6 +50,14 @@ def build_couple_verdict(couple: Any, api_count: Any = None,
     ``verdict`` vaut ``match``, ``mismatch`` ou ``not_compared`` ; ``match``
     reste ``False`` pour un couple non comparable, qui n'est ni un succès de
     croisement ni un échec.
+
+    Exemple :
+    | ${api_count}=    Get Odata Count    /sap/opu/odata/iwbep/GWSAMPLE_BASIC/ProductSet    alias=a4h
+    | ${ddic_count}=    Count Rfc Table Rows    SNWD_PD    alias=a4h
+    | &{couple}=    Create Dictionary    entity_set=ProductSet    service=/sap/opu/odata/iwbep/GWSAMPLE_BASIC
+    | ...    table=SNWD_PD    expected=equal
+    | ${verdict}=    `Build Couple Verdict`    ${couple}    ${api_count}    ${ddic_count}
+    | Should Be Equal    ${verdict}[verdict]    match
     """
     record = dict(couple or {})
     expected = str(record.get("expected", "equal")).strip() or "equal"
@@ -81,14 +91,15 @@ def build_couple_verdict(couple: Any, api_count: Any = None,
     }
 
 
+@keyword
 def shortlist_write_candidates(candidates: Any, allowlist: Any = None,
                                require_declared: bool = True
                                ) -> list[dict[str, Any]]:
     """Réduit les candidats d'écriture à ceux qu'une campagne peut retenir.
 
     ``candidates`` vient de ``sapfx_common.odata_metadata
-    .write_simulation_candidates`` ; ``allowlist`` est la **liste blanche
-    métier** portée par la couche ``resources/``.
+    .write_simulation_candidates`` ; ``allowlist`` est la *liste blanche
+    métier* portée par la couche ``resources/``.
 
     Deux gardes, dans cet ordre, et la première est une correction que la
     mesure live a imposée :
@@ -121,6 +132,13 @@ def shortlist_write_candidates(candidates: Any, allowlist: Any = None,
     interdiction déclarée ne fait plus office d'appui. Sur la cible mesurée,
     la conséquence est qu'aucun entity set ne reste candidat : c'est le
     résultat honnête, préférable à deux fiches que rien n'appuie.
+
+    Exemple :
+    | ${shortlist}=    `Shortlist Write Candidates`    ${qualified}    ${{ ['ProductSet'] }}
+    | Should Be Empty    ${shortlist}
+    | ${by_default}=    `Shortlist Write Candidates`    ${qualified}    ${{ ['ProductSet'] }}
+    | ...    require_declared=${False}
+    | Should Be Equal    ${by_default}[0][reversibility_observed]    unknown
     """
     entries = candidates
     if isinstance(candidates, Mapping):
@@ -168,10 +186,18 @@ def selection_criteria(signature: Any) -> dict[str, str]:
     ainsi naturellement écartés.
 
     Pourquoi dériver plutôt que déclarer : les critères sont POSITIONNELS
-    (``I1``, ``I2``…) et leur ordre dépend du choix des champs de sélection,
+    (``I1``, ``I2`` …) et leur ordre dépend du choix des champs de sélection,
     qui persiste par utilisateur. Un dictionnaire écrit à la main dérive en
     silence ; la perception, non. Relevé live sur DD03L : 31 critères présents
     là où le plan en avait observé 17.
+
+    À ne pas confondre avec le keyword homonyme de
+    ``sapfx_common.webgui_selection``, qui lit une page du WebGUI.
+
+    Exemple :
+    | ${criteria}=    `Selection Criteria`    ${signature}
+    | Should Be Equal    ${criteria}[MTEXT]    wnd[0]/usr/txtI1-LOW
+    | Dictionary Should Not Contain Key    ${criteria}    Maximum No. of Hits
     """
     lines: Iterable[str]
     if isinstance(signature, str):
@@ -212,6 +238,7 @@ def _key_fields(fields: Any) -> list[str]:
                    and str(row.get("KEYFLAG", "")).strip().upper() == "X"})
 
 
+@keyword
 def describe_ddic_table(table: str, fields: Any,
                         entry_count: Any = None) -> dict[str, Any]:
     """Fiche d'une table du périmètre, telle que l'artefact doit la porter.
@@ -220,6 +247,11 @@ def describe_ddic_table(table: str, fields: Any,
     ``key_fields`` sur l'indicateur de clé : les deux attributs dont une
     future suite d'écriture a besoin pour savoir quoi cibler sans
     re-explorer.
+
+    Exemple :
+    | ${table}=    `Describe Ddic Table`    SNWD_PD    ${fields}    205
+    | Should Be True    ${table}[client_dependent]
+    | Should Be Equal    ${table}[key_fields]    ${{ ['CLIENT', 'NODE_KEY'] }}
     """
     rows = [row for row in (fields or []) if isinstance(row, Mapping)]
     return {
@@ -231,6 +263,7 @@ def describe_ddic_table(table: str, fields: Any,
     }
 
 
+@keyword
 def build_cross_channel_artifact(target_id: str, scope: Any,
                                  observed_at_utc: str, catalog: Any = None,
                                  services: Any = None, probes: Any = None,
@@ -246,6 +279,12 @@ def build_cross_channel_artifact(target_id: str, scope: Any,
 
     Les paramètres de campagne font partie de l'artefact : sans eux, deux
     exécutions de périmètres différents seraient comparables par accident.
+
+    Exemple :
+    | ${artifact}=    `Build Cross Channel Artifact`    A4H-754/001    ${scope}
+    | ...    2026-10-17T09:00:00+00:00    catalog=${coverage}    services=${service_contracts}
+    | ...    probes=${verdicts}    couples=${couples}    tables=${tables}
+    | Should Be Equal As Integers    ${artifact}[summary][couples_matched]    1
     """
     scope_map = dict(scope or {})
     catalog_map = dict(catalog or {})
@@ -313,15 +352,30 @@ def build_cross_channel_artifact(target_id: str, scope: Any,
     }
 
 
+@keyword
 def cross_channel_artifact_json(artifact: Any) -> str:
-    """Sérialisation déterministe : clés triées, indentation fixe, fins LF."""
+    """Sérialisation déterministe : clés triées, indentation fixe, fins LF.
+
+    Exemple :
+    | ${content}=    `Cross Channel Artifact Json`    ${artifact}
+    | Create File    ${OUTPUT DIR}/croisement_A4H_754.json    ${content}
+    | Should Start With    ${content}    {
+    """
     return json.dumps(artifact, ensure_ascii=False, indent=2,
                       sort_keys=True) + "\n"
 
 
+@keyword
 def cross_channel_hash(artifact: Any) -> str:
     """SHA-256 de l'artefact HORS horodatage : deux campagnes lisant les mêmes
-    données produisent la même empreinte, quel que soit le moment du relevé."""
+    données produisent la même empreinte, quel que soit le moment du relevé.
+
+    Exemple :
+    | ${digest}=    `Cross Channel Hash`    ${artifact}
+    | Set To Dictionary    ${artifact}    observed_at_utc=2026-10-17T10:30:00+00:00
+    | ${again}=    `Cross Channel Hash`    ${artifact}
+    | Should Be Equal    ${again}    ${digest}
+    """
     stripped = {k: v for k, v in dict(artifact).items()
                 if k != "observed_at_utc"}
     return hashlib.sha256(
@@ -366,6 +420,7 @@ def _as_artifact(value: Any) -> dict[str, Any]:
     return dict(value or {})
 
 
+@keyword
 def compare_cross_channel_artifacts(artifact_a: Any,
                                     artifact_b: Any) -> dict[str, Any]:
     """Compare deux artefacts de même schéma, à périmètre équivalent.
@@ -373,15 +428,21 @@ def compare_cross_channel_artifacts(artifact_a: Any,
     Les deux arguments acceptent un dict ou le TEXTE JSON du fichier.
 
     Retour JSON-safe séparant volontairement les trois natures d'écart que le
-    plan distingue : **disponibilité** (entity set apparu ou disparu,
-    adressabilité changée), **volumétrie** (verdict de couple changé) et
-    **schéma** (contrat de champs dégradé, mesuré sur le nombre d'appariements
+    plan distingue : *disponibilité* (entity set apparu ou disparu,
+    adressabilité changée), *volumétrie* (verdict de couple changé) et
+    *schéma* (contrat de champs dégradé, mesuré sur le nombre d'appariements
     et sur les orphelins).
 
     Aucune égalité stricte n'est exigée entre une cible ECC et une cible
     S/4HANA : c'est l'écart qui porte l'information. L'ordre, la langue et
     l'horodatage n'en créent aucun ; des périmètres différents marquent la
     comparaison non équivalente au lieu de produire des écarts trompeurs.
+
+    Exemple :
+    | ${content}=    Cross Channel Artifact Json    ${artifact}
+    | ${comparison}=    `Compare Cross Channel Artifacts`    ${artifact}    ${content}
+    | Should Be True    ${comparison}[compatible]
+    | Should Be Empty    ${comparison}[volume_verdict_changed]
     """
     a = _as_artifact(artifact_a)
     b = _as_artifact(artifact_b)
@@ -434,8 +495,15 @@ def compare_cross_channel_artifacts(artifact_a: Any,
     }
 
 
+@keyword
 def render_cross_channel_report(comparison: Any) -> str:
-    """Rapport Markdown d'une comparaison, lisible hors SAP."""
+    """Rapport Markdown d'une comparaison, lisible hors SAP.
+
+    Exemple :
+    | ${comparison}=    Compare Cross Channel Artifacts    ${artifact}    ${artifact}
+    | ${report}=    `Render Cross Channel Report`    ${comparison}
+    | Should Contain    ${report}    entity sets communs : 16
+    """
     data = dict(comparison or {})
     lines = [
         "# Comparaison de croisements DDIC et OData",

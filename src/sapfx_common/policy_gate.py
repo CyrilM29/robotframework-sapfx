@@ -56,7 +56,7 @@ class PolicyGate:
         candidate = session_policy.normalize_policy(wanted)
         # Charger la politique AVANT de lire le verrou : sur une garde neuve,
         # c'est ce chargement qui pose ``locked`` (sinon un premier
-        # `Set Session Policy` relâchait une politique d'environnement).
+        # réglage de politique relâchait une politique d'environnement).
         current = self.policy
         if self.locked:
             refusals = session_policy.tightening_refusals(current, candidate)

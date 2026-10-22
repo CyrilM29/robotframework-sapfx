@@ -13,7 +13,7 @@ Trois modes, du plus permissif au plus strict :
 - ``full`` (défaut, le comportement d'avant) : les écritures passent, et sont
   journalisées ;
 - ``explore`` : chaque écriture exige une approbation explicite juste avant
-  (`Approve Next Write`), consommée par le geste qu'elle autorise ;
+  posée juste avant, consommée par le geste qu'elle autorise ;
 - ``read_only`` : toute écriture est refusée.
 
 Ce qui compte comme ÉCRITURE, par canal, et la limite de chacun :
@@ -63,14 +63,17 @@ import os
 import re
 from typing import Any, Iterable, Mapping, Optional
 
+# La règle « quelle transaction un OK-code démarre » vit dans transaction_code
+# (backlog 2.83) : une seule copie pour la garde, le journal des touches et les
+# outils de couverture. Les noms restent exposés ici, ils sont employés ailleurs.
+from sapfx_common.transaction_code import SYSTEM_OK_CODES, bare_transaction
+
 ENV_VAR = "SAPFX_SESSION_POLICY"
 
 MODES = ("full", "explore", "read_only")
 
 #: Qui peut approuver une écriture en mode ``explore``, du moins au plus strict.
 APPROVERS = ("agent", "human")
-
-SYSTEM_OK_CODES = frozenset({"/N", "/NEX", "/NEND", "/I", "/O"})
 
 SAVE_VKEY = 11
 SAVE_BUTTON_SUFFIX = "tbar[0]/btn[11]"
@@ -83,6 +86,8 @@ READ_HTTP_METHODS = frozenset({"GET", "HEAD"})
 #: incrémente le compteur d'échecs du compte. ``BAPI_XMI_LOGON`` et
 #: ``BAPI_XMI_LOGOFF`` ouvrent et ferment la session XBP des lectures de
 #: journal et de spool ; ``BAPI_TRANSACTION_ROLLBACK`` n'écrit rien.
+#: ``RFC_GET_FUNCTION_INTERFACE`` lit l'interface déclarée d'un module sans
+#: l'exécuter (sonde FI, fiche 21).
 READ_FUNCTIONS = frozenset({
     "RFC_READ_TABLE", "RFC_SYSTEM_INFO", "RFC_PING", "STFC_CONNECTION",
     "TH_GET_PARAMETER", "EM_GET_NUMBER_OF_ENTRIES", "DDIF_FIELDINFO_GET",
@@ -95,7 +100,8 @@ READ_FUNCTIONS = frozenset({
     "RSAU_GET_AUDIT_CONFIG", "RSAU_READ_LOG", "SXPG_COMMAND_LIST_GET",
     "BAPI_TRANSACTION_ROLLBACK", "SSFR_GET_ALL_STRUST_IDENTITIES",
     "SSFR_GET_OWNCERTIFICATE", "SSFR_PARSE_CERTIFICATE", "ICM_GET_INFO",
-    "SWNC_COLLECTOR_GET_AGGREGATES",
+    "SWNC_COLLECTOR_GET_AGGREGATES", "RPY_PROGRAM_READ", "BGRFC_CONF_READ_INB_DEST",
+    "ESH_DB_OVERVIEW", "RFC_GET_FUNCTION_INTERFACE",
 })
 
 
@@ -226,22 +232,6 @@ def target_matches(pattern: str, target: str) -> bool:
         return True
     regex = ".*".join(re.escape(part) for part in wanted.split("*"))
     return re.fullmatch(regex, str(target or "").strip(), re.IGNORECASE) is not None
-
-
-def bare_transaction(okcode: str) -> str:
-    """Le code de transaction d'un OK-code (``/nSE16`` -> ``SE16``), un
-    OK-code système rendu tel quel en majuscules (``/NEX``). Un tcode de
-    namespace garde son ``/`` (``/IWFND/MAINT_SERVICE``)."""
-    code = str(okcode or "").strip().upper()
-    if code in SYSTEM_OK_CODES:
-        return code
-    if re.match(r"^/[NO]/", code):            # /n/IWFND/MAINT_SERVICE
-        return code[2:]
-    if re.match(r"^/[A-Z0-9_]+/", code):      # /IWFND/MAINT_SERVICE, /NAMESPACE/X
-        return code
-    if re.match(r"^/[NO]", code):             # /nSE16
-        return code[2:]
-    return code
 
 
 def decide_transaction(policy: Mapping[str, Any], okcode: str) -> tuple[str, str]:

@@ -14,6 +14,9 @@ génère (Ctrl+Alt+A). Ce qui a changé :
   état de case autre que ``checked`` / ``unchecked``), là où l'amont mêlait
   ``Warning``, ``ValueError`` et ``AssertionError``.
 """
+from typing import TYPE_CHECKING, Any
+
+from sapfx_common.gui_element_id import GuiElementIdInput
 
 _TEXT_TYPES = ("GuiTextField", "GuiCTextField", "GuiComboBox", "GuiTitlebar",
                "GuiButton", "GuiLabel", "GuiStatusPane", "GuiStatusbar", "GuiTab")
@@ -24,7 +27,13 @@ _TOGGLE_STATES = ("checked", "unchecked")
 class ValueCheckKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`. Lecture seule."""
 
-    def element_value_should_be(self, element_id, expected_value, message=None):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def element_value_should_be(self, element_id: GuiElementIdInput, expected_value, message=None):
         """Échoue si la valeur de ``element_id`` (voir `Get Value`) n'est pas
         exactement ``expected_value``. Pour une case ou un bouton radio,
         ``expected_value`` vaut ``checked`` ou ``unchecked`` (casse
@@ -50,8 +59,10 @@ class ValueCheckKeywords:
                 % (element_id, expected, actual)))
         self._explicit_pause()
 
-    def element_value_should_contain(self, element_id, expected_value, message=None):
-        """Échoue si la valeur de ``element_id`` (voir `Get Value`) ne contient
+    def element_value_should_contain(self, element_id: GuiElementIdInput, expected_value, message=None):
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité.
+
+        Échoue si la valeur de ``element_id`` (voir `Get Value`) ne contient
         pas ``expected_value``. Réservé aux éléments à texte (champ, libellé,
         bouton, onglet, combo, barre de titre ou de statut). ``message``
         remplace le message d'écart.

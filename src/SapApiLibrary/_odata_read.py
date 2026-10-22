@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import json
 import urllib.parse
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
 from robot.api import logger
 
-from sapfx_common import robot_args
+from sapfx_common.robot_args import NameListInput
+from sapfx_common.argument_types import ODataPathInput, ODataServicePathInput
+from sapfx_common import robot_args, touch_log
 from sapfx_common.cross_channel import odata_error_code
 from sapfx_common.odata_batch import build_batch, parse_batch_response
 
@@ -28,7 +30,7 @@ from ._http import _BODY_EXCERPT, _as_bool, _header
 class OdataReadKeywords(_ApiCore):
     """Mixin de :class:`SapApiLibrary` : les lectures du canal OData."""
 
-    def get_odata(self, path: str, alias: str = "default",
+    def get_odata(self, path: ODataPathInput, alias: str = "default",
                   **query: str) -> Any:
         """GET OData → JSON décodé tel quel (enveloppe v2/v4 comprise). Les
         arguments nommés deviennent des paramètres de requête (``top=5`` →
@@ -42,8 +44,8 @@ class OdataReadKeywords(_ApiCore):
         status, _, body = self._request(alias, "GET", path, query)
         return self._decode_json(body, status, path)
 
-    def get_odata_entities(self, path: str, alias: str = "default",
-                           follow_next: Any = False, max_pages: Any = 100,
+    def get_odata_entities(self, path: ODataPathInput, alias: str = "default",
+                           follow_next: bool = False, max_pages: int = 100,
                            **query: str) -> list:
         """GET OData → la *liste d'entités*, quelle que soit la version :
         ``d.results`` (v2), ``value`` (v4), ou l'entité seule dans une liste.
@@ -113,7 +115,7 @@ class OdataReadKeywords(_ApiCore):
         link = payload.get("@odata.nextLink")
         return str(link) if link else None
 
-    def get_odata_count(self, entity_path: str, alias: str = "default",
+    def get_odata_count(self, entity_path: ODataPathInput, alias: str = "default",
                         **query: str) -> int:
         """``GET <entity_path>/$count`` → entier (v2 et v4). Le chemin est
         celui de l'entity set (``.../Products``) ; les filtres passent en
@@ -140,7 +142,7 @@ class OdataReadKeywords(_ApiCore):
                 % (entity_path, status, text[:_BODY_EXCERPT]))
         return int(text)
 
-    def call_odata_function(self, path: str, method: str = "GET",
+    def call_odata_function(self, path: ODataPathInput, method: Literal["GET", "POST"] = "GET",
                             payload: Any = None, alias: str = "default",
                             csrf_fetch_path: Optional[str] = None,
                             if_match: Optional[str] = None,
@@ -178,21 +180,21 @@ class OdataReadKeywords(_ApiCore):
         | ...    IsActiveEntity=true
         | Log    ${response}[d][PurchaseOrderOverallStatus]
         """
-        method = str(method).upper().strip()
-        if method == "GET":
+        verb = str(method).upper().strip()
+        if verb == "GET":
             return self.get_odata(path, alias=alias, **query)
         body = None
         if payload is not None:
             body = payload if isinstance(payload, (str, bytes)) else json.dumps(payload)
         extra = None if if_match in (None, "", "None") else {"If-Match": str(if_match)}
         status, _, raw = self._write_request(
-            alias, method, path, query, body, extra_headers=extra,
+            alias, verb, path, query, body, extra_headers=extra,
             csrf_fetch_path=csrf_fetch_path)
         if status == 204 or not raw.strip():
             return {}
         return self._decode_json(raw, status, path)
 
-    def post_odata_batch(self, service_path: str, operations: Any,
+    def post_odata_batch(self, service_path: ODataServicePathInput, operations: Any,
                          alias: str = "default", atomic: bool = True,
                          fail_on_error: bool = True) -> list[dict[str, Any]]:
         """Envoie un ``$batch`` OData (multipart, v2 ET v4) : N opérations en
@@ -227,6 +229,7 @@ class OdataReadKeywords(_ApiCore):
             alias, "POST", root + "/$batch", None, body,
             extra_headers={"Content-Type": content_type},
             csrf_fetch_path=root + "/")
+        touch_log.record_batch("SapApiLibrary", root, operations)
         responses = parse_batch_response(raw, _header(headers, "Content-Type") or "")
         failures = [r for r in responses if r["status"] >= 400]
         if failures and _as_bool(fail_on_error):
@@ -239,9 +242,9 @@ class OdataReadKeywords(_ApiCore):
                 % (service_path, len(failures), len(responses), status, detail))
         return responses
 
-    def probe_odata_entity_sets(self, service_path: str, entity_sets: Any,
+    def probe_odata_entity_sets(self, service_path: ODataServicePathInput, entity_sets: NameListInput,
                                 alias: str = "default",
-                                max_entity_sets: Any = 50) -> dict[str, Any]:
+                                max_entity_sets: int = 50) -> dict[str, Any]:
         """*Sonde tolérante* d'existence : compte chaque entity set en UN
         aller-retour ``$batch`` et ENREGISTRE les refus au lieu d'échouer.
 

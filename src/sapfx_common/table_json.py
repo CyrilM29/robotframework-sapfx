@@ -1,10 +1,10 @@
-"""Écriture d'un relevé tabulaire en **JSON** et en **JSON Lines**, pure.
+"""Écriture d'un relevé tabulaire en *JSON* et en *JSON Lines*, pure.
 
 Le format des trois précédents qui vise une MACHINE. Le SVG se regarde, le
 classeur se trie, le CSV se charge tant bien que mal ; celui-ci se lit par un
 script Python ou R et par les outils décisionnels, sans convention à deviner.
 
-**Pourquoi deux formes.** Le tableau JSON (``[{...}, {...}]``) est celui qu'on
+*Pourquoi deux formes.* Le tableau JSON (``[{...}, {...}]``) est celui qu'on
 ouvre, qu'on relit et qu'on compare. Le JSON Lines (un objet par ligne) est
 celui des gros volumes : il se lit en flux sans charger le fichier entier, se
 concatène, se découpe, et c'est ce que lisent nativement ``pandas``
@@ -12,17 +12,17 @@ concatène, se découpe, et c'est ce que lisent nativement ``pandas``
 décisionnelles. Un relevé de paramètres tient en mémoire ; l'inventaire d'un
 système, non, et c'est le cas que cette forme couvre.
 
-**Trois propriétés délibérées.**
+*Trois propriétés délibérées.*
 
-1. **Tout est du texte**, comme dans les autres formats. Deviner des types
+1. *Tout est du texte*, comme dans les autres formats. Deviner des types
    ferait de ``000`` un zéro et de ``0012`` un douze, or ce sont des valeurs
    SAP : un mandant, un identifiant. Le consommateur retype s'il le veut, en
    sachant ce qu'il fait.
-2. **L'ordre des colonnes est PRÉSERVÉ** dans chaque objet, ce qui n'est pas
+2. *L'ordre des colonnes est PRÉSERVÉ* dans chaque objet, ce qui n'est pas
    gratuit : un dictionnaire JSON n'a pas d'ordre garanti par la norme, mais
    les lecteurs le respectent, et un relevé relu doit ressembler à l'écran
    dont il vient. L'en-tête est aussi rendu à part par le verdict.
-3. **Le fichier est déterministe** : indentation fixe, aucune date injectée,
+3. *Le fichier est déterministe* : indentation fixe, aucune date injectée,
    fins de ligne LF. Deux extractions de la même donnée produisent le même
    fichier, donc un écart entre deux fichiers signale un écart du SYSTÈME.
 
@@ -40,12 +40,19 @@ from sapfx_common._tabular import row_limit
 from sapfx_common._tabular_io import write_text
 from sapfx_common.robot_args import as_optional_int
 
-__all__ = [
-    "table_records",
-    "render_table_json",
-    "write_table_json",
-    "read_table_json",
-]
+from sapfx_common import __version__ as _package_version
+from robot.api.deco import keyword
+
+#: Version de ce module quand Robot l'importe comme bibliothèque (Libdoc, journal) :
+#: celle du paquet, jamais une seconde valeur à aligner à chaque release.
+ROBOT_LIBRARY_VERSION = _package_version
+
+#: Seules les fonctions décorées par ``@keyword`` deviennent des keywords :
+#: Robot lit aussi ``__all__``, mais le chargeur de rf-mcp ne lit que ce
+#: drapeau, et sans lui y publiait les fonctions importées d'ailleurs.
+ROBOT_AUTO_KEYWORDS = False
+
+__all__ = ["write_table_json", "read_table_json"]
 
 
 def table_records(rows: Iterable[Mapping[str, Any]],
@@ -57,6 +64,10 @@ def table_records(rows: Iterable[Mapping[str, Any]],
 
     La brique commune aux deux formes : ce qui part dans le fichier est ce que
     cette fonction rend, donc un appelant peut l'ASSERTER avant écriture.
+
+    Exemple :
+    | ${records}=    `Table Records`    ${rows}    headers=${headers}
+    | Should Be Equal    ${records}[0][City]    Walldorf
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -81,6 +92,10 @@ def render_table_json(rows: Iterable[Mapping[str, Any]],
     ``lines=True`` produit du JSON Lines (un objet compact par ligne), la
     forme des gros volumes et des lectures en flux ; sinon un tableau indenté,
     la forme qu'on ouvre et qu'on relit.
+
+    Exemple :
+    | ${text}=    `Render Table Json`    ${rows}    lines=${True}
+    | Should Contain    ${text}    "MANDT":"001"
     """
     fiches = table_records(rows, columns, max_rows, headers)
     if lines:
@@ -92,6 +107,7 @@ def render_table_json(rows: Iterable[Mapping[str, Any]],
                       indent=profondeur if profondeur else None) + "\n"
 
 
+@keyword
 def write_table_json(path: str, rows: Iterable[Mapping[str, Any]],
                      columns: Optional[Sequence[str]] = None,
                      max_rows: Optional[int] = None,
@@ -103,6 +119,10 @@ def write_table_json(path: str, rows: Iterable[Mapping[str, Any]],
     truncated_rows, bytes}``. ``format`` vaut ``json`` ou ``jsonl`` : le
     consommateur n'a pas à deviner d'après l'extension, et deux chaînes
     d'outils différentes n'attendent pas la même chose.
+
+    Exemple :
+    | ${verdict}=    `Write Table Json`    ${OUTPUT DIR}/T000_A4H.jsonl    ${rows}    lines=${True}
+    | Should Be Equal    ${verdict}[format]    jsonl
     """
     lignes = normalize_rows(rows)
     colonnes = table_columns(lignes, columns)
@@ -124,6 +144,7 @@ def write_table_json(path: str, rows: Iterable[Mapping[str, Any]],
     }
 
 
+@keyword
 def read_table_json(path: str) -> list[dict[str, Any]]:
     """Relit un JSON ou un JSON Lines et rend son relevé.
 
@@ -136,6 +157,10 @@ def read_table_json(path: str) -> list[dict[str, Any]]:
     porte volontiers une marque d'ordre d'octets, et une lecture stricte
     échouerait sur son propre décodage plutôt que sur le contenu, leçon déjà
     payée par la sentinelle de posture de sécurité.
+
+    Exemple :
+    | ${read}=    `Read Table Json`    ${jsonl}
+    | Length Should Be    ${read}    2
     """
     with open(str(path), "r", encoding="utf-8-sig") as flux:
         contenu = flux.read()

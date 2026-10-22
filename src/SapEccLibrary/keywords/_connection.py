@@ -22,6 +22,8 @@ Rien ici ne communique avec un serveur réel tant qu'une connexion n'est pas
 ouverte, ce qui rend la logique de lancement testable unitairement en
 simulant ``subprocess`` et la recherche dans la table des objets actifs.
 """
+from typing import TYPE_CHECKING, Any
+
 import contextlib
 import os
 import subprocess
@@ -58,7 +60,14 @@ def _engine_is_alive(engine):
 class ConnectionKeywords:
     """Mixin ajouté à :class:`SapEccLibrary`."""
 
-    def connect_to_session(self, explicit_wait=0):
+    if TYPE_CHECKING:
+        # Contrat du composite (SapEccLibrary), pour mypy seulement : les
+        # keywords annotés (type GuiElementId) font vérifier leurs corps.
+        def _explicit_pause(self, *args: Any, **kwargs: Any) -> Any: ...
+        def set_explicit_wait(self, *args: Any, **kwargs: Any) -> Any: ...
+        def take_screenshot(self, *args: Any, **kwargs: Any) -> Any: ...
+
+    def connect_to_session(self, explicit_wait: int = 0):
         """Se connecte au moteur de scripting du SAP Logon Pad en cours
         d'exécution (sans ouvrir de connexion ni de session) et fixe la pause
         de `Set Explicit Wait` (``0`` par défaut, une durée Robot sinon).
@@ -86,7 +95,10 @@ class ConnectionKeywords:
         self._explicit_pause()
 
     def connect_to_existing_connection(self, connection_name):
-        """Rattache la bibliothèque à une connexion DÉJÀ ouverte, désignée par
+        """Hérité de robotframework-sapguilibrary et gardé pour la compatibilité : pour
+        se rattacher à une session déjà ouverte par son rang, `Attach To Open Session`.
+
+        Rattache la bibliothèque à une connexion DÉJÀ ouverte, désignée par
         sa description dans SAP Logon (le nom de l'entrée, ex. ``A4H``), et à
         sa première session. Toutes les connexions ouvertes sont examinées ;
         aucune ne porte ce nom = échec listant celles qui existent. Une
@@ -195,7 +207,7 @@ class ConnectionKeywords:
                 found.append((None, exc))
         return found
 
-    def attach_to_open_session(self, connection_index=0, session_index=0):
+    def attach_to_open_session(self, connection_index: int = 0, session_index: int = 0):
         """Rattache la bibliothèque à une session SAP GUI *déjà ouverte*,
         sans Logon Pad à lancer ni login à rejouer : le prérequis exact d'un
         replay d'enregistrement du recorder bureau (dont les suites générées
@@ -291,7 +303,7 @@ class ConnectionKeywords:
         if proc is not None:
             self.sapapp = -1
 
-    def connect_to_session_with_retry(self, retries=3, retry_interval="2s", explicit_wait=0):
+    def connect_to_session_with_retry(self, retries: int = 3, retry_interval="2s", explicit_wait: int = 0):
         """Comme `Connect To Session` mais réessaie pendant que le Logon Pad
         finit de démarrer. Utile juste après `Open Sap Logon` sur les machines lentes.
 

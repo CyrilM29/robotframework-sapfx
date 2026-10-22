@@ -14,8 +14,9 @@ Typed.
 """
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Literal
 
+from sapfx_common.robot_args import NameListInput
 from sapfx_common import idoc_profiles
 
 from ._rfc_reads import RfcReadKeywords
@@ -30,7 +31,7 @@ def abap_key(err: BaseException) -> str:
 class RfcIdocProfileKeywords(RfcReadKeywords):
     """Mixin de :class:`SapApiLibrary` : les profils partenaire d'IDoc."""
 
-    def get_idoc_partner_profiles(self, direction: str = "outbound",
+    def get_idoc_partner_profiles(self, direction: Literal["outbound", "inbound"] = "outbound",
                                   alias: str = "default") -> list[dict[str, str]]:
         """Lit les profils partenaire ``outbound`` (``EDP13``) ou ``inbound``
         (``EDP21``) du mandant de la connexion, en clés parlantes
@@ -60,7 +61,7 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
 
     def ensure_idoc_outbound_profile(self, partner: str, message_type: str,
                                      idoc_type: str, port: str,
-                                     allowed_message_types: Any,
+                                     allowed_message_types: NameListInput,
                                      partner_type: str = "LS",
                                      output_mode: str = "2",
                                      package_size: Any = "1",
@@ -108,7 +109,7 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         return {"state": "present", "key": label}
 
     def ensure_idoc_inbound_profile(self, partner: str, message_type: str,
-                                    process_code: str, allowed_message_types: Any,
+                                    process_code: str, allowed_message_types: NameListInput,
                                     partner_type: str = "LS", processing: str = "1",
                                     alias: str = "default") -> dict[str, Any]:
         """Garantit un profil ENTRANT (``EDP21``) pour (partenaire émetteur,
@@ -151,7 +152,7 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
         return {"state": "present", "key": label}
 
     def remove_idoc_outbound_profile(self, partner: str, message_type: str,
-                                     allowed_message_types: Any,
+                                     allowed_message_types: NameListInput,
                                      partner_type: str = "LS",
                                      alias: str = "default") -> dict[str, Any]:
         """Retire un profil sortant PAR SA CLÉ, seulement pour un type de
@@ -169,7 +170,7 @@ class RfcIdocProfileKeywords(RfcReadKeywords):
                                     key, partner, partner_type, wanted_type, alias)
 
     def remove_idoc_inbound_profile(self, partner: str, message_type: str,
-                                    allowed_message_types: Any,
+                                    allowed_message_types: NameListInput,
                                     partner_type: str = "LS",
                                     alias: str = "default") -> dict[str, Any]:
         """Retire un profil entrant PAR SA CLÉ, mêmes garde-fous
