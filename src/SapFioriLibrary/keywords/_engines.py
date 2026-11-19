@@ -64,6 +64,12 @@ class EngineKeywords:
         SAP GUI for HTML, *pas* Fiori/UI5. Retourne un sélecteur ``xpath=``.
         Respecte `Set Ui5 Frame` (page WebGUI embarquée dans un launchpad).
 
+        Le sélecteur vise l'élément porteur le plus profond : dans une table
+        control, le WebGUI pose le SID d'une cellule sur la cellule ``TD`` ET sur
+        son contenu, et c'est le contenu qui est désigné (une seule correspondance,
+        là où le mode strict de Browser en refusait deux). Deux éléments distincts
+        non emboîtés portant le même SID restent une ambiguïté que Browser signale.
+
         Exemple :
         | ${selector}=    `Resolve Sid`    wnd[0]/usr/ctxtDATABROWSE-TABLENAME
         | Should Start With    ${selector}    xpath=

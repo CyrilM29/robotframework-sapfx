@@ -373,14 +373,37 @@ class ActionKeywords:
         recorder web (Shift+Alt+clic), pendant de `Ui5 Control Should Be Visible`
         pour le contenu.
 
+        Relit le texte jusqu'à ce qu'il vaille ``expected`` ou que ``ui5_timeout``
+        soit écoulé, puis échoue sur le DERNIER texte lu. Une seule lecture ne
+        suffisait pas : mesuré le 2026-10-28 sur cap-sflight, l'assertion que le
+        recorder pose juste après « Go » lisait le titre de la table avant son
+        rechargement (« Travels (4,133) » pour « Travels (91) » attendu), alors
+        que le rejeu dans la page, plus lent, passait.
+
         Exemple :
         | `Ui5 Text Should Be`    Travels (4,133)    idSuffix=fe::table::Travel::LineItem-title
         """
-        actual = self.get_ui5_text(index=index, **selector_parts)
-        if str(actual).strip() != str(expected).strip():
-            raise AssertionError(
-                "UI5 control %s text is %r, expected %r."
-                % (selector_parts or ("index %s" % index), actual, expected))
+        wanted = str(expected).strip()
+        last = {}
+
+        def _read():
+            try:
+                last["text"] = self.get_ui5_text(index=index, **selector_parts)
+            except Exception as err:
+                # contrôle pas encore rendu, ou redessiné entre résolution et
+                # lecture : on relit (contrat de poll_until, la sonde ne lève pas)
+                last["error"] = err
+                return False
+            return str(last["text"]).strip() == wanted
+
+        if poll_until(_read, timestr_to_secs(self.ui5_timeout), step=self.poll_interval):
+            return
+        if "text" not in last:
+            raise last["error"]
+        raise AssertionError(
+            "UI5 control %s text is %r, expected %r (read again for %s)."
+            % (selector_parts or ("index %s" % index), last["text"], expected,
+               self.ui5_timeout))
 
 
 def _warn_partial_read(payload, rows, description):

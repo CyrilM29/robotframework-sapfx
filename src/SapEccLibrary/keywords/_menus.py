@@ -61,11 +61,41 @@ class MenuKeywords:
         attend la fin de l'aller-retour. Retourne l'id sélectionné (à
         journaliser dans le page object : c'est lui qui est stable).
 
+        Une entrée DÉSACTIVÉE (mesuré le 2026-10-25 sur la 754 : « Create >
+        Organization » de BP pour un utilisateur sans droit de création) fait
+        échouer ``Select()`` par une erreur COM ; l'échec nomme alors l'entrée et
+        dit qu'elle est désactivée, au lieu de laisser fuir l'erreur brute.
+
         Exemple :
         | `Select Menu Item`    System > Status
         | `Element Should Be Present`    wnd[1]/usr/txtSYST-MANDT
         """
         element_id = self.resolve_menu_item(path, window)
-        self.click_element(element_id)
+        try:
+            self.click_element(element_id)
+        except Exception as err:
+            if not _is_disabled_menu_error(err):
+                raise
+            raise AssertionError(
+                "The menu entry '%s' (%s) could not be selected: SAP GUI refused it, "
+                "it is disabled for this user or this screen (COM error %s). A "
+                "disabled entry is a fact to assert, not a gesture to retry."
+                % (path, element_id, getattr(err, "hresult", err))) from err
         self.wait_until_busy_done()
         return element_id
+
+
+#: Code d'erreur du scripting SAP GUI pour une entrée de menu désactivée
+#: (« The menu item is disabled », mesuré le 2026-10-25 sur la 754).
+DISABLED_MENU_ITEM_CODE = 623
+
+
+def _is_disabled_menu_error(err: BaseException) -> bool:
+    """Vrai pour la seule ``com_error`` d'une entrée de menu DÉSACTIVÉE : son
+    ``excepinfo`` porte le code 623. Toute autre erreur COM (session fermée,
+    mauvais thread, serveur RPC indisponible) garde son message d'origine."""
+    if type(err).__name__ != "com_error":
+        return False
+    args: tuple[Any, ...] = tuple(getattr(err, "args", ()))
+    excepinfo = args[2] if len(args) > 2 and isinstance(args[2], tuple) else ()
+    return DISABLED_MENU_ITEM_CODE in excepinfo

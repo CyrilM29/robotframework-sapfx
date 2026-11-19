@@ -285,30 +285,14 @@ def ui5_page_map(tree_xml: str,
 _INTENT_RE = re.compile(r"^[A-Za-z_][\w]*-[A-Za-z_][\w]*$")
 
 
-# Préfixe de la classe technique que le runtime UI5 pose sur ``<html>`` pour le
-# thème RÉELLEMENT appliqué. Indépendant de la locale, contrairement au libellé
-# de l'entrée de menu qui l'a choisi (convention #3).
-THEME_CLASS_PREFIX = "sapUiTheme-"
-
-
-def applied_theme(class_attribute: str | None) -> str:
-    """Thème réellement APPLIQUÉ, extrait de l'attribut ``class`` de ``<html>``.
-
-    Chaîne vide quand le document ne porte aucune classe de thème : ce n'est pas
-    un cas théorique, il existe une fenêtre transitoire, juste après un
-    changement de thème, où le runtime a retiré l'ancienne classe sans avoir
-    encore posé la nouvelle (mesuré live sur le Demo Kit OpenUI5 le 2026-08-30).
-    Un appelant qui asserte doit donc attendre la valeur voulue, jamais lire une
-    fois.
-
-    La classe est le témoin locale-safe : ``sapUiTheme-sap_horizon_dark`` porte
-    la clé technique du thème, là où l'entrée de menu qui l'a choisi porte un
-    libellé traduit.
-    """
-    for token in str(class_attribute or "").split():
-        if token.startswith(THEME_CLASS_PREFIX) and len(token) > len(THEME_CLASS_PREFIX):
-            return token[len(THEME_CLASS_PREFIX):]
-    return ""
+# Le thème appliqué (classe de <html>, feuilles chargées) vit dans `_ui5_theme`,
+# sorti d'ici le 2026-11-16 quand ce module atteignait la marge des 500 lignes ;
+# réexporté pour les importeurs historiques.
+from ._ui5_theme import (  # noqa: E402,F401  (réexport de compatibilité)
+    THEME_CLASS_PREFIX,
+    applied_theme,
+    applied_theme_from,
+)
 
 
 def table_read_verdict(payload: Any, description: str) -> list[dict[str, Any]]:

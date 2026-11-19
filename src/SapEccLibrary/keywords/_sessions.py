@@ -41,6 +41,7 @@ from robot.api import logger
 from robot.api.types import Secret
 from robot.utils import timestr_to_secs
 
+from sapfx_common.com_safety import is_dead_server_error
 from sapfx_common.polling import poll_until
 from sapfx_common.secrets import reveal_secret
 
@@ -227,6 +228,14 @@ class SessionKeywords:
         Uniquement des chaînes/booléens, jamais d'objet COM (contrainte
         rf-mcp : un objet COM ne doit JAMAIS traverser la frontière MCP).
 
+        ``connected`` est faux pour un alias sans session, et aussi pour une
+        session dont le serveur COM a DISPARU (une des pannes de
+        ``com_safety.DEAD_SERVER_HRESULTS``). Mesuré le 2026-11-03 sur a4h :
+        après `Close SAP` (``/nex`` puis arrêt de SAP Logon), l'alias restait
+        annoncé connecté alors que sa lecture levait
+        ``RPC_S_SERVER_UNAVAILABLE``. Toute autre panne (session occupée,
+        mauvais thread) laisse ``connected`` vrai, sans les champs lus.
+
         Exemple :
         | ${sessions}=    `List Sap Sessions`
         | Should Be Equal    ${sessions}[-1][alias]    erp
@@ -245,8 +254,13 @@ class SessionKeywords:
                     entry["client"] = str(info.Client)
                     entry["user"] = str(info.User)
                     entry["transaction"] = str(info.Transaction)
-                except Exception:
-                    pass    # session morte / Info partiel : l'inventaire reste best-effort
+                except Exception as exc:
+                    # Serveur disparu : la session n'est plus connectée. Toute
+                    # autre panne (Info partiel, occupé) : best-effort.
+                    if is_dead_server_error(exc):
+                        entry["connected"] = False
+                        for key in ("system", "client", "user", "transaction"):
+                            entry.pop(key, None)
             entries.append(entry)
         return entries
 

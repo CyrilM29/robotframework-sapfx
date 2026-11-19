@@ -46,9 +46,10 @@ from typing import Any, Mapping, Optional, Sequence
 from sapfx_common.robot_args import as_optional_int
 
 __all__ = ["COUNT_FUNCTION", "BUFFER_ERROR_CODE", "UNKNOWN_OBJECT_ROWS",
-           "VIEW_ROWS", "entries_total", "require_bounded_scope",
-           "describe_rfc_source", "count_function_missing_message",
-           "buffer_exceeded_remedy"]
+           "VIEW_ROWS", "GTT_FIELD", "COUNT_CRASH_CODE", "entries_total",
+           "entries_totals", "require_bounded_scope", "describe_rfc_source",
+           "count_function_missing_message", "buffer_exceeded_remedy",
+           "global_temporary_tables", "global_temporary_table_message"]
 
 #: Le module qui COMPTE, distinct de celui qui LIT. C'est cette distinction
 #: qui fait que la garde d'extraction mesure quelque chose.
@@ -69,6 +70,48 @@ VIEW_ROWS = -2
 #: et sort en ``DATA_BUFFER_EXCEEDED`` (``AD/E/559``), les paramètres du
 #: message portant le nom de la table et la limite de 512.
 BUFFER_ERROR_CODE = "DATA_BUFFER_EXCEEDED"
+
+#: Le champ de ``DD02L`` qui marque une TABLE TEMPORAIRE GLOBALE (classe
+#: ``TRANSP``, contenu propre à une transaction de base de données, vide en
+#: dehors). Le module de comptage ne sait pas la compter : son
+#: ``SELECT COUNT(*)`` dynamique PLANTE côté serveur
+#: (:data:`COUNT_CRASH_CODE`, exception ``CX_SY_DYNAMIC_OSQL_SEMANTICS``, un
+#: dump dans ST22) au lieu de rendre un total négatif. Mesuré le 2026-11-15 :
+#: 154 tables ``ACM*`` de la 754 demandées d'un coup, un dump ; les 149 non
+#: temporaires se comptent sans erreur ; et les deux tables ``ESH_NLQ_GR_*``
+#: connues pour planter depuis le 2026-10-19 portent ce même drapeau sur la
+#: 758. Le champ n'existe que sur une release qui connaît ces tables : sa
+#: présence se lit dans ``DD03L`` avant de le demander. La liste de ces tables
+#: (45 sur la 754, 60 sur la 758) se lit UNE fois par connexion : ensuite
+#: chaque comptage la consulte sans aucun aller-retour.
+GTT_FIELD = "IS_GTT"
+#: Le code de l'erreur d'exécution du module de comptage sur une telle table.
+COUNT_CRASH_CODE = "SAPSQL_PARSE_ERROR"
+
+
+def global_temporary_tables(dd02l_rows: Sequence[Mapping[str, Any]]) -> set[str]:
+    """Les tables que des lignes de ``DD02L`` déclarent temporaires globales
+    (:data:`GTT_FIELD` à ``X`` sur la version active ; une ligne lue sans
+    ``AS4LOCAL`` est tenue pour active, l'appelant ayant filtré). Des lignes
+    lues sans le champ ne déclarent rien : ensemble vide."""
+    names: set[str] = set()
+    for row in dd02l_rows:
+        version = str(row.get("AS4LOCAL", "A") or "").strip().upper()
+        if version == "A" and str(row.get(GTT_FIELD, "") or "").strip().upper() == "X":
+            names.add(str(row.get("TABNAME", "") or "").strip().upper())
+    names.discard("")
+    return names
+
+
+def global_temporary_table_message(table: Any) -> str:
+    """Le refus, AVANT tout appel, de compter une table temporaire globale."""
+    return (
+        "%s est une table temporaire globale (DD02L-%s) : elle n'est pas "
+        "soumise à %s, dont le SELECT dynamique plante sur elle côté serveur "
+        "(%s, un dump dans ST22). Elle ne porte des lignes que dans la "
+        "transaction qui la remplit et elle est vide en dehors : il n'y a rien "
+        "à compter." % (str(table or "?").strip().upper(), GTT_FIELD, COUNT_FUNCTION,
+                        COUNT_CRASH_CODE))
 
 
 def buffer_exceeded_remedy(table: Any, fields: Any = None) -> str:
@@ -124,6 +167,14 @@ def _negative_total_message(table: str, raw: Any, total: Optional[int]) -> str:
     return (
         "%s annonce un total illisible pour %s (reçu %r) : un total qu'on ne "
         "sait pas lire ne vaut pas zéro." % (COUNT_FUNCTION, table, raw))
+
+
+def entries_totals(response: Mapping[str, Any], tables: Sequence[Any]) -> dict[str, int]:
+    """Le total de CHAQUE table de ``tables`` dans UNE réponse du module de
+    comptage, appelé une fois pour toute la liste : ``{table: total}``, dans
+    l'ordre demandé. Chaque total passe par :func:`entries_total`, donc un
+    total négatif, illisible ou absent fait échouer en nommant sa table."""
+    return {str(name).strip().upper(): entries_total(response, name) for name in tables}
 
 
 def entries_total(response: Mapping[str, Any], table: Any) -> int:
@@ -262,7 +313,20 @@ def count_function_missing_message(table: Any, error: Any) -> str:
     partout (une cible durcie restreint ``S_RFC`` module par module). Le dire
     en nommant les replis vaut mieux qu'un code technique nu, qui enverrait
     chercher un défaut de connexion là où le canal fonctionne parfaitement.
+
+    Un échec au code :data:`COUNT_CRASH_CODE` n'est pas de cette famille : le
+    module a été joint et il a PLANTÉ sur une table qu'il ne sait pas compter.
+    Le message le dit alors, au lieu d'accuser sa libération.
     """
+    if str(getattr(error, "key", "") or "").strip() == COUNT_CRASH_CODE:
+        return (
+            "%s a planté côté serveur en comptant %s (%s, un dump dans ST22) : "
+            "le module a été joint, c'est une table qu'il ne sait pas compter. "
+            "Le cas mesuré est la table temporaire globale (DD02L-%s), écartée "
+            "avant l'appel quand le dictionnaire de la cible se laisse lire ; "
+            "il ne l'a pas été ici, ou la table est d'une autre nature : "
+            "vérifier sa ligne de DD02L."
+            % (COUNT_FUNCTION, str(table or "?").strip().upper(), COUNT_CRASH_CODE, GTT_FIELD))
     return (
         "Impossible de compter %s par %s (%s). Ce module n'est pas libéré "
         "pour l'appel distant sur cette cible, ou l'autorisation S_RFC le "

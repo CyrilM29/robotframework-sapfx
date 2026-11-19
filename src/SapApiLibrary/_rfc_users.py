@@ -31,6 +31,7 @@ from typing import Any
 
 from sapfx_common.robot_args import NameListInput, OptionalNameListInput
 from sapfx_common import security_baseline, user_provisioning
+from sapfx_common.rfc_tables import abap_quote
 from sapfx_common.secrets import reveal_secret
 
 from ._rfc_idoc_profiles import abap_key
@@ -255,7 +256,7 @@ class RfcUserKeywords(RfcRoleKeywords):
         """Demande au système si ``user`` détient ``authorization_object``
         pour les valeurs de champ données en arguments nommés (``TCD=SEPM_SO``,
         ``ACTVT=02``), et rend ``authorized``, ``not_authorized``,
-        ``user_missing`` ou ``user_locked``.
+        ``user_missing``, ``user_locked`` ou ``object_missing``.
 
         Le contrôle est celui du noyau (``AUTHORITY_CHECK``), sur les
         autorisations EFFECTIVES de l'utilisateur, sans qu'il ait à se
@@ -264,9 +265,23 @@ class RfcUserKeywords(RfcRoleKeywords):
         « autorisé » quel que soit l'utilisateur (mesuré sur la 758), ce qui
         ferait passer une assertion de refus pour de mauvaises raisons.
 
+        Un objet que la cible ne déclare pas (absent de ``TOBJ``) est refusé
+        par le noyau à TOUT utilisateur, administrateur compris (mesuré sur
+        754 et 758 avec ``F_T_TRANSB``, objet de la gestion de trésorerie que
+        les images ne portent pas) : ce refus ne dit rien des droits, il rend
+        donc ``object_missing``. ``TOBJ`` n'est lu que sur un refus, et une
+        seule fois par objet déclaré et par connexion : une série de demandes
+        sur le même objet (un périmètre relevé valeur par valeur) ne paie pas
+        une lecture du dictionnaire par refus. Un nom plus long que
+        ``TOBJ-OBJCT`` (10 caractères) ne peut pas y être déclaré : il rend
+        ``object_missing`` sans lire la table, dont la recherche plantait côté
+        serveur (dump ``SAPSQL_DATA_LOSS`` sur la 754, mesuré le 2026-11-18).
+
         Exemple :
         | ${verdict}=    `Check User Authorization`    DEVELOPER    S_TCODE    TCD=SEPM_SO    alias=abap2023
         | Should Be Equal    ${verdict}    authorized
+        | ${absent}=    `Check User Authorization`    DEVELOPER    F_T_TRANSB    ACTVT=01    alias=abap2023
+        | Should Be Equal    ${absent}    object_missing
         """
         params = user_provisioning.check_fields(fields)
         try:
@@ -274,14 +289,36 @@ class RfcUserKeywords(RfcRoleKeywords):
                           OBJECT=str(authorization_object).strip().upper(), **params)
         except Exception as err:
             key = abap_key(err)
-            if key:
-                return user_provisioning.authority_verdict(key)
-            raise
+            if not key:
+                raise
+            verdict = user_provisioning.authority_verdict(key)
+            if verdict == "not_authorized" and not self._authorization_object_declared(
+                    authorization_object, alias):
+                return user_provisioning.OBJECT_MISSING
+            return verdict
         raise AssertionError(
             "AUTHORITY_CHECK est revenu sans exception pour %s, une issue que "
             "le module ne produit pas sur les releases mesurées : aucun "
             "verdict n'en est déduit."
             % user_provisioning.describe_check(user, authorization_object, fields))
+
+    def _authorization_object_declared(self, authorization_object: str, alias: str) -> bool:
+        """L'objet est-il déclaré dans ``TOBJ`` ? Seule une réponse POSITIVE est
+        gardée pour la connexion : un objet absent est relu à chaque fois."""
+        obj = str(authorization_object).strip().upper()
+        if not user_provisioning.fits_authorization_object(obj):
+            # Plus long que TOBJ-OBJCT : il ne peut pas y être déclaré, et le
+            # littéral trop long fait planter RFC_READ_TABLE côté serveur
+            # (SAPSQL_DATA_LOSS sur la 754, OPTION_NOT_VALID sur la 758).
+            return False
+        declared = self._rfc_connection_memory(alias).setdefault("declared_objects", set())
+        if obj in declared:
+            return True
+        found = bool(self.read_rfc_table("TOBJ", ["OBJCT"], alias=alias,
+                                         options="OBJCT = %s" % abap_quote(obj)))
+        if found:
+            declared.add(obj)
+        return found
 
     def user_should_be_authorized(self, user: str, authorization_object: str,
                                   alias: str = "default", **fields: Any) -> None:
@@ -301,7 +338,8 @@ class RfcUserKeywords(RfcRoleKeywords):
                                       alias: str = "default", **fields: Any) -> None:
         """Échoue sauf si `Check User Authorization` rend ``not_authorized``.
         Un utilisateur ABSENT ou VERROUILLÉ échoue aussi : son refus ne
-        prouverait rien sur ses droits.
+        prouverait rien sur ses droits ; un objet que la cible ne déclare pas
+        (``object_missing``) aussi, le noyau le refusant à tout utilisateur.
 
         Exemple :
         | `User Should Not Be Authorized`    SAPFX_EPM_RO    S_TCODE    TCD=SEPM_SO    alias=abap2023
@@ -311,5 +349,6 @@ class RfcUserKeywords(RfcRoleKeywords):
         if verdict != "not_authorized":
             raise AssertionError(
                 "Refus attendu, verdict %s : %s. Un utilisateur absent ou "
-                "verrouillé ne prouve rien sur ses droits."
+                "verrouillé ne prouve rien sur ses droits, ni un objet que la "
+                "cible ne déclare pas (object_missing), refusé à tout utilisateur."
                 % (verdict, user_provisioning.describe_check(user, authorization_object, fields)))

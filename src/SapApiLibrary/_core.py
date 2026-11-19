@@ -20,9 +20,10 @@ import urllib.parse
 import urllib.request
 from typing import Any, Optional
 
-from sapfx_common import touch_log
+from sapfx_common import rfc_channel, touch_log
 from sapfx_common.policy_gate import gate_for
 from sapfx_common.secrets import reveal_secret
+from sapfx_common.session_context import current_execution_namespace
 
 from ._http import (
     _BODY_EXCERPT,
@@ -50,6 +51,68 @@ class _ApiCore:
 
     def _rfc_connections(self) -> dict[str, Any]:
         raise NotImplementedError   # fourni par SapApiLibrary
+
+    def _rfc_connection_memory(self, alias: str) -> dict[str, Any]:
+        """Ce que la bibliothèque a déjà LU du dictionnaire de la cible jointe par
+        ``alias`` et qui ne change pas le temps d'une connexion (tables
+        temporaires globales, objets d'autorisation déclarés) : un dictionnaire
+        tenu par l'OBJET connexion, pour ne pas relire à chaque appel. Un alias
+        refermé puis rouvert, même vers un autre système, repart d'une mémoire
+        vide (ce qui est vrai d'une release ne l'est pas d'une autre)."""
+        try:
+            connection = self._rfc_connections().get(alias)
+        except NotImplementedError:   # mixin composé sans le registre des connexions
+            connection = None
+        stores = self.__dict__.setdefault("_rfc_memory_by_namespace", {})
+        by_alias = stores.setdefault(current_execution_namespace(), {})
+        known = by_alias.get(alias)
+        if known is None or known[0] is not connection:
+            known = by_alias[alias] = (connection, {})
+        return known[1]
+
+    # -- télémétrie du canal RFC -------------------------------------------------
+
+    def _rfc_call_telemetry(self, alias: str) -> dict[str, Any]:
+        """Les compteurs des appels RFC de la connexion ``alias``, dans l'espace
+        d'exécution courant, créés au premier besoin. Ils ne portent que le nom
+        du module, la durée de l'appel et le code d'un refus : jamais un
+        paramètre ni une valeur rendue. ``last_seconds`` reste ``None`` tant
+        qu'aucun appel n'a eu lieu (une durée non mesurée n'est pas zéro)."""
+        stores = self.__dict__.setdefault("_rfc_telemetry_by_namespace", {})
+        by_alias = stores.setdefault(current_execution_namespace(), {})
+        return by_alias.setdefault(alias, {
+            "calls": 0, "errors": 0, "seconds": 0.0, "last_function": None,
+            "last_seconds": None, "last_error": None, "functions": {}})
+
+    def _record_rfc_call(self, alias: str, function_name: str, seconds: float,
+                         error: Optional[BaseException] = None) -> None:
+        """Compte un appel RFC parti sur le réseau : sa durée, et son refus
+        par classe et code technique (jamais le message, qui peut citer une
+        valeur)."""
+        telemetry = self._rfc_call_telemetry(alias)
+        name = str(function_name).strip().upper()
+        per_function = telemetry["functions"].setdefault(
+            name, {"calls": 0, "errors": 0, "seconds": 0.0})
+        for counters in (telemetry, per_function):
+            counters["calls"] += 1
+            counters["seconds"] += seconds
+        telemetry["last_function"] = name
+        telemetry["last_seconds"] = seconds
+        if error is not None:
+            telemetry["errors"] += 1
+            per_function["errors"] += 1
+            telemetry["last_error"] = ("%s %s" % (
+                type(error).__name__, rfc_channel.rfc_error_code(error))).strip()
+
+    def _forget_rfc_call_telemetry(self, alias: Optional[str] = None) -> None:
+        """Oublie les compteurs RFC d'``alias``, ou de tout l'espace
+        d'exécution courant : une connexion fermée repart de zéro."""
+        stores = self.__dict__.get("_rfc_telemetry_by_namespace", {})
+        namespace = current_execution_namespace()
+        if alias is None:
+            stores.pop(namespace, None)
+        else:
+            stores.get(namespace, {}).pop(alias, None)
 
     # -- plomberie ---------------------------------------------------------------
 
@@ -134,11 +197,14 @@ class _ApiCore:
         telemetry = session.telemetry
         telemetry["requests"] += 1
         telemetry["last_url"] = url
-        started = time.monotonic()
+        # perf_counter et non monotonic : sous Windows et Python 3.12 ou plus
+        # ancien, monotonic n'avance que par pas de 15,625 ms (mesuré le
+        # 2026-10-25), et un appel court y durait zéro.
+        started = time.perf_counter()
         try:
             response = self._transport(session, request)
         except urllib.error.HTTPError as err:
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             telemetry["last_status"] = err.code
             if err.code == 401 and session.token_url and not _retried_auth:
                 session.access_token = None
@@ -157,7 +223,7 @@ class _ApiCore:
                 % (method.upper(), url, err.code, err.reason, excerpt),
                 err.code, dict(err.headers or {}))
         except urllib.error.URLError as err:
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             telemetry["errors"] += 1
             telemetry["last_error"] = str(err.reason)
             raise AssertionError(
@@ -165,7 +231,7 @@ class _ApiCore:
                 "vérifier base_url/verify_tls)." % (method.upper(), url, err.reason))
         with response:
             payload = _decompress(response.headers, response.read())
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             telemetry["last_status"] = response.status
             return (response.status, dict(response.headers), payload)
 
@@ -209,7 +275,7 @@ class _ApiCore:
         telemetry = session.telemetry
         telemetry["requests"] += 1
         telemetry["last_url"] = url
-        started = time.monotonic()
+        started = time.perf_counter()
 
         def cut(raw_headers: Any, payload: bytes) -> tuple[str, bool]:
             text = _decompress(raw_headers, payload).decode(
@@ -219,19 +285,19 @@ class _ApiCore:
         try:
             response = self._transport(session, request)
         except urllib.error.HTTPError as err:
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             telemetry["last_status"] = err.code
             body, truncated = cut(err.headers, err.read())
             return err.code, dict(err.headers or {}), body, truncated, None, url
         except urllib.error.URLError as err:
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             return None, {}, "", False, str(err.reason), url
         except Exception as err:   # réponse malformée, timeout socket…
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             return None, {}, "", False, str(err), url
         with response:
             body, truncated = cut(response.headers, response.read())
-            telemetry["seconds"] += time.monotonic() - started
+            telemetry["seconds"] += time.perf_counter() - started
             telemetry["last_status"] = response.status
             return (response.status, dict(response.headers), body, truncated,
                     None, url)
@@ -239,7 +305,8 @@ class _ApiCore:
     def _write_request(self, alias: str, method: str, path: str,
                        query: Optional[dict], body: Any,
                        extra_headers: Optional[dict] = None,
-                       csrf_fetch_path: Optional[str] = None
+                       csrf_fetch_path: Optional[str] = None,
+                       csrf_fetch_headers: Optional[dict] = None
                        ) -> tuple[int, dict, bytes]:
         """Écriture OData avec le protocole CSRF, générique à POST / PATCH /
         DELETE / $batch : token obtenu au besoin, re-fetch et rejeu UNE fois
@@ -255,22 +322,27 @@ class _ApiCore:
         session = self._session(alias)
         try:
             return self._send_with_csrf(session, alias, method, path, query,
-                                        body, extra_headers, csrf_fetch_path)
+                                        body, extra_headers, csrf_fetch_path,
+                                        csrf_fetch_headers)
         except AssertionError as err:
             if not _csrf_rejected(err):
                 raise
             session.csrf_token = None
             return self._send_with_csrf(session, alias, method, path, query,
-                                        body, extra_headers, csrf_fetch_path)
+                                        body, extra_headers, csrf_fetch_path,
+                                        csrf_fetch_headers)
 
     def _send_with_csrf(self, session: _ApiSession, alias: str, method: str,
                         path: str, query: Optional[dict], body: Any,
                         extra_headers: Optional[dict] = None,
-                        csrf_fetch_path: Optional[str] = None
+                        csrf_fetch_path: Optional[str] = None,
+                        csrf_fetch_headers: Optional[dict] = None
                         ) -> tuple[int, dict, bytes]:
         """Une écriture avec token CSRF, obtenu d'abord si la session n'en a
         pas (GET sur ``csrf_fetch_path``, défaut le chemin visé ; $batch
         fetche sur la racine du service : GET sur $batch n'existe pas).
+        ``csrf_fetch_headers`` s'ajoute à ce GET : l'API des outils ABAP refuse
+        en 406 l'``Accept`` JSON de la session sur ``/sap/bc/adt/discovery``.
 
         L'en-tête du token est lu par ``_header`` (insensible à la casse,
         comme du côté du juge de rejeu) : les en-têtes HTTP sont
@@ -281,7 +353,7 @@ class _ApiCore:
         if session.csrf_token is None:
             _, headers, _ = self._request(
                 alias, "GET", csrf_fetch_path or path, None,
-                headers={"X-CSRF-Token": "Fetch"})
+                headers={**(csrf_fetch_headers or {}), "X-CSRF-Token": "Fetch"})
             session.csrf_token = _header(headers, "x-csrf-token") or ""
         extra = {"Content-Type": "application/json"}
         if extra_headers:

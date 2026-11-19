@@ -23,6 +23,8 @@ import importlib.util
 import inspect
 from typing import Any
 
+from sapfx_common.robot_args import keep_name_list_messages
+
 __all__ = ["extend_library", "extension_mixins", "homonyms"]
 
 
@@ -67,7 +69,7 @@ def extend_library(cls: type, package: str) -> type:
     """
     mixins = extension_mixins(package)
     if not mixins:
-        return cls
+        return keep_name_list_messages(cls)
     clashes = homonyms(cls, mixins)
     if clashes:
         raise TypeError(
@@ -84,4 +86,4 @@ def extend_library(cls: type, package: str) -> type:
     if converters:
         namespace["ROBOT_LIBRARY_CONVERTERS"] = {
             **getattr(cls, "ROBOT_LIBRARY_CONVERTERS", {}), **converters}
-    return type(cls.__name__, (*mixins, cls), namespace)
+    return keep_name_list_messages(type(cls.__name__, (*mixins, cls), namespace))

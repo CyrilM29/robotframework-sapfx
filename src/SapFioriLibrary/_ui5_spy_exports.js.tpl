@@ -23,6 +23,12 @@
   // Page UI5 : l'application doit être au repos avant le 1er geste. New Page rend la
   // main au chargement du document, avant que le runtime UI5 ait construit l'écran.
   function bootstrapWait() { return needsUi5Ready() ? '    Wait For UI5 Ready\n' : ''; }
+  // La langue du record, posée avant la page : UI5 et le serveur la lisent au chargement.
+  function bootstrapContext() {
+    var tag = recordedLocale();
+    return tag ? '    New Context    locale=' + tag + '\n' : '';
+  }
+  function localeLine() { var tag = recordedLocale(); return tag ? '- **Langue du navigateur** : ' + tag + '\n' : ''; }
   function buildScript() {
     var groups = splitScenarios();
     var s = '*** Settings ***\n' + browserImport(groups) + 'Library    SapFioriLibrary\n\n';
@@ -31,6 +37,7 @@
       s += group.name + '\n';
       if (gi === 0) {
         s += '    New Browser    chromium    headless=False\n';
+        s += bootstrapContext();
         s += '    New Page    ' + startUrl() + '\n';
         s += bootstrapWait();
       }
@@ -165,6 +172,7 @@
       robot += group.name + '\n';
       if (gi === 0) {
         robot += '    New Browser    chromium    headless=False\n';
+        robot += bootstrapContext();
         robot += '    New Page    ' + startUrl() + '\n';
         robot += bootstrapWait();
       }
@@ -233,7 +241,7 @@
     md += '> **Brouillon g\u00e9n\u00e9r\u00e9 par le recorder web** : \u00e0 retravailler\n';
     md += '> (r\u00e9sultats attendus, donn\u00e9es) avant passage au sap-generator.\n\n';
     md += '- **Canal** : Fiori (web)\n';
-    md += '- **Syst\u00e8me / URL** : ' + startUrl() + '\n';
+    md += '- **Syst\u00e8me / URL** : ' + startUrl() + '\n' + localeLine();
     md += '- **Pr\u00e9conditions** : application accessible.\n\n';
     md += '## Donn\u00e9es observ\u00e9es\n\n- Valeurs saisies pendant l\'enregistrement : voir les \u00e9tapes.\n\n';
     md += '## Sc\u00e9narios\n\n';
@@ -373,7 +381,7 @@
     md += '> formel (l\u2019agent sap-istqb peut r\u00e9diger ce document).\n\n';
     md += '- **Identifiant** : TP-' + istqbSlug(testName()) + '\n';
     md += '- **Canal** : Fiori (web)\n';
-    md += '- **Syst\u00e8me / URL** : ' + startUrl() + '\n\n';
+    md += '- **Syst\u00e8me / URL** : ' + startUrl() + '\n' + localeLine() + '\n';
     md += '## 1. Objectif et p\u00e9rim\u00e8tre\n\n';
     md += '- **Objectif** : \u00e0 compl\u00e9ter (constat\u00e9 : d\u00e9roul\u00e9 enregistr\u00e9 ci-dessous).\n';
     md += '- **\u00c9l\u00e9ments \u00e0 tester** : \u00e0 compl\u00e9ter.\n';

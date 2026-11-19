@@ -379,57 +379,76 @@ class LocatorKeywords:
         aucune forme ne résout. Au moins une forme (rôle, ``xpath=``,
         ``sid=``, ``wc=`` ou ``dom=``) est requise.
 
+        Une réparation ne retient qu'un contrôle UNIQUE : une forme de repli qui
+        en désigne plusieurs est refusée (« ambiguous repair », les premiers
+        nommés) et la chaîne passe à la suivante. Jusqu'au 2026-11-18 elle
+        retenait le premier en silence : mesuré sur l'aperçu Fiori Elements des
+        voyages d'a4h, un repli ``//Button`` « réparait » le bouton Go vers le
+        sélecteur de variante (fiche scénario 171). Le
+        WARNING et la ligne du journal (``resolved``) nomment le contrôle retenu.
+
         Exemple :
         | ${selector}=    `Resolve Ui5 With Fallback`    idSuffix=fe::FilterBar::Travel::BasicSearchField-inner
         | ...    xpath=//SearchField[1]    attempt_timeout=10s
         | Should Start With    ${selector}    css=
         """
-        attempts = []
+        # Chaque tentative : (description, résolution -> liste des correspondances,
+        # choix -> sélecteur). Une REPARATION (tentative de repli) qui trouve plusieurs
+        # contrôles est refusée : retenir le premier cliquerait peut-être ailleurs.
+        attempts: list[tuple[str, Any, Any]] = []
         if selector_parts:
             selector = build_control_selector(**selector_parts)
-            attempts.append(("role %s" % selector, lambda: self._pick(
-                self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector),
-                              str(selector), timeout=attempt_timeout),
-                0, str(selector))))
+            attempts.append(("role %s" % selector,
+                             lambda: self._resolve(RESOLVE_ROLE_JS, selector_to_json(selector),
+                                                   str(selector), timeout=attempt_timeout),
+                             lambda ids: self._pick(ids, 0, str(selector))))
         if xpath:
-            attempts.append(("xpath %s" % xpath, lambda: self._pick(
-                self._resolve(RESOLVE_XPATH_JS, xpath, xpath, timeout=attempt_timeout),
-                0, "xpath %s" % xpath)))
+            attempts.append(("xpath %s" % xpath,
+                             lambda: self._resolve(RESOLVE_XPATH_JS, xpath, xpath,
+                                                   timeout=attempt_timeout),
+                             lambda ids: self._pick(ids, 0, "xpath %s" % xpath)))
         if sid:
             def _try_sid():
-                selector = self.resolve_sid(sid)
-                self._wait_visible(selector, timeout=attempt_timeout)
-                return selector
-            attempts.append(("sid %s" % sid, _try_sid))
+                found = self.resolve_sid(sid)
+                self._wait_visible(found, timeout=attempt_timeout)
+                return [found]
+            attempts.append(("sid %s" % sid, _try_sid, lambda ids: ids[0]))
         if wc:
             wc_selector = build_wc_selector(**_coerce_dict(wc, "wc"))
-            attempts.append(("wc %s" % wc_selector, lambda: self._pick_wc(
-                self._resolve(RESOLVE_WC_JS, selector_to_json(wc_selector),
-                              "wc %s" % wc_selector, timeout=attempt_timeout),
-                0, "wc %s" % wc_selector)))
+            attempts.append(("wc %s" % wc_selector,
+                             lambda: self._resolve(RESOLVE_WC_JS, selector_to_json(wc_selector),
+                                                   "wc %s" % wc_selector, timeout=attempt_timeout),
+                             lambda ids: self._pick_wc(ids, 0, "wc %s" % wc_selector)))
         if dom:
             dom_selector = build_dom_selector(**_coerce_dict(dom, "dom"))
-            attempts.append(("dom %s" % dom_selector, lambda: self._pick_wc(
-                self._resolve(RESOLVE_DOM_JS, selector_to_json(dom_selector),
-                              "dom %s" % dom_selector, timeout=attempt_timeout),
-                0, "dom %s" % dom_selector, noun="DOM element")))
+            attempts.append(("dom %s" % dom_selector,
+                             lambda: self._resolve(RESOLVE_DOM_JS, selector_to_json(dom_selector),
+                                                   "dom %s" % dom_selector, timeout=attempt_timeout),
+                             lambda ids: self._pick_wc(ids, 0, "dom %s" % dom_selector,
+                                                       noun="DOM element")))
         if not attempts:
             raise ValueError("Resolve Ui5 With Fallback needs at least one of: "
                              "role selector parts, xpath=, sid=, wc=, dom=.")
         failures = []
-        for position, (description, attempt) in enumerate(attempts):
+        for position, (description, resolve, choose) in enumerate(attempts):
             try:
-                resolved = attempt()
+                found = resolve()
+                if position > 0 and len(found) > 1:
+                    raise AssertionError(
+                        "ambiguous repair: %s controls match (%s%s), none is retained"
+                        % (len(found), ", ".join(str(f) for f in found[:5]),
+                           ", ..." if len(found) > 5 else ""))
+                resolved = choose(found)
             except Exception as err:
                 failures.append("%s -> %s" % (description, err))
                 continue
             if position > 0:
                 logger.warn(
-                    "Localisateur réparé par fallback (%s) ; le localisateur "
-                    "primaire a dérivé : %s. Mettre à jour resources/."
-                    % (description, " ; ".join(failures)))
+                    "Localisateur réparé par fallback (%s) ; contrôle retenu : %s ; le "
+                    "localisateur primaire a dérivé : %s. Mettre à jour resources/."
+                    % (description, resolved, " ; ".join(failures)))
                 record_healing("fiori", original=attempts[0][0], healed=description,
-                               engine=description.split(" ", 1)[0])
+                               engine=description.split(" ", 1)[0], resolved=resolved)
             return resolved
         raise AssertionError(
             "No fallback resolved the control. Attempts: %s\n"

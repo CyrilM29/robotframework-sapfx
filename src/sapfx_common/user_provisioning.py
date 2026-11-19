@@ -47,8 +47,23 @@ AUTHORITY_OUTCOMES = {
     "USER_IS_LOCKED": "user_locked",
 }
 
+#: Verdict d'un refus sur un objet que la cible ne déclare pas (``TOBJ``) : le
+#: noyau le refuse à tout utilisateur (mesuré sur 754 et 758), donc il ne dit
+#: rien des droits.
+OBJECT_MISSING = "object_missing"
+
 #: Les dix couples champ/valeur qu'accepte ``AUTHORITY_CHECK``.
 MAX_CHECK_FIELDS = 10
+
+#: Longueur du nom d'un objet d'autorisation (``TOBJ-OBJCT``, CHAR 10).
+AUTHORIZATION_OBJECT_LENGTH = 10
+
+
+def fits_authorization_object(name: str) -> bool:
+    """Un nom d'objet d'autorisation tient-il dans ``TOBJ-OBJCT`` ? Un nom plus
+    long ne peut pas y être déclaré, et le chercher par ``RFC_READ_TABLE``
+    fait planter le module côté serveur (littéral plus long que le champ)."""
+    return 0 < len(str(name).strip()) <= AUTHORIZATION_OBJECT_LENGTH
 
 
 def _allowed_prefixes(allowed: Any) -> list[str]:

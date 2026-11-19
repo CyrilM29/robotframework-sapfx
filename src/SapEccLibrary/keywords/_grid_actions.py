@@ -24,6 +24,30 @@ from typing import TYPE_CHECKING, Any
 from pythoncom import com_error
 from sapfx_common.gui_element_id import GuiElementIdInput
 
+def context_menu_entries(menu: Any, max_level: int = 3) -> list[dict[str, Any]]:
+    """Les entrées ``{code, text, level}`` d'un menu contextuel SAP GUI
+    (``GuiContextMenu``), sous-menus compris jusqu'au niveau ``max_level`` : le
+    code fonction est la donnée stable, le texte est localisé. Partagé par le
+    menu contextuel d'une grille et le menu d'un bouton de sa barre."""
+    items: list[dict[str, Any]] = []
+
+    def walk(node: Any, level: int) -> None:
+        children = node.Children
+        for index in range(children.Count):
+            child = children.Item(index)
+            code = str(getattr(child, "Name", "") or "").strip()
+            text = str(getattr(child, "Text", "") or "").strip()
+            if code or text:
+                items.append({"code": code, "text": text, "level": level})
+            try:
+                if child.Children.Count and level < max_level:
+                    walk(child, level + 1)
+            except (AttributeError, com_error):
+                pass
+    walk(menu, 0)
+    return items
+
+
 _TRUTHY = ("1", "true", "yes", "on")
 _SORT_CODES = {False: ("&SORT_UP", "&SORT_ASC"), True: ("&SORT_DOWN", "&SORT_DSC")}
 
@@ -121,23 +145,7 @@ class GridActionKeywords:
             menu = grid.CurrentContextMenu
         except (AttributeError, com_error) as exc:
             raise ValueError("Menu contextuel indisponible sur '%s' (%s)." % (table_id, exc))
-        items = []
-
-        def walk(node, level):
-            children = node.Children
-            for index in range(children.Count):
-                child = children.Item(index)
-                code = str(getattr(child, "Name", "") or "").strip()
-                text = str(getattr(child, "Text", "") or "").strip()
-                if code or text:
-                    items.append({"code": code, "text": text, "level": level})
-                try:
-                    if child.Children.Count and level < 3:
-                        walk(child, level + 1)
-                except (AttributeError, com_error):
-                    pass
-        walk(menu, 0)
-        return items
+        return context_menu_entries(menu)
 
     def select_grid_context_menu_item(self, table_id: GuiElementIdInput, code):
         """Ouvre le menu contextuel de la grille et choisit l'entrée de code

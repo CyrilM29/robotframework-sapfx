@@ -20,9 +20,16 @@ _SU53 = "SU53"
 _OTHER_USER_BUTTON = "wnd[0]/tbar[1]/btn[5]"
 _USER_FIELD = "wnd[1]/usr/ctxtG0010_BNAME"
 _CONFIRM_BUTTON = "wnd[1]/tbar[0]/btn[0]"
-# Le conteneur de la grille : `_grid` descend jusqu'à la GridView sous les
-# deux GuiSplitterShell (la moitié haute est un HTMLViewer, jamais lue).
-_JOURNAL_GRID = "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell/shellcont[1]/shell"
+# La grille du journal n'est pas à la même profondeur selon la release (mesuré
+# le 2026-10-25, scénario 25) : sur la 758 elle est sous DEUX GuiSplitterShell,
+# sur la 754 sous UN seul (la moitié haute est un HTMLViewer, jamais lue). Les
+# chemins sont essayés du plus profond au plus court, et seul un GridView est
+# retenu : jamais un splitter pris pour la grille.
+_JOURNAL_GRIDS = (
+    "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell/shellcont[1]/shell",
+    "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell",
+    "wnd[0]/usr/cntlGRID1/shellcont/shell",
+)
 
 
 class AuthorizationFailureKeywords:
@@ -107,9 +114,21 @@ class AuthorizationFailureKeywords:
             raise AssertionError(
                 "SU53 does not show the journal of '%s': the window title is '%s'. "
                 "Reading it would attribute another user's failures." % (name, title))
-        rows = self.read_full_grid(_JOURNAL_GRID, max_rows=limit,
+        rows = self.read_full_grid(self._journal_grid(), max_rows=limit,
                                    columns=list(journal.FAILURE_COLUMNS))
         return journal.parse_failure_rows(rows)
+
+    def _journal_grid(self):
+        """L'identifiant de la grille du journal SU53 sur CETTE release : le
+        premier chemin connu qui porte une GridView, jamais un conteneur."""
+        for grid_id in _JOURNAL_GRIDS:
+            element = self.session.findById(grid_id, False)
+            if element is not None and self._is_grid_view(element):
+                return grid_id
+        raise AssertionError(
+            "SU53 shows no journal grid at the known places (%s): perceive the "
+            "screen with `Get Screen Signature` before reading again."
+            % ", ".join(_JOURNAL_GRIDS))
 
     def get_new_authorization_check_failures(self, before, after):
         """Les entrées de ``after`` absentes de ``before`` (deux lectures de

@@ -15,6 +15,9 @@ dictionnaire ABAP) : ici la casse est préservée, l'appelant décide.
 from __future__ import annotations
 
 import ast
+import inspect
+import sys
+import typing
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Union
 
 from sapfx_common import __version__ as _package_version
@@ -106,6 +109,52 @@ if TYPE_CHECKING:
 else:
     NameListInput = NameList
     OptionalNameListInput = NameList
+
+
+def _written_as_name_list(function: Any, parameter: str) -> bool:
+    """L'annotation écrite du paramètre désigne-t-elle NameList (et non une union) ?"""
+    written = function.__annotations__.get(parameter)
+    if isinstance(written, str):
+        try:
+            written = eval(written, function.__globals__)  # noqa: S307 : une annotation du code source, comme typing
+        except Exception:  # noqa: BLE001 : une annotation illisible ne se fige pas
+            return False
+    return written is NameList
+
+
+def keep_name_list_messages(cls: type, implicit_optional: bool = sys.version_info < (3, 11)) -> type:
+    """Garde, sous Python 3.10, le message du convertisseur aux arguments NameList facultatifs.
+
+    Jusqu'à 3.10, ``typing.get_type_hints`` fait d'un ``extra: NameList = None``
+    un ``Optional[NameList]`` (l'Optional implicite, retiré en 3.11) : Robot y
+    voit une union et ne rend que « cannot be converted to NameList or None »,
+    sans le message qu'un agent lit pour se corriger. Python 3.10 est le
+    plancher du pack (pyrfc). Pour chaque keyword de ``cls`` dont un argument
+    est ÉCRIT NameList avec ``None`` par défaut, les types que Robot lit
+    (``robot_types``) reprennent l'annotation écrite ; les autres arguments
+    gardent ceux que Robot aurait lus. Un keyword aux types déjà fixés par
+    ``@keyword(types=...)`` n'est pas touché. Sans effet à partir de 3.11.
+    """
+    if not implicit_optional:
+        return cls
+    for name in dir(cls):
+        function = getattr(getattr(cls, name, None), "__func__", getattr(cls, name, None))
+        if not inspect.isfunction(function):
+            continue
+        fixed = getattr(function, "robot_types", ())
+        if fixed or fixed is None:
+            continue
+        try:
+            hints = typing.get_type_hints(function)
+            defaults = inspect.signature(function).parameters
+        except Exception:  # noqa: BLE001 : Robot retombe alors sur ses propres types
+            continue
+        pinned = {parameter: NameList for parameter, hint in hints.items()
+                  if parameter in defaults and defaults[parameter].default is None
+                  and hint == Optional[NameList] and _written_as_name_list(function, parameter)}
+        if pinned:
+            typing.cast(Any, function).robot_types = {**hints, **pinned}  # ce que pose @keyword(types=...)
+    return cls
 
 
 def as_optional_int(value: Any, argument: str, hint: str = "") -> int | None:

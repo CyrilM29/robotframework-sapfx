@@ -32,6 +32,28 @@ _ID_TYPE_PREFIXES = ("ctxt", "txt", "pwd", "btn", "chk", "rad", "cmb", "lbl",
                      "shell", "usr", "wnd", "sbar", "tbar", "mbar", "okcd")
 
 
+#: Le type SAP GUI qu'annonce le préfixe du segment terminal d'un id (le
+#: préfixe le plus long d'abord : ``ctxt`` avant ``txt``).
+_PREFIX_TYPES = (("ctxt", "GuiCTextField"), ("txt", "GuiTextField"), ("pwd", "GuiPasswordField"),
+                 ("btn", "GuiButton"), ("chk", "GuiCheckBox"), ("rad", "GuiRadioButton"),
+                 ("cmb", "GuiComboBox"), ("lbl", "GuiLabel"), ("tabp", "GuiTab"),
+                 ("tabs", "GuiTabStrip"), ("tbl", "GuiTableControl"), ("okcd", "GuiOkCodeField"))
+
+
+def expected_gui_type(element_id: str) -> Optional[str]:
+    """Le type SAP GUI qu'annonce l'id (``btn[31]`` : ``GuiButton``,
+    ``ctxtDATABROWSE-TABLENAME`` : ``GuiCTextField``), ``None`` quand son
+    préfixe n'en dit rien (conteneurs, shells)."""
+    segments = split_segments(element_id)
+    if not segments:
+        return None
+    terminal = segments[-1]
+    for prefix, gui_type in _PREFIX_TYPES:
+        if terminal.startswith(prefix) and len(terminal) > len(prefix):
+            return gui_type
+    return None
+
+
 class ScoredCandidate(NamedTuple):
     """Un candidat de réparation : id (ou libellé) et score dans [0, 1]."""
     candidate: str

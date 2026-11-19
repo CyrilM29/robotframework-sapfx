@@ -99,11 +99,22 @@
     return null;
   }
   function findBySid(sid) {
+    // Même règle que le résolveur de la bibliothèque (sid_xpath) : l'élément porteur
+    // LE PLUS PROFOND, aucun descendant ne portant le même SID. Le WebGUI pose le SID
+    // d'une cellule de table control sur la TD ET sur son contenu (backlog 2.113).
     var nodes = document.querySelectorAll('[lsdata]');
+    var porteurs = [];
     for (var i = 0; i < nodes.length; i++) {
       var ls = nodes[i].getAttribute('lsdata') || '';
       if (ls.indexOf('"SID":"' + sid + '"') !== -1 ||
-          ls.indexOf("SID:'" + sid + "'") !== -1) return nodes[i];
+          ls.indexOf("SID:'" + sid + "'") !== -1) porteurs.push(nodes[i]);
+    }
+    for (var j = 0; j < porteurs.length; j++) {
+      var englobe = false;
+      for (var k = 0; k < porteurs.length; k++) {
+        if (k !== j && porteurs[j].contains(porteurs[k])) { englobe = true; break; }
+      }
+      if (!englobe) return porteurs[j];
     }
     return null;
   }
@@ -335,11 +346,13 @@
         else out.push(testMarkerLine(trimmed));      // test suivant -> marqueur
         return;
       }
-      if (/^(New Browser|New Page|\[)/.test(trimmed)) {
-        // Round-trip : le New Page importé restaure l'URL de départ (le
-        // bootstrap reste re-généré à l'export, donc toujours compté ignoré).
+      if (/^(New Browser|New Context|New Page|\[)/.test(trimmed)) {
+        // Round-trip : le New Page importé restaure l'URL de départ, le New Context sa
+        // langue (le bootstrap reste re-généré à l'export, donc toujours compté ignoré).
         var mNP = trimmed.match(/^New Page\s{2,}(\S+)/);
         if (mNP) { try { sessionStorage.setItem(URL_KEY, mNP[1]); } catch (e) { warnStorage(e); } }
+        var mNC = trimmed.match(/^New Context\s{2,}.*\blocale=(\S+)/);
+        if (mNC) { try { sessionStorage.setItem(LOCALE_KEY, mNC[1]); } catch (e) { warnStorage(e); } }
         afterNewPage = !!mNP;
         skipped++; return;
       }

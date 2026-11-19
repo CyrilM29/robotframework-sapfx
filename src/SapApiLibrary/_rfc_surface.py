@@ -9,12 +9,14 @@ Trois pièges d'appel mesurés le 2026-09-14 sur ABAP Platform 2023 (release
 758) sont encodés ici, et tous trois produisent un résultat plausible plutôt
 qu'une erreur visible :
 
-1. ``RSAU_READ_LOG`` déclare ``IS_INTV`` OBLIGATOIRE. Appelé sans lui, il rend
-   zéro entrée et zéro fichier *sans lever quoi que ce soit*. Graver ce zéro
-   revient à écrire « le journal d'audit est vide » sans l'avoir lu. Et la
-   structure porte ``DAT_FROM`` / ``DAT_TO``, pas ``DATE_FROM`` : l'orthographe
-   plausible sort en ``RFC_INVALID_PARAMETER`` côté client, donc sans jamais
-   atteindre le système.
+1. ``RSAU_READ_LOG`` rend zéro entrée *sans lever quoi que ce soit* quand on
+   ne lui donne pas de vecteur d'événements, même avec son intervalle bien
+   formé (source lue le 2026-11-17 sur 754 et 758) : le journal se lit donc
+   par ``RSAU_API_GET_LOG_DATA``, qui annonce lui-même le nombre d'entrées
+   trouvées. Les deux structures d'intervalle portent ``DAT_FROM`` /
+   ``DAT_TO``, pas ``DATE_FROM`` : l'orthographe plausible sort en
+   ``RFC_INVALID_PARAMETER`` côté client, donc sans jamais atteindre le
+   système.
 2. Les services web se lisent dans DEUX tables : ``ICFSERVLOC`` porte le
    drapeau d'activation, ``ICFSERVICE`` porte le nom. Lire la seconde seule
    donne 3410 noeuds dont on ignore lesquels répondent.
@@ -36,6 +38,7 @@ from sapfx_common.robot_args import NameListInput
 from sapfx_common import robot_args, security_baseline, security_surface
 
 from ._rfc_security import RfcSecurityKeywords
+
 
 #: Les motifs de nom qui désignent un service web notoirement sensible. Une
 #: aide au rapport, jamais un critère d'échec : ce qui est sensible dépend du
@@ -241,31 +244,41 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         et rend le verdict de couverture.
 
         Rend ``{"verdict", "configuration_verdict", "entries", "files",
-        "window_days", "consistent", "note"}``, plus la configuration complète
-        sous ``configuration``.
+        "window_days", "consistent", "note", "entries_total",
+        "system_entries", "reported"}``, plus la configuration complète sous
+        ``configuration``. ``entries`` compte les entrées ATTRIBUÉES À UN
+        UTILISATEUR, celles sur lesquelles porte le verdict ;
+        ``system_entries`` les événements que le noyau écrit sans utilisateur
+        quel que soit le filtrage (démarrage et arrêt du serveur, changement
+        de support du journal) ; ``reported`` le nombre que le module annonce
+        lui-même (message ``SECAUDIT/201``).
 
         *Ce que ce keyword prouve et que `Get Audit Configuration` ne peut
         que déduire.* La configuration dit « armé, dix emplacements déclarés,
-        aucun actif », d'où l'on conclut que le journal n'enregistre rien.
-        C'était un raisonnement ; la lecture du journal sur la fenêtre le rend
-        CONSTATÉ. Mesuré sur la cible : zéro entrée et zéro fichier sur un an
-        comme sur quatre.
+        aucun actif », d'où l'on conclut que le journal n'enregistre aucune
+        activité. La lecture du journal sur la fenêtre le CONSTATE ou le
+        dément : sur la 758, mesuré le 2026-11-17, les exécutions en
+        environnement de test de SE37 et SE24 par DEVELOPER y sont écrites
+        sans aucun filtre actif (verdict ``entries_without_filter``).
 
-        *Le piège d'appel, et il est silencieux.* ``RSAU_READ_LOG`` déclare
-        son intervalle OBLIGATOIRE mais ne le vérifie pas : appelé sans lui, il
-        rend zéro entrée sans lever la moindre erreur, et ce zéro passe
-        parfaitement pour une mesure. La structure attend par ailleurs
-        ``DAT_FROM`` / ``DAT_TO`` et non ``DATE_FROM``, orthographe qui sort en
-        ``RFC_INVALID_PARAMETER`` levé côté client, donc sans jamais atteindre
-        le système. Le keyword compose l'intervalle lui-même, pour que
-        l'appelant ne puisse commettre ni l'un ni l'autre.
+        *Le piège qu'il corrige, et il était silencieux.* Jusqu'au 2026-11-17
+        ce keyword lisait ``RSAU_READ_LOG`` avec son seul intervalle. Or ce
+        module rend immédiatement zéro entrée quand on ne lui donne pas de
+        vecteur d'événements (source lue sur 754 et 758), même avec un
+        intervalle bien formé : il n'a donc jamais rien lu, et ses zéros
+        passaient pour une mesure. Il lit désormais ``RSAU_API_GET_LOG_DATA``,
+        qui rend toutes les entrées de l'intervalle sans sélection (167 sur
+        a4h, 290 sur abap2023 depuis la création des conteneurs) et annonce
+        lui-même combien il en a trouvé.
 
-        Une lecture qui ÉCHOUE rend ``not_measured`` et jamais zéro : sur un
+        Une lecture qui ÉCHOUE rend ``not_measured`` et jamais zéro, comme
+        une réponse sans sa table ``ET_LOG``, un message d'erreur dans
+        ``ET_RETURN`` ou un nombre annoncé différent du nombre rendu : sur un
         contrôle d'audit, confondre « vide » et « non lu » est le faux positif
         que tout ce domaine cherche à éviter.
 
         Exemple :
-        | ${coverage}=    `Read Audit Log Coverage`    alias=a4h    window_days=365
+        | ${coverage}=    `Read Audit Log Coverage`    alias=a4h    window_days=365    today=20261116
         | Should Be Equal    ${coverage}[verdict]    armed_without_filter_and_silent
         """
         configuration = self.get_audit_configuration(alias=alias)
@@ -280,33 +293,41 @@ class RfcSurfaceKeywords(RfcSecurityKeywords):
         end = (datetime.datetime.strptime(str(today), "%Y%m%d").date()
                if today else datetime.date.today())
         start = end - datetime.timedelta(days=days)
-        entries: Optional[int] = None
+        counts: Optional[dict[str, int]] = None
         files: Optional[int] = None
+        reported: Optional[int] = None
         ok = True
         try:
             out = self.call_rfc(
-                "RSAU_READ_LOG", alias=alias,
-                IS_INTV={"DAT_FROM": start.strftime("%Y%m%d"),
-                         "TIM_FROM": "000000",
-                         "DAT_TO": end.strftime("%Y%m%d"),
-                         "TIM_TO": "235959"})
-            # La réponse doit PORTER ses tables de sortie. Sans ce contrôle,
-            # une réponse vide ou de forme inattendue (module renommé sur une
-            # autre release, refus rendu sans exception) donnerait zéro entrée
-            # et « lecture réussie », donc exactement le verdict de silence
-            # recherché, obtenu sans avoir rien lu. C'est le piège de l'appel
-            # sans intervalle, déplacé d'un cran.
-            if not isinstance(out, Mapping) or "ET_DATA" not in out:
+                "RSAU_API_GET_LOG_DATA", alias=alias,
+                IS_INTERVAL={"DAT_FROM": start.strftime("%Y%m%d"),
+                             "TIM_FROM": "000000",
+                             "DAT_TO": end.strftime("%Y%m%d"),
+                             "TIM_TO": "235959"})
+            # La réponse doit PORTER sa table de sortie : une réponse vide ou
+            # de forme inattendue (module renommé sur une autre release, refus
+            # rendu sans exception) donnerait sinon zéro entrée et « lecture
+            # réussie », exactement le verdict de silence recherché.
+            if not isinstance(out, Mapping) or "ET_LOG" not in out:
                 ok = False
             else:
-                entries = len(out.get("ET_DATA") or [])
-                files = len(out.get("ET_STAT") or [])
+                reported, refused = security_surface.reported_audit_count(
+                    out.get("ET_RETURN") or [])
+                log = out.get("ET_LOG") or []
+                if refused or (reported is not None and reported != len(log)):
+                    ok = False
+                else:
+                    counts = security_surface.count_audit_log_entries(log)
+                    files = len(out.get("ET_FSTAT") or [])
         except Exception:  # noqa: BLE001 - un refus n'est pas un journal vide
             ok = False
 
         verdict = security_surface.corroborate_audit_coverage(
-            configuration, entries, files_seen=files, window_days=days,
-            read_succeeded=ok)
+            configuration, counts["user"] if counts else None,
+            files_seen=files, window_days=days, read_succeeded=ok)
+        verdict["entries_total"] = counts["total"] if counts else None
+        verdict["system_entries"] = counts["system"] if counts else None
+        verdict["reported"] = reported
         verdict["configuration"] = configuration
         return verdict
 

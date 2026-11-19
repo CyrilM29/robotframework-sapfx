@@ -73,6 +73,32 @@ class SystemIdentityKeywords:
         except (AttributeError, com_error):
             return None
 
+    def _describe_open_modal(self):
+        """Titre et premiers textes du modal ``wnd[1]``, lus au mieux : la trace
+        qui dit QUEL modal bloque (un avis de licence arrivé en retard n'appelle
+        pas le même remède qu'un autre dialogue), jamais au prix du refus."""
+        parts = []
+        try:
+            title = str(getattr(self._element("wnd[1]"), "Text", "") or "").strip()
+        except (AttributeError, com_error):
+            title = ""
+        if title:
+            parts.append("titre « %s »" % title)
+        texts = []
+        try:
+            children = self._element("wnd[1]/usr").Children
+            for index in range(min(int(children.Count), 12)):
+                text = str(getattr(children.ElementAt(index), "Text", "") or "").strip()
+                if text:
+                    texts.append(text)
+                if len(texts) >= 4:
+                    break
+        except (AttributeError, TypeError, ValueError, com_error):
+            pass
+        if texts:
+            parts.append("textes : " + " | ".join(texts))
+        return " ; ".join(parts) or "contenu illisible"
+
     def _read_fields(self, window, fields):
         """``{suffixe: texte}`` des champs de ``wnd[window]/usr/`` présents."""
         values = {}
@@ -111,8 +137,9 @@ class SystemIdentityKeywords:
         """
         if self._element("wnd[1]") is not None:
             raise AssertionError(
-                "Un modal (wnd[1]) est déjà ouvert : le refermer d'abord "
-                "(Dismiss Modal Window) avant d'ouvrir System > Status.")
+                "Un modal (wnd[1]) est déjà ouvert (%s) : le refermer d'abord "
+                "(Dismiss Modal Window) avant d'ouvrir System > Status."
+                % self._describe_open_modal())
         items = menu_items_from_elements(self._screen_elements(), "wnd[0]")
         tops = sorted((item for item in items if item.depth == 1),
                       key=lambda item: item.positions[0])

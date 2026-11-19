@@ -288,7 +288,7 @@
   function setRecording(on) {
     recording = !!on;
     saveRecording();
-    if (on) rememberUrl();
+    if (on) { rememberUrl(); rememberLocale(); }
     btnRec.textContent = on ? 'pause' : 'rec';
     btnRec.style.background = on ? '#d0021b' : 'transparent';
     dot.style.display = on ? 'inline-block' : 'none';
@@ -326,7 +326,7 @@
   btnClear.addEventListener('click', function () {
     captures = []; steps = [];
     saveSteps();
-    try { sessionStorage.removeItem(URL_KEY); } catch (e) {}
+    try { sessionStorage.removeItem(URL_KEY); sessionStorage.removeItem(LOCALE_KEY); } catch (e) {}
     render();
   });
   btnClose.addEventListener('click', function () { window.__ui5SpyStop(); });

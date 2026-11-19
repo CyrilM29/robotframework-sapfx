@@ -50,6 +50,11 @@ class TableControlKeywords:
         lignes non matérialisées lèvent côté COM. Ce keyword retourne donc
         les lignes RÉELLEMENT remplies et s'arrête à la première ligne dont
         aucune cellule n'existe : jamais de lignes fantômes dans le résultat.
+        Second piège, mesuré live sur RSA7 (754 et 758) : un écran peut aussi
+        MATÉRIALISER ses lignes réservées, cellules vides ; les lignes
+        entièrement vides de FIN de table sont donc retirées (une table sans
+        donnée rend ``[]``), une ligne vide suivie d'une ligne remplie est
+        gardée telle que l'écran l'affiche.
 
         Une colonne *GuiCheckBox* (la colonne « Key » des champs SE11) se
         rend en drapeau ABAP : ``X`` cochée, chaîne vide sinon, la convention
@@ -88,7 +93,7 @@ class TableControlKeywords:
             if exhausted:
                 break
         self._scroll_table_to(table_id, original, best_effort=True)
-        return rows
+        return table_control.drop_trailing_blank_rows(rows)
 
     def get_table_control_cell(self, table_id: GuiElementIdInput, row, column_title):
         """Texte de la cellule ``(ligne absolue, titre de colonne)`` d'un

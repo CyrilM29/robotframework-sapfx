@@ -164,7 +164,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
     `Read Security Posture` relit un artefact de posture (JSON) tel quel.
     """
 
-    __version__ = "0.8.6"
+    __version__ = "0.8.7"
     ROBOT_LIBRARY_SCOPE = "SUITE"
     ROBOT_LIBRARY_DOC_FORMAT = "ROBOT"
     # Types métier d'arguments (backlog 2.75) : Robot convertit, Libdoc publie
@@ -320,6 +320,7 @@ class SapApiLibrary(OdataWriteKeywords, DiscoveryKeywords,
         """
         namespace = current_execution_namespace()
         connections = self._rfc_by_namespace.pop(namespace, {})
+        self._forget_rfc_call_telemetry()
         for alias, connection in connections.items():
             try:
                 connection.close()

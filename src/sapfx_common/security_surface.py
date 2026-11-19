@@ -50,6 +50,8 @@ __all__ = [
     "classify_external_command",
     "summarize_external_commands",
     "corroborate_audit_coverage",
+    "count_audit_log_entries",
+    "reported_audit_count",
     "summarize_trust_surface",
 ]
 
@@ -323,12 +325,17 @@ def corroborate_audit_coverage(configuration: Mapping[str, Any],
 
     **Ce que ce croisement apporte, et pourquoi il fallait une fonction pour
     ça.** Le paramètre du noyau dit « armé », la configuration dit « aucun
-    filtre actif », et jusqu'ici la conclusion « donc il n'enregistre rien »
-    restait une déduction. La lecture du journal sur quatre ans, qui rend zéro
-    entrée et zéro fichier, la transforme en constat. Inversement, des entrées
-    trouvées alors qu'aucun filtre n'est actif signalent que quelque chose
-    enregistre en dehors de ce que la configuration décrit, ce qui mérite
-    d'être vu plutôt que supposé impossible.
+    filtre actif », et la conclusion « donc il n'enregistre rien » reste une
+    déduction tant que le journal n'est pas lu. ``entries_read`` est le nombre
+    d'entrées ATTRIBUÉES À UN UTILISATEUR (voir
+    :func:`count_audit_log_entries`) : le noyau écrit des événements système
+    (démarrage et arrêt du serveur, changement de support du journal) quels
+    que soient les filtres, et les compter ferait dire « des entrées sans
+    filtre » d'un journal qui n'enregistre aucune activité. Des entrées
+    attribuées trouvées alors qu'aucun filtre n'est actif signalent que
+    quelque chose enregistre en dehors de ce que la configuration décrit :
+    mesuré sur la 758 le 2026-11-17, les exécutions en environnement de test
+    de SE37 et SE24 (``FUJ``, ``FUK``) sont journalisées sans aucun filtre.
 
     **Une lecture qui a échoué ne vaut JAMAIS zéro.** ``read_succeeded=False``
     rend ``not_measured``, distinct de tout verdict de silence : confondre
@@ -433,3 +440,44 @@ def summarize_trust_surface(trusted: Iterable[Mapping[str, Any]],
                                          for c in rappels} - {""}),
         "any_trust_configured": bool(entrants or sortants),
     }
+
+
+def count_audit_log_entries(log: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """Compte les entrées d'un relevé du journal d'audit (lignes ``ET_LOG`` de
+    ``RSAU_API_GET_LOG_DATA``) et sépare celles qu'un utilisateur porte.
+
+    Rend ``{"total", "user", "system"}`` : ``user`` compte les entrées dont
+    ``SLGUSER`` est renseigné, ``system`` les autres. Le noyau écrit des
+    événements système sans utilisateur (``AUG`` démarrage, ``AUH`` arrêt,
+    ``FU0`` changement de support, mesurés sur 754 et 758) quel que soit le
+    filtrage : ils disent que le journal fonctionne, pas qu'il couvre une
+    activité.
+    """
+    total = user = 0
+    for row in log or []:
+        if not isinstance(row, Mapping):
+            continue
+        total += 1
+        if _clean(row.get("SLGUSER")):
+            user += 1
+    return {"total": total, "user": user, "system": total - user}
+
+def reported_audit_count(returns: Any) -> tuple[Optional[int], bool]:
+    """Le nombre d'entrées que ``RSAU_API_GET_LOG_DATA`` annonce (message
+    ``SECAUDIT/201``) et si un message d'erreur (type ``E``, ``A`` ou ``X``)
+    est rendu. Un nombre illisible vaut ``None``, jamais zéro."""
+    reported: Optional[int] = None
+    refused = False
+    for message in returns or []:
+        if not isinstance(message, Mapping):
+            continue
+        kind = str(message.get("TYPE", "")).strip().upper()
+        if kind in ("E", "A", "X"):
+            refused = True
+        if str(message.get("ID", "")).strip().upper() == "SECAUDIT" and \
+                str(message.get("NUMBER", "")).strip() == "201":
+            try:
+                reported = int(str(message.get("MESSAGE_V1", "")).strip())
+            except ValueError:
+                reported = None
+    return reported, refused

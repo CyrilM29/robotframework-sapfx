@@ -17,6 +17,7 @@ Extrait de ``SapApiLibrary.py`` (convention #13).
 """
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from sapfx_common.robot_args import NameListInput
@@ -27,6 +28,10 @@ from sapfx_common import rfc_channel, rfc_tables
 from sapfx_common.secrets import reveal_secret
 
 from ._core import _ApiCore
+
+#: Les systèmes joints par ce PROCESSUS, par identifiant système : le cache des
+#: descriptions du SDK NW RFC est propre au processus, la garde aussi.
+_DESCRIPTION_CACHE = rfc_channel.DescriptionCacheGuard()
 
 
 class RfcKeywords(_ApiCore):
@@ -102,9 +107,45 @@ class RfcKeywords(_ApiCore):
         | ...    user=DEVELOPER    passwd=${RFC_PASSWORD}    lang=EN
         """
         pyrfc = self._require_pyrfc()
-        self._rfc_connections()[alias] = pyrfc.Connection(
+        connection = pyrfc.Connection(
             **{name: reveal_secret(value) for name, value in params.items()})
+        self._rfc_connections()[alias] = connection
+        self._record_rfc_partner(alias, connection)
         return alias
+
+    def _record_rfc_partner(self, alias: str, connection: Any) -> tuple[str, tuple[str, ...]] | None:
+        """L'identité du système joint par ``connection``, retenue pour la
+        connexion et pour le processus (voir ``rfc_channel.DescriptionCacheGuard``)."""
+        memory = self._rfc_connection_memory(alias)
+        known = memory.get("partner_identity")
+        if known is not None:
+            return known
+        attributes = getattr(connection, "get_connection_attributes", None)
+        if attributes is None:
+            return None
+        known = rfc_channel.partner_identity(attributes())
+        memory["partner_identity"] = known
+        _DESCRIPTION_CACHE.record(*known)
+        return known
+
+    def _purge_shared_description(self, alias: str, connection: Any, function_name: str) -> None:
+        """Retire du cache du SDK la description de ``function_name`` quand
+        l'identifiant système de la connexion désigne, dans ce processus, plus
+        d'un système : l'appel lit alors l'interface du serveur joint, jamais
+        celle de l'autre."""
+        # Seule l'ouverture par `Open Rfc Connection` retient une identité : une
+        # connexion posée autrement (doublure de test) ne déclenche jamais de purge.
+        known = self._rfc_connection_memory(alias).get("partner_identity")
+        if known is None or not _DESCRIPTION_CACHE.is_ambiguous(known[0]):
+            return
+        remove = getattr(connection, "func_desc_remove", None)
+        if remove is None:
+            raise RuntimeError(
+                "Deux systèmes d'identifiant %s sont joints par ce processus et le "
+                "binding RFC ne sait pas retirer une description de son cache "
+                "(func_desc_remove absent) : %s serait appelé avec l'interface de "
+                "l'autre système." % (known[0], function_name))
+        remove(known[0], function_name)
 
     def _require_pyrfc(self) -> Any:
         """Le module `pyrfc` UTILISABLE, ou une erreur actionnable qui nomme la
@@ -336,6 +377,16 @@ class RfcKeywords(_ApiCore):
         la chaîne corromprait les champs caractère numériques, où ``'0400'``
         est un numéro de liaison et non l'entier 400.
 
+        Deux systèmes de MÊME identifiant joints par le même processus (les
+        deux conteneurs du banc s'appellent ``A4H``) se confondraient dans le
+        cache des descriptions du SDK, qui est rangé par identifiant : un module
+        décrit sur l'un serait appelé sur l'autre avec la première interface
+        (mesuré le 2026-11-19 : ``EXTUID_GET``, propre à la 758, refusé côté
+        client après une description lue sur la 754). Dès qu'un identifiant
+        désigne deux systèmes, la description est retirée du cache avant chaque
+        appel, ce qui coûte un aller-retour de métadonnées ; un seul système par
+        identifiant ne coûte rien.
+
         Exemple :
         | ${info}=    `Call Rfc`    RFC_SYSTEM_INFO    alias=a4h
         | Should Be Equal    ${info}[RFCSI_EXPORT][RFCSYSID]    A4H
@@ -345,8 +396,20 @@ class RfcKeywords(_ApiCore):
         connection = self._require_rfc_connection(alias, "Call Rfc")
         gate_for(self, "SapApiLibrary", "Approve Next Api Write").check_rfc(function_name)
         touch_log.record_rfc("SapApiLibrary", function_name, params)
-        return connection.call(
-            function_name, **rfc_channel.plain_rfc_parameters(params))
+        parameters = rfc_channel.plain_rfc_parameters(params)
+        self._purge_shared_description(alias, connection, str(function_name))
+        # La durée mesurée est celle de l'aller-retour seul : la garde et la
+        # conversion des paramètres sont faites avant de lancer l'horloge.
+        # perf_counter et non monotonic : sous Windows et Python 3.12 (le canal
+        # RFC exige 3.10 à 3.12), monotonic n'avance que par pas de 15,625 ms.
+        started = time.perf_counter()
+        try:
+            result = connection.call(function_name, **parameters)
+        except Exception as err:
+            self._record_rfc_call(alias, function_name, time.perf_counter() - started, err)
+            raise
+        self._record_rfc_call(alias, function_name, time.perf_counter() - started)
+        return result
 
     def reset_rfc_server_context(self, alias: str = "default") -> None:
         """Remet à zéro le CONTEXTE SERVEUR de la connexion RFC ``alias`` sans
@@ -381,5 +444,6 @@ class RfcKeywords(_ApiCore):
         | `Close Rfc Connection`    a4h
         """
         connection = self._rfc_connections().pop(alias, None)
+        self._forget_rfc_call_telemetry(alias)
         if connection is not None:
             connection.close()

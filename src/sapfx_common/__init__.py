@@ -33,7 +33,7 @@ derrière n'importe quel canal.
 """
 from importlib.util import find_spec as _find_spec
 
-__version__ = "0.8.6"
+__version__ = "0.8.7"
 
 #: Les modules du paquet qu'une suite importe comme bibliothèques Robot
 #: (``Library    sapfx_common.table_csv``). Une seule liste, que lisent la page

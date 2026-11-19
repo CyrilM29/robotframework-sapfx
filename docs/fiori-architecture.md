@@ -195,6 +195,10 @@ selector to fix, and the repair is appended to the cumulative
 `sapfx_common.healing_telemetry`). Failures list what *each* engine tried; role
 failures add a type-level hint (« N control(s) of that type ARE rendered » vs
 « none at all ») so a wrong property is distinguishable from a wrong control type.
+Since 0.8.7 a fallback form that designates SEVERAL controls is refused as an
+« ambiguous repair » and the next form is tried: `//Button` used to « repair »
+the Go button of a Fiori Elements list into the variant selector, the first of
+nine buttons. The journal line names the control retained (`resolved`).
 
 ### Fiori Elements: stable `idSuffix`
 

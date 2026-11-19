@@ -82,6 +82,13 @@ def classify_audit_configuration(config: Mapping[str, Any]) -> dict[str, Any]:
     Un ``SLOTINFO`` absent ou illisible ne compte JAMAIS comme des slots
     actifs : le repli sûr, ici, est de ne pas inventer une couverture d'audit.
 
+    L'état d'un emplacement se lit dans son champ ``STATUS`` (``X`` = actif),
+    le seul que ``RSAU_GET_AUDIT_CONFIG`` remplit (source lue sur 754 et 758,
+    2026-11-17) : le champ ``ENABLE`` d'une ligne de ``SLOTINFO`` reste
+    toujours vide, l'interrupteur du journal étant le ``ENABLE`` de la
+    réponse. Compter sur ``ENABLE`` rendait zéro emplacement actif même avec
+    des filtres posés, constaté le même jour sur a4h.
+
     Exemple :
     | ${config}=    Call Rfc    RSAU_GET_AUDIT_CONFIG    alias=a4h
     | ${audit}=    `Classify Audit Configuration`    ${config}
@@ -97,7 +104,7 @@ def classify_audit_configuration(config: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(slots, Iterable) and not isinstance(slots, (str, bytes)):
         for slot in slots:
             if isinstance(slot, Mapping) and \
-                    str(slot.get("ENABLE", "")).strip().upper() == "X":
+                    str(slot.get("STATUS", "")).strip().upper() == "X":
                 active += 1
     if not enabled:
         verdict = "disabled"

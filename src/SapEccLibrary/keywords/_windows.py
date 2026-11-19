@@ -22,15 +22,21 @@ fenêtre ACTIVE. Avec un seul modal ouvert, rien ne change.
 from typing import TYPE_CHECKING, Any
 
 from pythoncom import com_error
+from robot.api import logger
 
 from sapfx_common.status_message import normalize_message_class, normalize_message_number
 
 # Boutons de fermeture d'un modal, du plus neutre au plus spécifique :
 # barre d'outils du modal (btn[12] = Annuler/F12, btn[0] = Entrée) puis les
 # boutons SPOP des dialogues de confirmation (OPTION2 = Non/Annuler,
-# OPTION1 = Oui/Continuer).
-_CANCEL_BUTTONS = ("tbar[0]/btn[12]", "usr/btnSPOP-OPTION2", "usr/btnSPOP-OPTION_CAN")
-_CONFIRM_BUTTONS = ("tbar[0]/btn[0]", "usr/btnSPOP-OPTION1")
+# OPTION1 = Oui/Continuer), puis ceux de ``POPUP_TO_CONFIRM`` (dynpro
+# ``SAPLSPO1/600`` : BUTTON_2 = la seconde réponse, Non, BUTTON_1 = la
+# première, Oui). Mesuré le 2026-11-02 sur a4h et abap2023 (avertissement
+# d'OBBS, sans bouton Annuler) : F12 y est refusé par ``00/S/255`` et aucun
+# bouton SPOP n'existe, le dialogue restait ouvert.
+_CANCEL_BUTTONS = ("tbar[0]/btn[12]", "usr/btnSPOP-OPTION2", "usr/btnSPOP-OPTION_CAN",
+                   "usr/btnBUTTON_2")
+_CONFIRM_BUTTONS = ("tbar[0]/btn[0]", "usr/btnSPOP-OPTION1", "usr/btnBUTTON_1")
 
 # « Function code cannot be selected » : la fonction du bouton pressé est
 # EXCLUE du statut GUI du dialogue. Mesuré le 2026-10-06 sur A4H : après un
@@ -52,6 +58,9 @@ _MAX_MODAL_DEPTH = 9
 _MESSAGE_DIALOG_PROGRAM = "SAPMSDYP"
 _INFORMATION_ICON = "M_INFO"
 _MESSAGE_TEXT_FIELDS = 9
+# Liste classique en modal : la forme du dialogue « Copyright » de la connexion.
+_LIST_PROGRAM = "SAPMSSY0"
+_LIST_SCREEN = "120"
 
 
 class WindowKeywords:
@@ -103,16 +112,42 @@ class WindowKeywords:
 
         ``excluded`` : boutons dont la pression a rendu ``00/S/255`` (fonction
         exclue du statut GUI), tenus pour absents : un Annuler masqué que
-        ``findById`` trouve encore n'est pas un Annuler."""
+        ``findById`` trouve encore n'est pas un Annuler.
+
+        Un bouton de la barre ``tbar[0]`` ne compte aussi que s'il est parmi
+        ses ENFANTS, c'est-à-dire affiché. Mesuré le 2026-11-03 sur a4h
+        (fenêtre « aucun IDoc » de WE02, ``SAPMSDYP/10``, icône ``M_INFO``) :
+        la barre n'affiche que Continuer et Aide, mais ``findById`` y trouve
+        un ``btn[12]`` masqué, géométrie et info-bulle « Cancel » comprises,
+        absent des enfants de la barre ; il faisait prendre l'information
+        pour un dialogue annulable. Des enfants illisibles laissent la seule
+        réponse de ``findById``."""
         def present(suffix):
             if suffix in excluded:
                 return False
             try:
-                return self.session.findById("wnd[%s]/%s" % (window, suffix), False) is not None
+                found = self.session.findById("wnd[%s]/%s" % (window, suffix), False) is not None
             except (AttributeError, com_error):
                 return False
+            if found and suffix.startswith("tbar[0]/"):
+                displayed = self._displayed_toolbar_buttons(window)
+                if displayed is not None:
+                    return "wnd[%s]/%s" % (window, suffix) in displayed
+            return found
         return (present("tbar[0]/btn[0]") and not present("tbar[0]/btn[12]")
                 and not present("usr/btnSPOP-OPTION1"))
+
+    def _displayed_toolbar_buttons(self, window):
+        """Les boutons AFFICHÉS de la barre ``wnd[window]/tbar[0]``, en ids
+        relatifs (``wnd[1]/tbar[0]/btn[0]``), lus dans ses enfants ; ``None``
+        quand la barre ou ses enfants sont illisibles."""
+        marker = "wnd[%s]/tbar[0]/" % window
+        try:
+            children = self.session.findById("wnd[%s]/tbar[0]" % window).Children
+            ids = [str(children.ElementAt(index).Id) for index in range(children.Count)]
+        except (AttributeError, com_error, TypeError):
+            return None
+        return {marker + child_id.split(marker, 1)[1] for child_id in ids if marker in child_id}
 
     def _function_was_excluded(self):
         """Vrai si la barre de statut porte ``00/S/255`` : la dernière
@@ -182,6 +217,12 @@ class WindowKeywords:
         les voies = échec listant ses boutons. Retourne ``True`` quand une
         fenêtre a été refermée.
 
+        Avec ``confirm``, un dialogue ``POPUP_TO_CONFIRM`` (``SAPLSPO1/600``,
+        boutons ``BUTTON_1`` à ``BUTTON_3``) est confirmé par ``BUTTON_1``, sa
+        première réponse, AVANT toute touche : Entrée y presse le bouton par
+        défaut, que l'appelant du dialogue choisit et qui vaut « No » sur
+        l'avertissement d'OBBS. Le bouton pressé est journalisé.
+
         Exemple :
         | `Open System Status`
         | ${closed}=    `Dismiss Modal Window`
@@ -190,6 +231,8 @@ class WindowKeywords:
         window = self._modal_window_argument(window)
         if window is None or not self._window_open(window):
             return False
+        if _as_bool(confirm) and self._press_first_answer(window):
+            return True
         vkey = 0 if _as_bool(confirm) else 12
         buttons = _CONFIRM_BUTTONS if _as_bool(confirm) else _CANCEL_BUTTONS
         attempts = []
@@ -246,7 +289,73 @@ class WindowKeywords:
             "(cliquer le bon par Click Element, ou Click Popup Button)."
             % (window, ", ".join(attempts), available))
 
+    def _press_first_answer(self, window):
+        """Confirme un ``POPUP_TO_CONFIRM`` (``SAPLSPO1/600``) par son bouton
+        ``BUTTON_1``, la première réponse, sans passer par Entrée : Entrée y
+        presse le bouton PAR DÉFAUT, que l'appelant du dialogue choisit
+        (l'avertissement d'OBBS a « No » par défaut, mesuré le 2026-11-02).
+        Rend ``True`` quand le dialogue s'est refermé, ``False`` quand il n'a
+        pas ce bouton (les autres voies prennent alors le relais). Un bouton
+        présent qui ne referme pas le dialogue fait échouer : se rabattre sur
+        Entrée risquerait de répondre « No »."""
+        element_id = "wnd[%s]/usr/btnBUTTON_1" % window
+        try:
+            button = self.session.findById(element_id, False)
+        except (AttributeError, com_error):
+            button = None
+        if button is None:
+            return False
+        try:
+            button.press()
+            outcome = "pressé"
+        except (AttributeError, com_error) as error:
+            outcome = "refusé (%s)" % error
+        self.wait_until_busy_done()
+        if not self._window_open(window):
+            logger.info("Dialogue wnd[%s] confirmé par sa première réponse (%s)."
+                        % (window, element_id))
+            return True
+        self._fail_if_covered(window, [element_id])
+        self.take_screenshot()
+        raise AssertionError(
+            "La fenêtre wnd[%s] est restée ouverte : sa première réponse %s a été %s, et "
+            "Entrée n'est pas tentée (elle presse le bouton par défaut, qui peut être "
+            "« No »). Boutons du modal : %s."
+            % (window, element_id, outcome,
+               ", ".join("%s (%s)" % (b["id"], b["text"] or b["tooltip"])
+                         for b in self.get_modal_buttons(window)) or "aucun"))
+
     def _information_dialog(self, window):
+        """``{text, icon}`` si ``wnd[window]`` est un dialogue d'INFORMATION, sous
+        l'une de ses deux formes (message SAPMSDYP, liste d'information de la
+        connexion), sinon ``None``."""
+        return self._message_information(window) or self._information_list(window)
+
+    def _information_list(self, window):
+        """``{text, icon}`` si ``wnd[window]`` est une LISTE d'information en
+        modal : programme ``SAPMSSY0``, dynpro ``120``, zone utilisateur faite
+        de libellés seulement, aucune question ni Annuler mais un ``btn[0]``.
+        C'est le dialogue « Copyright » que la connexion affiche quand sa langue
+        change d'une connexion à l'autre (mesuré le 2026-11-17 sur a4h, en
+        anglais après l'allemand et l'inverse, jamais deux fois de suite dans la
+        même langue) ; son titre, traduit, n'est jamais lu. ``icon`` est vide."""
+        try:
+            program = (self.session.Info.Program or "").strip().upper()
+            screen = str(self.session.Info.ScreenNumber or "").strip().lstrip("0")
+            children = self.session.findById("wnd[%s]/usr" % window).Children
+            items = [children.ElementAt(index) for index in range(int(children.Count))]
+        except (AttributeError, TypeError, ValueError, com_error):
+            return None
+        if program != _LIST_PROGRAM or screen != _LIST_SCREEN or not items:
+            return None
+        if any(str(getattr(item, "Type", "") or "") != "GuiLabel" for item in items):
+            return None
+        if not self._is_informational_modal(window):
+            return None
+        texts = [str(getattr(item, "Text", "") or "").strip() for item in items]
+        return {"text": " ".join(text for text in texts if text), "icon": ""}
+
+    def _message_information(self, window):
         """``{text, icon}`` si ``wnd[window]`` est le dialogue de message SAPMSDYP
         d'une INFORMATION (icône ``M_INFO``, ``usr/txtMESSTXT1`` présent, aucune
         question ni Annuler), sinon ``None``."""
@@ -278,9 +387,18 @@ class WindowKeywords:
         son icône, jamais à son texte, traduit. Mesuré le 2026-10-21 sur a4h :
         « License expiration date: 04.11.2026 (in 14 days) » suit chaque
         connexion SAP GUI et bloque `Open System Status` tant qu'il est
-        ouvert. Tout autre modal reste en place (message d'erreur ou
+        ouvert. Seconde forme reconnue : la LISTE d'information en modal
+        (programme ``SAPMSSY0``, dynpro ``120``, libellés seulement, un seul
+        bouton Continuer), le dialogue « Copyright » que la connexion affiche
+        quand sa langue change d'une connexion à l'autre (mesuré le 2026-11-17
+        sur a4h) ; avant ce correctif, il restait ouvert et `Open System
+        Status` refusait ensuite. Tout autre modal reste en place (message d'erreur ou
         d'avertissement, question, connexion multiple, changement de mot de
         passe) : le keyword s'arrête au premier qui n'est pas une information.
+        Un bouton de la barre ne compte que s'il y est AFFICHÉ : la fenêtre
+        « aucun IDoc » de WE02 (a4h, 2026-11-03) n'affiche que Continuer et
+        Aide mais garde un Annuler masqué ; avant ce correctif, le keyword la
+        laissait ouverte.
         Un dialogue que son bouton ne referme pas échoue en le nommant, comme
         plus de ``max_dialogs`` à la suite.
 

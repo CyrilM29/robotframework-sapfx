@@ -133,6 +133,47 @@ def plain_rfc_parameters(params: Mapping[str, Any]) -> dict[str, Any]:
     return {str(name): plain_rfc_value(value) for name, value in params.items()}
 
 
+#: Les attributs d'une connexion qui distinguent le SYSTÈME joint, au-delà de
+#: son identifiant : deux conteneurs du banc annoncent tous deux ``A4H``, et
+#: se séparent par leur release et leur kernel (et l'adresse jointe).
+PARTNER_IDENTITY_KEYS = ("partnerHost", "partnerIP", "partnerRel", "kernelRel", "sysNumber")
+
+
+def partner_identity(attributes: Mapping[str, Any]) -> tuple[str, tuple[str, ...]]:
+    """``(identifiant système, identité du système joint)`` lus dans les
+    attributs d'une connexion RFC (``get_connection_attributes``)."""
+    system_id = str(attributes.get("sysId", "")).strip()
+    return system_id, tuple(str(attributes.get(key, "")).strip() for key in PARTNER_IDENTITY_KEYS)
+
+
+class DescriptionCacheGuard:
+    """Les systèmes joints par un processus, rangés par identifiant système.
+
+    Le SDK NW RFC garde les descriptions de modules fonction en cache par
+    IDENTIFIANT SYSTÈME, pour tout le processus. Deux systèmes qui partagent
+    cet identifiant s'y confondent : mesuré le 2026-11-19 sur le banc,
+    ``BAPI_USER_GET_DETAIL`` décrit sur la 754 puis appelé sur la 758 avec
+    ``EXTUID_GET``, paramètre propre à la 758, est refusé côté client
+    (``RFC_INVALID_PARAMETER``, « field 'EXTUID_GET' not found »). Un
+    identifiant vu pour DEUX systèmes différents est ambigu : l'appelant
+    retire alors la description du cache avant chaque appel. Un identifiant
+    qui ne désigne qu'un système, même par plusieurs connexions, ne coûte
+    rien."""
+
+    def __init__(self) -> None:
+        self._seen: dict[str, set[tuple[str, ...]]] = {}
+
+    def record(self, system_id: str, partner: tuple[str, ...]) -> None:
+        if system_id:
+            self._seen.setdefault(system_id, set()).add(partner)
+
+    def is_ambiguous(self, system_id: str) -> bool:
+        return len(self._seen.get(system_id, ())) > 1
+
+    def systems(self, system_id: str) -> int:
+        return len(self._seen.get(system_id, ()))
+
+
 def rfc_error_code(error: BaseException) -> str:
     """Le **code technique** d'un refus RFC, ou la chaîne vide s'il n'en porte
     pas. Les exceptions `pyrfc` exposent ce code dans leur attribut ``key``

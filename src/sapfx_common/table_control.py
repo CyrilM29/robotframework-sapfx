@@ -11,7 +11,7 @@ d'une ligne absolue. Le pilotage COM vit dans le mixin.
 """
 from __future__ import annotations
 
-from typing import Sequence
+from typing import Mapping, Sequence
 
 
 def unique_titles(raw_titles: Sequence[str]) -> list[str]:
@@ -128,3 +128,20 @@ def window_for_row(row: int, total_rows: int, visible_rows: int) -> tuple[int, i
     max_position = max(0, total_rows - visible_rows)
     position = min(row - (row % visible_rows), max_position)
     return position, row - position
+
+
+def drop_trailing_blank_rows(rows: Sequence[Mapping[str, str]]) -> list[dict[str, str]]:
+    """Les lignes lues, sans les lignes ENTIÈREMENT vides qui les suivent.
+
+    Un table control réserve des lignes de deux façons. Sur SE11, une ligne
+    réservée n'a aucune cellule (``GetCell`` lève) et la lecture s'arrête là.
+    Sur RSA7 (mesuré le 2026-11-07, 754 et 758), les 17 lignes visibles sont
+    MATÉRIALISÉES avec des cellules vides, un bouton par ligne compris, alors
+    que la table ne porte aucune donnée : sans ce filtre, elles sortaient
+    comme 17 lignes réelles. Seules les lignes vides de FIN sont retirées :
+    une ligne vide suivie d'une ligne remplie est une donnée telle que
+    l'écran l'affiche, et la retirer décalerait les indices en silence."""
+    kept = [dict(row) for row in rows]
+    while kept and not any(value for value in kept[-1].values()):
+        kept.pop()
+    return kept

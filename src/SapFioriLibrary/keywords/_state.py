@@ -31,7 +31,7 @@ from .._ui5_js import (
     UI5_RUNTIME_PROBE_JS,
     UI5_THEME_PROBE_JS,
 )
-from .._ui5_runtime import applied_theme
+from .._ui5_theme import applied_theme_from
 from typing import TYPE_CHECKING, Literal, Any
 
 
@@ -276,17 +276,33 @@ class StateKeywords:
         est mesurable. ``requested`` est le thème que le runtime a reçu ordre
         d'appliquer (module ``sap/ui/core/Theming``, repli sur la configuration
         du Core hérité que UI5 2.x supprime) ; ``applied`` est celui que le
-        document porte réellement, extrait de la classe technique
-        ``sapUiTheme-<clé>`` de ``<html>``.
+        document a réellement CHARGÉ, lu sur les feuilles de thème actives
+        (``<link id="sap-ui-theme-…">``, la clé étant le DERNIER segment
+        ``…/themes/<clé>/`` de l'adresse, une racine de thème du référentiel
+        ABAP en portant deux), la classe technique ``sapUiTheme-<clé>`` de
+        ``<html>`` n'étant qu'un repli quand la page n'a aucune feuille de
+        thème. ``applied`` est VIDE, jamais le premier venu, dans trois cas :
+        une feuille encore en attente de chargement, des feuilles de plusieurs
+        thèmes, plusieurs classes de thème sans feuille. Mesuré le 2026-11-16 :
+        sur le Demo Kit OpenUI5, la classe et l'adresse des feuilles basculent
+        ensemble vers la cible et les feuilles se chargent jusqu'à une seconde
+        et demie plus tard, pendant lesquelles l'écran montre encore l'ancien
+        thème ; le launchpad SAPUI5 1.120.15 d'ABAP Platform 2023 garde
+        ``sapUiTheme-sap_belize`` à côté de ``sapUiTheme-sap_horizon`` alors
+        qu'il n'affiche et ne charge que Horizon. Deux limites : une feuille en
+        ÉCHEC (404) porte elle aussi un ``sheet`` sous Chromium, donc elle est
+        tenue pour chargée et ``applied`` peut nommer un thème qu'une
+        bibliothèque n'a pas ; et une bibliothèque qui retomberait sur un thème
+        de repli rendrait ``applied`` vide en permanence (une attente échoue
+        alors, jamais en silence).
 
         Le témoin *locale-safe* d'un changement de thème (convention n°3) :
         l'entrée de menu qui l'a choisi porte un libellé traduit, la clé
-        technique ``sap_horizon_dark`` non. Relevé live sur le Demo Kit OpenUI5
-        (2026-08-30) : juste après le clic, ``applied`` est VIDE le temps que le
-        runtime échange les feuilles de style, alors que ``requested`` porte déjà
-        la cible. Asserter le thème demande donc d'attendre la valeur voulue,
-        jamais de lire une fois. Lecture pure (aucune injection du bundle, donc
-        aucune instrumentation de la page), respecte la portée de frame.
+        technique ``sap_horizon_dark`` non. ``requested`` porte la cible dès le
+        clic, ``applied`` ne la porte qu'une fois les feuilles chargées :
+        asserter le thème demande donc d'attendre la valeur voulue, jamais de
+        lire une fois. Lecture pure (aucune injection du bundle, donc aucune
+        instrumentation de la page), respecte la portée de frame.
 
         Exemple :
         | ${theme}=    `Get Ui5 Theme`
@@ -296,7 +312,7 @@ class StateKeywords:
         if not isinstance(result, dict):
             return {"requested": "", "applied": ""}
         return {"requested": str(result.get("requested") or ""),
-                "applied": applied_theme(result.get("classes"))}
+                "applied": applied_theme_from(result.get("classes"), result.get("sheets"))}
 
     def get_ui5_messages(self, include_toasts: bool = True):
         """Lit les *messages UI5* de la page : le MessageManager (module

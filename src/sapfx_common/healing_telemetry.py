@@ -39,13 +39,15 @@ def telemetry_path() -> Optional[str]:
 
 def record_healing(channel: str, original: str, healed: str,
                    score: Optional[float] = None,
-                   engine: Optional[str] = None) -> bool:
+                   engine: Optional[str] = None,
+                   resolved: Optional[str] = None) -> bool:
     """Consigne une réparation de localisateur dans le journal JSONL.
 
     ``channel`` identifie le canal (``ecc`` / ``fiori``), ``original`` le
     localisateur primaire qui a dérivé, ``healed`` ce qui a été retenu à la
     place ; ``score`` (ECC : similarité [0,1]) et ``engine`` (Fiori : moteur de
-    repli, xpath/sid/wc) sont facultatifs. Retourne ``True`` si une ligne a été
+    repli, xpath/sid/wc) sont facultatifs, comme ``resolved`` (Fiori : le
+    contrôle réellement retenu, ``css=[id="..."]``, depuis le 2026-11-18). Retourne ``True`` si une ligne a été
     écrite, ``False`` sinon (désactivé ou erreur d'E/S, jamais d'exception)."""
     path = telemetry_path()
     if not path:
@@ -60,6 +62,8 @@ def record_healing(channel: str, original: str, healed: str,
         event["score"] = round(float(score), 3)
     if engine:
         event["engine"] = engine
+    if resolved:
+        event["resolved"] = resolved
     try:
         with _lock, open(path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")

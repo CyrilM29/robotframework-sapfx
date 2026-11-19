@@ -209,7 +209,11 @@ cumulatif `SAPFX_HEALING_LOG` s'il est configuré ; voir
 `sapfx_common.healing_telemetry`). Les échecs listent ce que *chaque* moteur a
 tenté ; les échecs role ajoutent un indice au niveau du type (« N contrôle(s) de
 ce type SONT rendus » vs « aucun ») pour distinguer une mauvaise propriété d'un
-mauvais type de contrôle.
+mauvais type de contrôle. Depuis la 0.8.7, une forme de repli qui désigne
+PLUSIEURS contrôles est refusée (« ambiguous repair ») et la forme suivante est
+essayée : `//Button` « réparait » le bouton Go d'une liste Fiori Elements vers
+le sélecteur de variante, le premier de neuf boutons. La ligne du journal nomme
+le contrôle retenu (`resolved`).
 
 ### Fiori Elements : `idSuffix` stable
 

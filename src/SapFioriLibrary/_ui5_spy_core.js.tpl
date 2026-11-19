@@ -248,6 +248,21 @@
   function startUrl() {
     try { return sessionStorage.getItem(URL_KEY) || location.href; } catch (e) { return location.href; }
   }
+  // La LANGUE du navigateur au début du record, même cycle de vie que l'URL : les exports
+  // la fixent (New Context), sinon le rejeu prend celle du poste. Constaté le 2026-10-28 :
+  // enregistré en en-US, rejoué sur un poste français, l'export lisait « Voyages (91) ».
+  var LOCALE_KEY = '__ui5RecorderLocale';
+  function rememberLocale() {
+    try {
+      if (!sessionStorage.getItem(LOCALE_KEY)) sessionStorage.setItem(LOCALE_KEY, navigator.language || '');
+    } catch (e) { warnStorage(e); }
+  }
+  // Une étiquette BCP 47 seulement (elle devient une cellule Robot) : sinon, pas de New Context.
+  function recordedLocale() {
+    var tag = '';
+    try { tag = sessionStorage.getItem(LOCALE_KEY) || navigator.language || ''; } catch (e) { tag = navigator.language || ''; }
+    return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/.test(tag) ? tag : '';
+  }
 
   // --- panneau intégré listant les sélecteurs capturés -----------------------
   var captures = [];

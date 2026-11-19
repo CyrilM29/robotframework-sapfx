@@ -345,7 +345,10 @@ UI5_THEME_PROBE_JS = (
     "if (cfg && typeof cfg.getTheme === 'function') requested = String(cfg.getTheme() || ''); } "
     "catch (e) {} } "
     "return { requested: requested, "
-    "classes: String(document.documentElement.className || '') }; }")
+    "classes: String(document.documentElement.className || ''), "
+    "sheets: Array.from(document.querySelectorAll('link[id^=\"sap-ui-theme-\"]'))"
+    ".filter(l => !l.disabled)"
+    ".map(l => ({ href: String(l.getAttribute('href') || ''), loaded: !!l.sheet })) }; }")
 
 IFRAMES_PROBE_JS = (
     "() => Array.from(document.querySelectorAll('iframe'))"
@@ -381,11 +384,20 @@ def sid_xpath(sid):
     On compare donc avec deux ``contains()`` XPath, un par encodage. ``sid`` ne doit jamais
     contenir de guillemet (les ids SAP GUI n'en ont jamais) : un guillemet casserait le
     littéral XPath et pourrait rediriger le sélecteur vers un élément arbitraire de la page,
-    donc on le rejette plutôt que de l'interpoler tel quel."""
+    donc on le rejette plutôt que de l'interpoler tel quel.
+
+    Le sélecteur vise l'élément porteur LE PLUS PROFOND : celui dont aucun descendant ne
+    porte le même SID (backlog 2.113, mesuré le 2026-11-17 sur la 754 et la 758). Dans une
+    table control, le WebGUI pose le SID d'une cellule sur la cellule ``TD`` ET sur son
+    contenu (un ``SPAN`` en affichage, le champ en modification) : sans cette règle, la
+    bibliothèque Browser trouvait deux éléments et refusait en mode strict. Deux éléments
+    distincts NON emboîtés restent deux correspondances : une vraie ambiguïté, signalée par
+    Browser, jamais tranchée en silence."""
     if "'" in sid or '"' in sid:
         raise ValueError("Invalid SAP GUI SID (must not contain a quote character): %r" % sid)
-    return ("xpath=//*[contains(@lsdata, '\"SID\":\"%s\"')"
-            " or contains(@lsdata, \"SID:'%s'\")]" % (sid, sid))
+    porte = ("contains(@lsdata, '\"SID\":\"%s\"')"
+             " or contains(@lsdata, \"SID:'%s'\")" % (sid, sid))
+    return "xpath=//*[%s][not(.//*[%s])]" % (porte, porte)
 
 
 # Extrait Spy DevTools autonome, généré depuis le même BUNDLE afin que la logique de capture
